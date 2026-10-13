@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { MatrixDrafts } from './permission-matrix-draft'
+import type { PermissionRoleChange } from '@/api/modules/system-permission'
 import type { PermissionItem, RoleManageItem, RoleStatus } from '@/api/modules/system-role'
-import { permissionCategoryMeta, permissionCategoryOf, permissionResourceOf } from '@/utils/permission-catalog'
+import { permissionCategoryMeta, permissionCategoryOf, permissionResourceLabels, permissionResourceOf } from '@/utils/permission-catalog'
 import {
   MATRIX_PERMISSION_PAGE_SIZE,
   MATRIX_ROLE_PAGE_SIZE,
@@ -11,19 +13,45 @@ import {
   matrixPermissions,
   matrixRoles,
 } from './permission-matrix'
+import { matrixDraftTarget, matrixSaveChanges, reconcileMatrixDrafts, setMatrixGrants, toggleMatrixGrant } from './permission-matrix-draft'
 
 const props = defineProps<{
   roles: RoleManageItem[]
   permissions: PermissionItem[]
   loading: boolean
+  saving?: boolean
 }>()
 
 const emit = defineEmits<{
   editRole: [role: RoleManageItem]
+  saveChanges: [changes: PermissionRoleChange[]]
+  dirtyChange: [dirty: boolean]
+  inspectPermission: [code: string]
 }>()
 
 const { auth } = useAppAuth()
+const modal = useYdModal()
 const canEdit = computed(() => auth('system:role:edit'))
+const editMode = ref(false)
+const drafts = ref<MatrixDrafts>({})
+const bulkRoleId = ref<string | number>()
+const previewVisible = ref(false)
+const previewChanges = ref<PermissionRoleChange[]>([])
+const activeCodeSet = computed(() => new Set(props.permissions.filter(item => item.status === 'ACTIVE').map(item => item.code)))
+const dirtyRoles = computed(() => Object.values(drafts.value))
+const conflicts = computed(() => dirtyRoles.value.filter(item => item.conflict))
+const saveableChanges = computed(() => matrixSaveChanges(drafts.value))
+const dirty = computed(() => dirtyRoles.value.length > 0)
+const busy = computed(() => props.loading || props.saving)
+const previewCurrent = computed(() => JSON.stringify(previewChanges.value) === JSON.stringify(saveableChanges.value))
+const permissionIndex = computed(() => new Map(props.permissions.map(item => [item.code, item])))
+const resourceLabels = computed(() => permissionResourceLabels(props.permissions))
+const bulkRole = computed(() => props.roles.find(role => role.id === bulkRoleId.value))
+const bulkRoleOptions = computed(() => props.roles.map(role => ({
+  label: `${role.name} · ${role.code}${role.deptName ? ` · ${role.deptName}` : ''}${role.status === 'DEPRECATED' ? '（停用）' : ''}`,
+  value: role.id,
+  disabled: role.systemType === 'SUPER_ADMIN' || role.permissions.includes('*') || !!drafts.value[role.id]?.conflict,
+})))
 const permissionKeyword = ref('')
 const roleKeyword = ref('')
 const selectedDomain = ref('')
@@ -39,7 +67,7 @@ const permissionPageSize = ref(MATRIX_PERMISSION_PAGE_SIZE)
 const domainOptions = computed(() => {
   const domains = new Map<string, string>()
   matrixPermissions(props.permissions).forEach((item) => {
-    const resource = permissionResourceOf(item)
+    const resource = permissionResourceOf(item, resourceLabels.value)
     domains.set(resource.domainKey, resource.domainLabel)
   })
   return [{ label: '全部业务域', value: '' }, ...Array.from(domains, ([value, label]) => ({ label, value }))]
@@ -47,7 +75,7 @@ const domainOptions = computed(() => {
 const resourceOptions = computed(() => {
   const resources = new Map<string, string>()
   matrixPermissions(props.permissions, { domain: selectedDomain.value }).forEach((item) => {
-    const resource = permissionResourceOf(item)
+    const resource = permissionResourceOf(item, resourceLabels.value)
     resources.set(resource.key, resource.label)
   })
   return [{ label: '全部资源', value: '' }, ...Array.from(resources, ([value, label]) => ({ label, value }))]
@@ -90,14 +118,14 @@ const visiblePermissions = computed(() => matrixPage(filteredPermissions.value, 
 const groups = computed(() => {
   const grouped = new Map<string, { key: string, label: string, domainLabel: string, permissions: PermissionItem[] }>()
   visiblePermissions.value.forEach((permission) => {
-    const resource = permissionResourceOf(permission)
+    const resource = permissionResourceOf(permission, resourceLabels.value)
     const group = grouped.get(resource.key) || { key: resource.key, label: resource.label, domainLabel: resource.domainLabel, permissions: [] }
     group.permissions.push(permission)
     grouped.set(resource.key, group)
   })
   return Array.from(grouped.values())
 })
-const grantSets = computed(() => new Map(visibleRoles.value.map(role => [role.id, new Set(role.permissions)])))
+const grantSets = computed(() => new Map(visibleRoles.value.map(role => [role.id, new Set(drafts.value[role.id] ? matrixDraftTarget(drafts.value[role.id]) : role.permissions)])))
 const emptyMessage = computed(() => {
   if (!props.roles.length) {
     return '暂无角色，可通过新增角色建立权限配置。'
@@ -117,16 +145,129 @@ watch(() => filteredRoles.value.length, (total) => {
 watch(() => filteredPermissions.value.length, (total) => {
   permissionPage.value = Math.min(permissionPage.value, Math.max(1, Math.ceil(total / MATRIX_PERMISSION_PAGE_SIZE)))
 })
+watch([() => props.roles, () => props.permissions], ([roles]) => {
+  drafts.value = reconcileMatrixDrafts(drafts.value, roles, activeCodeSet.value)
+}, { deep: true })
+watch(dirty, value => emit('dirtyChange', value), { immediate: true })
 
 function stateOf(role: RoleManageItem, permission: PermissionItem) {
   return matrixGrantState(role, permission.code, grantSets.value.get(role.id))
 }
 
 function editRole(role: RoleManageItem) {
-  if (canEdit.value) {
+  if (canEdit.value && !props.saving) {
     emit('editRole', role)
   }
 }
+
+function cellChange(role: RoleManageItem, code: string) {
+  return drafts.value[role.id]?.grant.includes(code) ? '待授予' : drafts.value[role.id]?.revoke.includes(code) ? '待撤销' : ''
+}
+
+function cellLabel(role: RoleManageItem, permission: PermissionItem) {
+  const change = cellChange(role, permission.code)
+  const state = change ? `${role.name} · ${permission.name}：草稿${change}，尚未保存${role.status === 'DEPRECATED' ? '；角色停用，配置未生效' : ''}` : matrixGrantLabel(role, permission, stateOf(role, permission))
+  return `${state}${role.systemType === 'SUPER_ADMIN' ? '；超级管理员通配授权不可编辑' : role.permissions.includes('*') ? '；配置含通配，单项改动无法限制授权，需原权限树处理' : drafts.value[role.id]?.conflict ? '；授权冲突，请先复位此角色' : editMode.value ? '；点击切换待保存授权' : ''}`
+}
+
+function cellDisabled(role: RoleManageItem) {
+  return !canEdit.value || busy.value || role.systemType === 'SUPER_ADMIN' || role.permissions.includes('*') || !!drafts.value[role.id]?.conflict
+}
+
+function grantIcon(role: RoleManageItem, permission: PermissionItem) {
+  const state = stateOf(role, permission)
+  return state === 'super-admin' || state === 'configured-wildcard' ? 'morph:shield-check' : state === 'assigned' ? 'morph:check' : 'morph:minus'
+}
+
+function toggleCell(role: RoleManageItem, permission: PermissionItem) {
+  if (editMode.value && !cellDisabled(role)) {
+    drafts.value = toggleMatrixGrant(drafts.value, role, permission.code, activeCodeSet.value)
+  }
+}
+
+function applyBulk(assigned: boolean) {
+  if (!editMode.value || !bulkRole.value || cellDisabled(bulkRole.value)) {
+    return
+  }
+  drafts.value = setMatrixGrants(drafts.value, bulkRole.value, filteredPermissions.value.map(item => item.code), assigned, activeCodeSet.value)
+}
+
+function discardChanges() {
+  drafts.value = {}
+  previewVisible.value = false
+}
+
+function confirmDiscard(leaveMode = false) {
+  if (props.saving) {
+    return
+  }
+  if (!dirty.value) {
+    if (leaveMode) {
+      editMode.value = false
+    }
+    return
+  }
+  modal.confirm({
+    title: leaveMode ? '返回只读矩阵' : '丢弃授权草稿',
+    content: `将丢弃 ${dirtyRoles.value.length} 个角色尚未保存的授权变更，服务器授权保持原样。`,
+    confirmButtonText: '丢弃草稿',
+    onConfirm: () => {
+      if (props.saving) {
+        return
+      }
+      discardChanges()
+      if (leaveMode) {
+        editMode.value = false
+      }
+    },
+  })
+}
+
+function resetRoleDraft(roleId: string) {
+  const draft = drafts.value[roleId]
+  if (!draft || props.saving) {
+    return
+  }
+  modal.confirm({
+    title: '复位此角色草稿',
+    content: `只丢弃「${draft.roleName}（${draft.roleCode}）」的未保存变更，其他角色草稿保留。`,
+    confirmButtonText: '复位此角色',
+    onConfirm: () => {
+      if (props.saving) {
+        return
+      }
+      const kept = { ...drafts.value }
+      delete kept[roleId]
+      drafts.value = kept
+    },
+  })
+}
+
+function openSavePreview() {
+  drafts.value = reconcileMatrixDrafts(drafts.value, props.roles, activeCodeSet.value)
+  if (!canEdit.value || busy.value || !saveableChanges.value.length) {
+    return
+  }
+  previewChanges.value = matrixSaveChanges(drafts.value)
+  previewVisible.value = true
+}
+
+function submitChanges() {
+  if (canEdit.value && !busy.value && previewCurrent.value && previewChanges.value.length) {
+    emit('saveChanges', previewChanges.value.map(change => ({ ...change, expectedPermissions: [...change.expectedPermissions], grant: [...change.grant], revoke: [...change.revoke] })))
+  }
+}
+
+function conflictMessage(kind: string | undefined) {
+  return kind === 'missing' ? '角色已不可用' : kind === 'protected' ? '角色已变为受保护的超级管理员' : kind === 'wildcard' ? '配置含通配，需原权限树处理' : kind === 'catalog' ? '变更涉及已失效权限，复位后保留这些原授权' : '服务器授权已变化，原基线与当前配置不一致'
+}
+
+function previewRole(roleId: string) {
+  const draft = drafts.value[roleId]
+  return draft ? `${draft.roleName} · ${draft.roleCode}` : props.roles.find(role => role.id === roleId)?.name || roleId
+}
+
+defineExpose({ discardChanges, hasUnsavedChanges: () => dirty.value })
 
 function resetFilters() {
   permissionKeyword.value = ''
@@ -140,7 +281,7 @@ function resetFilters() {
 </script>
 
 <template>
-  <section class="permission-matrix" aria-label="只读权限矩阵" :aria-busy="loading">
+  <section class="permission-matrix" :aria-label="editMode ? '编辑权限矩阵' : '只读权限矩阵'" :aria-busy="busy">
     <div class="matrix-intro">
       <div>
         <h2 class="text-base font-semibold">
@@ -150,16 +291,73 @@ function resetFilters() {
           对照角色保存的权限配置。用户实际权限按当前所选部门和角色判定；停用角色的配置未生效。
         </p>
       </div>
-      <YdTag variant="outline">
-        只读
-      </YdTag>
+      <div class="flex flex-wrap gap-2 items-center justify-end">
+        <YdTag variant="outline">
+          {{ editMode ? '编辑授权' : '只读' }}
+        </YdTag>
+        <YdButton v-if="!editMode && canEdit" variant="outline" :disabled="busy" @click="editMode = true">
+          <YdIcon name="morph:square-pen" />编辑授权
+        </YdButton>
+        <YdButton v-if="editMode" variant="outline" :disabled="saving" @click="confirmDiscard(true)">
+          返回只读
+        </YdButton>
+      </div>
+    </div>
+
+    <YdAlert v-if="editMode" title="修改先保存在草稿中" description="点击单元格切换授权；筛选与分页保留草稿。保存前会逐角色预览，停用角色允许修改配置但不会生效。超级管理员与配置含通配的角色不能在矩阵编辑，需通过原权限树处理。" />
+    <YdAlert v-if="editMode && !canEdit" variant="destructive" title="当前账号没有角色编辑权限" description="草稿已保留，恢复权限后可继续，或丢弃草稿返回只读。" />
+
+    <div v-if="editMode" class="matrix-edit-toolbar">
+      <div class="matrix-bulk-scope">
+        <span class="matrix-description">单角色批量操作</span>
+        <YdCombobox v-model="bulkRoleId" :options="bulkRoleOptions" clearable virtual-list :disabled="busy || !canEdit" placeholder="选择一个角色（名称 / 编码）" aria-label="选择批量授权目标角色" />
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <YdButton variant="outline" size="sm" :disabled="!bulkRole || cellDisabled(bulkRole) || !filteredPermissions.length" @click="applyBulk(true)">
+          授予筛选权限
+        </YdButton>
+        <YdButton variant="outline" size="sm" :disabled="!bulkRole || cellDisabled(bulkRole) || !filteredPermissions.length" @click="applyBulk(false)">
+          撤销筛选权限
+        </YdButton>
+      </div>
+      <p class="matrix-description w-full">
+        仅作用于所选角色的 {{ filteredPermissions.length }} 项筛选匹配权限，包含全部权限分页；其他角色、未匹配权限和暂失效授权均保留。{{ bulkRole?.status === 'DEPRECATED' ? '目标角色停用，修改配置不会使其生效。' : '' }}
+      </p>
+    </div>
+
+    <div v-if="dirty" class="matrix-draft-summary">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <span>{{ dirtyRoles.length }} 个角色待保存 · 新增 {{ dirtyRoles.reduce((total, draft) => total + draft.grant.length, 0) }} 项 · 撤销 {{ dirtyRoles.reduce((total, draft) => total + draft.revoke.length, 0) }} 项</span>
+        <div class="flex flex-wrap gap-2">
+          <YdButton variant="outline" size="sm" :disabled="saving" @click="confirmDiscard()">
+            丢弃全部草稿
+          </YdButton>
+          <YdButton size="sm" :loading="saving" :disabled="!canEdit || busy || !saveableChanges.length" @click="openSavePreview">
+            预览并保存{{ conflicts.length ? '无冲突角色' : '' }}
+          </YdButton>
+        </div>
+      </div>
+      <p v-if="conflicts.length" class="matrix-description">
+        {{ conflicts.length }} 个角色发生冲突，保留原草稿并停止保存这些角色；复位后可依据最新授权重新编辑。
+      </p>
+      <div class="mt-3 flex flex-col gap-2">
+        <div v-for="draft in dirtyRoles" :key="draft.roleId" class="flex flex-wrap gap-2 items-center">
+          <YdTag :variant="draft.conflict ? 'destructive' : 'outline'">
+            {{ draft.roleName }} · {{ draft.roleCode }}
+          </YdTag>
+          <span class="matrix-description">+{{ draft.grant.length }} / −{{ draft.revoke.length }}{{ draft.conflict ? ` · ${conflictMessage(draft.conflict)}` : '' }}</span>
+          <YdButton variant="ghost" size="sm" :disabled="saving" @click="resetRoleDraft(draft.roleId)">
+            复位此角色
+          </YdButton>
+        </div>
+      </div>
     </div>
 
     <div class="matrix-filters">
-      <label class="matrix-filter">
+      <YdLabel class="matrix-filter">
         <span>角色</span>
         <YdInput v-model="roleKeyword" clearable placeholder="角色名称 / 编码" aria-label="搜索角色名称或编码" class="w-full" />
-      </label>
+      </YdLabel>
       <div class="matrix-filter">
         <span>部门</span>
         <YdSelect v-model="selectedDept" :options="deptOptions" aria-label="筛选角色所属部门" class="w-full" />
@@ -180,10 +378,10 @@ function resetFilters() {
         <span>动作分类</span>
         <YdSelect v-model="selectedCategory" :options="categoryOptions" aria-label="筛选权限动作分类" class="w-full" />
       </div>
-      <label class="matrix-filter">
+      <YdLabel class="matrix-filter">
         <span>权限</span>
         <YdInput v-model="permissionKeyword" clearable placeholder="权限名称 / 编码" aria-label="搜索权限名称或编码" class="w-full" />
-      </label>
+      </YdLabel>
       <YdButton variant="outline" class="self-end" @click="resetFilters">
         重置
       </YdButton>
@@ -193,23 +391,22 @@ function resetFilters() {
       <span><YdIcon name="morph:check" aria-hidden="true" /> 已授权</span>
       <span><YdIcon name="morph:minus" aria-hidden="true" /> 未授权</span>
       <span><YdIcon name="morph:shield-check" aria-hidden="true" /> 超级管理员 · 全部权限</span>
-      <span class="matrix-description">点击角色标题进入原有编辑与权限树</span>
+      <span><YdIcon name="morph:shield-check" aria-hidden="true" /> 配置含通配 · 需原权限树处理</span>
+      <span class="matrix-description">点击权限名称查看细则；点击角色标题进入原有编辑与权限树</span>
     </div>
 
     <div v-if="loading" class="matrix-empty" role="status">
-      <YdIcon name="morph:loader-circle" class="animate-spin" aria-hidden="true" />
-      正在加载权限矩阵…
+      <YdLoading :size="24" text="正在加载权限矩阵…" />
     </div>
     <div v-else-if="!filteredRoles.length || !filteredPermissions.length" class="matrix-empty" role="status">
-      <YdIcon name="morph:grid-2x2" aria-hidden="true" />
-      {{ emptyMessage }}
+      <YdEmpty icon="morph:grid-2x2" title="暂无匹配配置" :description="emptyMessage" />
     </div>
     <template v-else>
       <!-- 权限矩阵有双向表头与逐列角色操作，使用语义 table 保持固定标题和屏幕阅读器关联。 -->
       <div class="matrix-scroll" tabindex="0" role="region" aria-label="角色与权限对照表，可横向和纵向滚动">
         <table class="matrix-table">
           <caption class="sr-only">
-            只读角色权限配置。行是权限，列是角色；停用角色的配置未生效。
+            角色权限配置。行是权限，列是角色；停用角色的配置未生效。{{ editMode ? '编辑模式，单元格可以切换待保存授权。' : '只读模式。' }}
           </caption>
           <thead>
             <tr>
@@ -222,7 +419,7 @@ function resetFilters() {
                   variant="ghost"
                   size="sm"
                   class="matrix-role-button"
-                  :disabled="!canEdit"
+                  :disabled="!canEdit || saving"
                   :aria-label="canEdit ? `编辑角色 ${role.name}，打开原有权限树` : `角色 ${role.name}，无编辑权限`"
                   :title="canEdit ? `编辑 ${role.name}` : '当前账号没有角色编辑权限'"
                   @click="editRole(role)"
@@ -238,6 +435,12 @@ function resetFilters() {
                 <YdTag v-else-if="role.systemType === 'SUPER_ADMIN'" variant="outline" class="mt-1">
                   超级管理员
                 </YdTag>
+                <YdTag v-if="role.systemType !== 'SUPER_ADMIN' && role.permissions.includes('*')" variant="outline" class="mt-1">
+                  配置含通配 · 需原权限树处理
+                </YdTag>
+                <YdTag v-if="drafts[role.id]?.conflict" variant="destructive" class="mt-1">
+                  授权冲突
+                </YdTag>
               </th>
             </tr>
           </thead>
@@ -250,7 +453,9 @@ function resetFilters() {
             <tr v-for="permission in group.permissions" :key="permission.code">
               <th scope="row" class="matrix-permission-cell" :title="permission.desc || permission.name">
                 <div class="flex flex-wrap gap-2 items-center">
-                  <span>{{ permission.name }}</span>
+                  <YdButton variant="ghost" size="sm" class="matrix-permission-button" :aria-label="`查看权限细则：${permission.name}`" @click="emit('inspectPermission', permission.code)">
+                    {{ permission.name }}
+                  </YdButton>
                   <YdTag :variant="permissionCategoryOf(permission.code).variant">
                     {{ permissionCategoryOf(permission.code).label }}
                   </YdTag>
@@ -262,7 +467,20 @@ function resetFilters() {
                 :key="role.id"
                 :class="{ 'matrix-disabled': role.status === 'DEPRECATED' }"
               >
+                <YdButton
+                  v-if="editMode"
+                  size="icon-sm"
+                  :variant="stateOf(role, permission) === 'unassigned' ? 'ghost' : 'secondary'"
+                  :disabled="cellDisabled(role)"
+                  :aria-pressed="stateOf(role, permission) !== 'unassigned'"
+                  :aria-label="cellLabel(role, permission)"
+                  :title="cellLabel(role, permission)"
+                  @click="toggleCell(role, permission)"
+                >
+                  <YdIcon :name="grantIcon(role, permission)" aria-hidden="true" />
+                </YdButton>
                 <span
+                  v-else
                   class="matrix-grant"
                   :class="{ 'matrix-granted': stateOf(role, permission) !== 'unassigned' }"
                   role="img"
@@ -270,10 +488,11 @@ function resetFilters() {
                   :title="matrixGrantLabel(role, permission, stateOf(role, permission))"
                 >
                   <YdIcon
-                    :name="stateOf(role, permission) === 'super-admin' ? 'morph:shield-check' : stateOf(role, permission) === 'assigned' ? 'morph:check' : 'morph:minus'"
+                    :name="grantIcon(role, permission)"
                     aria-hidden="true"
                   />
                 </span>
+                <small v-if="cellChange(role, permission.code)">{{ cellChange(role, permission.code) }}</small>
               </td>
             </tr>
           </tbody>
@@ -291,6 +510,48 @@ function resetFilters() {
         </div>
       </div>
     </template>
+
+    <YdModal
+      v-model="previewVisible"
+      title="确认授权变更"
+      description="以下是逐角色的操作意图；未列出的权限保持原样。"
+      show-cancel-button
+      confirm-button-text="确认保存"
+      :confirm-button-disabled="!canEdit || busy || !previewCurrent || !previewChanges.length"
+      :confirm-button-loading="saving"
+      class="sm:max-w-3xl"
+      @confirm="submitChanges"
+    >
+      <YdAlert v-if="!previewCurrent" variant="destructive" title="授权草稿已变化" description="请关闭此预览，处理冲突后重新预览保存。" />
+      <YdAlert v-if="conflicts.length" title="冲突角色不会提交" :description="`${conflicts.length} 个角色保留草稿，仅保存下面无冲突的角色。`" class="mb-4" />
+      <div class="flex flex-col gap-5">
+        <section v-for="change in previewChanges" :key="change.roleId" class="matrix-preview-role">
+          <h3 class="font-semibold">
+            {{ previewRole(change.roleId) }}
+          </h3>
+          <p class="matrix-description">
+            角色 ID：{{ change.roleId }}{{ roles.find(role => role.id === change.roleId)?.status === 'DEPRECATED' ? ' · 停用角色，配置暂不生效' : '' }}
+          </p>
+          <div v-for="operation in [{ key: 'grant', label: '新增授权', codes: change.grant }, { key: 'revoke', label: '撤销授权', codes: change.revoke }]" :key="operation.key" class="mt-3">
+            <p class="text-sm font-medium">
+              {{ operation.label }} · {{ operation.codes.length }} 项
+            </p>
+            <ul v-if="operation.codes.length" class="matrix-preview-list">
+              <li v-for="code in operation.codes" :key="code" class="flex flex-wrap gap-2 items-center">
+                <YdTag :variant="permissionCategoryOf(code).variant">
+                  {{ permissionCategoryOf(code).label }}{{ permissionCategoryOf(code).key === 'danger' ? ' · 危险权限' : '' }}
+                </YdTag>
+                <span>{{ permissionIndex.get(code)?.name || code }}</span>
+                <span class="matrix-description break-all">{{ code }}</span>
+              </li>
+            </ul>
+            <p v-else class="matrix-description">
+              无
+            </p>
+          </div>
+        </section>
+      </div>
+    </YdModal>
   </section>
 </template>
 
@@ -314,6 +575,40 @@ function resetFilters() {
   font-size: 12px;
   line-height: 1.6;
   color: var(--color-text-3);
+}
+
+.matrix-edit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 12px;
+}
+
+.matrix-bulk-scope {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(100%, 250px);
+}
+
+.matrix-draft-summary,
+.matrix-preview-role {
+  padding: 16px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 12px;
+}
+
+.matrix-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .matrix-filters {
@@ -424,6 +719,14 @@ function resetFilters() {
 .matrix-role-button {
   width: 100%;
   max-width: 184px;
+}
+
+.matrix-permission-button {
+  height: auto;
+  padding: 4px;
+  margin-left: -4px;
+  text-align: left;
+  white-space: normal;
 }
 
 .matrix-role-code {

@@ -22,6 +22,7 @@ const resourceLabels: Record<string, string> = {
   'system:user': '用户管理',
   'system:role': '角色管理',
   'system:dept': '部门管理',
+  'system:file': '文件管理',
   'system:menu': '菜单管理',
   'system:backup': '数据备份',
   'system:about': '关于系统',
@@ -46,6 +47,7 @@ const resourceLabels: Record<string, string> = {
   'platform:agent:tool': 'Agent 工具',
   'platform:agent-skill': 'Agent 技能',
   'platform:ai': 'AI 生成',
+  'platform:ai:tool': 'AI 工具',
   'platform:capability': '平台能力管理',
   'platform:chat': '聊天服务',
   'platform:chat:quota': '聊天配额',
@@ -65,13 +67,26 @@ const resourceLabels: Record<string, string> = {
   'platform:integration': 'HTTP 集成',
   'platform:integration:log': 'HTTP 集成日志',
   'platform:milky': 'QQ 消息平台',
+  'platform:mobile-config': '移动端配置',
   'platform:plugin': '插件管理',
   'platform:plugin-devtools': '插件开发工具',
   'platform:plugin-market-source': '本机插件市场源',
   'platform:plugin-marketplace': '插件市场',
   'platform:render': '消息渲染',
   'platform:wiki': '知识库',
+  'platform:wiki:tool': '知识库工具',
   'mobile:device': '移动设备',
+}
+
+// SystemMenuModule 的入口码与直属按钮实际权限归属；只归一展示资源，叶权限码继续独立保存。
+const resourceAliases: Record<string, string> = {
+  'system:agent-trace': 'system:monitor:agent-trace',
+  'system:api-log': 'system:monitor:api-log',
+  'system:login-log': 'system:monitor:login-log',
+  'system:online-user': 'system:monitor:online',
+  'system:redis-monitor': 'system:monitor:redis',
+  'system:resource-monitor': 'system:monitor:resource',
+  'system:theme': 'system:setting:theme',
 }
 
 export function permissionCategoryOf(code: string): PermissionCategoryMeta {
@@ -80,17 +95,75 @@ export function permissionCategoryOf(code: string): PermissionCategoryMeta {
     || permissionCategoryMeta[permissionCategoryMeta.length - 1]!
 }
 
-export function permissionResourceOf(permission: Pick<PermissionItem, 'code' | 'module'>) {
+function permissionResourceIdentity(permission: Pick<PermissionItem, 'code'>) {
   const parts = permission.code.split(':')
   const valid = parts.length >= 3 && parts.every(part => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(part))
     && (parts[0] !== 'plugin' || parts.length === 3)
   const domainKey = domains[parts[0]!] ? parts[0]! : 'other'
-  const key = valid ? parts.slice(0, -1).join(':') : `legacy:${permission.code}`
-  const module = permission.module?.trim()
-  const meaningfulModule = module && !Object.values(domains).includes(module) && module !== 'default'
+  // 原始导航码是独立授权叶子，但与同资源的动作码归在一起；插件历史嵌套码仍归属稳定插件 owner。
+  const key = parts[0] === 'plugin' && parts[1]
+    ? `plugin:${parts[1]}`
+    : resourceAliases[permission.code]
+      || (Object.hasOwn(resourceLabels, permission.code)
+        ? permission.code
+        : valid ? resourceAliases[parts.slice(0, -1).join(':')] || parts.slice(0, -1).join(':') : `legacy:${permission.code}`)
+  return { key, domainKey, valid }
+}
+
+function permissionModuleLabel(module: string | undefined) {
+  const label = module?.trim().replace(/\s+/g, ' ')
+  return label && !Object.values(domains).includes(label) && label !== 'default' ? label : undefined
+}
+
+/** 按完整目录生成统一资源名，优先可用 owner 模块，再取短名和字典序；过滤或输入顺序不改变标签。 */
+export function permissionResourceLabels(permissions: readonly Pick<PermissionItem, 'code' | 'module' | 'status'>[]): Map<string, string> {
+  const candidates = new Map<string, { label: string, active: boolean, owner: number }[]>()
+  const resourceDomains = new Map<string, string>()
+  for (const permission of permissions) {
+    const { key, domainKey } = permissionResourceIdentity(permission)
+    resourceDomains.set(key, domainKey)
+    if (!candidates.has(key)) {
+      candidates.set(key, [])
+    }
+    const label = permissionModuleLabel(permission.module)
+    if (label) {
+      const owner = permission.code === key ? 2 : key.startsWith('plugin:') && permission.code.split(':').length === 3 ? 1 : 0
+      candidates.get(key)!.push({ label, active: permission.status === 'ACTIVE', owner })
+    }
+  }
+  const labels = new Map([...candidates].sort(([left], [right]) => left.localeCompare(right)).map(([key, names]) => {
+    const preferred = [...names].sort((left, right) => Number(right.active) - Number(left.active)
+      || right.owner - left.owner
+      || left.label.length - right.label.length
+      || left.label.localeCompare(right.label, 'zh-CN'))[0]?.label
+    return [key, resourceLabels[key] || preferred || key]
+  }))
+  const namesByDomain = new Map<string, Map<string, string[]>>()
+  for (const [key, label] of labels) {
+    const domain = resourceDomains.get(key)!
+    if (!namesByDomain.has(domain)) {
+      namesByDomain.set(domain, new Map())
+    }
+    const names = namesByDomain.get(domain)!
+    const keys = names.get(label) || []
+    keys.push(key)
+    names.set(label, keys)
+  }
+  for (const names of namesByDomain.values()) {
+    for (const [label, keys] of names) {
+      if (keys.length > 1) {
+        keys.forEach(key => labels.set(key, `${label}（${key}）`))
+      }
+    }
+  }
+  return labels
+}
+
+export function permissionResourceOf(permission: Pick<PermissionItem, 'code' | 'module'>, labels?: ReadonlyMap<string, string>) {
+  const { key, domainKey, valid } = permissionResourceIdentity(permission)
   return {
     key,
-    label: resourceLabels[key] || (meaningfulModule ? module : key),
+    label: labels?.get(key) || resourceLabels[key] || permissionModuleLabel(permission.module) || key,
     domainKey,
     domainLabel: domains[domainKey] || '其他来源',
     valid,
@@ -107,12 +180,13 @@ export interface PermissionTreeNode {
 
 export function buildPermissionTree(permissions: PermissionItem[], keyword = ''): PermissionTreeNode[] {
   const query = keyword.trim().toLocaleLowerCase()
+  const labels = permissionResourceLabels(permissions)
   const grouped = new Map<string, { label: string, resources: Map<string, { label: string, items: PermissionItem[] }> }>()
   for (const item of [...permissions].sort((a, b) => a.code.localeCompare(b.code))) {
     if (item.status !== 'ACTIVE') {
       continue
     }
-    const resource = permissionResourceOf(item)
+    const resource = permissionResourceOf(item, labels)
     const category = permissionCategoryOf(item.code)
     if (query && ![item.name, item.code, item.module, item.desc, resource.label, resource.domainLabel, category.label].some(value => value?.toLocaleLowerCase().includes(query))) {
       continue

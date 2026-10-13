@@ -7,6 +7,7 @@ import online.yudream.base.application.system.user.query.RolePageQuery;
 import online.yudream.base.application.system.user.query.PermissionOverviewQuery;
 import online.yudream.base.application.system.user.service.PermissionOverviewAppService;
 import online.yudream.base.application.system.user.service.RoleManageAppService;
+import online.yudream.base.application.system.user.service.RolePermissionChangesAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -15,6 +16,7 @@ import online.yudream.base.interfaces.system.user.assembler.PermissionOverviewWe
 import online.yudream.base.interfaces.system.user.request.RoleAssignPermissionsRequest;
 import online.yudream.base.interfaces.system.user.request.RoleCreateRequest;
 import online.yudream.base.interfaces.system.user.request.RoleUpdateRequest;
+import online.yudream.base.interfaces.system.user.request.RolePermissionChangesRequest;
 import online.yudream.base.interfaces.system.user.res.OptionRes;
 import online.yudream.base.interfaces.system.user.res.PermissionRes;
 import online.yudream.base.interfaces.system.user.res.PermissionOverviewRes;
@@ -37,6 +39,14 @@ public class RoleManageController {
 
     private final RoleManageAppService roleManageAppService;
     private final PermissionOverviewAppService permissionOverviewAppService;
+    private final RolePermissionChangesAppService rolePermissionChangesAppService;
+
+    @PutMapping("/{id}/permission-changes")
+    @PermissionRegister(code = "system:role:edit", name = "分配角色权限", module = "系统管理", desc = "增量授予或撤销角色权限")
+    public Result<RoleManageRes> permissionChanges(@PathVariable Long id, @Valid @RequestBody RolePermissionChangesRequest request) {
+        StpUtil.checkPermission("system:role:edit");
+        return Result.ok(UserManageWebAssembler.toRes(rolePermissionChangesAppService.apply(UserManageWebAssembler.toCmd(id, request))));
+    }
 
     @GetMapping("/permission-overview")
     @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看权限矩阵与授权溯源")

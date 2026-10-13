@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
-import type { PermissionOverview, PermissionOverviewQuery } from '@/api/modules/system-permission'
+import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
 import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
+import type { UserManageItem } from '@/api/modules/system-user'
+import { useYdModal, useYdToast } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
 import apiRole from '@/api/modules/system-role'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
-import { buildPermissionTree, mergeVisiblePermissions, permissionCategoryOf, permissionResourceOf, permissionTreeKeys } from '@/utils/permission-catalog'
+import { permissionOperationError } from './components/permission-operations'
 import PermissionConstellation from './components/PermissionConstellation.vue'
 import PermissionMatrix from './components/PermissionMatrix.vue'
+import PermissionOperations from './components/PermissionOperations.vue'
+import PermissionTreeEditor from './components/PermissionTreeEditor.vue'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const router = useRouter()
 const { auth } = useAppAuth()
 const activeView = ref<string | number>('list')
@@ -22,16 +26,24 @@ const viewOptions = [
   { value: 'matrix', label: '矩阵', icon: 'morph:table' },
   { value: 'trace', label: '溯源', icon: 'morph:orbit' },
 ]
-const overview = ref<PermissionOverview>()
+const overview = shallowRef<PermissionOverview>()
 const overviewLoading = ref(false)
 const overviewError = ref('')
 const overviewQuery = reactive<PermissionOverviewQuery>({ userPage: 1, userSize: 30 })
 let overviewRequest = 0
+const matrixRef = ref<InstanceType<typeof PermissionMatrix>>()
+const operationsRef = ref<InstanceType<typeof PermissionOperations>>()
+const permissionTreeRef = ref<InstanceType<typeof PermissionTreeEditor>>()
+const matrixDirty = ref(false)
+const matrixSaving = ref(false)
+const operationBusy = ref(false)
+const matrixResults = ref<{ roleId: string, name: string, success: boolean, message: string }[]>([])
 
 const loading = ref(false)
+let rolesRequest = 0
 const rows = ref<RoleManageItem[]>([])
 const depts = ref<DeptManageItem[]>([])
-const permissions = ref<PermissionItem[]>([])
+const permissions = shallowRef<PermissionItem[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive<{ keyword: string, deptId?: IdValue, status?: RoleStatus }>({ keyword: '' })
 
@@ -58,14 +70,6 @@ const levelOptions = [
 ]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
-const legacyPermissionCount = computed(() => permissions.value.filter(item => item.status === 'ACTIVE' && (!permissionResourceOf(item).valid || permissionCategoryOf(item.code).key === 'other')).length)
-
-const permissionKeyword = ref('')
-const expandedKeys = ref<string[]>([])
-const permissionTreeData = computed(() => buildPermissionTree(permissions.value, permissionKeyword.value))
-// 树当前实际渲染出的权限码集合。搜索过滤后只剩匹配项，勾选事件回传也只反映这部分状态
-const visibleCodeSet = computed(() => new Set(permissionTreeKeys(permissionTreeData.value, true)))
-
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
   { accessorKey: 'code', header: '编码', width: 180 },
@@ -117,10 +121,10 @@ async function loadOverview() {
 }
 
 async function refreshViews() {
-  await loadRoles()
-  if (overview.value || activeView.value !== 'list') {
-    await loadOverview()
-  }
+  await Promise.allSettled([
+    loadRoles(),
+    ...(overview.value || activeView.value !== 'list' ? [loadOverview()] : []),
+  ])
 }
 
 function searchOverviewUsers(keyword: string) {
@@ -148,6 +152,113 @@ function editOverviewRole(row: RoleManageItem) {
   }
 }
 
+function updateOverviewRole(role: RoleManageItem) {
+  ++overviewRequest
+  ++rolesRequest
+  overviewLoading.value = false
+  loading.value = false
+  rows.value = rows.value.map(item => item.id === role.id
+    ? { ...role, permissionCount: role.permissions.filter(code => permissionCodeSet.value.has(code)).length }
+    : item)
+  if (overview.value) {
+    overview.value = { ...overview.value, roles: overview.value.roles.map(item => item.id === role.id ? role : item) }
+  }
+}
+
+async function afterRoleSaved(role: RoleManageItem) {
+  updateOverviewRole(role)
+  await refreshViews()
+}
+
+async function afterUserSaved(user: UserManageItem) {
+  ++overviewRequest
+  overviewLoading.value = false
+  if (overview.value) {
+    overview.value = {
+      ...overview.value,
+      users: overview.value.users.map(item => item.id === user.id
+        ? {
+            ...item,
+            roleIds: [...user.roleIds],
+            deptIds: [...user.deptIds],
+            status: user.status,
+            emailVerified: user.emailVerified,
+            currentRoleId: user.roleIds.includes(item.currentRoleId || '') ? item.currentRoleId : undefined,
+          }
+        : item),
+    }
+  }
+  await refreshViews()
+}
+
+async function saveMatrixChanges(changes: PermissionRoleChange[]) {
+  if (!auth('system:role:edit') || matrixSaving.value || operationBusy.value || !changes.length) {
+    return
+  }
+  matrixSaving.value = true
+  matrixResults.value = []
+  ++overviewRequest
+  overviewLoading.value = false
+  try {
+    for (const change of changes) {
+      const name = overview.value?.roles.find(role => role.id === change.roleId)?.name || change.roleId
+      try {
+        const response = await apiPermission.changeRolePermissions(change)
+        updateOverviewRole(response.data)
+        matrixResults.value.push({ roleId: change.roleId, name, success: true, message: '授权已保存' })
+      }
+      catch (error) {
+        matrixResults.value.push({ roleId: change.roleId, name, success: false, message: permissionOperationError(error) })
+      }
+    }
+    const success = matrixResults.value.filter(item => item.success).length
+    if (success) {
+      toast.success(`已保存 ${success} 个角色的授权`)
+    }
+    await refreshViews()
+  }
+  finally {
+    matrixSaving.value = false
+  }
+}
+
+onBeforeRouteLeave(async () => {
+  if (matrixSaving.value || operationBusy.value) {
+    toast.warning('授权操作正在保存，请完成后再离开。')
+    return false
+  }
+  if (matrixDirty.value) {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      modal.confirm({
+        title: '矩阵授权尚未保存',
+        content: '离开页面将丢弃这些授权草稿。已保存的权限不会被撤回。',
+        confirmButtonText: '丢弃草稿并离开',
+        cancelButtonText: '继续编辑',
+        closeOnPressEscape: false,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) {
+      return false
+    }
+    matrixRef.value?.discardChanges()
+  }
+  operationsRef.value?.closeDialogs()
+  return true
+})
+
+function canEditOriginal() {
+  if (matrixSaving.value || operationBusy.value) {
+    return false
+  }
+  if (matrixDirty.value) {
+    toast.warning('请先保存或丢弃矩阵中的授权草稿，再打开原权限树。')
+    return false
+  }
+  return true
+}
+
 function editOverviewUser(id: string) {
   if (auth('system:user:view') && auth('system:user:edit')) {
     router.push({ path: '/system/user', query: { editUser: id } })
@@ -160,12 +271,6 @@ function editOverviewMenu(code: string) {
   }
 }
 
-watch(permissionKeyword, (keyword) => {
-  if (keyword.trim()) {
-    expandAllPermissions()
-  }
-})
-
 async function loadOptions() {
   const [deptRes, permissionRes] = await Promise.all([apiDept.tree(), apiRole.permissions()])
   depts.value = deptRes.data
@@ -173,6 +278,7 @@ async function loadOptions() {
 }
 
 async function loadRoles() {
+  const request = ++rolesRequest
   loading.value = true
   try {
     const res = await apiRole.page({
@@ -182,15 +288,19 @@ async function loadRoles() {
       deptId: search.deptId,
       status: search.status,
     })
-    // 权限数按现存权限计数展示（失效码不出现在树中）；row.permissions 保留原始数据，编辑回显与保存不丢
-    rows.value = res.data.records.map(row => ({
-      ...row,
-      permissionCount: row.permissions.filter(code => permissionCodeSet.value.has(code)).length,
-    }))
-    pagination.total = res.data.total
+    if (request === rolesRequest) {
+      // 只让最新请求更新列表；保留原权限快照供原编辑流程使用。
+      rows.value = res.data.records.map(row => ({
+        ...row,
+        permissionCount: row.permissions.filter(code => permissionCodeSet.value.has(code)).length,
+      }))
+      pagination.total = res.data.total
+    }
   }
   finally {
-    loading.value = false
+    if (request === rolesRequest) {
+      loading.value = false
+    }
   }
 }
 
@@ -202,37 +312,10 @@ function resetSearch() {
   loadRoles()
 }
 
-function treeGroupKeys() {
-  return permissionTreeKeys(permissionTreeData.value)
-}
-
-function expandAllPermissions() {
-  expandedKeys.value = treeGroupKeys()
-}
-
-function collapseAllPermissions() {
-  expandedKeys.value = []
-}
-
-function selectAllPermissions() {
-  form.permissions = [...new Set([...form.permissions, ...permissionCodeSet.value])]
-}
-
-function clearPermissions() {
-  form.permissions = []
-}
-
-function onPermissionCheck(checkedKeys: (string | number)[]) {
-  // 树外的勾选（被搜索过滤隐藏、或权限已失效）不在 checkedKeys 里，直接全量重算会把它们清掉
-  form.permissions = mergeVisiblePermissions(form.permissions, checkedKeys, visibleCodeSet.value)
-}
-
-function resetPermissionPanel() {
-  permissionKeyword.value = ''
-  expandAllPermissions()
-}
-
 function openCreate() {
+  if (!canEditOriginal()) {
+    return
+  }
   editing.value = null
   Object.assign(form, {
     name: '',
@@ -242,11 +325,14 @@ function openCreate() {
     status: 'ACTIVE' as RoleStatus,
     permissions: [],
   })
-  resetPermissionPanel()
   formVisible.value = true
+  nextTick(() => permissionTreeRef.value?.reset())
 }
 
 function openEdit(row: RoleManageItem) {
+  if (!canEditOriginal()) {
+    return
+  }
   editing.value = row
   Object.assign(form, {
     name: row.name,
@@ -256,8 +342,8 @@ function openEdit(row: RoleManageItem) {
     status: row.status,
     permissions: [...row.permissions],
   })
-  resetPermissionPanel()
   formVisible.value = true
+  nextTick(() => permissionTreeRef.value?.reset())
 }
 
 async function saveForm() {
@@ -337,28 +423,28 @@ function importRoles() {
 
 <template>
   <div>
-    <FaPageHeader title="角色管理" description="配置角色权限，查看授权矩阵并追溯用户与菜单的关系。" main-class="flex-[1_1_240px]" class="mb-0">
+    <YdPageHeader title="角色管理" description="配置角色权限，查看授权矩阵并追溯用户与菜单的关系。" main-class="flex-[1_1_240px]" class="mb-0">
       <YdTabs v-model="activeView" :list="viewOptions" class="min-w-56" />
-      <FaButton v-if="activeView === 'list'" v-auth="'system:role:export'" variant="outline" @click="exportRoles">
-        <FaIcon name="morph:file-spreadsheet" />
+      <YdButton v-if="activeView === 'list'" v-auth="'system:role:export'" variant="outline" @click="exportRoles">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-      <FaButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
-        <FaIcon name="morph:download" />
+      </YdButton>
+      <YdButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
+        <YdIcon name="morph:download" />
         模板
-      </FaButton>
-      <FaButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="importRoles">
-        <FaIcon name="morph:upload" />
+      </YdButton>
+      <YdButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="importRoles">
+        <YdIcon name="morph:upload" />
         导入
-      </FaButton>
-      <FaButton v-auth="'system:role:create'" @click="openCreate">
-        <FaIcon name="i-ri:user-star-line" />
+      </YdButton>
+      <YdButton v-auth="'system:role:create'" @click="openCreate">
+        <YdIcon name="i-ri:user-star-line" />
         新增角色
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain v-if="activeView === 'list'">
-      <FaResponsiveTable
+    <YdPageMain v-if="activeView === 'list'">
+      <YdResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -370,39 +456,39 @@ function importRoles() {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <FaInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
-              <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <YdInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
+              <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
               <div class="flex gap-2 col-end--1 justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton @click="loadRoles">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton @click="loadRoles">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-systemRole="{ row }">
-          <FaTag :variant="row.original.systemRole ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
             {{ row.original.systemRole ? '系统角色' : '自定义' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
             {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-operation="{ row }">
           <div class="flex-center gap-2">
-            <FaButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
+            <YdButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
               编辑
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-if="row.original.status === 'DEPRECATED'"
               v-auth="'system:role:edit'"
               variant="outline"
@@ -410,8 +496,8 @@ function importRoles() {
               @click="confirmEnable(row.original)"
             >
               启用
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-if="row.original.status === 'ACTIVE'"
               v-auth="'system:role:delete'"
               variant="destructive"
@@ -420,22 +506,22 @@ function importRoles() {
               @click="confirmDisable(row.original)"
             >
               停用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
 
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                 <div class="flex gap-1">
-                  <FaTag :variant="row.systemRole ? 'default' : 'secondary'">
+                  <YdTag :variant="row.systemRole ? 'default' : 'secondary'">
                     {{ row.systemRole ? '系统角色' : '自定义' }}
-                  </FaTag>
-                  <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                  </YdTag>
+                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
                     {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
               </div>
               <div class="flex flex-col gap-1 text-sm">
@@ -457,22 +543,22 @@ function importRoles() {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                <YdButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton v-if="row.status === 'DEPRECATED'" v-auth="'system:role:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'DEPRECATED'" v-auth="'system:role:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
                   启用
-                </FaButton>
-                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:role:delete'" variant="destructive" size="sm" :disabled="row.systemRole" @click="confirmDisable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:role:delete'" variant="destructive" size="sm" :disabled="row.systemRole" @click="confirmDisable(row)">
                   停用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -480,22 +566,34 @@ function importRoles() {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <YdPageMain v-else>
+    <YdPageMain v-show="activeView !== 'list'">
       <div v-if="overviewError" class="flex flex-wrap items-center justify-between gap-3 p-6" role="alert">
         <span>{{ overviewError }}</span>
         <YdButton variant="outline" @click="loadOverview">重试</YdButton>
       </div>
       <PermissionMatrix
-        v-else-if="activeView === 'matrix'"
+        ref="matrixRef"
+        v-show="activeView === 'matrix' && !overviewError"
         :roles="overview?.roles || []"
         :permissions="overview?.permissions || []"
         :loading="overviewLoading"
+        :saving="matrixSaving || operationBusy"
         @edit-role="editOverviewRole"
+        @save-changes="saveMatrixChanges"
+        @dirty-change="matrixDirty = $event"
+        @inspect-permission="operationsRef?.inspectPermission($event)"
       />
+      <div v-if="activeView === 'matrix' && matrixResults.length" class="flex flex-col gap-2 border-t p-4" aria-live="polite">
+        <p v-for="result in matrixResults" :key="result.roleId" class="flex flex-wrap items-center gap-2 text-sm">
+          <YdTag :variant="result.success ? 'secondary' : 'destructive'">{{ result.success ? '成功' : '需复核' }}</YdTag>
+          <span>{{ result.name }}：{{ result.message }}</span>
+        </p>
+        <p class="text-xs text-secondary-foreground/70">各角色独立保存，失败项的草稿保留；发生冲突需刷新复核后重新选择。</p>
+      </div>
       <PermissionConstellation
-        v-else-if="overview"
+        v-if="activeView === 'trace' && overview && !overviewError"
         :overview="overview"
         :loading="overviewLoading"
         :user-keyword="overviewQuery.userKeyword"
@@ -503,134 +601,63 @@ function importRoles() {
         @edit-role="editOverviewRole"
         @edit-user="editOverviewUser"
         @edit-menu="editOverviewMenu"
+        @grant-permission="operationsRef?.grantPermission($event)"
+        @revoke-permission="(roleId, code) => operationsRef?.revokePermission(roleId, code)"
+        @assign-user-roles="operationsRef?.assignUserRoles($event)"
+        @inspect-permission="operationsRef?.inspectPermission($event)"
         @user-page="pageOverviewUsers"
         @user-search="searchOverviewUsers"
         @user-unassigned="showUnassignedUsers"
         @refresh="loadOverview"
       />
-      <div v-else class="p-16 text-center" role="status">正在加载权限全景…</div>
+      <div v-if="activeView === 'trace' && !overview && !overviewError" class="p-16 text-center" role="status">正在加载权限全景…</div>
     </YdPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑角色' : '新增角色'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
-      <a-form :model="form" layout="vertical">
-        <a-grid :cols="2" :col-gap="16">
-          <a-grid-item>
-            <a-form-item label="角色名称" required>
-              <FaInput v-model="form.name" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="角色编码" required>
-              <FaInput v-model="form.code" :disabled="editing?.systemRole" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="所属部门" required>
-              <FaSelect v-model="form.deptId" :options="deptOptions" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="等级">
-              <FaSelect v-model="form.level" :options="levelOptions" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="editing">
-            <a-form-item label="状态">
-              <FaSelect v-model="form.status" :disabled="editing.systemRole" :options="statusOptions" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-        </a-grid>
+    <PermissionOperations
+      ref="operationsRef"
+      :overview="overview"
+      :blocked="matrixDirty"
+      :busy="matrixSaving"
+      @role-saved="afterRoleSaved"
+      @user-saved="afterUserSaved"
+      @edit-role="editOverviewRole"
+      @busy-change="operationBusy = $event"
+    />
 
-        <a-form-item label="权限">
-          <div class="permission-panel">
-            <p class="text-xs text-secondary-foreground/70">
-              按业务域、资源和动作分类授权。{{ legacyPermissionCount ? `另有 ${legacyPermissionCount} 项历史或非标准权限，按原码兼容展示。` : '' }}
-            </p>
-            <div class="permission-toolbar">
-              <FaInput v-model="permissionKeyword" clearable placeholder="搜索权限名称 / 编码" class="min-w-[200px] flex-1" />
-              <span class="permission-count">已选 {{ form.permissions.filter(code => permissionCodeSet.has(code)).length }} 项</span>
-              <FaButton size="sm" variant="outline" @click="selectAllPermissions">
-                全选
-              </FaButton>
-              <FaButton size="sm" variant="outline" @click="clearPermissions">
-                清空
-              </FaButton>
-              <FaButton size="sm" variant="outline" @click="expandAllPermissions">
-                展开
-              </FaButton>
-              <FaButton size="sm" variant="outline" @click="collapseAllPermissions">
-                收起
-              </FaButton>
-            </div>
-            <div class="permission-tree">
-              <a-tree
-                v-model:expanded-keys="expandedKeys"
-                :checked-keys="form.permissions"
-                :data="permissionTreeData"
-                :selectable="false"
-                checkable
-                block-node
-                @check="onPermissionCheck"
-              >
-                <template #title="node">
-                  <FaTag v-if="node.variant" :variant="node.variant">
-                    {{ node.title }}
-                  </FaTag>
-                  <template v-else>
-                    <span :class="{ 'font-semibold': !node.code }">{{ node.title }}</span>
-                    <span v-if="node.code" class="permission-code">{{ node.code }}</span>
-                  </template>
-                </template>
-              </a-tree>
-              <div v-if="!permissionTreeData.length" class="permission-empty">
-                无匹配权限
-              </div>
-            </div>
+    <YdModal v-model="formVisible" :title="editing ? '编辑角色' : '新增角色'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
+      <YdForm :model="form" layout="vertical">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <YdFormItem label="角色名称" required>
+              <YdInput v-model="form.name" class="w-full" />
+            </YdFormItem>
           </div>
-        </a-form-item>
-      </a-form>
-    </FaModal>
+          <div>
+            <YdFormItem label="角色编码" required>
+              <YdInput v-model="form.code" :disabled="editing?.systemRole" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="所属部门" required>
+              <YdSelect v-model="form.deptId" :options="deptOptions" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="等级">
+              <YdSelect v-model="form.level" :options="levelOptions" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="editing">
+            <YdFormItem label="状态">
+              <YdSelect v-model="form.status" :disabled="editing.systemRole" :options="statusOptions" class="w-full" />
+            </YdFormItem>
+          </div>
+        </div>
+
+        <YdFormItem label="权限">
+          <PermissionTreeEditor ref="permissionTreeRef" v-model="form.permissions" :permissions="permissions" :implicit-wildcard="editing?.systemType === 'SUPER_ADMIN'" />
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
   </div>
 </template>
-
-<style scoped>
-.permission-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.permission-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.permission-count {
-  font-size: 12px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-}
-
-.permission-tree {
-  max-height: 360px;
-  padding: 4px 8px;
-  overflow: auto;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-}
-
-.permission-code {
-  margin-left: 8px;
-  font-size: 12px;
-  color: var(--color-text-3);
-}
-
-.permission-empty {
-  padding: 16px;
-  font-size: 13px;
-  color: var(--color-text-3);
-  text-align: center;
-}
-</style>

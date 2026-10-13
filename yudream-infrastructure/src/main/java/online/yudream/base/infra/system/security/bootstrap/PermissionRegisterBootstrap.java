@@ -4,12 +4,14 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.security.PermissionMeta;
+import online.yudream.base.domain.system.security.PermissionCatalogNormalizer;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
@@ -41,12 +43,19 @@ public class PermissionRegisterBootstrap implements ApplicationListener<Applicat
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
         log.info("Start scanning @PermissionRegister / @SaCheckPermission annotations...");
-        Set<PermissionMeta> scanned = scanPermissions();
-        permissionDomainService.syncPermissions(scanned);
+        rescan();
     }
 
-    private Set<PermissionMeta> scanPermissions() {
-        Set<PermissionMeta> result = new HashSet<>();
+    /** 仅重建真实已装配 Bean 的权限登记，不重新播种菜单、角色或其他业务数据。 */
+    public List<PermissionMeta> rescan() {
+        List<PermissionMeta> scanned = scanPermissions();
+        permissionDomainService.syncPermissions(scanned);
+        return scanned;
+    }
+
+    /** 只读扫描可供运维对照，不丢弃同码不同端点的名称与说明。 */
+    public List<PermissionMeta> scanPermissions() {
+        List<PermissionMeta> result = new ArrayList<>();
         String[] beanNames = applicationContext.getBeanDefinitionNames();
         for (String beanName : beanNames) {
             Object bean;
@@ -62,10 +71,10 @@ public class PermissionRegisterBootstrap implements ApplicationListener<Applicat
             }
             ReflectionUtils.doWithMethods(targetClass, method -> collectFromMethod(method, result));
         }
-        return result;
+        return PermissionCatalogNormalizer.normalize(result);
     }
 
-    private void collectFromMethod(Method method, Set<PermissionMeta> result) {
+    private void collectFromMethod(Method method, List<PermissionMeta> result) {
         PermissionRegister register = AnnotatedElementUtils.findMergedAnnotation(method, PermissionRegister.class);
         SaCheckPermission saCheck = AnnotatedElementUtils.findMergedAnnotation(method, SaCheckPermission.class);
 
@@ -100,14 +109,7 @@ public class PermissionRegisterBootstrap implements ApplicationListener<Applicat
     }
 
     private Class<?> getTargetClass(Object bean) {
-        Class<?> clazz = bean.getClass();
-        // 处理 Spring 代理类
-        if (clazz.getName().contains("$$SpringCGLIB$$") || clazz.getName().contains("$Proxy")) {
-            Class<?> targetClass = org.springframework.util.ClassUtils.getUserClass(bean);
-            if (targetClass != clazz) {
-                return targetClass;
-            }
-        }
-        return clazz;
+        // JDK 接口代理的方法不携带实现类登记，必须使用 Spring 提供的真实目标类型。
+        return AopUtils.getTargetClass(bean);
     }
 }

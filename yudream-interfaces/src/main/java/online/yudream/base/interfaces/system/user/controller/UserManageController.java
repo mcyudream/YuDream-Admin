@@ -8,6 +8,7 @@ import online.yudream.base.application.system.security.service.LoginTokenAppServ
 import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserManageAppService;
+import online.yudream.base.application.system.user.service.UserRoleChangesAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.domain.system.user.aggregate.User;
@@ -19,6 +20,7 @@ import online.yudream.base.interfaces.system.user.request.UserAssignRolesRequest
 import online.yudream.base.interfaces.system.user.request.UserCreateRequest;
 import online.yudream.base.interfaces.system.user.request.UserPasswordChangeRequest;
 import online.yudream.base.interfaces.system.user.request.UserUpdateRequest;
+import online.yudream.base.interfaces.system.user.request.UserRoleChangesRequest;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserManageRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +40,15 @@ public class UserManageController {
     private final UserManageAppService userManageAppService;
     private final UserAppService userAppService;
     private final LoginTokenAppService loginTokenAppService;
+    private final UserRoleChangesAppService userRoleChangesAppService;
+
+    @PutMapping("/{id}/role-changes")
+    @PermissionRegister(code = "system:user:assign-role", name = "分配用户角色", module = "系统管理", desc = "增量分配或移除用户角色")
+    public Result<UserManageRes> roleChanges(@PathVariable Long id, @Valid @RequestBody UserRoleChangesRequest request) {
+        StpUtil.checkPermission("system:user:assign-role");
+        StpUtil.checkPermission("system:user:view");
+        return Result.ok(UserManageWebAssembler.toRes(userRoleChangesAppService.apply(UserManageWebAssembler.toCmd(id, request))));
+    }
 
     @GetMapping("/{id}")
     @PermissionRegister(code = "system:user:view", name = "查看用户", module = "系统管理", desc = "查看用户资料")

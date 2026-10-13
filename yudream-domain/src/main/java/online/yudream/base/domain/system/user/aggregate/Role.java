@@ -13,6 +13,9 @@ import online.yudream.base.domain.system.user.valobj.RoleID;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 @EqualsAndHashCode(callSuper = true)
 @Getter
@@ -73,6 +76,36 @@ public class Role extends BaseDomain {
 
     public void replacePermissions(List<PermissionID> permissions) {
         this.permissions = permissions == null ? new ArrayList<>() : new ArrayList<>(permissions);
+    }
+
+    /** 按授权快照执行明确的增量变化；未被点名撤销的历史权限原样保留。 */
+    public boolean applyPermissionChanges(List<PermissionID> expectedPermissions,
+                                          List<PermissionID> grant, List<PermissionID> revoke) {
+        if (systemType == SystemRoleType.SUPER_ADMIN
+                || (permissions != null && permissions.stream().anyMatch(permission -> "*".equals(permission.getCode())))) {
+            throw new BizException("角色拥有通配权限，不支持单项增量授权，请使用原编辑流程");
+        }
+        List<PermissionID> current = permissions == null ? List.of() : permissions;
+        if (expectedPermissions == null || !Objects.equals(current, expectedPermissions)) {
+            throw new BizException("角色授权已变化，请刷新后重试");
+        }
+        List<PermissionID> grants = grant == null ? List.of() : grant;
+        Set<PermissionID> revokes = new HashSet<>(revoke == null ? List.of() : revoke);
+        if (grants.stream().anyMatch(revokes::contains)) {
+            throw new BizException("同一权限不能同时授予和撤销");
+        }
+        List<PermissionID> next = new ArrayList<>(current);
+        next.removeIf(revokes::contains);
+        for (PermissionID permission : grants) {
+            if (!next.contains(permission)) {
+                next.add(permission);
+            }
+        }
+        if (current.equals(next)) {
+            return false;
+        }
+        permissions = next;
+        return true;
     }
 
     public void activate() {

@@ -11,6 +11,8 @@ import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.enumerate.PermissionSource;
 import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
 import online.yudream.base.domain.system.user.repo.PermissionRepo;
+import online.yudream.base.domain.system.security.PermissionMeta;
+import online.yudream.base.domain.system.security.PermissionCatalogNormalizer;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -19,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -32,7 +35,7 @@ public class MenuDomainService {
     private final PermissionRepo permissionRepo;
 
     /**
-     * 同步菜单树到数据库，并为每个节点维护一条 source = MENU 的权限记录。
+     * 同步菜单树到数据库，只为真实叶子权限补充 MENU 来源登记。
      *
      * @param menus 解析后的菜单树
      */
@@ -71,8 +74,18 @@ public class MenuDomainService {
     public void deleteMenu(String code) {
         Menu menu = menuRepo.findByCode(code).orElse(null);
         menuRepo.deleteByCode(code);
-        if (menu != null) {
-            permissionRepo.deleteByCode(menu.getPermissionCode());
+        if (menu != null && permissionLeaf(menu)) {
+            Permission permission = permissionRepo.findByCode(menu.getPermissionCode()).orElse(null);
+            if (permission != null && permission.getSource() == PermissionSource.MENU) {
+                List<Menu> remaining = menuRepo.findAll();
+                boolean referenced = remaining != null && remaining.stream().anyMatch(candidate -> permissionLeaf(candidate)
+                        && menu.getPermissionCode().equals(candidate.getPermissionCode()));
+                if (referenced) {
+                    syncPermissionCatalog(remaining, menu.getPermissionCode());
+                } else {
+                    permissionRepo.deleteByCode(menu.getPermissionCode());
+                }
+            }
         }
         log.debug("Deleted menu: code={}", code);
     }
@@ -99,22 +112,93 @@ public class MenuDomainService {
     }
 
     private void upsertMenuPermission(Menu menu) {
-        String permissionCode = menu.getPermissionCode();
-        Permission permission = permissionRepo.findByCode(permissionCode)
-                .orElseGet(() -> Permission.create(permissionCode, menu.getName(), menu.getModule(), "菜单权限"));
-        permission.setSource(PermissionSource.MENU);
-        permission.update(menu.getName(), menu.getModule(), "菜单权限");
-        permission.setStatus(menu.getStatus() == MenuStatus.ACTIVE ? PermissionStatus.ACTIVE : PermissionStatus.DEPRECATED);
-        permissionRepo.save(permission);
+        if (!permissionLeaf(menu)) {
+            return;
+        }
+        List<Menu> allMenus = new ArrayList<>();
+        List<Menu> persisted = menuRepo.findAll();
+        if (persisted != null) {
+            persisted.stream().filter(candidate -> !menu.getCode().equals(candidate.getCode())).forEach(allMenus::add);
+        }
+        allMenus.add(menu);
+        syncPermissionCatalog(allMenus, menu.getPermissionCode());
     }
 
-    private List<Menu> flatten(Collection<Menu> menus) {
+    /** 仅同步权限目录，运维重建时不保存菜单、不调整角色配置。 */
+    public int syncPermissionCatalog(Collection<Menu> menus) {
+        return syncPermissionCatalog(menus, null);
+    }
+
+    private int syncPermissionCatalog(Collection<Menu> menus, String selectedCode) {
+        int updated = 0;
+        for (Permission proposed : planPermissionCatalog(menus)) {
+            String code = proposed.getId().getCode();
+            if (selectedCode != null && !selectedCode.equals(code)) {
+                continue;
+            }
+            Permission existing = permissionRepo.findByCode(code).orElse(null);
+            // 真实端点和插件/人工登记拥有元数据；菜单只能补缺，不能夺取来源或改写名称。
+            if (existing != null && existing.getSource() != PermissionSource.MENU) {
+                continue;
+            }
+            Permission permission = existing == null ? proposed : existing;
+            permission.update(proposed.getName(), proposed.getModule(), proposed.getDescription());
+            permission.setSource(PermissionSource.MENU);
+            permission.setStatus(proposed.getStatus());
+            permissionRepo.save(permission);
+            updated++;
+        }
+        return updated;
+    }
+
+    /** 纯计算重建计划，供运维在任何写入前审查；不会访问仓储。 */
+    public static List<Permission> planPermissionCatalog(Collection<Menu> menus) {
+        if (menus == null || menus.isEmpty()) {
+            return List.of();
+        }
+        List<Menu> allMenus = flatten(menus);
+        Map<String, Menu> menuMap = allMenus.stream()
+                .collect(Collectors.toMap(Menu::getCode, menu -> menu, (left, right) -> left));
+        Map<String, List<Menu>> groups = allMenus.stream().filter(MenuDomainService::permissionLeaf)
+                .collect(Collectors.groupingBy(Menu::getPermissionCode, TreeMap::new, Collectors.toList()));
+        List<Permission> plan = new ArrayList<>();
+        for (Map.Entry<String, List<Menu>> entry : groups.entrySet()) {
+            List<PermissionMeta> candidates = entry.getValue().stream().map(menu -> menuPermissionMeta(menu, menuMap)).toList();
+            PermissionMeta meta = PermissionCatalogNormalizer.normalize(candidates).getFirst();
+            Permission permission = Permission.create(meta.code(), meta.name(), meta.module(), meta.desc(), PermissionSource.MENU);
+            permission.setStatus(entry.getValue().stream().anyMatch(menu -> menu.getStatus() == MenuStatus.ACTIVE && menu.isAvailableForRuntime())
+                    ? PermissionStatus.ACTIVE : PermissionStatus.DEPRECATED);
+            plan.add(permission);
+        }
+        return plan;
+    }
+
+    private static boolean permissionLeaf(Menu menu) {
+        return (menu.getType() == MenuNodeType.MENU || menu.getType() == MenuNodeType.LINK || menu.getType() == MenuNodeType.BUTTON)
+                && menu.getPermissionCode() != null && !menu.getPermissionCode().isBlank();
+    }
+
+    private static PermissionMeta menuPermissionMeta(Menu menu, Map<String, Menu> menus) {
+        String code = menu.getPermissionCode();
+        String action = PermissionCatalogNormalizer.actionName(code);
+        String access = menu.getType() == MenuNodeType.LINK ? "访问外链入口" : menu.getType() == MenuNodeType.BUTTON ? "执行按钮操作" : "访问页面入口";
+        String name = (action == null ? access : action + "权限") + "（" + code + "）";
+        String module = menu.getModule();
+        Menu moduleMenu = module == null ? null : menus.get(module);
+        if (moduleMenu != null && (moduleMenu.getType() == MenuNodeType.CATEGORY || moduleMenu.getType() == MenuNodeType.LAYOUT)) {
+            module = moduleMenu.getName();
+        }
+        String description = access + "「" + menu.getName() + "」，权限码：" + code;
+        return new PermissionMeta(code, name, module, description);
+    }
+
+    private static List<Menu> flatten(Collection<Menu> menus) {
         return menus.stream()
-                .flatMap(this::flattenWithChildren)
+                .flatMap(MenuDomainService::flattenWithChildren)
                 .collect(Collectors.toList());
     }
 
-    private java.util.stream.Stream<Menu> flattenWithChildren(Menu menu) {
+    private static java.util.stream.Stream<Menu> flattenWithChildren(Menu menu) {
         return java.util.stream.Stream.concat(
                 java.util.stream.Stream.of(menu),
                 menu.getChildren() == null ? java.util.stream.Stream.empty() : flatten(menu.getChildren()).stream()
