@@ -19,6 +19,7 @@ const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
 
 const loginBanner = computed(() => appSettingsStore.loginBanner || new URL('@/assets/images/login-banner.png', import.meta.url).href)
+const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
 
 const redirect = ref(sanitizeRedirect(route.query.redirect, appSettingsStore.settings.app.home.fullPath))
 
@@ -84,7 +85,6 @@ onMounted(async () => {
 
 <template>
   <div class="login-page">
-    <div class="bg-banner" aria-hidden="true" />
     <div v-if="appSettingsStore.mode === 'pc' || appSettingsStore.settings.toolbar.colorScheme" class="login-toolbar">
       <FaDropdown
         v-if="appSettingsStore.mode === 'pc'"
@@ -109,22 +109,12 @@ onMounted(async () => {
     <div class="login-box" :class="layoutAlign">
       <div class="login-banner">
         <div class="banner-heading">
-          <span class="banner-eyebrow">
-            <FaIcon name="morph:panels-top-left" class="size-4" />
-            {{ appSettingsStore.siteName }}
-          </span>
-          <h1>从这里，<br>开启新的工作。</h1>
-          <p>专注当下，让工作井然有序。</p>
+          <img :src="logo" class="banner-logo" alt="">
+          <h1>{{ appSettingsStore.siteName }}</h1>
+          <p>{{ appSettingsStore.siteDescription || '你的工作、内容与社区，从这里连接。' }}</p>
         </div>
         <div class="banner-artwork" aria-hidden="true">
-          <div class="banner-orbit banner-orbit--outer" />
-          <div class="banner-orbit banner-orbit--inner" />
           <img :src="loginBanner" class="banner" alt="">
-        </div>
-        <div class="banner-caption" aria-hidden="true">
-          <span class="banner-caption-line" />
-          <FaIcon name="morph:sparkles" class="size-4" />
-          <span>每一次开始，都向前一步</span>
         </div>
       </div>
       <div class="login-form flex-col-center">
@@ -188,70 +178,32 @@ onMounted(async () => {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   min-height: 100svh;
-  padding: 88px 32px 0;
+  color: var(--color-text-1);
   background: var(--color-bg-1);
   isolation: isolate;
 }
 
-.bg-banner {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 12% 18%, var(--color-fill-2), transparent 52%),
-    radial-gradient(ellipse at 88% 84%, var(--color-fill-3), transparent 52%);
-
-  &::after {
-    position: absolute;
-    inset: 0;
-    content: "";
-    background-image: radial-gradient(var(--color-border-2) 1px, transparent 1px);
-    background-size: 24px 24px;
-    opacity: 0.45;
-    mask-image: linear-gradient(135deg, #000, transparent 65%);
-  }
-}
-
 .login-toolbar {
   position: absolute;
-  top: 24px;
-  right: 32px;
-  z-index: 1;
+  top: 20px;
+  right: 24px;
+  z-index: 2;
   display: flex;
   gap: 4px;
   align-items: center;
-  padding: 4px;
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border-2);
-  border-radius: 14px;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-text-1) 4%, transparent);
+  color: var(--color-text-2);
 }
 
 .login-box {
   position: relative;
   display: flex;
-  width: min(1080px, 100%);
-  min-height: 620px;
-  overflow: hidden;
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border-2);
-  border-radius: var(--yd-surface-radius, 24px);
-  box-shadow: var(--yd-surface-shadow, 0 20px 64px color-mix(in srgb, var(--color-text-1) 8%, transparent));
-  animation: login-reveal var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out) both;
+  flex: 1;
+  width: 100%;
+  min-height: calc(100svh - 64px);
 
   &.left {
     flex-direction: row-reverse;
-  }
-
-  &.left,
-  &.right {
-    width: min(1440px, 100%);
-    min-height: max(620px, calc(100svh - 164px));
   }
 }
 
@@ -260,163 +212,120 @@ onMounted(async () => {
   display: flex;
   flex: 1;
   flex-direction: column;
+  justify-content: center;
   min-width: 0;
-  padding: 40px;
+  padding: clamp(40px, 6vw, 96px);
   overflow: hidden;
-  background: linear-gradient(155deg, var(--color-fill-1), var(--color-fill-3));
+  background: var(--color-fill-1);
 }
 
 .banner-heading {
   position: relative;
   z-index: 1;
-  animation: login-reveal var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out) var(--yd-motion-stagger, 70ms) both;
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+  animation: login-reveal var(--yd-motion-duration-slow, 440ms) var(--yd-motion-ease, ease-out) both;
 
   h1 {
-    margin: 28px 0 16px;
-    font-size: clamp(30px, 3vw, 42px);
-    font-weight: 650;
-    line-height: 1.4;
+    margin: 28px 0 20px;
+    font-size: clamp(40px, 4.6vw, 76px);
+    font-weight: 700;
+    line-height: 1.12;
     color: var(--color-text-1);
-    letter-spacing: -0.04em;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
   }
 
   p {
+    max-width: 36em;
     margin: 0;
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1.8;
-    color: var(--color-text-3);
+    color: var(--color-text-2);
+    text-wrap: pretty;
   }
 }
 
-.banner-eyebrow {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  max-width: 100%;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.6;
-  color: var(--color-text-2);
-  overflow-wrap: anywhere;
+.banner-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .banner-artwork {
-  position: relative;
   display: grid;
-  flex: 1;
   place-items: center;
-  min-height: 280px;
-  margin: 12px -20px;
-  animation: login-reveal var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out) calc(var(--yd-motion-stagger, 70ms) * 2) both;
-}
-
-.banner-orbit {
-  position: absolute;
-  width: 250px;
-  aspect-ratio: 1;
-  pointer-events: none;
-  border: 1px solid var(--color-border-2);
-  border-radius: 50%;
-
-  &--outer {
-    width: 340px;
-    border-style: dashed;
-    opacity: 0.65;
-  }
+  margin-top: 32px;
+  animation: login-reveal var(--yd-motion-duration-slow, 440ms) var(--yd-motion-ease, ease-out) var(--yd-motion-stagger, 45ms) both;
 }
 
 .banner {
-  position: relative;
-  width: min(100%, 380px);
-  height: 300px;
+  display: block;
+  width: min(100%, 480px);
+  height: clamp(200px, 32vh, 360px);
   object-fit: contain;
-  transition: transform var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out);
-}
-
-.banner-caption {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding-top: 16px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-3);
-  animation: login-reveal var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out) calc(var(--yd-motion-stagger, 70ms) * 3) both;
-}
-
-.banner-caption-line {
-  width: 28px;
-  height: 1px;
-  background: var(--color-border-3);
 }
 
 .login-form {
-  flex: 0 0 52%;
-  min-width: 0;
-  max-width: 580px;
-  padding: 24px 0;
-  animation: login-reveal var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, ease-out) calc(var(--yd-motion-stagger, 70ms) * 2) both;
+  flex: 0 0 43%;
+  min-width: 400px;
+  padding: 88px 32px 56px;
+  background: var(--color-bg-2);
+  animation: login-reveal var(--yd-motion-duration-slow, 440ms) var(--yd-motion-ease, ease-out) calc(var(--yd-motion-stagger, 45ms) * 2) both;
 
   :deep(input:is(:autofill, :-webkit-autofill)),
   :deep(input:is(:autofill, :-webkit-autofill):hover),
   :deep(input:is(:autofill, :-webkit-autofill):focus) {
-    caret-color: oklch(var(--foreground));
-    box-shadow: 0 0 0 1000px oklch(var(--background)) inset !important;
-    transition: background-color 9999s ease-out, color 9999s ease-out;
-    -webkit-text-fill-color: oklch(var(--foreground)) !important;
+    caret-color: var(--color-text-1);
+    box-shadow: 0 0 0 1000px var(--color-bg-2) inset !important;
+    -webkit-text-fill-color: var(--color-text-1) !important;
   }
 }
 
-.login-form-content :deep(.p-12) {
-  padding: clamp(24px, 4vw, 48px);
+.login-form-content {
+  max-width: 400px;
 }
 
-.login-form-content :deep(h3) {
-  font-size: clamp(28px, 3vw, 34px);
+.login-form-content :deep(.p-12) {
+  padding: 0;
+}
+
+.login-form-content :deep(.min-h-500px) {
+  min-height: 0;
+}
+
+.login-form-content :deep(:is(h2, h3)) {
+  font-size: 30px;
   line-height: 1.35;
   letter-spacing: -0.035em;
 }
 
-/* 登录辅助操作保持文本可读性，不依赖管理员选择的主色明度。 */
 .login-form-content :deep([data-slot="button"].text-primary) {
   color: var(--color-text-2);
 }
 
 .binding-notice {
   padding: 12px 16px;
-  margin: 20px clamp(24px, 4vw, 48px) 0;
+  margin-bottom: 24px;
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text-2);
   background: var(--color-fill-1);
   border: 1px solid var(--color-border-2);
-  border-radius: 12px;
+  border-radius: var(--yd-control-radius, 12px);
 }
 
 .copyright {
   position: relative;
   width: 100%;
-  padding: 24px 0;
+  padding: 20px 24px;
   margin: 0;
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .banner-artwork:hover .banner {
-    transform: translateY(var(--yd-motion-lift, -4px)) rotate(-1deg);
-  }
-
-  html[data-admin-motion="reduced"] .banner-artwork:hover .banner {
-    transform: none;
-  }
+  background: var(--color-bg-2);
 }
 
 @media (width <= 768px) {
-  .login-page {
-    justify-content: flex-start;
-    padding: 76px 16px 0;
-  }
-
   .login-toolbar {
     top: 16px;
     right: 16px;
@@ -431,36 +340,41 @@ onMounted(async () => {
 
   .login-banner {
     flex: none;
-    padding: 24px;
+    padding: 56px 24px 28px;
   }
 
   .banner-heading h1 {
-    margin: 12px 0 8px;
-    font-size: 26px;
-
-    br {
-      display: none;
-    }
+    margin: 16px 0 12px;
+    font-size: clamp(32px, 8vw, 44px);
   }
 
-  .banner-artwork,
-  .banner-caption {
+  .banner-heading p {
+    font-size: 14px;
+  }
+
+  .banner-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .banner-artwork {
     display: none;
   }
 
   .login-form {
-    flex: none;
+    flex: 1;
+    justify-content: flex-start;
     width: 100%;
-    max-width: none;
-    padding: 8px 0;
+    min-width: 0;
+    padding: 32px 24px 40px;
   }
 
-  .login-form-content :deep(.min-h-500px) {
-    min-height: 0;
+  .login-form-content {
+    max-width: 440px;
   }
 
-  .copyright {
-    padding: 20px 0;
+  .login-form-content :deep(:is(h2, h3)) {
+    font-size: 26px;
   }
 }
 
@@ -477,16 +391,10 @@ onMounted(async () => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-box,
   .banner-heading,
   .banner-artwork,
-  .banner-caption,
   .login-form {
     animation: none;
-  }
-
-  .banner {
-    transition: none;
   }
 }
 </style>

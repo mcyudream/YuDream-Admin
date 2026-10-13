@@ -97,9 +97,9 @@ const onResetSubmit = resetForm.handleSubmit(async (values) => {
   <div class="p-12 flex-col-stretch-center min-h-500px w-full">
     <form v-if="!isResetMode" @submit="onSendSubmit">
       <div class="mb-8 space-y-2">
-        <h3 class="text-4xl font-bold">
+        <h2 class="text-4xl font-bold">
           找回密码
-        </h3>
+        </h2>
         <p class="text-sm text-muted-foreground lg:text-base">
           输入用户名或邮箱，系统会发送密码重置链接
         </p>
@@ -130,9 +130,9 @@ const onResetSubmit = resetForm.handleSubmit(async (values) => {
 
     <form v-else @submit="onResetSubmit">
       <div class="mb-8 space-y-2">
-        <h3 class="text-4xl font-bold">
+        <h2 class="text-4xl font-bold">
           设置新密码
-        </h3>
+        </h2>
         <p class="text-sm text-muted-foreground lg:text-base">
           新密码保存后即可返回登录
         </p>

@@ -4,25 +4,12 @@ import { useForm } from 'vee-validate'
 import * as z from 'zod'
 import apiUser from '@/api/modules/user'
 import { useAppFeatureStore } from '@/store/modules/app/features'
-import { createPasskeyAuthenticationResponse } from '@/utils/webauthn'
 import { FormControl, FormField, FormItem, FormMessage } from '@/ui/shadcn/ui/form'
+import { createPasskeyAuthenticationResponse } from '@/utils/webauthn'
 
 defineOptions({
   name: 'LoginForm',
 })
-
-/** 插件登录入口的呈现方式，与宿主 SPI PluginExternalLoginPresentation 对应 */
-export type ExternalLoginPresentation = 'ICON' | 'TAB'
-
-export interface ExternalLoginEntry {
-  providerCode: string
-  type: string
-  label: string
-  icon: string
-  presentation?: ExternalLoginPresentation
-  /** 插件登录入口的排序位，决定登录 Tab 的顺序 */
-  sort?: number
-}
 
 const props = defineProps<{
   account?: string
@@ -40,12 +27,23 @@ const emits = defineEmits<{
   onExternalLogin: [entry: ExternalLoginEntry]
 }>()
 
+/** 插件登录入口的呈现方式，与宿主 SPI PluginExternalLoginPresentation 对应 */
+export type ExternalLoginPresentation = 'ICON' | 'TAB'
+
+export interface ExternalLoginEntry {
+  providerCode: string
+  type: string
+  label: string
+  icon: string
+  presentation?: ExternalLoginPresentation
+  /** 插件登录入口的排序位，决定登录 Tab 的顺序 */
+  sort?: number
+}
+
 const appAccountStore = useAppAccountStore()
 const appFeatureStore = useAppFeatureStore()
-const appSettingsStore = useAppSettingsStore()
 const toast = useFaToast()
 
-const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
 const loading = ref(false)
 const passkeyLoading = ref(false)
 const type = ref<string>('password')
@@ -194,14 +192,13 @@ function rememberAccount(account: string, remember?: boolean) {
 <template>
   <div class="p-12 flex-col-stretch-center min-h-500px w-full">
     <div class="mb-6 space-y-2">
-      <div class="flex items-center gap-3">
-        <img :src="logo" class="h-10 w-10 object-contain rounded">
-        <h3 class="text-4xl font-bold">
-          欢迎使用
-        </h3>
+      <div class="flex gap-3 items-center">
+        <h2 class="text-4xl font-bold">
+          登录
+        </h2>
       </div>
       <p class="text-sm text-muted-foreground lg:text-base">
-        {{ appSettingsStore.siteName }}
+        欢迎回来，请选择登录方式。
       </p>
     </div>
     <div class="mb-4">
@@ -216,7 +213,7 @@ function rememberAccount(account: string, remember?: boolean) {
         <FormField v-slot="{ componentField, errors }" name="account">
           <FormItem class="pb-6 relative space-y-0">
             <FormControl>
-              <FaInput type="text" placeholder="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+              <FaInput type="text" placeholder="用户名或邮箱" aria-label="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                 <template #start>
                   <FaIcon name="i-lucide:user" />
                 </template>
@@ -232,7 +229,7 @@ function rememberAccount(account: string, remember?: boolean) {
         <FormField v-slot="{ componentField, errors }" name="password">
           <FormItem class="pb-6 relative space-y-0">
             <FormControl>
-              <FaInput type="password" placeholder="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+              <FaInput type="password" placeholder="密码" aria-label="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                 <template #start>
                   <FaIcon name="i-lucide:lock" />
                 </template>

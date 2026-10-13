@@ -543,6 +543,10 @@
     {
       "key": "gridstack-button-handle-icon",
       "text": "GridStack 的拖拽手柄若为 button，鼠标命中其图标后代会被 DDDraggable._mouseDown 的交互元素过滤忽略，表现为只能拖按钮边缘。让 FaIcon 根节点 pointer-events:none（继承到后代），使事件直接命中手柄按钮；浏览器测试应从图标中心真实拖动，并验证保存与刷新后的 placements。"
+    },
+    {
+      "key": "site-theme-login-contrast",
+      "text": "登录页必须同时验证无插件与启用 SITE 主题。主题在 .login-page 内同时桥接 --color-* 和组件语义变量，避免后台浅色令牌在深色主题上造成不可读文字。相对资源 URL 在插件自己的 CSS 选择器内消费，不能经变量传入宿主样式后按宿主 URL 解析。匹配 text-primary 必须使用完整类名，避免误伤 text-primary-foreground 主按钮。"
     }
   ]
 }
