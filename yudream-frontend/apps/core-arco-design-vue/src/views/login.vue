@@ -279,13 +279,37 @@ onMounted(async () => {
   :deep(input:is(:autofill, :-webkit-autofill):hover),
   :deep(input:is(:autofill, :-webkit-autofill):focus) {
     caret-color: var(--color-text-1);
-    box-shadow: 0 0 0 1000px var(--color-bg-2) inset !important;
+    box-shadow: 0 0 0 1000px var(--color-fill-1) inset !important;
     -webkit-text-fill-color: var(--color-text-1) !important;
   }
 }
 
 .login-form-content {
   max-width: 400px;
+}
+
+.login-form :deep([data-slot="input-group"]) {
+  height: 48px;
+  overflow: hidden;
+  background: var(--color-fill-1);
+}
+
+.login-form :deep([data-slot="input-group-control"]) {
+  height: 100%;
+  padding-block: 0;
+  font-family: "Segoe UI", system-ui, "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.login-form :deep([data-slot="input-group-addon"][data-align^="inline-"]) {
+  align-self: stretch;
+  padding-block: 0;
+}
+
+.login-form :deep([data-slot="input-group-addon"][data-align="inline-end"] button) {
+  width: 40px;
+  height: 40px;
 }
 
 .login-form-content :deep(.p-12) {
@@ -323,6 +347,44 @@ onMounted(async () => {
   padding: 20px 24px;
   margin: 0;
   background: var(--color-bg-2);
+}
+
+@media (width > 768px) {
+  .login-page:has(.login-box.center) {
+    padding-top: 64px;
+  }
+
+  .login-page:has(.login-box.center):not(:has(.copyright)) {
+    padding-bottom: 64px;
+  }
+
+  .login-box.center {
+    flex: 0 0 auto;
+    width: min(1080px, calc(100% - 64px));
+    min-height: 0;
+    margin: auto;
+    overflow: hidden;
+    border: 1px solid var(--color-border-2);
+    border-radius: var(--yd-surface-radius, 18px);
+  }
+
+  .login-box.center .login-banner {
+    padding: clamp(28px, 4vw, 56px);
+  }
+
+  .login-box.center .banner-heading h1 {
+    font-size: clamp(36px, 4vw, 56px);
+  }
+
+  .login-box.center .banner {
+    height: clamp(160px, 24vh, 260px);
+  }
+
+  .login-box.center .login-form {
+    flex-basis: 50%;
+    min-width: 0;
+    padding: 48px 32px;
+  }
 }
 
 @media (width <= 768px) {
@@ -375,6 +437,11 @@ onMounted(async () => {
 
   .login-form-content :deep(:is(h2, h3)) {
     font-size: 26px;
+  }
+
+  .login-form :deep([data-slot="input-group-addon"][data-align="inline-end"] button) {
+    width: 44px;
+    height: 44px;
   }
 }
 
