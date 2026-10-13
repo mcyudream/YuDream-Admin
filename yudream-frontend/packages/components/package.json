@@ -1,7 +1,7 @@
 {
   "name": "@yudream/components",
   "type": "module",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "files": [
     "src",
     "resolver.ts"
@@ -41,6 +41,15 @@
     }
   },
   "dependencies": {
+    "@codemirror/autocomplete": "catalog:",
+    "@codemirror/commands": "catalog:",
+    "@codemirror/lang-css": "catalog:",
+    "@codemirror/lang-html": "catalog:",
+    "@codemirror/lang-javascript": "catalog:",
+    "@codemirror/lang-json": "catalog:",
+    "@codemirror/language": "catalog:",
+    "@codemirror/state": "catalog:",
+    "@codemirror/view": "catalog:",
     "@arco-design/web-vue": "catalog:arco-design-vue",
     "@iconify/vue": "catalog:",
     "@lucide/vue": "catalog:",

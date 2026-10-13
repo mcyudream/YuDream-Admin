@@ -6,7 +6,7 @@ Coding Agent 会话、Harness、Skills、MCP、工作区以及回答引用/工�
 
 YD 在既有 FA 组件、主题变量和交互基础上提供自己的外观层，并按 [FA Pro 公开组件目录](https://fantastic-admin.hurui.me/components/pro/FaAnimatedBeam.html) 的 47 个参考项独立实现通用交互、日历和动效能力。参考目录用于确定功能范围；YD 没有复制闭源 Pro 源码，也不承诺 FA Pro 的属性、插槽或事件兼容。下方矩阵记录当前实现的能力与边界。
 
-新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。组件源码、resolver 与插件 SDK 的宿主共享映射已接入本仓工作区。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)，只有发布及验签完成的版本才能用于生产插件。
+新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。当前工作区源码目录已有 131 个 YD 组件入口；其中 `YdFilePicker`、`YdMultiSelect`、`YdMarkdownEditor`、`YdCodeEditor` 属于未发布入口，不包含在已发布并验签的 components 1.4.0 / plugin-sdk 1.9.0 的 127 个入口中。插件只能使用已发布验签的契约。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)。
 
 ## 接入与基础二次封装
 
@@ -34,10 +34,17 @@ const name = ref('')
 | 按钮与信息 | `YdButton`、`YdButtonGroup`、`YdAlert`、`YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup`、`YdProgress`、`YdTrend`、`YdToast` |
 | 页面与数据 | `YdCard`、`YdPageHeader`、`YdPageMain`、`YdDescriptions`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdSearchBar`、`YdPagination`、`YdTable`、`YdResponsiveTable`、`YdTabs`、`YdCollapsible` |
 | 浮层与文件 | `YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdDrawer`、`YdModal`、`YdImagePreview`、`YdImageUpload`、`YdFileUpload` |
+| 技术编辑器 | `YdCodeEditor`、`YdMarkdownEditor` |
 
 对应组合式入口为 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`。基础组件的具体参数仍以对应 Fa 源码契约为准；列表手机端使用 `YdResponsiveTable` 的 `#card` 插槽。
 
 `YdCombobox` 与 `YdMention` 使用 Reka 交互基础并由 YD 绘制控件；`YdTree` 和多列模式的 `YdCascader` 仍在组件内部复用 Arco 的树及级联交互，控件和弹出层消费 YD 主题样式。业务调用方使用 YD 的模型、数据结构和插槽，无需直接引入 Arco 原生控件。
+
+搜索型受控多选使用 `YdMultiSelect`，`modelValue` 为 `string[]`，选项为 `{ label, value, disabled? }[]`；支持本地搜索、标签删除、`maxTagCount`、`option` / `empty` 插槽及键盘选择。文件输入控件仅需触发系统选择并接收 `File[]` 时使用 `YdFilePicker`；完整上传队列继续使用 `YdFileUpload`。
+
+`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。此入口目前仅存在于工作区，待统一发布验签后插件才能使用。
+
+`YdCodeEditor` 使用 CodeMirror 6 承载 JSON、HTML、CSS 和 JavaScript 编辑，可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁 EditorView。此入口同样只存在于当前工作区。
 
 ## 主题、预设与动效
 
@@ -203,6 +210,7 @@ const max = parseDate('2026-12-31')
 | 入口 | 核心模型 / 参数 | 插槽、事件和方法 |
 | --- | --- | --- |
 | `YdCombobox` | `v-model: string | number | undefined`；`options` 为 `{ label, value, disabled? }` 或 `{ label, options }` 分组；`virtualList`、`filter(search, option)`、`clearable`、`loading` | `#option={ option }`、`#empty`、`#loading`；`change`、`clear`、`search` |
+| `YdMultiSelect` | `v-model: string[]`；`options: { label, value: string, disabled? }[]`；`allowSearch`、`maxTagCount`、`disabled`、`id`、`ariaInvalid`、`ariaDescribedby`、`ariaLabel` | `#option={ option }`、`#empty`；`change(string[])`、`search(string)`；ref `focus()` / `blur()` / `element`；保留已选的隐藏/禁用 ID，陌生 ID 不进入模型 |
 | `YdCascader` | 相同单值模型；递归 `options`；`leafOnly=true`、`panelMode='multi'|'single'`、`triggerMode='click'|'hover'` | `#option={ option }`、`#empty`；`change`、`clear`。triggerMode 作用于多列模式 |
 | `YdTree` | `data: YdTreeNode[]`；`selectedKeys`、`checkedKeys`、`expandedKeys` 三个字符串数组模型；`checkable`、`filterable`、`virtualList`、`defaultExpandAll`、`filterMethod` | 默认槽 `{ node, expanded }`、`#empty`；`selectionChange(node|null)`、`checkChange(nodes)`；ref 的 `expand(keys?)`、`collapse(keys?)`、`checkAll(on)`、`setSelection(key)`、`clearSelection()` |
 | `YdMention` | `v-model` 文本、`v-model:value` 去重后的提及 ID 数组；`items: YdMentionOption[]`；trigger 默认 `@`，inputAs 默认 textarea | `#option={ option }`、`#empty`；`change(text)`、`search(query)`、`select(option)`；ref 的 `focus()` / `blur()` |
@@ -337,6 +345,8 @@ type 可选 plane/chase/bounce/wave/pulse/flow/swing/circle/circle-fade/grid/fol
 | --- | --- |
 | `YdCode` | code、language、title、copyable 默认 true、lineNumbers；高亮器转义输入代码，组件不执行代码 |
 | `YdCodePreview` | code、language 默认 xml、title；默认插槽直接承载已编写的 Vue 示例 |
+| `YdCodeEditor` | `modelValue`、`defaultValue`、`language: json/html/css/javascript/text`、`completions`、`placeholder`、`height`、`readonly`、`disabled`、`lineNumbers`、`error`；`update:modelValue`、`focus`、`blur`、`formatError`；ref `focus()` / `blur()` / `format()` / `resetToDefault()` / `element` |
+| `YdMarkdownEditor` | `modelValue`、`placeholder`、`height`、`language`、`previewTheme`、`codeTheme`、`readonly`、`disabled`、`error`、`ariaLabel`；`update:modelValue`、`uploadError`；`imageUpload(files, callback)` 注入图片上传；ref `focus()` / `blur()` / `element` |
 | `YdLinkPreview` | url、title、description、image、target；默认槽是链接内容，`#preview` 可完全替换预览卡 |
 | `YdQrcode` | value、size 默认180且限制64..2048、margin 默认4、errorCorrectionLevel 默认M、foreground/background、label；ready(dataUrl)、error(Error)；ref.download(filename?) / refresh() / dataUrl |
 | `YdStorageBox<T>` | uniqueKey、boxId、data:T、title、limit 默认20；takeOut(data)、error(error)；默认槽可替换打开按钮 |

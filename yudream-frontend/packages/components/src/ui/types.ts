@@ -119,6 +119,13 @@ export interface YdInputTagItem {
   label?: string
   closable?: boolean
 }
+export interface YdFilePickerInstance {
+  open: () => void
+  reset: () => void
+  focus: () => void
+  blur: () => void
+  element: Readonly<import('vue').ShallowRef<HTMLInputElement | null>>
+}
 export type YdInputTagValue = string | number | YdInputTagItem
 export interface YdInputTagInstance {
   focus: () => void

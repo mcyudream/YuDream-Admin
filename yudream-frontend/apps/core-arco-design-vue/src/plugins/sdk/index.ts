@@ -8,7 +8,7 @@ import { applyPublicSeo } from '@/utils/public-seo'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.9.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.10.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()

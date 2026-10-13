@@ -4,7 +4,7 @@ import type { YdFormFieldBindings } from './types'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Fragment, h } from 'vue'
-import { bindYdFormControls } from './form-controls'
+import { bindYdFormControls, isYdFormLabelFallbackTarget } from './form-controls'
 import { getYdRatePointerValue, normalizeYdRate } from './rate'
 
 test('评分精度、边界和异常输入保持有效模型', () => {
@@ -51,4 +51,17 @@ test('字段桥穿过 Fragment，但保留布局元素和显式控件禁用状�
   assert.equal(children[0], label)
   assert.equal(children[1].props?.disabled, false)
   assert.equal(children[1].props?.id, 'field-control')
+})
+test('字段桥识别 script setup 的 __name 并只将标签回退焦点用于复合可编辑入口', () => {
+  const bindings = { 'id': 'field-control', 'disabled': false, 'aria-invalid': true, 'aria-describedby': 'field-help', 'onUpdate:modelValue': () => {}, 'onInput': () => {}, 'onChange': () => {}, 'onBlur': () => {}, 'onFocus': () => {} } satisfies YdFormFieldBindings
+  const node = h({ __name: 'YdCodeEditor', setup: () => () => null }, { 'aria-describedby': 'caller-help' })
+  const [result] = bindYdFormControls([node], bindings)
+  assert.equal(result.props?.id, 'field-control')
+  assert.equal(result.props?.['aria-invalid'], true)
+  assert.equal(result.props?.['aria-describedby'], 'field-help')
+  assert.equal(isYdFormLabelFallbackTarget({ tagName: 'DIV', isContentEditable: true, hasAttribute: () => false }), true)
+  assert.equal(isYdFormLabelFallbackTarget({ tagName: 'INPUT', isContentEditable: false, hasAttribute: () => true }), false)
+  assert.equal(isYdFormLabelFallbackTarget({ tagName: 'DIV', isContentEditable: false, hasAttribute: name => name === 'tabindex' }), true)
+  assert.equal(isYdFormLabelFallbackTarget({ tagName: 'DIV', isContentEditable: false, hasAttribute: () => true, getAttribute: name => name === 'aria-disabled' ? 'true' : null }), false)
+  assert.equal(isYdFormLabelFallbackTarget({ tagName: 'BUTTON', isContentEditable: false, hasAttribute: () => true }), false)
 })

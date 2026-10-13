@@ -56,7 +56,10 @@ const BASIC_COMPONENT_NAMES = [
 ] as const
 
 const YD_COMPONENT_NAMES = [
+  'YdCodeEditor',
+  'YdMarkdownEditor',
   'YdAction',
+  'YdFilePicker',
   'YdForm',
   'YdFormItem',
   'YdInputTag',
@@ -163,6 +166,7 @@ const YD_COMPONENT_NAMES = [
   'YdLoading',
   'YdMarquee',
   'YdMention',
+  'YdMultiSelect',
   'YdMultiStepLoader',
   'YdParticlesBg',
   'YdPatternBg',

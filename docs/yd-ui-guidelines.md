@@ -67,7 +67,7 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 `YdAction` 是保留原生按钮语义的基础动作容器，用于导航、卡片选择、编辑器工具等专门组合的可点击区域；它统一键盘、焦点和禁用行为，视觉由组合组件控制。普通 CRUD、表单提交与危险操作继续使用 `YdButton`，不能用 YdAction 到处自造主色按钮。
 
-`YdSelect` 与 Fa 基础实现同契约，不等于 Arco Select。它的 `options` 使用 `{ label, value, disabled? }` 或分组对象。不得通过裸 `Option` 子节点、任意字符串替换或传递不支持的远程搜索参数完成迁移。尤其多选必须验证模型、标签回显、删除和空态；当前基础实现的展示查找以标量为主，不能直接承诺任意多选行为。
+`YdSelect` 与 Fa 基础实现同契约，不等于 Arco Select。它的 `options` 使用 `{ label, value, disabled? }` 或分组对象。单选绑定标量，`multiple` 绑定数组；选择框回显全部已选标签，空值默认显示“没有选择”，不得回落到第一项。`allowSearch` 可开启本地候选筛选，默认关闭；搜索不清除已有选择，不提供远程分页能力。不得通过裸 `Option` 子节点、任意字符串替换或传递不支持的远程搜索参数完成迁移。尤其多选必须验证模型、标签回显、取消选择和空态。修复契约见 [YD 下拉选择](yd-select-components.md)；插件仍须等待包含此修复的契约包发布验签后接入。
 
 ### 3.2 树、级联与弹出集合选择
 
@@ -173,17 +173,17 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer` |
 | 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction` |
 | 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate` |
-| 集合选择 | `YdSelect`、`YdCombobox`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup` |
+| 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup` |
 | 层级与专用选择 | `YdTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
 | 查询与分页 | `YdSearchBar`、`YdPagination` |
 | 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdDescriptions`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
 | 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview` |
-| 文件 | `YdFileUpload`、`YdImageUpload`、`YdImagePreview` |
+| 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview` |
 | 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdProgress` |
 | 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdMultiStepLoader` |
-| 内容工具 | `YdCode`、`YdCodePreview`、`YdQrcode`、`YdStorageBox` |
+| 内容工具 | `YdCode`、`YdCodePreview`、`YdCodeEditor`、`YdMarkdownEditor`、`YdQrcode`、`YdStorageBox` |
 | 数字与内容运动 | `YdCountTo`、`YdAnimatedCountTo`、`YdAnimatedCountToGroup`、`YdCarousel`、`YdSmoothSwipe`、`YdMarquee`、`YdScrollingText` |
 | 文本动效 | `YdBlurReveal`、`YdFlipWords`、`YdSparklesText`、`YdTextHighlight`、`YdTextShiny` |
 | 装饰与互动 | `YdAnimatedBeam`、`YdBorderBeam`、`YdFlipCard`、`YdGlowyCard`、`YdGlowyCardWrapper`、`YdGradientButton`、`YdInteractiveButton`、`YdParticlesBg`、`YdPatternBg`、`YdSpotlightCard`、`YdScratchOff` |
@@ -201,7 +201,6 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | --- | --- |
 | 完整多选搜索与远程候选契约 | 保留数组模型、候选标签、删除、键盘与远程加载；不硬塞单值 Combobox。标签自由录入已使用 `YdInputTag` |
 | 特殊上传/文件候选与颜色选择 | 缺少当前公开上传器能力时，新增受控 adapter，不回退裸 input |
-| 专门代码/Markdown 编辑器 | 封装编辑模型、主题、语言、错误与实例方法；不是 YdCode 展示组件 |
 | 编辑型工作流画布、可视化构建器 | 保留节点、边、拖拽、缩放、历史、导入导出等真实能力；不是 YdGraphCanvas |
 | 完整图表与高级集合交互 | 根据实际业务需要封装图表引擎、远程多选、异步树、拖拽等能力，公开业务稳定模型 |
 
