@@ -8,8 +8,10 @@ const inputBasic = ref('')
 const inputClearable = ref('可清空的内容')
 const inputPassword = ref('')
 const textareaValue = ref('')
-const selectSingle = ref('1')
-const selectMultiple = ref<unknown[]>([])
+const selectSingle = ref<string>()
+const selectMultiple = ref<string[]>(['1', '3'])
+const selectGrouped = ref<string[]>(['1', '5'])
+const selectAllowSearch = ref(true)
 const switchValue = ref(true)
 const switchOff = ref(false)
 const switchOn = ref(true)
@@ -19,6 +21,24 @@ const selectOptions = [
   { label: 'TypeScript', value: '2' },
   { label: 'YD 组件', value: '3' },
 ]
+
+const selectGroupedOptions = [
+  { label: '前端技术', options: selectOptions },
+  {
+    label: '服务端技术',
+    options: [
+      { label: 'Java', value: '4' },
+      { label: 'Node.js', value: '5' },
+      { label: 'Redis（暂不可选）', value: '6', disabled: true },
+    ],
+  },
+]
+
+function clearSelectValues() {
+  selectSingle.value = undefined
+  selectMultiple.value = []
+  selectGrouped.value = []
+}
 
 interface PluginItem {
   id: string
@@ -101,11 +121,48 @@ const pickerCode = `<YdTablePicker
     </div>
   </DemoCard>
 
-  <DemoCard title="YdSelect" description="单选 / 多选 / 禁用">
-    <div class="gap-3 grid max-w-md">
-      <YdSelect v-model="selectSingle" :options="selectOptions" />
-      <YdSelect v-model="selectMultiple" :options="selectOptions" multiple />
-      <YdSelect model-value="1" :options="selectOptions" disabled />
+  <DemoCard title="YdSelect" description="没有选择 / 多选标签回显 / 可选前端搜索 / 分组 / 禁用">
+    <div class="gap-4 grid max-w-md">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <YdLabel class="text-sm flex gap-2 items-center">
+          <YdSwitch v-model="selectAllowSearch" aria-label="启用分组多选的前端搜索" />
+          启用前端搜索
+        </YdLabel>
+        <YdButton size="sm" variant="outline" aria-label="清空单选和多选示例的全部绑定值" @click="clearSelectValues">
+          清空全部选择
+        </YdButton>
+      </div>
+
+      <div class="gap-2 grid">
+        <span class="text-sm">单选（初始为空）</span>
+        <YdSelect v-model="selectSingle" :options="selectOptions" aria-label="技术单选空态示例" />
+        <output class="text-xs text-muted-foreground" aria-live="polite">实际绑定值：{{ JSON.stringify(selectSingle) ?? 'undefined' }}</output>
+      </div>
+
+      <div class="gap-2 grid">
+        <span class="text-sm">多选（已选标签回显）</span>
+        <YdSelect v-model="selectMultiple" :options="selectOptions" multiple aria-label="技术多选标签回显示例" />
+        <output class="text-xs text-muted-foreground break-words" aria-live="polite">实际绑定值：{{ JSON.stringify(selectMultiple) }}</output>
+      </div>
+
+      <div class="gap-2 grid">
+        <span class="text-sm">分组多选（{{ selectAllowSearch ? '允许搜索' : '关闭搜索' }}）</span>
+        <YdSelect
+          v-model="selectGrouped"
+          :options="selectGroupedOptions"
+          multiple
+          :allow-search="selectAllowSearch"
+          search-placeholder="搜索前端或服务端技术"
+          empty-text="没有匹配的技术"
+          aria-label="可搜索的技术分组多选示例"
+        />
+        <output class="text-xs text-muted-foreground break-words" aria-live="polite">实际绑定值：{{ JSON.stringify(selectGrouped) }}</output>
+      </div>
+
+      <div class="gap-2 grid">
+        <span class="text-sm">禁用单选</span>
+        <YdSelect model-value="1" :options="selectOptions" disabled aria-label="禁用的技术单选示例" />
+      </div>
     </div>
   </DemoCard>
 
