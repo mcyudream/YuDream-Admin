@@ -56,6 +56,25 @@ const BASIC_COMPONENT_NAMES = [
 ] as const
 
 const YD_COMPONENT_NAMES = [
+  'YdAgentWorkbench',
+  'YdAgentContextPanel',
+  'YdAgentAnswer',
+  'YdChatGraphView',
+  'YdChatMessageList',
+  'YdChatProcess',
+  'YdChatSender',
+  'YdCitationList',
+  'YdAttachmentList',
+  'YdChatSessionList',
+  'YdWelcome',
+  'YdChatWindow',
+  'YdBubble',
+  'YdPrompts',
+  'YdThoughtChain',
+  'YdChatActions',
+  'YdSuggestion',
+  'YdChatLoading',
+  'YdChatReasoning',
   'YdAlert',
   'YdAvatar',
   'YdBadge',
@@ -166,6 +185,10 @@ const COMPONENT_NAMES = [
 ] as const
 
 const AUTO_IMPORT_NAMES = [
+  'useYdChat',
+  'useYdChatStream',
+  'provideYdChatConfig',
+  'useYdChatConfig',
   'useYdDrawer',
   'useYdImagePreview',
   'useYdModal',

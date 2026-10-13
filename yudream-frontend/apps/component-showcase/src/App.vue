@@ -33,10 +33,14 @@ const categories: Category[] = [
   { key: 'form', label: '表单', en: 'Form', icon: 'morph:square-pen', group: '数据录入', description: '输入框、多行文本、选择器、开关等表单控件。', section: FormSection },
   { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:layout-grid', group: '数据展示', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
   { key: 'feedback', label: '反馈', en: 'Feedback', icon: 'morph:bell', group: '反馈', description: '气泡提示、弹窗、图片预览等交互反馈组件。', section: FeedbackSection },
-  { key: 'ai', label: 'AI 助手', en: 'AI Chat', icon: 'morph:sparkles', group: 'AI 助手', description: '会话、消息气泡、输入区、附件、思考链、动作与 AG-UI 流式元件。', section: AiSection },
+  { key: 'ai', label: 'AI 助手', en: 'Agent Studio', icon: 'morph:bot', group: 'AI 助手', description: '从对话到交付：Harness、Skills、MCP、工作区与可检查的代码变更。', section: AiSection },
 ]
 
-const active = useStorage('component-showcase:category', 'extended')
+const requestedCategory = new URLSearchParams(window.location.search).get('category')
+// 专用预览入口使用标签页内的视图状态，避免其他预览切页时中断当前演示。
+const active = requestedCategory && categories.some(item => item.key === requestedCategory)
+  ? ref(requestedCategory)
+  : useStorage('component-showcase:category', 'extended')
 const content = ref<HTMLElement>()
 watch(active, () => content.value?.scrollTo({ top: 0 }), { flush: 'post' })
 const { preset: appearance } = useShowcaseAppearance()

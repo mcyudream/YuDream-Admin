@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { YdChatAction, YdChatCitation, YdChatGraphNode, YdChatMessage, YdChatRetrievalHit, YdChatToolEvent } from './useYdChatStream'
-import { computed, nextTick, ref, watch } from 'vue'
 import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
+import { computed, nextTick, ref, watch } from 'vue'
 import FaIcon from '../basic/icon/index.vue'
-import YdAttachmentList from './YdAttachmentList.vue'
-import YdCitationList from './YdCitationList.vue'
-import YdChatProcess from './YdChatProcess.vue'
 import { useYdChatConfig } from './chat-context'
+import YdAttachmentList from './YdAttachmentList.vue'
+import YdChatProcess from './YdChatProcess.vue'
+import YdCitationList from './YdCitationList.vue'
+import 'md-editor-v3/lib/style.css'
 
 const props = withDefaults(defineProps<{
   messages: YdChatMessage[]
@@ -29,15 +29,6 @@ const props = withDefaults(defineProps<{
   imageUrlResolver: undefined,
 })
 
-const config = useYdChatConfig()
-const thinkingHint = computed(() => props.thinkingText ?? config.thinkingText ?? '正在检索并思考…')
-const reasoningLabel = computed(() => props.reasoningTitle ?? config.reasoningTitle ?? '深度思考')
-
-function rendered(content: string): string {
-  const transform = props.transformContent ?? config.transformContent
-  return transform ? transform(content) : content
-}
-
 const emits = defineEmits<{
   /** assistant 气泡内容上的点击（可拦截 wiki:// 等自定义链接） */
   contentClick: [event: MouseEvent]
@@ -48,6 +39,14 @@ const emits = defineEmits<{
   copyMessage: [message: YdChatMessage]
   regenerateMessage: [message: YdChatMessage]
 }>()
+const config = useYdChatConfig()
+const thinkingHint = computed(() => props.thinkingText ?? config.thinkingText ?? '正在检索并思考…')
+const reasoningLabel = computed(() => props.reasoningTitle ?? config.reasoningTitle ?? '深度思考')
+
+function rendered(content: string): string {
+  const transform = props.transformContent ?? config.transformContent
+  return transform ? transform(content) : content
+}
 
 const listEl = ref<HTMLElement | null>(null)
 const expandedReasoning = ref<Record<number, boolean>>({})
@@ -113,13 +112,17 @@ defineExpose({ scrollToBottom })
       <div v-if="message.role === 'user'" class="yd-msg yd-msg--user">
         <div class="yd-msg__body yd-msg__body--user">
           <YdAttachmentList :attachments="message.attachments ?? []" />
-          <div class="yd-bubble yd-bubble--user">{{ message.content }}</div>
+          <div class="yd-bubble yd-bubble--user">
+            {{ message.content }}
+          </div>
         </div>
       </div>
 
       <!-- 助手消息 -->
       <div v-else class="yd-msg">
-        <div class="yd-msg__avatar"><FaIcon name="morph:sparkles" /></div>
+        <div class="yd-msg__avatar">
+          <FaIcon name="morph:sparkles" />
+        </div>
         <div class="yd-msg__body">
           <!-- 深度思考 -->
           <section v-if="message.reasoning" class="yd-reasoning">
@@ -241,8 +244,8 @@ defineExpose({ scrollToBottom })
 .yd-chat-list {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   padding: 8px clamp(16px, 8vw, 120px) 20px;
+  overflow-y: auto;
 }
 
 .yd-chat-list__empty {
@@ -255,27 +258,27 @@ defineExpose({ scrollToBottom })
 /* 回到底部悬浮钮（sticky 底部吸附，按钮自身高度被负 margin 抵消） */
 .yd-chat-list__to-bottom {
   position: sticky;
-  z-index: 5;
   bottom: 12px;
+  z-index: 5;
   display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  place-items: center;
   margin-top: -34px;
   margin-left: auto;
-  border: 1px solid var(--color-border-2);
-  border-radius: 50%;
-  background: var(--color-bg-1);
+  font-size: 16px;
   color: var(--color-text-2);
   cursor: pointer;
-  font-size: 16px;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 50%;
   box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
   transition: color 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .yd-chat-list__to-bottom:hover {
-  border-color: var(--color-border-3);
   color: var(--color-text-1);
+  border-color: var(--color-border-3);
   transform: translateY(1px);
 }
 
@@ -291,57 +294,57 @@ defineExpose({ scrollToBottom })
 
 .yd-msg__avatar {
   display: grid;
-  width: 30px;
-  height: 30px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 9px;
-  background: rgba(var(--primary-6), 0.12);
-  color: rgb(var(--primary-6));
+  width: 30px;
+  height: 30px;
   font-size: 15px;
+  color: var(--yd-emphasis, oklch(var(--primary)));
+  background: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 12%, transparent);
+  border-radius: 9px;
 }
 
 .yd-msg__body {
-  max-width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .yd-msg--user .yd-msg__body {
   display: flex;
-  max-width: 82%;
   flex-direction: column;
   align-items: flex-end;
+  max-width: 82%;
 }
 
 .yd-bubble {
   padding: 10px 14px;
-  border-radius: 14px;
   font-size: 14.5px;
   line-height: 1.75;
+  border-radius: 14px;
 }
 
 .yd-bubble--user {
   max-width: 100%;
   padding: 11px 16px;
+  color: var(--color-text-1);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 10%, transparent);
   border-radius: 18px;
   border-bottom-right-radius: 6px;
-  background: rgba(var(--primary-6), 0.1);
-  color: var(--color-text-1);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .yd-bubble--assistant {
   padding: 4px 0;
-  border: 0;
   background: transparent;
+  border: 0;
   border-radius: 0;
 }
 
 .yd-bubble--error {
-  border-color: rgb(var(--danger-6, 245 63 63) / 33%);
-  background: rgb(var(--danger-6, 245 63 63) / 6%);
   color: rgb(var(--danger-6, 245 63 63));
+  background: rgb(var(--danger-6, 245 63 63) / 6%);
+  border-color: rgb(var(--danger-6, 245 63 63) / 33%);
 }
 
 .yd-markdown :deep(.md-editor-preview-wrapper) {
@@ -349,40 +352,40 @@ defineExpose({ scrollToBottom })
 }
 
 .yd-markdown :deep(.md-editor-preview) {
-  background: transparent;
-  color: inherit;
   font-size: 14px;
+  color: inherit;
+  background: transparent;
 }
 
 .yd-markdown :deep(a[href^='wiki://']) {
-  border-bottom: 1px dashed rgba(var(--primary-6), 0.5);
-  color: rgb(var(--primary-6));
-  cursor: pointer;
+  color: var(--yd-emphasis, oklch(var(--primary)));
   text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px dashed color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 50%, transparent);
 }
 
 /* 深度思考 */
 .yd-reasoning {
   margin-bottom: 10px;
   overflow: hidden;
+  background: var(--color-fill-1);
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: var(--color-fill-1);
 }
 
 .yd-reasoning__head {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   width: 100%;
   padding: 7px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-2);
   text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
 }
 
 .yd-reasoning__head:hover {
@@ -390,7 +393,7 @@ defineExpose({ scrollToBottom })
 }
 
 .yd-reasoning__head :deep(svg:first-child) {
-  color: rgb(var(--primary-6));
+  color: var(--yd-emphasis, oklch(var(--primary)));
 }
 
 .yd-reasoning__chevron {
@@ -400,9 +403,9 @@ defineExpose({ scrollToBottom })
 
 .yd-reasoning__body {
   padding: 2px 12px 10px;
-  color: var(--color-text-3);
   font-size: 12.5px;
   line-height: 1.7;
+  color: var(--color-text-3);
   white-space: pre-wrap;
 }
 
@@ -415,21 +418,21 @@ defineExpose({ scrollToBottom })
 
 .yd-tool {
   display: flex;
-  align-items: center;
   gap: 7px;
+  align-items: center;
   width: fit-content;
   max-width: 100%;
   padding: 6px 11px;
+  font-size: 12px;
+  color: var(--color-text-2);
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 999px;
-  background: var(--color-bg-1);
-  color: var(--color-text-2);
-  font-size: 12px;
 }
 
 .yd-tool__icon {
   flex-shrink: 0;
-  color: rgb(var(--primary-6));
+  color: var(--yd-emphasis, oklch(var(--primary)));
 }
 
 .yd-tool__icon--spin {
@@ -451,25 +454,25 @@ defineExpose({ scrollToBottom })
 
 .yd-tool__message {
   overflow: hidden;
-  color: var(--color-text-3);
   text-overflow: ellipsis;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
 /* 生成中三点动画 */
 .yd-bubble--thinking {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
-  color: var(--color-text-3);
+  align-items: center;
   font-size: 13px;
+  color: var(--color-text-3);
 }
 
 .yd-dot {
   width: 6px;
   height: 6px;
+  background: var(--yd-emphasis, oklch(var(--primary)));
   border-radius: 50%;
-  background: rgb(var(--primary-6));
   animation: yd-chat-blink 1.2s infinite;
 }
 
@@ -482,7 +485,9 @@ defineExpose({ scrollToBottom })
 }
 
 @keyframes yd-chat-blink {
-  0%, 60%, 100% { opacity: 0.25; }
+  0%,
+ 60%,
+ 100% { opacity: 0.25; }
   30% { opacity: 1; }
 }
 
@@ -496,9 +501,9 @@ defineExpose({ scrollToBottom })
   width: 8px;
   height: 16px;
   margin-left: 2px;
-  border-radius: 2px;
-  background: rgb(var(--primary-6));
   vertical-align: text-bottom;
+  background: var(--yd-emphasis, oklch(var(--primary)));
+  border-radius: 2px;
   animation: yd-chat-blink 1s infinite;
 }
 
@@ -512,22 +517,22 @@ defineExpose({ scrollToBottom })
 
 .yd-action {
   display: inline-flex;
-  align-items: center;
   gap: 5px;
+  align-items: center;
   padding: 5px 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 999px;
-  background: var(--color-bg-1);
-  color: rgb(var(--primary-6));
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--yd-emphasis, oklch(var(--primary)));
+  cursor: pointer;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
   transition: border-color 0.15s, background 0.15s;
 }
 
 .yd-action:hover {
-  border-color: rgba(var(--primary-6), 0.4);
-  background: rgba(var(--primary-6), 0.06);
+  background: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 6%, transparent);
+  border-color: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 40%, transparent);
 }
 
 /* 消息操作 */
@@ -539,20 +544,20 @@ defineExpose({ scrollToBottom })
 
 .yd-message-tool {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
   padding: 3px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-3);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
 }
 
 .yd-message-tool:hover {
+  color: var(--yd-emphasis, oklch(var(--primary)));
   background: var(--color-fill-1);
-  color: rgb(var(--primary-6));
 }
 </style>

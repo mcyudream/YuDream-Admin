@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { ComposablesAutoImports as FantasticAdminComposablesAutoImports } from '@fantastic-admin/composables/resolver'
-import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@yudream/components/resolver'
 import vue from '@vitejs/plugin-vue'
+import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@yudream/components/resolver'
 import Unocss from 'unocss/vite'
 import autoImport from 'unplugin-auto-import/vite'
 import components from 'unplugin-vue-components/vite'
@@ -38,6 +38,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
+  },
+  // 组件工作区按源码热更新，新增公开入口无需重建依赖预打包缓存。
+  optimizeDeps: {
+    exclude: ['@yudream/components'],
   },
   server: {
     port: 5188,

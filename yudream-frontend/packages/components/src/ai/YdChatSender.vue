@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { YdChatAttachment } from './useYdChatStream'
+import type { YdSuggestionItem } from './YdSuggestion.vue'
+import { computed, ref } from 'vue'
 import FaButton from '../basic/button/index.vue'
 import FaIcon from '../basic/icon/index.vue'
+import { useYdChatConfig } from './chat-context'
 import YdAttachmentList from './YdAttachmentList.vue'
 import YdSuggestion from './YdSuggestion.vue'
-import type { YdSuggestionItem } from './YdSuggestion.vue'
-import { useYdChatConfig } from './chat-context'
 
 const props = withDefaults(defineProps<{
   /** 生成中：显示停止按钮、禁止再次发送 */
@@ -17,6 +17,8 @@ const props = withDefaults(defineProps<{
   suggestions?: string[]
   /** 当前附件列表（支持 v-model:attachments） */
   attachments?: YdChatAttachment[]
+  /** 是否允许添加附件；由宿主按当前能力决定 */
+  attachmentsEnabled?: boolean
   /** 可选文件类型，默认图片与常见文档 */
   accept?: string
   /** 是否允许多选 */
@@ -33,6 +35,7 @@ const props = withDefaults(defineProps<{
   placeholder: undefined,
   suggestions: () => [],
   attachments: () => [],
+  attachmentsEnabled: true,
   accept: 'image/*,.pdf,.txt,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx',
   multiple: true,
   disclaimer: undefined,
@@ -42,16 +45,16 @@ const props = withDefaults(defineProps<{
 })
 
 const emits = defineEmits<{
-  send: [text: string, attachments: YdChatAttachment[]]
-  stop: []
-  suggestionClick: [text: string]
-  attach: [files: File[]]
-  removeAttachment: [attachment: YdChatAttachment]
+  'send': [text: string, attachments: YdChatAttachment[]]
+  'stop': []
+  'suggestionClick': [text: string]
+  'attach': [files: File[]]
+  'removeAttachment': [attachment: YdChatAttachment]
   'update:attachments': [attachments: YdChatAttachment[]]
-  mentionSelect: [item: YdSuggestionItem]
+  'mentionSelect': [item: YdSuggestionItem]
 }>()
 
-const text = ref('')
+const text = defineModel<string>({ default: '' })
 const fileInput = ref<HTMLInputElement | null>(null)
 const focused = ref(false)
 const mentionSuggestion = ref<InstanceType<typeof YdSuggestion> | null>(null)
@@ -59,6 +62,7 @@ const config = useYdChatConfig()
 const placeholderText = computed(() => props.placeholder ?? config.placeholder ?? '尽管问，或让我帮你做点什么…')
 const disclaimerText = computed(() => props.disclaimer ?? config.disclaimer ?? '内容由余梦 AI 生成，请核对重要信息')
 const canSend = computed(() => !props.disabled && !props.loading && !!text.value.trim())
+const canAttach = computed(() => props.attachmentsEnabled && !props.loading && !props.disabled)
 
 function submit() {
   if (!canSend.value) {
@@ -69,7 +73,7 @@ function submit() {
 }
 
 function pickFiles() {
-  if (props.loading || props.disabled) {
+  if (!canAttach.value) {
     return
   }
   fileInput.value?.click()
@@ -78,13 +82,16 @@ function pickFiles() {
 function onFiles(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
-  if (files.length) {
+  if (canAttach.value && files.length) {
     emits('attach', files)
   }
   input.value = ''
 }
 
 function onDrop(event: DragEvent) {
+  if (!canAttach.value) {
+    return
+  }
   const files = Array.from(event.dataTransfer?.files ?? [])
   if (files.length) {
     emits('attach', files)
@@ -92,6 +99,9 @@ function onDrop(event: DragEvent) {
 }
 
 function onPaste(event: ClipboardEvent) {
+  if (!canAttach.value) {
+    return
+  }
   const files = Array.from(event.clipboardData?.files ?? [])
   if (files.length) {
     emits('attach', files)
@@ -99,6 +109,9 @@ function onPaste(event: ClipboardEvent) {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) {
+    return
+  }
   if (mentionSuggestion.value?.handleKeydown(event)) {
     event.preventDefault()
     return
@@ -150,19 +163,24 @@ function onMentionSelect(item: YdSuggestionItem) {
         @select="onMentionSelect"
       />
       <YdAttachmentList v-if="attachments.length" :attachments="attachments" removable @remove="emits('removeAttachment', $event)" />
+      <div v-if="$slots.context" class="yd-sender__context">
+        <slot name="context" />
+      </div>
       <textarea
         v-model="text"
         :rows="large ? 3 : 2"
         :placeholder="placeholderText"
         :disabled="disabled"
+        aria-label="输入消息"
         class="yd-sender__box"
         @focus="focused = true"
         @blur="focused = false"
         @keydown="onKeydown"
       />
       <div class="yd-sender__bar">
-        <input ref="fileInput" type="file" class="yd-sender__file" :accept="accept" :multiple="multiple" @change="onFiles">
+        <input v-if="attachmentsEnabled" ref="fileInput" type="file" class="yd-sender__file" :accept="accept" :multiple="multiple" @change="onFiles">
         <FaButton
+          v-if="attachmentsEnabled"
           variant="ghost"
           size="icon-sm"
           class="yd-sender__attach"
@@ -211,8 +229,8 @@ function onMentionSelect(item: YdSuggestionItem) {
 .yd-sender__suggestions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
+  justify-content: center;
 }
 
 .yd-sender--constrained .yd-sender__suggestions,
@@ -223,23 +241,26 @@ function onMentionSelect(item: YdSuggestionItem) {
 
 .yd-sender__chip {
   display: inline-flex;
-  align-items: center;
   gap: 5px;
+  align-items: center;
   padding: 6px 14px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 999px;
-  background: var(--color-bg-2);
+  font: inherit;
+  font-size: calc(var(--yd-control-font-size, 14px) - 1px);
   color: var(--color-text-2);
   cursor: pointer;
-  font: inherit;
-  font-size: 12.5px;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-control-radius, 12px);
+  transition:
+    border-color var(--yd-motion-duration-fast, 140ms) var(--yd-motion-ease, ease),
+    color var(--yd-motion-duration-fast, 140ms) var(--yd-motion-ease, ease),
+    background var(--yd-motion-duration-fast, 140ms) var(--yd-motion-ease, ease);
 }
 
 .yd-sender__chip:hover:not(:disabled) {
-  border-color: var(--color-border-2);
-  background: var(--color-fill-1);
   color: var(--color-text-1);
+  background: var(--color-fill-1);
+  border-color: var(--color-border-2);
 }
 
 .yd-sender__chip:disabled {
@@ -247,28 +268,37 @@ function onMentionSelect(item: YdSuggestionItem) {
   opacity: 0.6;
 }
 
-/* Kimi 风格大圆角输入框 */
 .yd-sender__composer {
   position: relative;
   overflow: visible;
-  border: 1px solid var(--color-border-2);
-  border-radius: 20px;
   background: var(--color-bg-1);
-  box-shadow: 0 4px 24px rgb(0 0 0 / 6%);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-surface-radius, 18px);
+  box-shadow: var(--yd-surface-shadow, none);
+  transition:
+    border-color var(--yd-motion-duration-fast, 140ms) var(--yd-motion-ease, ease),
+    box-shadow var(--yd-motion-duration-fast, 140ms) var(--yd-motion-ease, ease);
 }
 
 .yd-sender__composer.is-focused {
-  border-color: var(--color-border-2);
-  box-shadow: 0 4px 28px rgb(0 0 0 / 8%);
+  border-color: var(--color-text-3);
+  box-shadow: var(--yd-surface-shadow-hover, none);
+}
+
+.yd-sender__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px 0;
+  color: var(--color-text-2);
 }
 
 .yd-sender__mention {
   position: absolute;
-  z-index: 2;
   right: 14px;
   bottom: calc(100% + 8px);
   left: 14px;
+  z-index: 2;
   max-height: 248px;
   overflow-y: auto;
 }
@@ -277,15 +307,15 @@ function onMentionSelect(item: YdSuggestionItem) {
   display: block;
   width: 100%;
   min-height: 84px;
-  resize: none;
   padding: 16px 18px 4px;
-  border: 0;
+  font: inherit;
+  font-size: var(--yd-control-font-size, 14px);
+  line-height: 1.7;
+  color: var(--color-text-1);
+  resize: none;
   outline: 0;
   background: transparent;
-  color: var(--color-text-1);
-  font: inherit;
-  font-size: 15px;
-  line-height: 1.7;
+  border: 0;
   box-shadow: none;
 }
 
@@ -300,15 +330,15 @@ function onMentionSelect(item: YdSuggestionItem) {
 
 .yd-sender__bar {
   display: flex;
-  align-items: center;
   flex-wrap: nowrap;
   gap: 8px;
+  align-items: center;
   padding: 4px 14px 12px;
 }
 
 .yd-sender__attach {
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--yd-control-radius, 12px);
 }
 
 .yd-sender__attach-icon {
@@ -316,12 +346,12 @@ function onMentionSelect(item: YdSuggestionItem) {
 }
 
 .yd-sender__hint {
-  overflow: hidden;
-  margin-left: auto;
   margin-right: 4px;
-  color: var(--color-text-3);
-  font-size: 11px;
+  margin-left: auto;
+  overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
@@ -331,19 +361,19 @@ function onMentionSelect(item: YdSuggestionItem) {
 
 .yd-sender__action {
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--yd-control-radius, 12px);
 }
 
 .yd-sender__action--send:not(:disabled) {
-  background: var(--color-text-1);
   color: var(--color-bg-1);
+  background: var(--color-text-1);
 }
 
 .yd-sender__action--send:not(:disabled):hover {
   background: var(--color-text-2);
 }
 
-@media (max-width: 640px) {
+@media (width <= 768px) {
   .yd-sender {
     gap: 8px;
     padding: 8px 12px 12px;

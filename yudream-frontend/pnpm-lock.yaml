@@ -400,6 +400,9 @@ catalogs:
     vue-tsc:
       specifier: ^3.3.4
       version: 3.3.4
+    xss:
+      specifier: ^1.0.15
+      version: 1.0.15
     zod:
       specifier: ^4.4.3
       version: 4.4.3
@@ -1014,6 +1017,9 @@ importers:
       vue-sonner:
         specifier: 'catalog:'
         version: 2.0.9
+      xss:
+        specifier: 'catalog:'
+        version: 1.0.15
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

@@ -14,7 +14,7 @@ export interface YdThoughtChainItem {
   [key: string]: unknown
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   items: YdThoughtChainItem[]
   /** 默认收起为单行摘要 */
   collapsible?: boolean
@@ -27,7 +27,7 @@ withDefaults(defineProps<{
   title: '执行过程',
 })
 
-const expanded = ref(true)
+const expanded = ref(props.defaultExpanded)
 
 function statusIcon(item: YdThoughtChainItem): string {
   if (item.icon) {
@@ -48,6 +48,7 @@ function statusIcon(item: YdThoughtChainItem): string {
       v-if="collapsible"
       type="button"
       class="yd-thought-chain__head"
+      :aria-expanded="expanded"
       @click="expanded = !expanded"
     >
       <FaIcon name="morph:waypoints" />
@@ -71,8 +72,12 @@ function statusIcon(item: YdThoughtChainItem): string {
           <i v-if="index < items.length - 1" class="yd-thought-chain__line" />
         </span>
         <div class="yd-thought-chain__content">
-          <div class="yd-thought-chain__title">{{ item.title }}</div>
-          <div v-if="item.description" class="yd-thought-chain__desc">{{ item.description }}</div>
+          <div class="yd-thought-chain__title">
+            {{ item.title }}
+          </div>
+          <div v-if="item.description" class="yd-thought-chain__desc">
+            {{ item.description }}
+          </div>
           <slot name="extra" :item="item" :index="index" />
         </div>
       </li>
@@ -83,24 +88,24 @@ function statusIcon(item: YdThoughtChainItem): string {
 <style scoped>
 .yd-thought-chain {
   overflow: hidden;
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: var(--color-bg-1);
 }
 
 .yd-thought-chain__head {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   width: 100%;
   padding: 7px 12px;
-  border: 0;
-  background: var(--color-fill-1);
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-2);
   text-align: left;
+  cursor: pointer;
+  background: var(--color-fill-1);
+  border: 0;
 }
 
 .yd-thought-chain__head:hover {
@@ -117,8 +122,8 @@ function statusIcon(item: YdThoughtChainItem): string {
 }
 
 .yd-thought-chain__list {
-  margin: 0;
   padding: 12px 14px 4px;
+  margin: 0;
   list-style: none;
 }
 
@@ -129,9 +134,9 @@ function statusIcon(item: YdThoughtChainItem): string {
 
 .yd-thought-chain__rail {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
-  flex-shrink: 0;
   width: 18px;
 }
 
@@ -157,8 +162,8 @@ function statusIcon(item: YdThoughtChainItem): string {
 }
 
 .yd-thought-chain__line {
-  width: 1px;
   flex: 1;
+  width: 1px;
   min-height: 12px;
   margin: 3px 0;
   background: var(--color-border-2);
@@ -170,19 +175,19 @@ function statusIcon(item: YdThoughtChainItem): string {
 }
 
 .yd-thought-chain__title {
-  color: var(--color-text-1);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
+  color: var(--color-text-1);
 }
 
 .yd-thought-chain__desc {
   margin-top: 3px;
-  color: var(--color-text-3);
   font-size: 12px;
   line-height: 1.6;
+  color: var(--color-text-3);
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
-  word-break: break-word;
 }
 
 @keyframes yd-thought-chain-spin {

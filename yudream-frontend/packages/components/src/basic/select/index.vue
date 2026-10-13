@@ -116,7 +116,7 @@ const selectedOption = computed({
 
 <template>
   <Select v-model="selectValue" :multiple :disabled :dir="dir === 'ltr' ? 'ltr' : 'rtl'">
-    <SelectTrigger :class="cn('w-[200px]', props.class)">
+    <SelectTrigger :class="cn('w-[200px]', props.class)" :aria-label="$attrs['aria-label']" :aria-labelledby="$attrs['aria-labelledby']">
       <SelectValue :placeholder="props.placeholder">
         {{ selectedOption?.label }}
       </SelectValue>

@@ -120,9 +120,9 @@ function scopeIcon(scopeType?: string): string {
 <style scoped>
 .yd-session-list {
   display: flex;
+  flex-direction: column;
   width: 248px;
   min-width: 220px;
-  flex-direction: column;
   background: var(--color-bg-2);
 }
 
@@ -133,108 +133,108 @@ function scopeIcon(scopeType?: string): string {
 }
 
 .yd-session-list__new {
-  width: 100%;
   justify-content: center;
+  width: 100%;
   border-radius: 10px;
 }
 
 .yd-session-list__search {
   display: flex;
-  align-items: center;
   gap: 7px;
+  align-items: center;
   padding: 0 11px;
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 9px;
-  background: var(--color-bg-1);
 }
 
 .yd-session-list__search-icon {
   flex-shrink: 0;
-  color: var(--color-text-3);
   font-size: 14px;
+  color: var(--color-text-3);
 }
 
 .yd-session-list__search-input {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
   padding: 7px 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--color-text-1);
   font: inherit;
   font-size: 13px;
+  color: var(--color-text-1);
+  outline: 0;
+  background: transparent;
+  border: 0;
 }
 
 .yd-session-list__body {
-  min-height: 0;
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
   padding: 6px 10px 16px;
+  overflow-y: auto;
 }
 
 .yd-session-list__group {
   padding: 12px 8px 5px;
-  color: var(--color-text-3);
   font-size: 11px;
+  color: var(--color-text-3);
 }
 
 .yd-session-list__empty {
   padding: 28px 12px;
-  color: var(--color-text-3);
   font-size: 13px;
+  color: var(--color-text-3);
   text-align: center;
 }
 
 .yd-session {
   position: relative;
   display: flex;
-  align-items: center;
   gap: 9px;
+  align-items: center;
   width: 100%;
   padding: 9px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 13px;
+  color: var(--color-text-2);
   text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
 }
 
 .yd-session:hover {
-  background: var(--color-fill-2);
   color: var(--color-text-1);
+  background: var(--color-fill-2);
 }
 
 .yd-session.is-active {
-  background: rgba(var(--primary-6), 0.1);
   color: var(--color-text-1);
+  background: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 10%, transparent);
 }
 
 .yd-session__icon {
   flex-shrink: 0;
-  color: var(--color-text-3);
   font-size: 15px;
+  color: var(--color-text-3);
 }
 
 .yd-session.is-active .yd-session__icon {
-  color: rgb(var(--primary-6));
+  color: var(--yd-emphasis, oklch(var(--primary)));
 }
 
 .yd-session__title {
-  overflow: hidden;
-  min-width: 0;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .yd-session__pin {
   flex-shrink: 0;
-  color: rgb(var(--primary-6));
   font-size: 12px;
+  color: var(--yd-emphasis, oklch(var(--primary)));
 }
 
 .yd-session__actions {
@@ -243,12 +243,12 @@ function scopeIcon(scopeType?: string): string {
   display: none;
   gap: 1px;
   padding-left: 16px;
-  border-radius: 6px;
   background: linear-gradient(90deg, transparent, var(--color-fill-2) 30%);
+  border-radius: 6px;
 }
 
 .yd-session.is-active .yd-session__actions {
-  background: linear-gradient(90deg, transparent, rgba(var(--primary-6), 0.1) 30%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 10%, transparent) 30%);
 }
 
 .yd-session:hover .yd-session__actions {
@@ -261,19 +261,19 @@ function scopeIcon(scopeType?: string): string {
 
 .yd-session__actions button {
   display: grid;
+  place-items: center;
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
   color: var(--color-text-3);
   cursor: pointer;
-  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
 }
 
 .yd-session__actions button:hover {
+  color: var(--yd-emphasis, oklch(var(--primary)));
   background: var(--color-bg-1);
-  color: rgb(var(--primary-6));
 }
 </style>

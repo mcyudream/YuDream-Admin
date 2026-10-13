@@ -64,7 +64,8 @@
     "@internationalized/date": "catalog:",
     "qrcode": "catalog:",
     "highlight.js": "catalog:",
-    "@types/qrcode": "catalog:"
+    "@types/qrcode": "catalog:",
+    "xss": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
