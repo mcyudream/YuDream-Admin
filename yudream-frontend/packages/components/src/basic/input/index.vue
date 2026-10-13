@@ -50,6 +50,18 @@ function handleClear() {
   emits('clear')
 }
 
+function togglePasswordVisibility() {
+  if (props.disabled) {
+    return
+  }
+  // 浏览器自动填充可能尚未触发 input，切换类型前保留原生输入值。
+  const input = inputRef.value?.ref
+  if (input && input.value !== String(value.value ?? '')) {
+    value.value = input.value as T
+  }
+  type.value = type.value === 'password' ? 'text' : 'password'
+}
+
 defineExpose({
   ref: computed(() => inputRef.value?.ref),
 })
@@ -78,7 +90,7 @@ defineExpose({
       <Button v-if="!props.disabled && props.clearable && !!value && (isFocused || isHovered)" variant="ghost" size="icon" type="button" class="size-6" @click="handleClear">
         <Icon name="i-lucide:x" />
       </Button>
-      <Button v-if="props.type === 'password' && !!value" variant="ghost" size="icon" type="button" class="size-6" @click="type = type === 'password' ? 'text' : 'password'">
+      <Button v-if="props.type === 'password'" variant="ghost" size="icon" type="button" class="size-6" :disabled="props.disabled" :aria-label="type === 'password' ? '显示密码' : '隐藏密码'" @click="togglePasswordVisibility">
         <Icon :name="type === 'password' ? 'i-lucide:eye-off' : 'i-lucide:eye'" />
       </Button>
       <slot name="end" />
