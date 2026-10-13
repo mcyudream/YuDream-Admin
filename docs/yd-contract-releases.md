@@ -24,8 +24,19 @@
 
 视觉和组件选型见 [YD 规范](yd-ui-guidelines.md)，详细 API 见 [通用组件](yd-components.md)与 [Agent 工作台](yd-agent-workbench.md)。严格 YD-only 的全局页面迁移在契约验证与下游同步完成后交给 GPT-6 Luna 执行；新增能力必须继续同步规范、预览与文档。
 
-## 全局迁移补充契约（发布准备）
+## 全局迁移补充契约（已发布与验签）
 
-工作区准备 `components 1.5.0` / `plugin-sdk 1.10.0`，新增 `YdFilePicker`、`YdMultiSelect`、`YdCodeEditor` 与 `YdMarkdownEditor`，公开组件数为 131。搜索多选保留历史隐藏/禁用 ID，表单属性绑定到实际输入；代码与内容编辑支持受控模型、只读、禁用、主题与销毁。图标的开发环境日志不再要求消费者声明 `ImportMeta.env`。发布与验签完成前，下游继续使用已验证的 `1.4.0` / `1.9.0`。
+`components 1.5.0` / `plugin-sdk 1.10.0` 已发布并验签，新增 `YdFilePicker`、`YdMultiSelect`、`YdCodeEditor` 与 `YdMarkdownEditor`，该版本公开组件数为 131。搜索多选保留历史隐藏/禁用 ID，表单属性绑定到实际输入；代码与内容编辑支持受控模型、只读、禁用、主题与销毁。图标的开发环境日志不再要求消费者声明 `ImportMeta.env`。
+
+发布提交为 `746c5fe9`，tag 为 `pcomp-1.5.0` / `psdk-1.10.0`。[components #381](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/381) 与 [SDK #382](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/382) 的校验、发布和远程验签阶段均已通过。初次 PUT 返回 502；修复 Runner 网络后重试对应作业，保留原 tag 和版本，不覆盖发布物。
+
+本机从 Nexus 回读的完整性值：
+
+| 契约 | `dist.integrity` |
+| --- | --- |
+| components `1.5.0` | `sha512-jEKShr9F4bqDumjfTKZtiFJ8jB8WXJQyPp7WBfVPA2xrzo/RyNHD6PqN46Oke02R1mgR6Ih3gpu5DdaZmUj66w==` |
+| SDK `1.10.0` | `sha512-3cCoBvLHd+IHqBZOiwy0ywY8OXkll8BHh/3r4OpBZV1w//dlm7eQGrePqX6NrI9MLr+2gH/QWjC1gF+m2PnNww==` |
+
+插件仓 catalog/lockfile 已安装这两个已验签版本，后续迁移与下游验证单独提交。工作区新增的可排序树、工作流画布等契约仍需下一轮正式发布与验签，不属于 `1.5.0` / `1.10.0`。
 
 首轮已验签契约的插件仓同步提交为 `5f00d0c`，catalog/lockfile 已更新并推送；下游就绪检查通过。全局业务页面迁移由 GPT-6 Luna 分批实施，仍有技术编辑器、拖拽树和页面交互待完成，不能将发布成功视为迁移完成。
