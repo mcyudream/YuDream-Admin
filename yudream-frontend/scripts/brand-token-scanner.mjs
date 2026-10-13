@@ -46,8 +46,20 @@ function isAllowedThemeSelector(selector, scope) {
   }
   const branches = splitSelectorList(selector)
   return branches.length > 0 && branches.every((branch) => {
-    const target = branch.replace(/:has\([^)]*\)/g, '')
-    const classes = [...branch.matchAll(/\.([_a-zA-Z][\w-]*)/g)].map(match => match[1])
+    if (/:(?:not|has)\s*\(|[+~]/i.test(branch)) {
+      return false
+    }
+    let invalidGroup = false
+    const target = branch.replace(/\[[^\]]*\]/g, '').replace(/:(?:is|where)\(([^()]*)\)/g, (_group, choices) => {
+      if (!splitSelectorList(choices).every(choice => isAllowedThemeSelector(choice, 'SITE'))) {
+        invalidGroup = true
+      }
+      return '.site-page'
+    })
+    if (invalidGroup || /:(?:is|where)\s*\(/i.test(target)) {
+      return false
+    }
+    const classes = [...target.matchAll(/\.([_a-zA-Z][\w-]*)/g)].map(match => match[1])
     const targetClasses = [...target.matchAll(/\.([_a-zA-Z][\w-]*)/g)].map(match => match[1])
     return targetClasses.some(name => SITE_SCOPE_ANCHORS.has(name))
       && classes.every(name => SITE_SCOPE_CLASSES.has(name))

@@ -5,7 +5,7 @@ YD 是宿主页面、共享业务组件与插件的唯一公开 UI 入口。内�
 ## 契约状态
 
 ::: tip 已发布并完成远程验签
-`@yudream/components 1.4.0` 与 `@yudream/plugin-sdk 1.9.0` 已发布到 Nexus，包含 **127 个 YD 组件入口**。发布与远程验签流水线全部通过，插件可以升级到这组契约。当前宿主工作区有 **131 个源码入口**；`YdFilePicker`、`YdMultiSelect`、`YdMarkdownEditor`、`YdCodeEditor` 尚未发布，也未包含在插件已验签包中。证据与下游状态统一维护在 [契约发布记录](yd-contract-releases.md)。
+`@yudream/components 1.6.0` 与 `@yudream/plugin-sdk 1.11.0` 已发布到 Nexus，包含 **136 个 YD 组件入口**。发布、远程验签与规范门禁流水线全部通过，插件可以升级到这组契约。该版本包含文件/目录选择、内容/代码编辑、可排序树、工作流画布、容器加载与页面构建器。证据与下游状态统一维护在 [契约发布记录](yd-contract-releases.md)。
 :::
 
 源码目录、包版本与宿主运行时版本是不同概念。插件不得复制宿主组件、伪造版本或在 remoteEntry 内另外捆绑组件库。先使用已有发布且验签的契约，准备中的新能力只在当前工作区验证。
@@ -17,6 +17,7 @@ YD 是宿主页面、共享业务组件与插件的唯一公开 UI 入口。内�
 | 视觉语言、场景选型与持续维护 | [YD 视觉与组件使用规范](yd-ui-guidelines.md) |
 | 基础、集合、日历、动效、流程等组件 API | [YD 通用组件库](yd-components.md) |
 | 表单、标签、评分、动作与根装配 | [YD 表单与基础装配契约](yd-form-components.md) |
+| 下拉单选、多选、搜索和模型回显 | [YD 下拉选择契约](yd-select-components.md) |
 | Harness、Skills、MCP、工作区与回答协议 | [YD Agent 工作台](yd-agent-workbench.md) |
 | 灵动 / 雅致 / 紧凑与主题插件 | [后台外观预设与动效](frontend-appearance.md) |
 | 发布、远程验签与插件同步 | [YD 契约发布记录](yd-contract-releases.md) |

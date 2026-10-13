@@ -2,6 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { findThemeBrandDeclarationOffsets, resolvePluginThemeCssSources, scanBrandTokenUsage } from '../../scripts/brand-token-scanner.mjs'
 
+test('negative, sibling, attribute text and mixed grouping cannot imitate a SITE anchor', () => {
+  const css = ':not(.site-page){--primary-6: 1 2 3} .site-page + .dark{--primary-6: 1 2 3} :is(.site-page,body){--primary-6: 1 2 3} [data-label=".site-page"]{--primary-6: 1 2 3}'
+  assert.equal(findThemeBrandDeclarationOffsets(css, 'SITE').size, 0)
+  assert.equal(scanBrandTokenUsage(css).length, 4)
+})
+
 test('only declarations in explicit SITE theme selectors may define brand-step variables', () => {
   const css = `
 .site-page, .site-chrome { --primary-6: 78 122 46; }
