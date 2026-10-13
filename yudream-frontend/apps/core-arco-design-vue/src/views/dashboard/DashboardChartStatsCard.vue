@@ -137,7 +137,9 @@ async function load() {
 
 .trend-caption {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  min-width: 0;
   min-height: 18px;
 }
 
@@ -145,6 +147,7 @@ async function load() {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-2);
+  white-space: nowrap;
 }
 
 .trend-footer {
