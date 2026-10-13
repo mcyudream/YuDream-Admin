@@ -4,12 +4,14 @@
 
 ## 本次 YD 组件与 Agent 能力
 
-状态：准备发布；未完成远程发布与验签前，不更新插件依赖或宣称生产可用。
+状态：首次发布流水线在 tarball 验证前失败，发布作业未执行；修复 CI 依赖安装步骤后重试。未完成远程发布与验签前，不更新插件依赖或宣称生产可用。
 
 | 契约 | 发布版本 | 变化 | 流水线 tag |
 | --- | --- | --- | --- |
-| `@yudream/components` | `1.4.0` | 主题化基础入口、FA Pro 参考通用组件、Agent 工作台和回答引用/工具卡协议；严格 YD 使用的表单与交互封装 | `pcomp-1.4.0`（待推送） |
-| `@yudream/plugin-sdk` | `1.9.0` | 同步全部 YD 公开组件与组合式能力的宿主共享桥 | `psdk-1.9.0`（待推送） |
+| `@yudream/components` | `1.4.0` | 主题化基础入口、FA Pro 参考通用组件、Agent 工作台和回答引用/工具卡协议；严格 YD 使用的表单与交互封装 | `pcomp-1.4.0-1`（重试标签） |
+| `@yudream/plugin-sdk` | `1.9.0` | 同步全部 YD 公开组件与组合式能力的宿主共享桥 | `psdk-1.9.0-1`（重试标签） |
+
+首次尝试 [components #377](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/377) / [SDK #378](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/378) 使用提交 `664d5791`。失败原因为 tarball 作业尚无依赖安装，pnpm 的 `verifyDepsBeforeRun: prompt` 在 CI 非交互环境退出；已添加 `pnpm install --frozen-lockfile`，保留原标签及失败记录，不移动标签或为尚未发布的包无意义改版本。
 
 发布前验证组件/SDK 类型与构建、包结构、tarball 及 CI 发布配置；发布后验证对应 `publish:npm-*` 和 `verify:npm-contracts` jobs，再更新插件仓 catalog/lockfile 并执行下游检查。SPI 没有本次变更，不重复发布。
 

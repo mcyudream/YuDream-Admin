@@ -70,6 +70,7 @@ validate:contract-package-tarballs:
     - pnpm config set registry "$NPM_CONFIG_REGISTRY"
     - node -v
     - pnpm -v
+    - pnpm --dir "$FRONTEND_DIR" install --frozen-lockfile
   script:
     - sh ci/verify-contract-package-tarballs.sh
   rules:
