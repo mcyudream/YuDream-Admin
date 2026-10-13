@@ -101,8 +101,15 @@ if [ "${EXPECT_MAVEN_SPI_PUBLISH:-$EXPECT_SPI_DEFAULT}" = "true" ]; then
 fi
 
 if [ "${EXPECT_NEXUS_NPM_PUBLISH:-$EXPECT_NPM_DEFAULT}" = "true" ]; then
-  require_job_status "publish:npm-plugin-sdk" "success"
-  require_job_status "publish:npm-components" "success"
+  case "$TAG_NAME" in
+    psdk*) require_job_status "publish:npm-plugin-sdk" "success" ;;
+    pcomp*) require_job_status "publish:npm-components" "success" ;;
+    pdviz*) require_job_status "publish:npm-dataviz" "success" ;;
+    *)
+      require_job_status "publish:npm-plugin-sdk" "success"
+      require_job_status "publish:npm-components" "success"
+      ;;
+  esac
   require_job_status "verify:npm-contracts" "success"
 fi
 

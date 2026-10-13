@@ -37,6 +37,11 @@ features:
     details: SPI 契约 + remoteEntry 动态前端 + SDK 注入，支持热加载、热卸载、硬/软依赖与依赖级联。
     link: /plugin/overview
     linkText: 插件开发指南
+  - icon: 🎨
+    title: 统一 YD 组件与视觉语言
+    details: 业务与插件统一使用 YD 公开组件，FA 主题与基础能力在内部复用；灵动、雅致、紧凑三套外观继承主色、明暗与主题插件。
+    link: /components/yd-ui-guidelines
+    linkText: 查看组件选型规范
 ---
 
 ## 特性矩阵
@@ -46,7 +51,7 @@ features:
 | 平台能力（18 项） | api-docs、cms、wiki、form、document-template、integration、sse、websocket、rabbitmq、neo4j、ai、agent、dataviz、milky、message-render、file-preview、inbound-mail、plugin-market-source，全部受项目闸门（`yudream.platform.capabilities.<code>.enabled`）与应用闸门双重管控，支持依赖级联禁用 |
 | 插件体系 | 第三方插件仅依赖 `yudream-plugin-spi` 契约模块；JAR 内置 `plugin.yml` + 前端 `remoteEntry.js`；支持热加载/热卸载、硬依赖（`depend`）/软依赖（`softdepend`）、依赖级联、SITE/ADMIN 主题与插件市场源 |
 | 安全体系 | Sa-Token 双 Token 会话、接口加密、API Key、Passkey（WebAuthn）、OAuth，全部属于 system 基线能力，始终可用、不走动态开关 |
-| AI / Agent | provider-first 多模型配置（`providerCode + modelCode`），Spring AI 原生 tool calling，端到端真流式 SSE 与可扩展事件信封（`ai.message` / `ai.tool` / `ai.result` / `ai.error`） |
+| AI / Agent | provider-first 多模型配置（`providerCode + modelCode`），AgentScope Harness 管理会话与工具执行，端到端真流式 SSE 与可扩展事件信封（`ai.message` / `ai.tool` / `ai.result` / `ai.error`）；YD 工作台呈现引用、工具状态与工作区上下文 |
 | CMS 与公开站 | GrapesJS 拖拽构建 + 完整发布闭环；SITE 主题按 `themeCode` 隔离首页、chrome 与页面集，官方插件即可拼出对外官网 |
 | 渲染服务 | 独立 render-server（Fastify 5 + Playwright Chromium），HTML / Markdown / URL → 图片，支撑消息卡片、证书证明等场景 |
 
@@ -64,7 +69,9 @@ features:
 
 | 层 | 技术 |
 |---|---|
-| 后端 | YuDream 原创实现，基于 JDK 21、Spring Boot 3.5、Sa-Token 1.45、MongoDB、Redis、Spring AI 1.1、EasyExcel 4 |
-| 前端 | 使用 [Fantastic-admin](https://fantastic-admin.hurui.me/)，基于 Vue 3.5、Vite 8、Arco Design Vue 2.58、Pinia 3、pnpm workspace；`Fa*` 为 Fantastic-admin 自带组件（`FaResponsiveTable` 除外），`Yd*` 为 YuDream 原创组件与 composable，不按 AI/非 AI 区分 |
+| 后端 | YuDream 原创实现，基于 JDK 21、Spring Boot 3.5、Sa-Token 1.45、MongoDB、Redis、AgentScope 2、EasyExcel 4 |
+| 前端 | 基于 Vue 3、Vite 8、Pinia 3 与 pnpm workspace；业务和插件唯一公开 UI 入口为 `Yd*` / `useYd*`。内部复用 [Fantastic-admin](https://fantastic-admin.hurui.me/) 主题与基础能力，按职责封装 Fa / Reka / Arco；历史 Fa API 保留兼容，不作为新页面推荐 |
 | 渲染服务 | Node ≥ 22、Fastify 5、Playwright（Chromium headless）、markdown-it |
 | 部署 | Docker Compose（backend / frontend / render-server / kkfileview + watchtower 自动更新） |
+
+组件 `1.4.0` 与 SDK `1.9.0` 当前处于发布准备，远程验签完成前不代表生产插件可升级。请先阅读 [YD 规范](/components/yd-ui-guidelines) 与 [契约发布记录](/components/yd-contract-releases)。

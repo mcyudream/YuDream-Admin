@@ -41,7 +41,7 @@
 
 职责（实现 = 现有 TS 渲染逻辑的独立 JS 化，语义一致）：
 1. 预扫描 `data-yb-limit` → 拉取 `template-context`（含页面本地变量 site/system/auth）；
-2. 渲染 `data-yb-for/repeat`、`data-yb-if`、`data-yb-html/markdown`、`{{dotted.path}}`；
+2. 渲染 `data-yb-for/repeat`、`data-yb-if`、`data-yb-html/markdown`、<code v-pre>{{dotted.path}}</code>；
 3. 暴露 `window.YuCMS = { ready(cb), context(), refresh() }` 与
    `__YU_CMS_REGISTER_CLEANUP__` 生命周期（与现约定兼容）；
 4. 资产/链接相对路径不改写（静态服务已按同基路径提供）。

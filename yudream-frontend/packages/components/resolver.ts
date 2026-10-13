@@ -56,6 +56,12 @@ const BASIC_COMPONENT_NAMES = [
 ] as const
 
 const YD_COMPONENT_NAMES = [
+  'YdAction',
+  'YdForm',
+  'YdFormItem',
+  'YdInputTag',
+  'YdRate',
+  'YdUiProvider',
   'YdAgentWorkbench',
   'YdAgentContextPanel',
   'YdAgentAnswer',

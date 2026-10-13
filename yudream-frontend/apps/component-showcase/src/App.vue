@@ -12,6 +12,7 @@ import EffectsSection from '@/sections/EffectsSection.vue'
 import ExtendedSection from '@/sections/ExtendedSection.vue'
 import FeedbackSection from '@/sections/FeedbackSection.vue'
 import FormSection from '@/sections/FormSection.vue'
+import MigrationSection from '@/sections/MigrationSection.vue'
 import ToolsSection from '@/sections/ToolsSection.vue'
 
 interface Category {
@@ -31,6 +32,7 @@ const categories: Category[] = [
   { key: 'calendar', label: '日历与时间', en: 'Calendar', icon: 'morph:calendar-days', group: '全新体验', description: '日期、月份和年份的单选、范围与弹出选择。', section: CalendarSection },
   { key: 'basic', label: '基础', en: 'Basic', icon: 'morph:layout-grid', group: '通用', description: '按钮、标签、徽章、头像等最基础的视觉元件。', section: BasicSection },
   { key: 'form', label: '表单', en: 'Form', icon: 'morph:square-pen', group: '数据录入', description: '输入框、多行文本、选择器、开关等表单控件。', section: FormSection },
+  { key: 'migration', label: '表单与动作契约', en: 'Form Contract', icon: 'morph:list-checks', group: '数据录入', description: '统一字段校验、禁用继承、标签输入、键盘评分与自定布局动作。', section: MigrationSection },
   { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:layout-grid', group: '数据展示', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
   { key: 'feedback', label: '反馈', en: 'Feedback', icon: 'morph:bell', group: '反馈', description: '气泡提示、弹窗、图片预览等交互反馈组件。', section: FeedbackSection },
   { key: 'ai', label: 'AI 助手', en: 'Agent Studio', icon: 'morph:bot', group: 'AI 助手', description: '从对话到交付：Harness、Skills、MCP、工作区与可检查的代码变更。', section: AiSection },

@@ -11,7 +11,7 @@
 
 ### 形态 A：统一 AI 助手（已存在）
 - 入口：`/platform/chat` AI 助手页 + 左侧「AI 助手」悬浮入口。
-- 会话模型：GENERAL/WIKI/AGENT scope → 各自 Harness 会话（sessionId = chat-<id>）。
+- 会话模型：GENERAL/WIKI/AGENT scope → 各自 Harness 会话（`sessionId = chat-<id>`）。
 - 定位：完整对话界面、历史管理、附件与额度。
 
 ### 形态 B：浮层 + 路由感知 + 参数感知（待建）
@@ -20,10 +20,10 @@
 - **路由感知**：浮层根据当前路由自动选择 agent 与会话：
   | 路由 | agent | targetKey/sessionId |
   |---|---|---|
-  | /platform/cms/workspace | cms-builder | cms-<targetKey>（现有） |
-  | /platform/wiki/** | wiki-qa | wiki-<spaceSlug> |
+  | /platform/cms/workspace | cms-builder | `cms-<targetKey>`（现有） |
+  | /platform/wiki/** | wiki-qa | `wiki-<spaceSlug>` |
   | /platform/theme-center/** | cms-builder | cms-home（主题首页） |
-  | /platform/agents/**（工作流） | workflow | wf-<runKey> |
+  | /platform/agents/**（工作流） | workflow | `wf-<runKey>` |
   | 其他 | general | chat-<用户会话> |
 - **参数感知**：浮层打开时采集页面上下文参数（当前编辑文件、选中元素、知识库
   空间、主题 code），作为 RuntimeContext 参数/首条提示注入——与 CmsGrapesEditor

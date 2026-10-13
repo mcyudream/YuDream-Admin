@@ -6,6 +6,15 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 const componentsRoot = path.resolve(projectRoot, '../../../yudream-frontend/packages/components')
+const sharedYdPages = new Set([
+  'components/yd-ui-guidelines.md',
+  'components/yd-components.md',
+  'components/yd-form-components.md',
+  'components/yd-agent-workbench.md',
+  'components/frontend-appearance.md',
+  'components/yd-contract-releases.md'
+])
+const sourceRepository = 'https://github.com/mcyudream/YuDream-Admin/blob/master/'
 
 const guideSidebar = [
   {
@@ -130,6 +139,8 @@ const pluginSidebar = [
     text: '前端 SDK 与组件',
     items: [
       { text: '@yudream/plugin-sdk', link: '/plugin/sdk/' },
+      { text: 'YD-only 视觉与选型规范', link: '/components/yd-ui-guidelines' },
+      { text: 'YD 契约发布与验签', link: '/components/yd-contract-releases' },
       { text: '插件前端工程化（remoteEntry）', link: '/plugin/frontend-remote' }
     ]
   },
@@ -165,11 +176,20 @@ const protocolSidebar = [
 
 const componentSidebar = [
   {
-    text: '组件库',
-    items: [{ text: '使用指南', link: '/components/' }]
+    text: 'YD 规范与公开契约',
+    items: [
+      { text: 'YD 组件库入口与契约状态', link: '/components/' },
+      { text: '视觉与场景选型规范', link: '/components/yd-ui-guidelines' },
+      { text: '通用组件 API', link: '/components/yd-components' },
+      { text: '表单与基础装配 API', link: '/components/yd-form-components' },
+      { text: 'Agent 工作台与回答协议', link: '/components/yd-agent-workbench' },
+      { text: '三套外观与主题插件', link: '/components/frontend-appearance' },
+      { text: '契约发布与下游同步记录', link: '/components/yd-contract-releases' }
+    ]
   },
   {
-    text: '基础控件',
+    text: 'Fa 历史兼容：基础控件',
+    collapsed: true,
     items: [
       { text: 'FaButton 按钮', link: '/components/fa-button' },
       { text: 'FaInput 输入框', link: '/components/fa-input' },
@@ -188,7 +208,8 @@ const componentSidebar = [
     ]
   },
   {
-    text: '数据展示',
+    text: 'Fa 历史兼容：数据展示',
+    collapsed: true,
     items: [
       { text: 'FaTag 标签', link: '/components/tag' },
       { text: 'FaBadge 徽标', link: '/components/badge' },
@@ -206,7 +227,8 @@ const componentSidebar = [
     ]
   },
   {
-    text: '浮层与反馈',
+    text: 'Fa 历史兼容：浮层与反馈',
+    collapsed: true,
     items: [
       { text: 'FaModal 对话框', link: '/components/fa-modal' },
       { text: 'FaDrawer 抽屉', link: '/components/fa-drawer' },
@@ -220,7 +242,8 @@ const componentSidebar = [
     ]
   },
   {
-    text: '布局与其他',
+    text: 'Fa 历史兼容：布局与其他',
+    collapsed: true,
     items: [
       { text: 'FaPageHeader 页头', link: '/components/page-header' },
       { text: 'FaPageMain 页面主体', link: '/components/page-main' },
@@ -234,14 +257,15 @@ const componentSidebar = [
     ]
   },
   {
-    text: '功能函数',
+    text: 'Fa 历史兼容：功能函数',
+    collapsed: true,
     items: [
       { text: 'useFaModal', link: '/components/use-fa-modal' },
       { text: 'useFaDrawer', link: '/components/use-fa-drawer' }
     ]
   },
   {
-    text: 'Yd* YuDream 原创组件',
+    text: 'YD 既有领域 API',
     items: [
       { text: 'YdBubble 气泡', link: '/components/yd-bubble' },
       { text: 'YdChatSender 输入发送器', link: '/components/yd-chat-sender' },
@@ -249,7 +273,7 @@ const componentSidebar = [
       { text: 'YdChatWindow 对话窗口', link: '/components/yd-chat-window' },
       { text: 'YdChatSessionList 会话列表', link: '/components/yd-chat-session-list' },
       { text: 'YdChatProcess 执行过程', link: '/components/yd-chat-process' },
-      { text: 'YdChatGraph 关系图谱', link: '/components/yd-chat-graph' },
+      { text: 'YdChatGraphView 关系图谱', link: '/components/yd-chat-graph' },
       { text: 'YdChatActions 操作栏', link: '/components/yd-chat-actions' },
       { text: 'YdChatReasoning 思维链', link: '/components/yd-chat-reasoning' },
       { text: 'YdChatLoading 加载态', link: '/components/yd-chat-loading' },
@@ -284,6 +308,7 @@ export default withMermaid(
         { text: '插件开发', link: '/plugin/overview', activeMatch: '/plugin/' },
         { text: '协议', link: '/protocol/', activeMatch: '/protocol/' },
         { text: '参考', link: '/reference/', activeMatch: '/reference/' },
+        { text: 'YD 视觉规范', link: '/components/yd-ui-guidelines' },
         { text: '组件库', link: '/components/', activeMatch: '/components/' }
       ],
       sidebar: {
@@ -305,7 +330,19 @@ export default withMermaid(
     mermaid: {},
     markdown: {
       config(md) {
-        // 允许在代码块中渲染 Mermaid 图
+        // include 正文复用仓库文档；源码相对链接在公开站指向仓库，
+        // 其他文档链接仍由 VitePress 正常解析并检查，避免本机路径和失效 URL。
+        const renderLink = md.renderer.rules.link_open
+        md.renderer.rules.link_open = (tokens, index, options, env, self) => {
+          const token = tokens[index]
+          const href = token.attrGet('href')
+          if (sharedYdPages.has(env.relativePath) && href?.startsWith('../yudream-frontend/')) {
+            token.attrSet('href', sourceRepository + href.slice(3))
+          }
+          return renderLink
+            ? renderLink(tokens, index, options, env, self)
+            : self.renderToken(tokens, index, options)
+        }
       }
     },
     vite: {
@@ -315,7 +352,7 @@ export default withMermaid(
       },
       server: {
         port: 5174,
-        fs: { allow: [componentsRoot] }
+        fs: { allow: [componentsRoot, path.resolve(projectRoot, '../../..')] }
       },
       ssr: {
         noExternal: ['@yudream/components']
