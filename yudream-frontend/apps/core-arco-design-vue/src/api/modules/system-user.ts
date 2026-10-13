@@ -1,5 +1,5 @@
-import type { ApiResponse, PageResult } from './system-client'
 import type { MessagingIdentity } from './profile'
+import type { ApiResponse, PageResult } from './system-client'
 import type { LoginData } from './user'
 import systemClient from './system-client'
 
@@ -76,6 +76,7 @@ export interface UserUpdatePayload {
 
 export default {
   page: (params: UserPageParams) => systemClient.get<unknown, ApiResponse<PageResult<UserManageItem>>>('api/system/users', { params }),
+  detail: (id: IdValue) => systemClient.get<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`),
   create: (data: UserCreatePayload) => systemClient.post<unknown, ApiResponse<UserManageItem>>('api/system/users', data),
   update: (id: IdValue, data: UserUpdatePayload) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`, data),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/users/${id}`),

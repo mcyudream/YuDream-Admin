@@ -211,8 +211,9 @@ Assembler hard rules:
 ## Permission Codes
 
 - Permission code shape: `{domain}:{resource}:{action}` (optionally `{domain}:{subdomain}:{resource}:{action}`); plugins use `plugin:{pluginCode}:{action}`; `@PermissionRegister.module` is a Chinese module name.
-- The trailing action word drives the role permission tree's business grouping and color; pick from the vocabulary in root `AGENTS.md` section "权限码业务分类" (view: `view`/`export`/`download`; operate: `create`/`edit`/`import`/`upload`/`use`/`generate`/`publish`/`connect`/`send`/`test`/`run`/`invoke`/`execute`/`enable`/`disable`/`assign-*`/`dataset`/`report`/`accept`; manage: `manage`/`config`; danger: `delete`/`kickout`/`revoke`/`impersonate`). Unknown actions fall into the "其他" group. Adding a new action word requires updating AGENTS.md, the role page `permissionCategoryMeta`, and `knowledge.json` in the same commit.
+- The trailing action word drives the role permission tree's business grouping and color; pick from the vocabulary in root `AGENTS.md` section "权限码业务分类" (view: `view`/`export`/`download`; operate: `create`/`edit`/`import`/`upload`/`use`/`generate`/`publish`/`connect`/`send`/`test`/`run`/`invoke`/`execute`/`enable`/`disable`/`assign-*`/`dataset`/`report`/`accept`; manage: `manage`/`config`; danger: `delete`/`kickout`/`revoke`/`impersonate`). Unknown actions fall into the "其他" group. Adding a new action word requires updating AGENTS.md, the shared `src/utils/permission-catalog.ts` `permissionCategoryMeta`, and `knowledge.json` in the same commit.
 - Split permissions per resource into independent `view`/write/`delete` codes; do not register a single `manage` and re-check finer levels in code.
+- 权限树、只读矩阵和溯源统一按「业务域 → 稳定资源码 → 动作分类 → 权限」展示，集中复用 `permission-catalog.ts`，`assign-*` 匹配规范非空后缀，不以中文模块名作资源 key。历史非标准码列入其他并兼容保留，勾选只更新可见叶子，全选合并且保留未知插件码。权限全景用户/菜单读取须分别检查其 view 权限，全量成员/闲置统计在仓储聚合，菜单关系复用真实可见码计算。会话上下文只允许读取操作者自己的 tokenSession；他人使用明确标记的默认部门/角色上下文，禁止暗示其真实在线会话。细则与验证见 `docs/system/permission-management.md`。
 
 ## Excel / Import Export
 

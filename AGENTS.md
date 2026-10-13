@@ -111,8 +111,9 @@
   - 操作：`create`、`edit`、`import`、`upload`、`use`、`generate`、`publish`、`connect`、`send`、`test`、`run`、`invoke`、`execute`、`enable`、`disable`、`assign-*`、`dataset`、`report`、`accept`
   - 管理：`manage`、`config`
   - 危险：`delete`、`kickout`、`revoke`、`impersonate`
-  - 词表外动作归入"其他"分组；确需新动作词时，在同一提交同步本表、角色页 `permissionCategoryMeta` 与 skill `knowledge.json`。
+  - 词表外动作归入"其他"分组；确需新动作词时，在同一提交同步本表、集中词表 `src/utils/permission-catalog.ts` 的 `permissionCategoryMeta` 与 skill `knowledge.json`。
 - 查看/操作/管理/危险的分级语义靠动作词区分：新权限按资源拆分为独立的 `view`/`edit`/`delete` 等权限码，不得只注册一个 `manage` 再在代码内二次判断。
+- 权限管理统一按「业务域 → 稳定资源码 → 动作分类 → 权限」展示，权限树/矩阵/溯源共享 `permission-catalog.ts`；`assign-*` 匹配完整动作家族。整理分组不重命名历史权限码，不丢失搜索隐藏或暂失效的插件授权。全景用户/菜单分别受 `system:user:view`/`system:menu:view` 控制，统计由仓储聚合全量数据，不能依据当前分页；只有本人使用当前 tokenSession，其他用户明确显示默认部门/角色上下文。完整规则见 `docs/system/permission-management.md`。
 
 ## 12. 完成前自检
 

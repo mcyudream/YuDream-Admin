@@ -232,21 +232,17 @@ public class MenuAppService {
                 .map(Menu::getCode)
                 .collect(Collectors.toSet());
 
-        Set<String> visibleCodes = allMenus.stream()
-                .filter(m -> isVisible(m, permissionSet))
-                .map(Menu::getCode)
-                .collect(Collectors.toSet());
+        Set<String> runtimeAvailableCodes = new HashSet<>(routeMenuCodes);
         if (persistedMenus != null) {
             persistedMenus.stream()
                     .filter(menu -> menu.getType() == MenuNodeType.BUTTON)
                     .filter(menu -> menu.getStatus() == MenuStatus.ACTIVE)
                     .filter(Menu::isAvailableForRuntime)
                     .filter(this::platformCapabilityVisible)
-                    .filter(menu -> isVisible(menu, permissionSet))
                     .map(Menu::getCode)
-                    .forEach(visibleCodes::add);
+                    .forEach(runtimeAvailableCodes::add);
         }
-        includeStructuralRouteAncestors(visibleCodes, allMenuMap, routeMenuCodes);
+        Set<String> visibleCodes = visibleMenuCodes(permissionSet, new ArrayList<>(allMenuMap.values()), runtimeAvailableCodes);
 
         Map<String, List<Menu>> childrenMap = new HashMap<>();
         for (Menu menu : allMenus) {
@@ -270,6 +266,28 @@ public class MenuAppService {
         result.sort((a, b) -> Integer.compare((int) b.getOrDefault("_sort", 0), (int) a.getOrDefault("_sort", 0)));
         result.forEach(m -> m.remove("_sort"));
         return result;
+    }
+
+    /** 诊断与动态路由共用菜单可见性，包含按钮授权的页面和结构祖先。 */
+    public Set<String> visibleMenuCodes(Collection<String> permissions, List<Menu> menus, Set<String> runtimeAvailableCodes) {
+        Set<String> permissionSet = permissions == null ? Set.of() : new HashSet<>(permissions);
+        List<Menu> available = menus.stream()
+                .filter(menu -> menu.getStatus() == MenuStatus.ACTIVE)
+                .filter(menu -> runtimeAvailableCodes.contains(menu.getCode())).toList();
+        Map<String, Menu> menuMap = menus.stream()
+                .collect(Collectors.toMap(Menu::getCode, menu -> menu, (left, right) -> left));
+        Set<String> routeCodes = available.stream().filter(menu -> menu.getType() != MenuNodeType.BUTTON)
+                .map(Menu::getCode).collect(Collectors.toSet());
+        Set<String> visibleCodes = available.stream().filter(menu -> isVisible(menu, permissionSet))
+                .map(Menu::getCode).collect(Collectors.toSet());
+        includeStructuralRouteAncestors(visibleCodes, menuMap, routeCodes);
+        return visibleCodes;
+    }
+
+    /** 插件与平台能力的可用性独立于菜单的启停状态。 */
+    public Set<String> runtimeAvailableMenuCodes(List<Menu> menus) {
+        return menus.stream().filter(Menu::isAvailableForRuntime).filter(this::platformCapabilityVisible)
+                .map(Menu::getCode).collect(Collectors.toSet());
     }
 
     private Menu getMenu(String code) {

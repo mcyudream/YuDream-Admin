@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
+import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
 import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStatus, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
-import type { MessagingIdentity } from '@/api/modules/profile'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
@@ -13,6 +13,8 @@ import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from
 const modal = useFaModal()
 const toast = useFaToast()
 const { auth } = useAppAuth()
+const route = useRoute()
+const router = useRouter()
 const appAccountStore = useAppAccountStore()
 
 type EmailVerifiedFilter = 'true' | 'false'
@@ -22,7 +24,7 @@ const rows = ref<UserManageItem[]>([])
 const roles = ref<OptionItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; emailVerified?: EmailVerifiedFilter; status?: UserStatus }>({
+const search = reactive<{ keyword: string, roleId?: IdValue, deptId?: IdValue, emailVerified?: EmailVerifiedFilter, status?: UserStatus }>({
   keyword: '',
 })
 
@@ -94,7 +96,32 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
 
 onMounted(async () => {
   await Promise.all([loadOptions(), loadUsers()])
+  await openLinkedUser()
 })
+
+watch(() => route.query.editUser, () => openLinkedUser())
+let linkedUserRequest = 0
+
+async function openLinkedUser() {
+  const id = route.query.editUser
+  if (typeof id !== 'string' || !id || !auth('system:user:view') || !auth('system:user:edit')) {
+    return
+  }
+  const request = ++linkedUserRequest
+  try {
+    const response = await apiUser.detail(id)
+    if (request === linkedUserRequest && route.query.editUser === id) {
+      openEdit(response.data)
+    }
+  }
+  finally {
+    if (request === linkedUserRequest && route.query.editUser === id) {
+      const query = { ...route.query }
+      delete query.editUser
+      await router.replace({ query })
+    }
+  }
+}
 
 watch([selectedDeptIds, roles], () => {
   normalizeDefaultDept()
