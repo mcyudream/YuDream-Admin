@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import QRCode from 'qrcode'
-import { FaButton, FaIcon } from '@yudream/components'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
+import { FaButton, FaIcon } from '@yudream/components'
+import QRCode from 'qrcode'
+import { nextTick, onMounted, ref } from 'vue'
 import apiCapability from '@/api/modules/platform-capability'
 
 interface Props {
@@ -37,6 +37,7 @@ async function load() {
     }
     enabled.value = Boolean(item.enabled)
     if (enabled.value) {
+      await nextTick()
       await renderQr()
     }
   }
@@ -65,13 +66,13 @@ async function renderQr() {
     <template v-if="enabled">
       <div class="pair-body">
         <div class="pair-text">
-          <strong>用 YDAM App 扫码添加本站点</strong>
+          <strong>工作台，随身带走</strong>
           <p class="pair-url">
             <FaIcon name="morph:globe" />
             {{ pairUrl }}
           </p>
           <p class="pair-hint">
-            打开 App → 域管理 → 右上角扫一扫，扫下方二维码即可完成添加与登录引导。
+            在 YDAM App 的域管理中，扫一扫添加本站点。
           </p>
         </div>
         <div class="pair-qr">
@@ -85,10 +86,10 @@ async function renderQr() {
     </div>
 
     <div class="pair-footer">
-      <span>站点公开地址即二维码内容</span>
-      <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="props.onOpen?.(card)">
-        <FaIcon name="morph:arrow-right" />
+      <span>扫码添加站点</span>
+      <FaButton v-if="card.actionPath" size="sm" variant="ghost" @click="props.onOpen?.(card)">
         移动端配置
+        <FaIcon name="morph:arrow-up-right" />
       </FaButton>
     </div>
   </div>
@@ -99,26 +100,25 @@ async function renderQr() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 100%;
 }
 
 .pair-body {
   display: flex;
+  flex: 1;
   gap: 16px;
   align-items: center;
-  flex: 1;
 }
 
 .pair-text {
   display: grid;
-  gap: 8px;
   flex: 1;
+  gap: 8px;
   min-width: 0;
 }
 
 .pair-text strong {
-  color: var(--color-text-1);
   font-size: 14px;
+  color: var(--color-text-1);
 }
 
 .pair-url {
@@ -126,17 +126,17 @@ async function renderQr() {
   gap: 6px;
   align-items: center;
   margin: 0;
-  color: var(--color-text-2);
   font-family: ui-monospace, monospace;
   font-size: 12px;
+  color: var(--color-text-2);
   word-break: break-all;
 }
 
 .pair-hint {
   margin: 0;
-  color: var(--color-text-3);
   font-size: 12px;
   line-height: 1.6;
+  color: var(--color-text-3);
 }
 
 .pair-qr {
@@ -144,13 +144,15 @@ async function renderQr() {
   flex: none;
   place-items: center;
   padding: 8px;
+  background: #fff;
   border: 1px solid var(--color-border-2);
   border-radius: 12px;
-  background: #fff;
 }
 
 .pair-qr canvas {
   display: block;
+  width: 124px;
+  height: 124px;
 }
 
 .pair-empty {
@@ -158,8 +160,8 @@ async function renderQr() {
   flex: 1;
   gap: 10px;
   align-items: center;
-  color: var(--color-text-3);
   font-size: 13px;
+  color: var(--color-text-3);
 }
 
 .pair-empty__icon {
@@ -172,7 +174,7 @@ async function renderQr() {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  color: var(--color-text-3);
   font-size: 12px;
+  color: var(--color-text-3);
 }
 </style>

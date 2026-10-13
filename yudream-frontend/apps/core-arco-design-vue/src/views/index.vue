@@ -604,7 +604,6 @@ function cardProps(card: DashboardCard) {
                   <h2>{{ displayCardTitle(card) }}</h2>
                 </div>
               </div>
-              <span v-if="card.source === 'PLUGIN' && !editMode" class="dashboard-card__kind">扩展</span>
               <FaDropdown v-if="editMode" :items="cardMenu(card)" align="end">
                 <FaButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
                   <FaIcon name="morph:ellipsis" />
@@ -810,12 +809,6 @@ function cardProps(card: DashboardCard) {
   line-height: 1.4;
   color: var(--color-text-2);
   white-space: nowrap;
-}
-
-.dashboard-card__kind {
-  font-size: 10px;
-  color: var(--color-text-4);
-  letter-spacing: 0.1em;
 }
 
 .dashboard-card__body {

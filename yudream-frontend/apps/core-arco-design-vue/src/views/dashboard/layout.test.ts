@@ -64,6 +64,19 @@ describe('workbench layout model', () => {
     }
   })
 
+  it('fits three trend cards in one desktop row without changing saved sizes during normalization', () => {
+    const trends = ['USER_REGISTRATION', 'DEPT_CREATED', 'LOG_ACTIVITY'].map(name => ({ ...card(name, `DATAVIZ_${name}`), defaultW: 8, defaultH: 4, minH: 3 }))
+    const saved = trends.map((card, index) => ({ cardCode: card.code, visible: true, placements: { lg: { x: 0, y: index * 4, w: 8, h: 4 } } }))
+    assert.equal(normalizeLayout(saved, trends)[0].placements.lg!.h, 4)
+    const layout = arrangeLayout(saved, trends, 'recommended')
+    assert.deepEqual(layout.map(item => item.placements.lg), [
+      { x: 0, y: 0, w: 4, h: 3 },
+      { x: 4, y: 0, w: 4, h: 3 },
+      { x: 8, y: 0, w: 4, h: 3 },
+    ])
+    assertValid(layout, trends)
+  })
+
   it('retains disabled plugin preferences without leaving empty occupied space', () => {
     const unavailable = { cardCode: 'disabled-plugin', visible: true, placements: { lg: { x: 0, y: 0, w: 12, h: 100 } } }
     const hidden = { ...items[3], visible: false }
