@@ -23,7 +23,7 @@ const morphNode = computed(() => {
     return undefined
   }
   const node = resolveMorphIconNode(morphName)
-  if (!node && import.meta.env.DEV) {
+  if (!node && (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
     console.warn(`[FaIcon] MorphIcons 未收录 "${props.name}"，已回退 Iconify 通道`)
   }
   return node

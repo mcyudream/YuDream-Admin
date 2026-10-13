@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { YdGraphEdge, YdGraphNode, YdGraphNodeEvent, YdGraphNodeReducer } from '@yudream/components'
-import { YdGraphCanvas } from '@yudream/components'
+import { YdAction, YdGraphCanvas } from '@yudream/components'
 import { computed, ref, watch } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
@@ -312,7 +312,7 @@ const edges: YdGraphEdge[] = [
             <div class="atlas__search">
               <YdInput v-model="query" clearable placeholder="搜索节点…" />
               <div v-if="query && suggestions.length" class="atlas__suggestions">
-                <button
+                <YdAction
                   v-for="item in suggestions"
                   :key="item.id"
                   type="button"
@@ -322,7 +322,7 @@ const edges: YdGraphEdge[] = [
                   <span class="atlas__suggestion-dot" :style="{ background: item.color }" />
                   <span class="atlas__suggestion-label">{{ item.label }}</span>
                   <span class="atlas__suggestion-cluster">{{ clusterLabelOf(item) }}</span>
-                </button>
+                </YdAction>
               </div>
             </div>
 
@@ -346,19 +346,20 @@ const edges: YdGraphEdge[] = [
                 <YdIcon name="morph:layout-grid" />
                 聚类
               </div>
-              <button
+              <YdAction
                 v-for="cluster in atlasClusterCounts"
                 :key="cluster.key"
                 type="button"
                 class="atlas__cluster"
                 :class="{ 'is-hidden': hiddenClusters.has(cluster.key) }"
+                :aria-pressed="!hiddenClusters.has(cluster.key)"
                 @click="toggleCluster(cluster.key)"
               >
                 <span class="atlas__cluster-dot" :style="{ background: cluster.color }" />
                 <span class="atlas__cluster-label">{{ cluster.label }}</span>
                 <span class="atlas__cluster-count">{{ cluster.count }}</span>
                 <YdIcon :name="hiddenClusters.has(cluster.key) ? 'morph:eye-off' : 'morph:eye'" />
-              </button>
+              </YdAction>
             </div>
           </div>
         </template>

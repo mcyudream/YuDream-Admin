@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useYdToast } from '@yudream/components'
+import { useYdToast, YdAction } from '@yudream/components'
 import { ref } from 'vue'
 
 const props = withDefaults(defineProps<{
@@ -46,10 +46,10 @@ async function copyCode() {
 
     <footer v-if="code" class="demo-card__code">
       <div class="demo-card__code-bar">
-        <button type="button" class="demo-card__code-toggle" @click="codeVisible = !codeVisible">
+        <YdAction type="button" class="demo-card__code-toggle" :aria-expanded="codeVisible" @click="codeVisible = !codeVisible">
           <YdIcon :name="codeVisible ? 'morph:chevron-up' : 'morph:chevron-down'" />
           {{ codeVisible ? '收起代码' : '展开代码' }}
-        </button>
+        </YdAction>
         <YdButton v-if="codeVisible" size="icon-sm" variant="ghost" title="复制代码" @click="copyCode">
           <YdIcon name="morph:copy" />
         </YdButton>

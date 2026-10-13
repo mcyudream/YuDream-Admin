@@ -78,4 +78,5 @@ export { default as FaTooltip } from './basic/tooltip/index.vue'
 export { default as FaTrend } from './basic/trend/index.vue'
 // YD 通用交互、日历与动效组件
 export * from './extended/index'
+export * from './technical/index'
 export * from './ui/index'

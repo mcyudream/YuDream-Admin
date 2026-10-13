@@ -57,10 +57,13 @@ if ! grep -q '"unocss"' yudream-frontend/packages/plugin-sdk/package.json; then
 fi
 
 echo "[verify-contract-packages] checking npm publish registries"
-grep -q '"version":[[:space:]]*"1.9.0"' yudream-frontend/packages/plugin-sdk/package.json \
-  || fail "@yudream/plugin-sdk must use stable version 1.9.0"
-grep -q '"version":[[:space:]]*"1.4.0"' yudream-frontend/packages/components/package.json \
-  || fail "@yudream/components must use stable version 1.4.0"
+grep -Eq '"version":[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' yudream-frontend/packages/plugin-sdk/package.json \
+  || fail "@yudream/plugin-sdk must use a stable version from its package.json"
+grep -Eq '"version":[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' yudream-frontend/packages/components/package.json \
+  || fail "@yudream/components must use a stable version from its package.json"
+SDK_VERSION=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' yudream-frontend/packages/plugin-sdk/package.json | head -n 1)
+grep -Fq "YUDREAM_PLUGIN_SDK_VERSION = '$SDK_VERSION'" yudream-frontend/apps/core-arco-design-vue/src/plugins/sdk/index.ts \
+  || fail "host SDK runtime version must match the published SDK package version"
 if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' yudream-frontend/packages/plugin-sdk/package.json; then
   fail "@yudream/plugin-sdk must publish to Nexus npm-public"
 fi

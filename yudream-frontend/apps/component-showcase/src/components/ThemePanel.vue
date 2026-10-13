@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { YdAction } from '@yudream/components'
 import { useShowcaseAppearance } from '@/composables/useShowcaseAppearance'
 import { primaryColorPresets, themeColorSchemeOptions, useYdTheme } from '@/composables/useYdTheme'
 
@@ -48,7 +49,7 @@ watch(customColor, (value) => {
           主色
         </p>
         <div class="theme-panel__swatches">
-          <button
+          <YdAction
             v-for="preset in primaryColorPresets"
             :key="preset.name"
             type="button"
@@ -56,10 +57,12 @@ watch(customColor, (value) => {
             :class="{ 'is-active': primaryColor.toLowerCase() === preset.value.toLowerCase() }"
             :style="{ background: preset.value }"
             :title="preset.label"
+            :aria-label="preset.label"
+            :aria-pressed="primaryColor.toLowerCase() === preset.value.toLowerCase()"
             @click="setPrimaryColor(preset.value)"
           >
             <YdIcon v-if="primaryColor.toLowerCase() === preset.value.toLowerCase()" name="morph:check" />
-          </button>
+          </YdAction>
         </div>
         <div class="theme-panel__custom">
           <YdInput v-model="customColor" placeholder="#18181b" class="flex-1">

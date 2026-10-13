@@ -50,7 +50,8 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "unocss": "catalog:",
-    "unocss-preset-animations": "catalog:"
+    "unocss-preset-animations": "catalog:",
+    "vue": "catalog:"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged",

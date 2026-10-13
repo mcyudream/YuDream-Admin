@@ -23,3 +23,9 @@
 发布前验证组件/SDK 类型与构建、包结构、tarball 及 CI 发布配置；发布后验证对应 `publish:npm-*` 和 `verify:npm-contracts` jobs，再更新插件仓 catalog/lockfile 并执行下游检查。SPI 没有本次变更，不重复发布。
 
 视觉和组件选型见 [YD 规范](yd-ui-guidelines.md)，详细 API 见 [通用组件](yd-components.md)与 [Agent 工作台](yd-agent-workbench.md)。严格 YD-only 的全局页面迁移在契约验证与下游同步完成后交给 GPT-6 Luna 执行；新增能力必须继续同步规范、预览与文档。
+
+## 全局迁移补充契约（发布准备）
+
+工作区准备 `components 1.5.0` / `plugin-sdk 1.10.0`，新增 `YdFilePicker`、`YdMultiSelect`、`YdCodeEditor` 与 `YdMarkdownEditor`，公开组件数为 131。搜索多选保留历史隐藏/禁用 ID，表单属性绑定到实际输入；代码与内容编辑支持受控模型、只读、禁用、主题与销毁。图标的开发环境日志不再要求消费者声明 `ImportMeta.env`。发布与验签完成前，下游继续使用已验证的 `1.4.0` / `1.9.0`。
+
+首轮已验签契约的插件仓同步提交为 `5f00d0c`，catalog/lockfile 已更新并推送；下游就绪检查通过。全局业务页面迁移由 GPT-6 Luna 分批实施，仍有技术编辑器、拖拽树和页面交互待完成，不能将发布成功视为迁移完成。

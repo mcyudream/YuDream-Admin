@@ -1,6 +1,6 @@
 # YD 表单与基础装配契约
 
-`YdForm`、`YdFormItem`、`YdInputTag`、`YdRate`、`YdAction` 与 `YdUiProvider` 是共享组件的公开入口；根导出、resolver 与插件 SDK 宿主桥同步。业务不用引入底层 Arco / Reka 类型。
+`YdForm`、`YdFormItem`、`YdInputTag`、`YdRate`、`YdAction`、`YdFilePicker` 与 `YdUiProvider` 是共享组件的公开入口；根导出、resolver 与插件 SDK 宿主桥同步。业务不用引入底层 Arco / Reka 类型。
 
 ## 表单
 
@@ -32,6 +32,18 @@
 `YdInputTag` 的默认模型为 `YdInputTagValue[]`，元素为字符串、数字或 `{ value, label?, closable? }`；需要长 ID 时只能用字符串。`v-model:input-value` 控制待输入文本。默认 uniqueValue=true，allowClear=true。支持 placeholder/disabled/readonly/error/size/maxTagCount/retainInputValue/tagNowrap/formatTag；模型、输入、Enter、remove、clear、focus、blur 事件与 focus/blur 实例方法均保留。prefix/suffix/tag 插槽用于内容。它是创建标签的输入框，没有远程候选查询或多选下拉能力；后者需独立完整契约。
 
 `YdRate` 使用 number 模型（默认 0），默认 count=5，支持 allowHalf、allowClear、readonly、disabled、ariaLabel。鼠标可选半星；键盘通过 native range 语义使用方向键/Home/End，allowClear 时 Delete/Backspace 清空。只读保持可读且阻止键盘修改；disabled 继承表单。提供 change/hoverChange/focus/blur 与 focus/blur 方法。颜色由 YD 主题控制，没有业务自定固定 color 属性。
+
+## 文件选择
+
+`YdFilePicker` 只负责调用系统文件选择器并返回原生 `File` 对象，不上传文件。`accept` 原样传给浏览器，`multiple` 与 `disabled` 控制原生选择器；`select(files: File[])` 将 `FileList` 转成数组。默认提供可访问的“选择文件”按钮，也可用默认插槽提供 `{ open, reset, disabled, triggerAttrs }`，自定义按钮应绑定 `triggerAttrs`，让表单 `id`、错误和说明关联落在可聚焦触发器上。实例暴露 `open()`、`reset()`、`focus()`、`blur()` 和原生 input `element`；重置原生 input 后，同一文件可再次选中。上传、校验与业务状态由调用方负责，图片上传仍使用 `YdImageUpload`。
+
+```vue
+<YdFilePicker accept=".zip,application/zip" multiple @select="files => queue.push(...files)">
+  <template #default="{ open, disabled, triggerAttrs }">
+    <YdButton type="button" v-bind="triggerAttrs" :disabled="disabled" @click="open">选择 ZIP</YdButton>
+  </template>
+</YdFilePicker>
+```
 
 ## 自定动作与根 Provider
 

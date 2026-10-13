@@ -1,5 +1,8 @@
 const components = shared('components')
+export const YdCodeEditor = components.YdCodeEditor
+export const YdMarkdownEditor = components.YdMarkdownEditor
 export const YdAction = components.YdAction
+export const YdFilePicker = components.YdFilePicker
 export const YdForm = components.YdForm
 export const YdFormItem = components.YdFormItem
 export const YdInputTag = components.YdInputTag
@@ -131,6 +134,7 @@ export const YdLinkPreview = components.YdLinkPreview
 export const YdLoading = components.YdLoading
 export const YdMarquee = components.YdMarquee
 export const YdMention = components.YdMention
+export const YdMultiSelect = components.YdMultiSelect
 export const YdMultiStepLoader = components.YdMultiStepLoader
 export const YdParticlesBg = components.YdParticlesBg
 export const YdPatternBg = components.YdPatternBg
