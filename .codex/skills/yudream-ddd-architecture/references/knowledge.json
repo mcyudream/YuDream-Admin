@@ -169,6 +169,10 @@
       "text": "FaInput、FaTextarea、FaSelect 不渲染 label 属性；业务表单必须使用显式 label/字段标题，并提供 placeholder 或帮助文本。"
     },
     {
+      "key": "yd-select-selection-feedback",
+      "text": "共享 YdSelect 按真实模型回显：未选择默认显示没有选择，不回落第一项；multiple 数组在选择框内展示全部标签并可在列表取消；allowSearch 默认关闭，启用后仅本地过滤候选，不清理已选项。保留分组、禁用、标量/数组类型与字符串长 ID，远程分页用 YdTablePicker；插件等待包含修复的契约包发布验签后接入。详见 docs/yd-select-components.md。"
+    },
+    {
       "key": "workflow-editor-scroll-container",
       "text": "固定高度的 Grid/Flex 工作台中，侧栏根节点必须设置 height:100%、min-height:0、overflow:hidden，内部内容区使用 min-height:0 和 overflow:auto，避免长工具列表被裁切。"
     },
