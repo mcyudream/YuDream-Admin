@@ -1,34 +1,34 @@
 #!/usr/bin/env node
-/**
- * 前端 UI 审查工具：扫描 apps/* 源码中
- *  1. 存在 Fa 等价物却仍使用的 Arco 原生组件（模板 <a-*> 标签 + 脚本导入）
- *  2. 业务样式直接使用 Arco 品牌色阶梯令牌（--primary-N）
- * 输出 audit-report.json 到 yudream-frontend 根目录，供 vite dev 中间件
- * /__yudream-devtools/audit.json 读取并展示在插件开发者调试抽屉的「前端审查」页。
- *
- * 与 eslint 规则 yudream/prefer-fa-component、yudream/no-brand-color-token 共用映射与判定，
- * 此处独立实现文本扫描以覆盖 eslint 不处理的 css/scss 文件。
- */
+import { execFileSync } from 'node:child_process'
+/** Strict YD-only source audit. Report fields remain compatible with devtools. */
 import { existsSync, globSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { ARCO_SCRIPT_API_MAP, ARCO_TAG_TO_FA_MAP, ARCO_TO_FA_MAP } from '../eslint-rules/fa-component-map.mjs'
+import { isImplementationBoundary, scanUiSource } from '../eslint-rules/fa-component-map.mjs'
+import { scanBrandTokenUsage } from './brand-token-scanner.mjs'
 
 const FRONTEND_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const REPORT_PATH = path.join(FRONTEND_ROOT, 'audit-report.json')
-
+const DEFAULT_BASELINE_PATH = path.join(FRONTEND_ROOT, 'eslint-rules/yd-only-baseline.json')
 const SCAN_GLOBS = [
-  'apps/*/src/**/*.vue',
-  'apps/*/src/**/*.ts',
-  'apps/*/src/**/*.tsx',
-  'apps/*/src/**/*.css',
-  'apps/*/src/**/*.scss',
+  'apps/core-arco-design-vue/src/**/*.vue',
+  'apps/core-arco-design-vue/src/**/*.ts',
+  'apps/core-arco-design-vue/src/**/*.tsx',
+  'apps/core-arco-design-vue/src/**/*.css',
+  'apps/core-arco-design-vue/src/**/*.scss',
+  'apps/component-showcase/src/**/*.vue',
+  'apps/component-showcase/src/**/*.ts',
+  'apps/component-showcase/src/**/*.tsx',
+  'apps/component-showcase/src/**/*.css',
+  'apps/component-showcase/src/**/*.scss',
 ]
-
-const TAG_PATTERN = /<\s*a-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)/g
-const PASCAL_TAG_PATTERN = /<\s*A([A-Z][A-Za-z0-9]*)/g
-const ARCO_IMPORT_PATTERN = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"]@arco-design\/web-vue['"]/g
-const BRAND_TOKEN_PATTERN = /--primary-\d/g
+const gitSourceOption = process.argv.find(argument => argument.startsWith('--source=git:'))
+const gitRef = gitSourceOption?.slice('--source=git:'.length)
+const REPO_ROOT = path.resolve(FRONTEND_ROOT, '..')
+if (gitSourceOption && (!gitRef || !/^[\w./-]+$/.test(gitRef) || gitRef.startsWith('-'))) {
+  throw new Error('Invalid git source reference')
+}
 
 function lineOf(text, index) {
   let line = 1
@@ -41,109 +41,91 @@ function lineOf(text, index) {
 }
 
 function scanFile(relativePath, text) {
-  const violations = []
-  const arcoUsage = {}
-  const isScript = /\.(?:vue|tsx?)$/.test(relativePath)
-
-  if (isScript) {
-    for (const match of text.matchAll(TAG_PATTERN)) {
-      const tag = match[1]
-      arcoUsage[tag] = (arcoUsage[tag] ?? 0) + 1
-      const fa = ARCO_TAG_TO_FA_MAP[tag]
-      if (fa) {
-        violations.push({
-          file: relativePath,
-          rule: 'prefer-fa-component',
-          message: `优先使用 ${fa} 替代 Arco 原生组件 <a-${tag}>，保持组件体系与主题统一。如确需 Arco 原生组件，请 eslint-disable 本行并注明原因。`,
-          line: lineOf(text, match.index),
-        })
-      }
-    }
-    for (const match of text.matchAll(PASCAL_TAG_PATTERN)) {
-      const name = match[1]
-      const fa = ARCO_TO_FA_MAP[name]
-      if (fa) {
-        const tag = name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
-        arcoUsage[tag] = (arcoUsage[tag] ?? 0) + 1
-        violations.push({
-          file: relativePath,
-          rule: 'prefer-fa-component',
-          message: `优先使用 ${fa} 替代 Arco 原生组件 <a-${tag}>，保持组件体系与主题统一。如确需 Arco 原生组件，请 eslint-disable 本行并注明原因。`,
-          line: lineOf(text, match.index),
-        })
-      }
-    }
-    for (const match of text.matchAll(ARCO_IMPORT_PATTERN)) {
-      for (const rawName of match[1].split(',')) {
-        const name = rawName.trim().split(/\s+as\s+/)[0]?.replace(/^type\s+/, '').trim()
-        const fa = (name && (ARCO_TO_FA_MAP[name] ?? ARCO_SCRIPT_API_MAP[name])) || null
-        if (fa) {
-          violations.push({
-            file: relativePath,
-            rule: 'prefer-fa-component',
-            message: `优先使用 ${fa} 替代从 @arco-design/web-vue 导入的 ${name}。如确需 Arco 原生能力，请 eslint-disable 本行并注明原因。`,
-            line: lineOf(text, match.index),
-          })
-        }
-      }
+  const violations = scanUiSource(text, relativePath).map(item => ({
+    file: relativePath,
+    rule: item.rule,
+    message: item.message,
+    line: lineOf(text, item.index),
+  }))
+  if (!isImplementationBoundary(relativePath)) {
+    for (const match of scanBrandTokenUsage(text)) {
+      violations.push({
+        file: relativePath,
+        rule: 'no-brand-color-token',
+        message: `业务样式禁止直接使用品牌色令牌 ${match.token}，请改用中性语义变量。`,
+        line: lineOf(text, match.index),
+      })
     }
   }
-
-  for (const match of text.matchAll(BRAND_TOKEN_PATTERN)) {
-    violations.push({
-      file: relativePath,
-      rule: 'no-brand-color-token',
-      message: `业务样式禁止直接使用品牌色令牌 ${match[0]}，主题与主色由后台主题配置统一控制，请改用中性语义变量（--color-bg-* / --color-text-* / --color-border-* / --color-fill-*）。`,
-      line: lineOf(text, match.index),
-    })
-  }
-
-  return { violations, arcoUsage }
+  return violations
 }
 
-function main() {
-  const files = SCAN_GLOBS.flatMap(pattern =>
-    globSync(pattern, { cwd: FRONTEND_ROOT, exclude: ['**/node_modules/**'] }),
-  ).sort()
-
-  const violations = []
-  const arcoUsage = {}
-  let filesScanned = 0
-
-  for (const file of files) {
-    const absolute = path.join(FRONTEND_ROOT, file)
-    if (!existsSync(absolute)) {
-      continue
-    }
-    filesScanned++
-    const text = readFileSync(absolute, 'utf-8')
-    const result = scanFile(file.replaceAll(path.sep, '/'), text)
-    violations.push(...result.violations)
-    for (const [tag, count] of Object.entries(result.arcoUsage)) {
-      arcoUsage[tag] = (arcoUsage[tag] ?? 0) + count
-    }
+const files = gitRef
+  ? execFileSync('git', ['ls-tree', '-r', '--name-only', gitRef, '--', 'yudream-frontend/apps'], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split(/\r?\n/)
+      .filter(file => /^yudream-frontend\/apps\/(?:core-arco-design-vue|component-showcase)\/src\/.*\.(?:vue|ts|tsx|css|scss)$/.test(file))
+      .map(file => file.slice('yudream-frontend/'.length))
+      .sort()
+  : SCAN_GLOBS.flatMap(pattern => globSync(pattern, { cwd: FRONTEND_ROOT, exclude: ['**/node_modules/**'] })).sort()
+const violations = []
+let filesScanned = 0
+for (const file of files) {
+  const absolute = path.join(FRONTEND_ROOT, file)
+  if (!gitRef && !existsSync(absolute)) {
+    continue
   }
-
-  const report = {
-    generatedAt: new Date().toISOString(),
-    summary: {
-      filesScanned,
-      violationCount: violations.length,
-    },
-    arcoComponentUsage: Object.fromEntries(
-      Object.entries(arcoUsage).sort((a, b) => b[1] - a[1]),
-    ),
-    violations,
-  }
-
-  writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`)
-  console.log(`[audit:ui] 扫描 ${filesScanned} 个文件，发现 ${violations.length} 条审查警告，报告已写入 audit-report.json`)
-  if (Object.keys(arcoUsage).length > 0) {
-    console.log('[audit:ui] Arco 组件使用分布：')
-    for (const [tag, count] of Object.entries(report.arcoComponentUsage)) {
-      console.log(`  <a-${tag}> × ${count}`)
-    }
-  }
+  filesScanned++
+  const text = gitRef
+    ? execFileSync('git', ['show', `${gitRef}:yudream-frontend/${file}`], { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })
+    : readFileSync(absolute, 'utf8')
+  violations.push(...scanFile(file.replaceAll(path.sep, '/'), text))
 }
 
-main()
+const report = {
+  generatedAt: new Date().toISOString(),
+  source: gitRef ? `git:${gitRef}` : 'working-tree',
+  summary: { filesScanned, violationCount: violations.length },
+  arcoComponentUsage: {},
+  violations,
+}
+writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`)
+console.log(`[audit:ui] 扫描 ${filesScanned} 个文件，发现 ${violations.length} 条 YD-only 违规，报告已写入 audit-report.json`)
+
+function findingCounts(items) {
+  const counts = {}
+  for (const item of items) {
+    const key = JSON.stringify([item.file, item.rule, item.message])
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return counts
+}
+
+const baselineOption = process.argv.find(argument => argument.startsWith('--baseline='))
+const writeBaseline = process.argv.includes('--write-baseline')
+if (writeBaseline) {
+  if (!gitRef) {
+    throw new Error('基线只能从明确的已提交 Git 版本生成，请指定 --source=git:HEAD；不得接受工作区新增违规。')
+  }
+  const commit = execFileSync('git', ['rev-parse', gitRef], { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+  writeFileSync(DEFAULT_BASELINE_PATH, `${JSON.stringify({ sourceCommit: commit, findings: findingCounts(violations) }, null, 2)}\n`)
+  console.log(`[audit:ui] 已更新严格门禁基线 ${path.relative(FRONTEND_ROOT, DEFAULT_BASELINE_PATH)}`)
+}
+else if (baselineOption) {
+  const baselinePath = path.resolve(FRONTEND_ROOT, baselineOption.slice('--baseline='.length))
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')).findings ?? {}
+  const current = findingCounts(violations)
+  const regressions = Object.entries(current).filter(([key, count]) => count > (baseline[key] ?? 0))
+  if (regressions.length) {
+    console.error(`[audit:ui] 检出 ${regressions.length} 类基线外新增违规：`)
+    for (const [key, count] of regressions) {
+      console.error(`  ${key} × ${count - (baseline[key] ?? 0)}`)
+    }
+    process.exitCode = 1
+  }
+  else {
+    console.log(`[audit:ui] 严格门禁通过，违规数未超过基线 ${Object.values(baseline).reduce((sum, count) => sum + count, 0)}。`)
+  }
+}
+else if (violations.length) {
+  process.exitCode = 1
+}

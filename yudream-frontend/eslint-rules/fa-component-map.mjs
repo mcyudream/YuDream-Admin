@@ -1,73 +1,53 @@
-/**
- * Arco 原生组件 → Fa/Yd 组件体系的替代映射表。
- * eslint 规则 yudream/prefer-fa-component 与 scripts/audit-ui.mjs 共用，
- * 新增 Fa 组件或发现新的 Arco 用法时在此补充。
- *
- * 只收录存在明确 Fa 等价物的组件；Form/Grid/Tree/Menu 等无 Fa 对应的不在此列。
- */
-export const ARCO_TO_FA_MAP = {
-  Alert: 'FaAlert',
-  Avatar: 'FaAvatar',
-  Badge: 'FaBadge',
-  Button: 'FaButton',
-  Card: 'FaCard',
-  Checkbox: 'FaCheckbox',
-  CheckboxGroup: 'FaCheckboxGroup',
-  Collapse: 'FaCollapsible',
-  CollapseItem: 'FaCollapsible',
-  Descriptions: 'FaDescriptions',
-  DescriptionsItem: 'FaDescriptions 的 items 配置',
-  Divider: 'FaDivider',
-  Drawer: 'FaDrawer / useFaDrawer',
-  Dropdown: 'FaDropdown',
-  Doption: 'FaDropdown 的 items 配置',
-  Empty: '中性空态块（如 text-secondary-foreground/50 的占位 div）',
-  Image: 'FaImagePreview',
-  ImagePreview: 'useFaImagePreview',
-  ImagePreviewGroup: 'FaImagePreview',
-  Input: 'FaInput',
-  InputNumber: 'FaNumberField',
-  InputOtp: 'FaInputOTP',
-  InputPassword: 'FaInput type="password"',
-  InputSearch: 'FaInput',
-  Kbd: 'FaKbd',
-  Link: 'FaButton variant="link"',
-  Modal: 'FaModal / useFaModal',
-  Option: 'FaSelect 的 options 配置',
-  PageHeader: 'FaPageHeader',
-  Pagination: 'FaPagination',
-  Popconfirm: 'FaPopover / useFaModal 确认框',
-  Popover: 'FaPopover',
-  Progress: 'FaProgress',
-  Radio: 'FaRadioGroup',
-  RadioGroup: 'FaRadioGroup',
-  Scrollbar: 'FaScrollArea',
-  Select: 'FaSelect',
-  Slider: 'FaSlider',
-  Spin: 'FaProgress / 加载占位',
-  Switch: 'FaSwitch',
-  Table: 'FaTable / FaResponsiveTable',
-  TabPane: 'FaTabs 的 items 配置',
-  Tabs: 'FaTabs',
-  Tag: 'FaTag',
-  Textarea: 'FaTextarea',
-  Tooltip: 'FaTooltip',
-  Upload: 'FaFileUpload / FaImageUpload',
+/** Strict YD-only conformance primitives shared by ESLint and audit:ui. */
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { scanUiSyntax } from './ui-source-scanner.mjs'
+
+const FRONTEND_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const RESOLVER_PATH = path.join(FRONTEND_ROOT, 'packages/components/resolver.ts')
+
+export function getPublicYdNames() {
+  const source = readFileSync(RESOLVER_PATH, 'utf8')
+  return new Set([...source.matchAll(/'((?:Yd|useYd)[A-Za-z0-9]+)'/g)].map(match => match[1]))
 }
 
-/**
- * 脚本侧 API（非组件）：import { Message } from '@arco-design/web-vue'
- */
-export const ARCO_SCRIPT_API_MAP = {
-  Message: 'useFaToast',
-  Notification: 'useFaToast',
+export const YD_PUBLIC_NAMES = getPublicYdNames()
+export const THIRD_PARTY_UI_SOURCES = [
+  '@arco-design/',
+  'reka-ui',
+  'shadcn-vue',
+  'radix-vue',
+  'element-plus',
+  'ant-design-vue',
+  'naive-ui',
+  'vuetify',
+  'primevue',
+  'bootstrap-vue',
+  'tdesign-vue',
+]
+export const NATIVE_INTERACTIVE_TAGS = new Set(['button', 'input', 'select', 'textarea', 'option'])
+export const CLICKABLE_STRUCTURE_TAGS = new Set(['div', 'span', 'li', 'p', 'section', 'article'])
+
+const IMPLEMENTATION_BOUNDARIES = [
+  /^packages\/components\/src\//,
+  /^packages\/plugin-sdk\/src\/host-components\.ts$/,
+  /^apps\/[^/]+\/src\/(?:main|bootstrap|ui\/provider)\.[jt]sx?$/,
+  /^apps\/[^/]+\/src\/ui\/YdUiProvider\.vue$/,
+  /^apps\/core-arco-design-vue\/src\/ui\/provider\/index\.(?:ts|vue)$/,
+  /^apps\/core-arco-design-vue\/src\/ui\/shadcn\/ui\//,
+  /^apps\/[^/]+\/src\/types\/(?:components|auto-imports)\.d\.ts$/,
+  /^apps\/core-arco-design-vue\/src\/assets\/styles\/dashboard-appearance\.css$/,
+]
+
+export function isImplementationBoundary(file) {
+  const normalized = file.replaceAll('\\', '/').replace(/^.*?yudream-frontend\//, '')
+  return IMPLEMENTATION_BOUNDARIES.some(pattern => pattern.test(normalized))
 }
 
-export function toKebabCase(name) {
-  return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+export function scanUiSource(text, file = '') {
+  if (isImplementationBoundary(file) || /\.(?:css|scss)$/.test(file)) {
+    return []
+  }
+  return scanUiSyntax(text, file, { publicNames: YD_PUBLIC_NAMES, thirdPartySources: THIRD_PARTY_UI_SOURCES })
 }
-
-/** kebab-case 模板标签（去掉 a- 前缀后） → Fa 替代 */
-export const ARCO_TAG_TO_FA_MAP = Object.fromEntries(
-  Object.entries(ARCO_TO_FA_MAP).map(([name, fa]) => [toKebabCase(name), fa]),
-)
