@@ -43,8 +43,10 @@ function render() {
   if (!chart) {
     chart = init(element, undefined, { renderer: 'svg' })
     chart.on('updateAxisPointer', (event: unknown) => {
-      const index = (event as { axesInfo?: { seriesDataIndices?: { dataIndex: number }[] }[] }).axesInfo?.[0]?.seriesDataIndices?.[0]?.dataIndex
-      if (index !== undefined) {
+      const axis = (event as { axesInfo?: { axisDim: string, value: number }[] }).axesInfo?.find(axis => axis.axisDim === (props.kind === 'ranking' ? 'y' : 'x'))
+      const index = axis?.value
+      if (index !== undefined && Number.isInteger(index) && index >= 0 && index < props.points.length) {
+        keyboardIndex = index
         emit('select', index)
       }
     })
@@ -68,6 +70,7 @@ function schedule() {
 function clearSelection() {
   keyboardIndex = null
   emit('select', null)
+  chart?.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
   chart?.dispatchAction({ type: 'hideTip' })
 }
 
