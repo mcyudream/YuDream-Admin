@@ -10,6 +10,7 @@ const sharedYdPages = new Set([
   'components/yd-ui-guidelines.md',
   'components/yd-components.md',
   'components/yd-form-components.md',
+  'components/yd-select-components.md',
   'components/yd-agent-workbench.md',
   'components/frontend-appearance.md',
   'components/yd-contract-releases.md'
@@ -182,6 +183,7 @@ const componentSidebar = [
       { text: '视觉与场景选型规范', link: '/components/yd-ui-guidelines' },
       { text: '通用组件 API', link: '/components/yd-components' },
       { text: '表单与基础装配 API', link: '/components/yd-form-components' },
+      { text: '下拉选择与回显 API', link: '/components/yd-select-components' },
       { text: 'Agent 工作台与回答协议', link: '/components/yd-agent-workbench' },
       { text: '三套外观与主题插件', link: '/components/frontend-appearance' },
       { text: '契约发布与下游同步记录', link: '/components/yd-contract-releases' }

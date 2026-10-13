@@ -1,0 +1,15 @@
+{
+  "name": "yudream-admin-plugins-frontend",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "audit:ui": "node scripts/audit-ui.mjs",
+    "test:ui-audit": "node --test scripts/brand-token-scanner.test.mjs"
+  },
+  "devDependencies": {
+    "@yudream/components": "catalog:",
+    "@yudream/plugin-sdk": "catalog:",
+    "vue": "catalog:"
+  }
+}

@@ -10,18 +10,22 @@
 - `.npmrc.example`
 - `settings.xml.example`
 - `pnpm-workspace.yaml.example`
+- `yudream-frontend/package.json`（含严格 YD UI 审计与公开契约/Vue 编译器依赖）
 - `ci/verify-plugin-repo-independence.sh`
 - `ci/stage-plugin-repo-foundation.sh`
 - `ci/stage-plugin-source-migration.sh`
 - `ci/verify-core-maven-registry.sh`
 - `ci/verify-plugin-maven-boundary.sh`
 - `ci/verify-core-npm-contracts.sh`
+- `ci/verify-plugin-ui-conformance.sh`
+- `yudream-frontend/scripts/audit-ui.mjs`、AST scanner 与行为测试
 - `ci/verify-plugin-jar-assets.sh`
 - `ci/verify-plugin-release-selection.sh`
 - `ci/publish-plugin-jars.sh`
 - `ci/verify-published-plugin-jars.sh`
 - `release/plugins.txt`（官方 tag 发布的显式模块清单）
 - `docs/plugin-release.md`
+- `docs/yd-ui-development.md`
 - `plugin.yml.example`
 - `store.json.example`
 - `submission.json.example`
@@ -63,8 +67,9 @@
 6. 前端 workspace 只保留 `packages/plugin-*`，不要恢复成 `packages/*`
 7. 插件仓 CI 的前端构建入口也只匹配 `yudream-frontend/packages/plugin-*/package.json`
 8. 共享包只使用公开入口，例如 `@yudream/plugin-sdk`、`@yudream/plugin-sdk/vite-shared`，不要依赖 `src/*` 内部路径
-9. 官方 tag 发布由 `release/plugins.txt` 明确选择模块；默认清单包含 14 个完整 `yudream-plugin-*` artifactId。不使用 changed-plugin detection。
-10. 需要临时缩小 tag 发布范围时，设置严格校验的 `PLUGIN_RELEASE_MODULES`（逗号或空白分隔）；`PLUGIN_RELEASE_ONLY=1` 使用完整显式清单。未知、空白或重复 ID 会使流水线失败。
+9. 前端业务只使用公开 YD UI；`validate:ui-conformance` 安装已发布组件契约与 Vue compiler-sfc 后，扫描 Vue AST、脚本、JSX 和主题 scope。不得使用裸 Fa/Arco 控件或业务通用原生交互控件。
+10. 官方 tag 发布由 `release/plugins.txt` 明确选择模块；默认清单包含 14 个完整 `yudream-plugin-*` artifactId。不使用 changed-plugin detection。
+11. 需要临时缩小 tag 发布范围时，设置严格校验的 `PLUGIN_RELEASE_MODULES`（逗号或空白分隔）；`PLUGIN_RELEASE_ONLY=1` 使用完整显式清单。未知、空白或重复 ID 会使流水线失败。
 
 完整的选择、版本和 catalog 规则见 [`docs/plugin-release.md`](docs/plugin-release.md)。
 

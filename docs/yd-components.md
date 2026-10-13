@@ -6,7 +6,7 @@ Coding Agent 会话、Harness、Skills、MCP、工作区以及回答引用/工�
 
 YD 在既有 FA 组件、主题变量和交互基础上提供自己的外观层，并按 [FA Pro 公开组件目录](https://fantastic-admin.hurui.me/components/pro/FaAnimatedBeam.html) 的 47 个参考项独立实现通用交互、日历和动效能力。参考目录用于确定功能范围；YD 没有复制闭源 Pro 源码，也不承诺 FA Pro 的属性、插槽或事件兼容。下方矩阵记录当前实现的能力与边界。
 
-新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。当前工作区源码目录已有 136 个 YD 组件入口；`YdSortableTree`、`YdWorkflowCanvas`、`YdWorkflowHandle`、`YdLoadingOverlay` 和 `YdPageBuilder` 准备随 components 1.6.0 / plugin-sdk 1.11.0 发布，不包含在已发布并验签的 components 1.5.0 / plugin-sdk 1.10.0 的 131 个入口中。插件只能使用已发布验签的契约。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)。
+新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。components 1.6.0 / plugin-sdk 1.11.0 已发布并完成远程验签，共 136 个 YD 组件入口；其中 `YdSortableTree`、`YdWorkflowCanvas`、`YdWorkflowHandle`、`YdLoadingOverlay` 和 `YdPageBuilder` 为本轮新增。插件只能使用已发布验签的契约。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)。
 
 ## 接入与基础二次封装
 
@@ -55,7 +55,7 @@ const name = ref('')
 
 `YdCodeEditor` 使用 CodeMirror 6 承载 JSON、HTML、CSS 和 JavaScript 编辑，可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁 EditorView。此入口同样只存在于当前工作区。
 
-`YdPageBuilder` 在共享组件内部异步创建并销毁 GrapesJS。`builderProjectJson` 是首选恢复来源，缺失或无效时回退 `htmlContent` / `cssContent`；三个模型以 `update:*` 与 `change(snapshot)` 同步。受控父级回显不会重新载入项目，外部模型变更才更新编辑器。`setup(editor)` 在初始内容加载前注册业务块/类型，`upload(files)` 注入业务媒体上传并返回 `{ src, type?, name? }`；引擎选项在初始化时传入。`ready` 提供有类型的 editor facade，支持快照、加载项目、设置 HTML/CSS 和释放实例。调用 facade 的 `dispose()` 后，该 facade 的属性与所有方法均抛出 `Error`，包括 `getSnapshot()`，以免把已销毁引擎伪装成有效快照；通过组件 ref 调用 `dispose()` 后先前发出的 facade 同样失效。未完成的媒体上传仅会回调启动时对应且仍存活的编辑器实例，卸载后上传错误不会继续发出 `error` 事件。`readOnly` 与 `disabled` 冻结画布交互，但不限制宿主通过 facade 加载受控内容；`error` 报告解析、初始化与有效实例上的上传错误。CMS 主题、AI、API 与媒体权限逻辑继续留在宿主。该入口目前只存在于工作区。
+`YdPageBuilder` 在共享组件内部异步创建并销毁 GrapesJS。`builderProjectJson` 是首选恢复来源，缺失或无效时回退 `htmlContent` / `cssContent`；三个模型以 `update:*` 与 `change(snapshot)` 同步。受控父级回显不会重新载入项目，外部模型变更才更新编辑器。`setup(editor)` 在初始内容加载前注册业务块/类型，`upload(files)` 注入业务媒体上传并返回 `{ src, type?, name? }`；引擎选项在初始化时传入。`ready` 提供有类型的 editor facade，支持快照、加载项目、设置 HTML/CSS 和释放实例。调用 facade 的 `dispose()` 后，该 facade 的属性与所有方法均抛出 `Error`，包括 `getSnapshot()`，以免把已销毁引擎伪装成有效快照；通过组件 ref 调用 `dispose()` 后先前发出的 facade 同样失效。未完成的媒体上传仅会回调启动时对应且仍存活的编辑器实例，卸载后上传错误不会继续发出 `error` 事件。`readOnly` 与 `disabled` 冻结画布交互，但不限制宿主通过 facade 加载受控内容；`error` 报告解析、初始化与有效实例上的上传错误。CMS 主题、AI、API 与媒体权限逻辑继续留在宿主。该入口已包含在验签通过的 components 1.6.0 中。
 
 `YdSortableTree` 为需要持久化重排的目录/导航提供独立契约，不改变 `YdTree` 的勾选/筛选用途。节点使用全局唯一字符串 `key`、`label`、可选 `children`/`disabled`/`lazy`，额外业务字段随节点和插槽保留。`selectedKey`、`expandedKeys` 受控；拖拽或 Alt + 方向键只发出 `drop` 提案，包含完整拖动/落点节点、位置 `-1/0/1`（上方/成为子级/下方）、原父级/目标父级、层级和触发方式，不直接改写 `data`。组件内置禁用节点、环和 `maxDepth` 拒绝，`canDrop` 可添加业务约束；调用方经 `moveYdSortableTreeNode` 或自身模型接受并保存提案。`lazy` 节点通过 `loadChildren(node)` 加载，结果在实例内缓存，并发出 `load` / `loadError`。键盘支持方向导航、Home/End、Enter/Space 选中及 Alt + 上/下同级排序、Alt + 左/右调整层级；当前不提供虚拟列表。
 

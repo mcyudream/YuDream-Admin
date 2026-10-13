@@ -67,6 +67,23 @@ validate:core-npm-contracts:
   script:
     - sh ci/verify-core-npm-contracts.sh
 
+validate:ui-conformance:
+  stage: validate
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:24.15.0-bookworm
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+  script:
+    - cd yudream-frontend
+    - |
+      printf '%s\n' \
+        "registry=$NPM_CONFIG_REGISTRY" \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" > .npmrc
+    - pnpm install --frozen-lockfile
+    - cd ..
+    - sh ci/verify-plugin-ui-conformance.sh
+
 validate:docs:
   stage: validate
   image: alpine:3.20
