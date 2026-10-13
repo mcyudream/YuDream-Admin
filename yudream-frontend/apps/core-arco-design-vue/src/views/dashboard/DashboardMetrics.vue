@@ -66,7 +66,7 @@ defineEmits<{
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--color-border-1);
 }
 
@@ -99,6 +99,7 @@ defineEmits<{
 
 .dashboard-metrics__item dd {
   min-width: 0;
+  max-width: 100%;
   margin: 0;
   font-size: 19px;
   font-weight: 650;
