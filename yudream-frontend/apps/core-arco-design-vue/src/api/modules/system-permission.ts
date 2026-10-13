@@ -1,5 +1,6 @@
 import type { ApiResponse } from './system-client'
 import type { PermissionItem, RoleManageItem } from './system-role'
+import type { UserManageItem } from './system-user'
 import systemClient from './system-client'
 
 export interface PermissionOverviewUser {
@@ -57,6 +58,21 @@ export interface PermissionOverviewQuery {
   userUnassignedOnly?: boolean
 }
 
+export interface PermissionRoleChange {
+  roleId: string
+  expectedPermissions: string[]
+  grant: string[]
+  revoke: string[]
+}
+
+export interface UserRoleChange {
+  expectedRoleIds: string[]
+  grant: string[]
+  revoke: string[]
+}
+
 export default {
   overview: (params?: PermissionOverviewQuery) => systemClient.get<unknown, ApiResponse<PermissionOverview>>('api/system/roles/permission-overview', { params }),
+  changeRolePermissions: ({ roleId, ...change }: PermissionRoleChange) => systemClient.put<unknown, ApiResponse<RoleManageItem>>(`api/system/roles/${roleId}/permission-changes`, change),
+  changeUserRoles: (userId: string, change: UserRoleChange) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${userId}/role-changes`, change),
 }

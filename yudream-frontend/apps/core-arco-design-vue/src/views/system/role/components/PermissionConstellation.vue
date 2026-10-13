@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { PermissionOverview } from '@/api/modules/system-permission'
-import type { RoleManageItem } from '@/api/modules/system-role'
+import type { PermissionItem, RoleManageItem } from '@/api/modules/system-role'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, ref, useId, watch } from 'vue'
-import { permissionCategoryOf, permissionResourceOf } from '@/utils/permission-catalog'
+import { buildPermissionTree, permissionCategoryOf, permissionResourceLabels, permissionResourceOf, permissionTreeKeys } from '@/utils/permission-catalog'
 
 const props = defineProps<{
   overview: PermissionOverview
@@ -15,6 +15,10 @@ const emit = defineEmits<{
   editRole: [role: RoleManageItem]
   editUser: [id: string]
   editMenu: [code: string]
+  grantPermission: [code: string]
+  revokePermission: [roleId: string, code: string]
+  assignUserRoles: [id: string]
+  inspectPermission: [code: string]
   userPage: [page: number]
   userSearch: [keyword: string]
   userUnassigned: [enabled: boolean]
@@ -46,15 +50,21 @@ const focusedKind = ref<NodeKind | null>(null)
 const selectedId = ref<string | null>(null)
 const queryMode = ref<'all' | 'idle' | 'unassigned'>('all')
 const resourceKey = ref('')
+const rolePermissionKeyword = ref('')
+const rolePermissionPage = ref(1)
+const rolePermissionSize = ref(30)
 const labels: Record<NodeKind, string> = { users: '用户', roles: '角色', menus: '菜单', permissions: '权限' }
 const limits: Record<NodeKind, number> = { users: 16, roles: 24, menus: 20, permissions: 18 }
 const roleIndex = computed(() => new Map(props.overview.roles.map(role => [role.id, role])))
 const idleRoleIds = computed(() => new Set(props.overview.idleRoleIds || []))
+const resourceLabels = computed(() => permissionResourceLabels(props.overview.permissions))
 const activePermissions = computed(() => props.overview.permissions.filter(permission => permission.status === 'ACTIVE'))
+const activePermissionIndex = computed(() => new Map(activePermissions.value.map(permission => [permission.code, permission])))
+const permissionDisplayOrder = computed(() => new Map(permissionTreeKeys(buildPermissionTree(activePermissions.value), true).map((code, index) => [code, index])))
 const resourceOptions = computed(() => {
   const resources = new Map<string, { value: string, label: string }>()
   activePermissions.value.forEach((permission) => {
-    const resource = permissionResourceOf(permission)
+    const resource = permissionResourceOf(permission, resourceLabels.value)
     resources.set(resource.key, { value: resource.key, label: `${resource.domainLabel} / ${resource.label}` })
   })
   return [...resources.values()]
@@ -92,10 +102,10 @@ const allNodes = computed<StarNode[]>(() => [
     entityId: permission.code,
     kind: 'permissions' as const,
     label: permission.name,
-    caption: `${permission.code} · ${permissionResourceOf(permission).label} · ${permissionCategoryOf(permission.code).label}`,
-    roleIds: props.overview.roles.filter(role => role.systemType === 'SUPER_ADMIN' || role.permissions.includes(permission.code)).map(role => role.id),
+    caption: `${permission.code} · ${permissionResourceOf(permission, resourceLabels.value).label} · ${permissionCategoryOf(permission.code).label}`,
+    roleIds: props.overview.roles.filter(role => role.systemType === 'SUPER_ADMIN' || role.permissions.includes('*') || role.permissions.includes(permission.code)).map(role => role.id),
     available: permission.status === 'ACTIVE',
-    resourceKey: permissionResourceOf(permission).key,
+    resourceKey: permissionResourceOf(permission, resourceLabels.value).key,
   })),
 ])
 const selected = computed(() => allNodes.value.find(node => node.id === selectedId.value))
@@ -132,6 +142,66 @@ const relatedRoles = computed(() => (selected.value?.roleIds || []).map(id => ro
 const selectedUser = computed(() => props.overview.users.find(user => selected.value?.kind === 'users' && user.id === selected.value.entityId))
 const selectedMenu = computed(() => props.overview.menus.find(menu => selected.value?.kind === 'menus' && menu.code === selected.value.entityId))
 const selectedRole = computed(() => selected.value?.kind === 'roles' ? roleIndex.value.get(selected.value.entityId) : undefined)
+const selectedPermission = computed(() => selected.value?.kind === 'permissions' ? activePermissionIndex.value.get(selected.value.entityId) : undefined)
+const menuDirectPermission = computed(() => {
+  const menu = selectedMenu.value
+  return menu && ['MENU', 'LINK', 'BUTTON'].includes(menu.type) ? activePermissionIndex.value.get(menu.permission) : undefined
+})
+const selectedPermissionDetails = computed(() => {
+  const permission = selectedPermission.value
+  if (!permission) {
+    return []
+  }
+  const resource = permissionResourceOf(permission, resourceLabels.value)
+  return [
+    { key: 'name', label: '操作名称', value: permission.name },
+    { key: 'code', label: '权限码', value: permission.code, valueClass: 'break-all font-mono' },
+    { key: 'resource', label: '业务资源', value: `${resource.domainLabel} / ${resource.label}` },
+    { key: 'module', label: '登记模块', value: permission.module || '未声明' },
+    { key: 'category', label: '动作分类', value: permissionCategoryOf(permission.code).label },
+    { key: 'status', label: '目录状态', value: permission.status === 'ACTIVE' ? '已登记 · 可授予' : '已失效' },
+    { key: 'desc', label: '操作说明', value: permission.desc || '此权限未登记说明，查看细则可核对授权关系与入口。' },
+  ]
+})
+const userDeptNames = computed(() => (selectedUser.value?.deptIds || []).map((deptId) => {
+  const name = props.overview.roles.find(role => role.deptId === deptId && role.deptName)?.deptName
+  return name || `部门 ${deptId}`
+}))
+const userContextDept = computed(() => {
+  const deptId = selectedUser.value?.currentDeptId
+  if (!deptId) {
+    return '未选择'
+  }
+  return props.overview.roles.find(role => role.deptId === deptId && role.deptName)?.deptName || `部门 ${deptId}`
+})
+const canAssignSelectedUser = computed(() => !!selectedUser.value && props.overview.canViewUsers && auth('system:user:assign-role'))
+const rolePermissionItems = computed(() => {
+  const role = selectedRole.value
+  if (!role) {
+    return []
+  }
+  const needle = rolePermissionKeyword.value.trim().toLowerCase()
+  return activePermissions.value.filter((permission) => {
+    if (role.systemType !== 'SUPER_ADMIN' && !role.permissions.includes('*') && !role.permissions.includes(permission.code)) {
+      return false
+    }
+    const resource = permissionResourceOf(permission, resourceLabels.value)
+    return !needle || [permission.name, permission.code, permission.module, resource.domainLabel, resource.label, permissionCategoryOf(permission.code).label].some(value => value?.toLowerCase().includes(needle))
+  }).sort((left, right) => (permissionDisplayOrder.value.get(left.code) || 0) - (permissionDisplayOrder.value.get(right.code) || 0))
+})
+const rolePermissionGroups = computed(() => {
+  const groups = new Map<string, { key: string, label: string, permissions: PermissionItem[] }>()
+  const start = (rolePermissionPage.value - 1) * rolePermissionSize.value
+  rolePermissionItems.value.slice(start, start + rolePermissionSize.value).forEach((permission) => {
+    const resource = permissionResourceOf(permission, resourceLabels.value)
+    if (!groups.has(resource.key)) {
+      groups.set(resource.key, { key: resource.key, label: `${resource.domainLabel} / ${resource.label}`, permissions: [] })
+    }
+    groups.get(resource.key)!.permissions.push(permission)
+  })
+  return [...groups.values()]
+})
+const uncataloguedRolePermissionCount = computed(() => new Set(selectedRole.value?.permissions.filter(code => !activePermissionIndex.value.has(code))).size)
 const canEditSelected = computed(() => {
   if (selected.value?.kind === 'roles') {
     return auth('system:role:edit')
@@ -220,8 +290,7 @@ function showKind(kind: NodeKind) {
 function inspect(node: StarNode) {
   selectedId.value = node.id
 }
-function activate(node: StarNode) {
-  inspect(node)
+function openManagement(node: StarNode) {
   if (node.kind === 'roles' && auth('system:role:edit')) {
     const role = roleIndex.value.get(node.entityId)
     if (role) {
@@ -279,9 +348,18 @@ function displayCount(value: number | null) {
 function nodeKeydown(event: KeyboardEvent, node: StarNode) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    activate(node)
+    inspect(node)
   }
 }
+function canRevoke(role: RoleManageItem, code: string) {
+  return auth('system:role:edit') && role.systemType !== 'SUPER_ADMIN' && !role.permissions.includes('*') && role.permissions.includes(code) && activePermissionIndex.value.has(code)
+}
+watch([() => selectedRole.value?.id, rolePermissionKeyword], () => {
+  rolePermissionPage.value = 1
+})
+watch(() => rolePermissionItems.value.length, (total) => {
+  rolePermissionPage.value = Math.min(rolePermissionPage.value, Math.max(1, Math.ceil(total / rolePermissionSize.value)))
+})
 watch(() => props.overview, () => {
   if (selectedId.value && !allNodes.value.some(node => node.id === selectedId.value)) {
     selectedId.value = null
@@ -326,18 +404,18 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
         <div v-for="category in categories" :key="category.kind" class="summary-item">
           <span>{{ labels[category.kind] }}</span><strong>{{ displayCount(category.count) }}</strong>
         </div>
-        <YdButton variant="ghost" class="summary-item summary-query h-auto items-start p-0" :disabled="!overview.canViewUsers" @click="quickQuery('idle')">
+        <YdButton variant="ghost" class="summary-item summary-query p-0 h-auto items-start" :disabled="!overview.canViewUsers" @click="quickQuery('idle')">
           <span>闲置角色</span><strong>{{ displayCount(overview.stats.idleRoleCount) }}</strong>
         </YdButton>
         <div class="summary-item">
           <span>未配置授权菜单</span><strong>{{ displayCount(overview.stats.ungrantedMenuCount) }}</strong>
         </div>
-        <YdButton variant="ghost" class="summary-item summary-query h-auto items-start p-0" :disabled="!overview.canViewUsers" @click="quickQuery('unassigned')">
+        <YdButton variant="ghost" class="summary-item summary-query p-0 h-auto items-start" :disabled="!overview.canViewUsers" @click="quickQuery('unassigned')">
           <span>无角色用户</span><strong>{{ displayCount(overview.stats.unassignedUserCount) }}</strong>
         </YdButton>
       </div>
 
-      <svg :key="replayKey" class="constellation-svg" :viewBox="`0 0 ${geometry.width} ${geometry.height}`" role="group" aria-label="用户、角色、权限和菜单的配置关系。Tab 键选择节点，Enter 键打开对应管理入口。">
+      <svg :key="replayKey" class="constellation-svg" :viewBox="`0 0 ${geometry.width} ${geometry.height}`" role="group" aria-label="用户、角色、权限和菜单的配置关系。Tab 键选择节点，Enter 键显示详情与授权操作。">
         <defs>
           <radialGradient :id="gradientId" cx="35%" cy="26%" r="78%"><stop offset="0" class="sphere-stop-light" /><stop offset="0.65" class="sphere-stop-mid" /><stop offset="1" class="sphere-stop-dark" /></radialGradient>
         </defs>
@@ -354,7 +432,7 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
         <g class="constellation-stars">
           <g v-for="star in stars" :key="star.id" :style="{ '--enter-delay': `${Math.min(star.index * 24 + 380, 1400)}ms` }" :class="{ 'star-is-muted': selected && !relatedIds.has(star.id), 'star-is-selected': selectedId === star.id, 'star-is-unavailable': !star.available }">
             <path :d="curve(geometry.hubs[star.kind], star)" class="satellite-link" pathLength="1" aria-hidden="true" />
-            <g class="satellite" :transform="`translate(${star.x}, ${star.y})`" role="button" tabindex="0" :aria-label="`${labels[star.kind]}：${star.label}，${star.caption}${!star.available ? '，当前不可用' : ''}`" :aria-pressed="selectedId === star.id" @click="activate(star)" @keydown="nodeKeydown($event, star)" @focus="inspect(star)">
+            <g class="satellite" :transform="`translate(${star.x}, ${star.y})`" role="button" tabindex="0" :aria-label="`${labels[star.kind]}：${star.label}，${star.caption}${!star.available ? '，当前不可用' : ''}`" :aria-pressed="selectedId === star.id" @click="inspect(star)" @keydown="nodeKeydown($event, star)" @focus="inspect(star)">
               <title>{{ star.label }} · {{ star.caption }}</title>
               <circle r="15" class="satellite-hit" />
               <circle :r="star.kind === 'permissions' ? 3 : 4.5" class="satellite-dot" />
@@ -419,7 +497,7 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
       </div>
       <div v-if="focusedKind === 'permissions'" class="mt-3 flex flex-wrap gap-2 items-center">
         <span class="inspector-meta">按资源探索</span>
-        <YdSelect :model-value="activeResource" :options="resourceOptions" class="flex-1 min-w-0" allow-search placeholder="选择业务资源" aria-label="选择权限业务资源" @update:model-value="resourceKey = String($event || ''); selectedId = null" />
+        <YdCombobox :model-value="activeResource" :options="resourceOptions" class="flex-1 min-w-0" virtual-list :disabled="loading" placeholder="选择业务资源" aria-label="选择权限业务资源" @update:model-value="resourceKey = String($event || ''); selectedId = null" />
       </div>
     </div>
 
@@ -469,7 +547,7 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
           {{ focusedKind === 'users' && !overview.canViewUsers ? '用户信息未开放' : focusedKind === 'menus' && !overview.canViewMenus ? '菜单信息未开放' : '当前载入的数据中没有匹配项' }}
         </p>
       </div>
-      <div v-if="selected" class="inspector-panel" aria-live="polite">
+      <div v-if="selected" class="inspector-panel" :class="{ 'md:col-span-2': selectedRole || (!focusedKind && !normalizedKeyword && queryMode === 'all') }" aria-live="polite">
         <div class="flex gap-3 items-start justify-between">
           <div class="min-w-0">
             <span class="inspector-meta">{{ labels[selected.kind] }} · {{ selected.available ? '当前可用' : '当前停用或运行不可用' }}</span><h3 class="text-base font-semibold mt-1 break-words">
@@ -482,31 +560,123 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
           </YdButton>
         </div>
         <p v-if="selectedUser" class="inspector-note">
-          {{ selectedUser.contextSource === 'SESSION' ? '本次会话的部门 / 角色上下文' : '默认部门 / 角色上下文（实际会话可切换）' }}：{{ selectedUser.currentDeptId || '未选择' }} / {{ roleIndex.get(selectedUser.currentRoleId || '')?.name || '未选择' }}。已分配 {{ selectedUser.roleIds.length }} 个角色，实际访问不会合并所有角色权限。{{ selectedUser.status !== 'ACTIVE' || !selectedUser.emailVerified ? '此用户停用或尚未验证邮箱，当前不可访问。' : '' }}
+          {{ selectedUser.contextSource === 'SESSION' ? '本次会话的部门 / 角色上下文' : '默认部门 / 角色上下文（实际会话可切换）' }}：{{ userContextDept }} / {{ roleIndex.get(selectedUser.currentRoleId || '')?.name || '未选择' }}。已分配 {{ selectedUser.roleIds.length }} 个角色，实际访问不会合并所有角色权限。{{ selectedUser.status !== 'ACTIVE' || !selectedUser.emailVerified ? '此用户停用或尚未验证邮箱，当前不可访问。' : '' }}
         </p>
+        <p v-if="selectedUser" class="inspector-note">
+          所属部门：{{ userDeptNames.join('、') || '尚未分配' }}。修改角色分配只调整可选择的身份，不代表本次会话已切换。
+        </p>
+        <div v-if="selectedPermission" class="mt-3">
+          <YdDescriptions :items="selectedPermissionDetails" :column="1" size="sm" :label-width="80" value-class="break-words" />
+          <div class="mt-3 flex flex-wrap gap-2">
+            <YdButton size="sm" variant="outline" :disabled="loading" @click="emit('inspectPermission', selectedPermission.code)">
+              <YdIcon name="morph:book-open" />查看细则
+            </YdButton>
+            <YdButton v-if="auth('system:role:edit')" size="sm" :disabled="loading" @click="emit('grantPermission', selectedPermission.code)">
+              <YdIcon name="morph:shield-plus" />授予角色
+            </YdButton>
+          </div>
+        </div>
         <p v-if="selectedRole" class="inspector-note">
           {{ selectedRole.status === 'ACTIVE' ? '角色已启用' : '角色已停用' }} · 配置 {{ selectedRole.permissions.length }} 项权限。{{ selectedRole.systemType === 'SUPER_ADMIN' ? '超级管理员的实际授权由运行时规则判定。' : '' }}
         </p>
-        <p v-if="selectedMenu" class="inspector-note">
-          {{ selectedMenu.permission ? `入口权限：${selectedMenu.permission}` : '无独立权限码，关联由后端菜单规则推导。' }} {{ selectedMenu.runtimeAvailable ? '' : '当前运行不可用，配置授权不会使入口生效。' }}
-        </p>
-        <div v-if="selected.kind !== 'roles'" class="mt-3">
-          <span class="inspector-meta">{{ selected.kind === 'permissions' ? '权限来源角色' : '关联角色' }}</span><div v-if="relatedRoles.length" class="mt-2 flex flex-wrap gap-2">
-            <YdButton v-for="role in relatedRoles" :key="role.id" size="sm" variant="outline" :disabled="!auth('system:role:edit')" @click="emit('editRole', role)">
-              <YdIcon name="morph:shield" />{{ role.name }}
-              <span v-if="role.status !== 'ACTIVE'" class="inspector-meta">（停用）</span>
-              <span v-if="role.systemType === 'SUPER_ADMIN'" class="inspector-meta">（全权限）</span>
+        <div v-if="selectedRole" class="mt-4">
+          <div class="flex flex-wrap gap-2 items-center justify-between">
+            <strong>已有权限 · {{ (selectedRole.systemType === 'SUPER_ADMIN' || selectedRole.permissions.includes('*')) ? '全目录通配' : '显式配置' }}</strong><YdButton v-if="auth('system:role:edit')" size="sm" variant="outline" :disabled="loading" @click="emit('editRole', selectedRole)">
+              <YdIcon name="morph:settings-2" />调整权限
             </YdButton>
+          </div>
+          <p v-if="selectedRole.systemType === 'SUPER_ADMIN' || selectedRole.permissions.includes('*')" class="inspector-note">
+            此身份在启用并被会话选中时通过 * 获得全部权限。单项撤销不能限制通配身份，使用现有角色管理调整身份与状态。
+          </p>
+          <p v-if="uncataloguedRolePermissionCount" class="inspector-note">
+            另有 {{ uncataloguedRolePermissionCount }} 项未登记或暂失效权限码保留在配置中；此处不会展示或清除这些码。
+          </p>
+          <YdInput v-model="rolePermissionKeyword" class="mt-3 w-full" clearable aria-label="筛选角色已有权限" placeholder="搜索已有权限、资源或动作分类" />
+          <div v-if="rolePermissionGroups.length" class="role-permission-catalog">
+            <section v-for="group in rolePermissionGroups" :key="group.key" class="role-permission-group" :aria-label="group.label">
+              <h4 class="permission-resource-label">
+                {{ group.label }}
+              </h4>
+              <ol class="permission-action-list">
+                <li v-for="permission in group.permissions" :key="permission.code" class="permission-action-row">
+                  <YdButton size="sm" variant="ghost" class="permission-inspect-action" :disabled="loading" :title="`查看 ${permission.name} 的权限细则`" @click="emit('inspectPermission', permission.code)">
+                    <span class="permission-action-name">{{ permission.name }}<span class="permission-action-code">{{ permission.code }}</span></span>
+                  </YdButton>
+                  <YdTag :variant="permissionCategoryOf(permission.code).variant">
+                    {{ permissionCategoryOf(permission.code).label }}
+                  </YdTag>
+                  <YdButton v-if="canRevoke(selectedRole, permission.code)" size="sm" variant="destructive" :disabled="loading" :aria-label="`从 ${selectedRole.name} 撤销 ${permission.name}`" @click="emit('revokePermission', selectedRole.id, permission.code)">
+                    撤销
+                  </YdButton>
+                </li>
+              </ol>
+            </section>
+          </div>
+          <p v-else class="inspector-empty">
+            {{ rolePermissionKeyword ? '没有匹配的已登记权限' : '没有显式配置的 ACTIVE 权限' }}
+          </p>
+          <YdPagination v-if="rolePermissionItems.length > rolePermissionSize" v-model:page="rolePermissionPage" v-model:size="rolePermissionSize" :total="rolePermissionItems.length" :sizes="[30]" layout="total, ->, pager" class="mt-3" />
+        </div>
+        <div v-if="selectedMenu" class="mt-3">
+          <YdDescriptions
+            :items="[
+              { key: 'code', label: '菜单编码', value: selectedMenu.code, valueClass: 'break-all font-mono' },
+              { key: 'type', label: '节点类型', value: selectedMenu.type },
+              { key: 'permission', label: '直接入口码', value: selectedMenu.permission || '无独立入口权限码', valueClass: 'break-all font-mono' },
+              { key: 'status', label: '配置状态', value: selectedMenu.status === 'ACTIVE' ? '已启用' : '已停用' },
+              { key: 'runtime', label: '运行状态', value: selectedMenu.runtimeAvailable ? '当前可用' : '插件或平台能力当前不可用' },
+            ]" :column="1" size="sm" :label-width="80" value-class="break-words"
+          />
+          <p class="inspector-note">
+            可见角色身份由服务端按入口、按钮与结构祖先规则计算。配置权限不会开启菜单、插件或平台能力，实际访问仍取决于会话身份和运行状态。
+          </p>
+          <div v-if="menuDirectPermission" class="mt-3 flex flex-wrap gap-2">
+            <YdButton size="sm" variant="outline" :disabled="loading" @click="emit('inspectPermission', menuDirectPermission.code)">
+              <YdIcon name="morph:book-open" />入口权限细则
+            </YdButton>
+            <YdButton v-if="auth('system:role:edit')" size="sm" :disabled="loading" @click="emit('grantPermission', menuDirectPermission.code)">
+              <YdIcon name="morph:shield-plus" />授予此入口权限
+            </YdButton>
+          </div>
+          <p v-else class="inspector-note">
+            此节点没有对应的 ACTIVE 直接入口权限，无法从结构祖先或按钮关联推导可授予的权限码。
+          </p>
+        </div>
+        <div v-if="selected.kind !== 'roles'" class="mt-3">
+          <span class="inspector-meta">{{ selected.kind === 'permissions' ? '权限来源角色' : selected.kind === 'menus' ? '可见角色身份' : '已分配角色' }}</span>
+          <div v-if="relatedRoles.length" class="related-role-actions">
+            <div v-for="role in relatedRoles" :key="role.id" class="related-role-row">
+              <YdButton v-if="auth('system:role:edit')" size="sm" variant="outline" :disabled="loading" @click="emit('editRole', role)">
+                <YdIcon name="morph:shield" />{{ role.name }}
+              </YdButton>
+              <YdTag v-else variant="outline">
+                {{ role.name }}
+              </YdTag>
+              <YdTag v-if="role.status !== 'ACTIVE'" variant="secondary">
+                停用 · 配置未生效
+              </YdTag>
+              <YdTag v-if="role.systemType === 'SUPER_ADMIN' || role.permissions.includes('*')" variant="secondary">
+                全权限通配
+              </YdTag>
+              <YdButton v-if="selectedPermission && canRevoke(role, selectedPermission.code)" size="sm" variant="destructive" :disabled="loading" @click="emit('revokePermission', role.id, selectedPermission.code)">
+                撤销此权限
+              </YdButton>
+            </div>
           </div><p v-else class="inspector-empty">
             没有关联的角色配置。
           </p>
           <p v-if="selected.kind === 'permissions'" class="inspector-note">
-            包含超级管理员的通配授权；停用角色仅展示配置关系，不会生效。
+            包含超级管理员和历史配置的通配授权；停用角色仅展示配置关系，不会生效。
           </p>
         </div>
-        <YdButton v-if="canEditSelected" size="sm" variant="outline" class="mt-3" @click="activate(selected)">
-          <YdIcon name="morph:arrow-up-right" />{{ selected.kind === 'roles' ? '使用现有权限树编辑' : selected.kind === 'users' ? '前往用户管理' : '前往菜单管理' }}
-        </YdButton>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <YdButton v-if="canAssignSelectedUser && selectedUser" size="sm" :disabled="loading" @click="emit('assignUserRoles', selectedUser.id)">
+            <YdIcon name="morph:user-round-cog" />分配角色
+          </YdButton>
+          <YdButton v-if="canEditSelected && selected.kind !== 'roles'" size="sm" variant="outline" :disabled="loading" @click="openManagement(selected)">
+            <YdIcon name="morph:arrow-up-right" />{{ selected.kind === 'users' ? '前往用户管理' : '前往菜单管理' }}
+          </YdButton>
+        </div>
       </div>
     </div>
   </section>
@@ -916,6 +1086,79 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
   font-size: 12px;
   line-height: 1.8;
   color: var(--color-text-3);
+}
+
+.role-permission-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 520px;
+  padding: 4px;
+  margin-top: 12px;
+  overflow: auto;
+}
+
+.permission-resource-label {
+  padding-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-2);
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.permission-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+
+.permission-action-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.permission-inspect-action {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+  height: auto;
+  white-space: normal;
+}
+
+.permission-action-name {
+  display: block;
+  min-width: 0;
+  padding: 2px 0;
+  font-size: 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.permission-action-code {
+  display: block;
+  margin-top: 2px;
+  font-family: monospace;
+  font-size: 10px;
+  color: var(--color-text-3);
+}
+
+.related-role-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.related-role-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .is-paused :is(.orbit-drift, .hub-link, .core-sphere, .core-ticks, .satellite-link, .satellite-dot, .relation-paths path) {

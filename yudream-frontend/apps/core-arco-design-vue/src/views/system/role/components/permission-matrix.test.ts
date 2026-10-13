@@ -37,6 +37,13 @@ describe('read-only permission matrix semantics', () => {
     assert.match(matrixGrantLabel(role(), permissions[0], 'assigned'), /当前部门和角色/)
   })
 
+  it('shows legacy configured wildcard roles as all permissions without relying on their level', () => {
+    const configured = role({ permissions: ['*'], level: 'USER' })
+    assert.equal(matrixGrantState(configured, 'system:user:edit'), 'configured-wildcard')
+    assert.match(matrixGrantLabel(configured, permissions[0], 'configured-wildcard'), /配置含通配.*需原权限树处理/)
+    assert.equal(matrixGrantState(role({ permissions: ['*'], systemType: 'SUPER_ADMIN' }), 'system:user:edit'), 'super-admin')
+  })
+
   it('renders active catalog permissions only and preserves missing permission codes on the original role', () => {
     const configured = role()
     const before = [...configured.permissions]
@@ -53,6 +60,19 @@ describe('read-only permission matrix semantics', () => {
     assert.equal(matrixRoles(roles, { keyword: 'editor' }).length, 1)
     assert.deepEqual(matrixPermissions(permissions, { domain: 'system', resource: 'system:user', keyword: '编辑' }).map(item => item.code), ['system:user:edit'])
     assert.deepEqual(matrixPermissions(permissions, { category: 'view' }).map(item => item.code), ['system:user:view'])
+  })
+
+  it('filters both navigation and action gates by one resource and preserves whole-catalog plugin labels', () => {
+    const catalog: PermissionItem[] = [
+      { code: 'system:user', name: '用户页入口', module: '系统管理', status: 'ACTIVE' },
+      ...permissions,
+      { code: 'plugin:forum:category:view', name: '查看分类', module: '论坛分类', status: 'ACTIVE' },
+      { code: 'plugin:forum:view', name: '查看论坛', module: '论坛', status: 'ACTIVE' },
+    ]
+    assert.deepEqual(matrixPermissions(catalog, { resource: 'system:user' }).map(item => item.code), ['system:user:view', 'system:user:edit', 'system:user'])
+    assert.equal(matrixPermissions(catalog, { resource: 'plugin:forum' }).length, 2)
+    assert.deepEqual(matrixPermissions(catalog, { resource: 'plugin:forum', keyword: '分类' }).map(item => item.code), ['plugin:forum:category:view'])
+    assert.deepEqual(matrixPermissions(catalog, { resource: 'plugin:forum' }), matrixPermissions([...catalog].reverse(), { resource: 'plugin:forum' }))
   })
 
   it('uses the shared action classification for every assign-* permission', () => {

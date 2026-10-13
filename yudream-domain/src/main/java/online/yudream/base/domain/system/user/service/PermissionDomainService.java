@@ -3,8 +3,10 @@ package online.yudream.base.domain.system.user.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.security.PermissionMeta;
+import online.yudream.base.domain.system.security.PermissionCatalogNormalizer;
 import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.enumerate.PermissionSource;
+import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
 import online.yudream.base.domain.system.user.repo.PermissionRepo;
 import java.util.Collection;
 import java.util.List;
@@ -36,6 +38,11 @@ public class PermissionDomainService {
             return;
         }
 
+        List<PermissionMeta> normalized = PermissionCatalogNormalizer.normalize(scanned);
+        if (normalized.isEmpty()) {
+            log.warn("No valid permission scanned, skip sync");
+            return;
+        }
         List<Permission> existingPermissions = permissionRepo.findAll();
         // 同 code 多条（导入合并/并发注册等历史原因产生）保留先加载的一条并自愈清理，
         // 否则 toMap 无 merge 函数会让整个应用启动失败。
@@ -65,7 +72,7 @@ public class PermissionDomainService {
 
         int created = 0;
         int updated = 0;
-        for (PermissionMeta meta : scanned) {
+        for (PermissionMeta meta : normalized) {
             Permission existing = existingMap.get(meta.code());
             if (existing == null) {
                 Permission permission = Permission.create(meta.code(), meta.name(), meta.module(), meta.desc(), PermissionSource.ANNOTATION);
@@ -73,14 +80,14 @@ public class PermissionDomainService {
                 created++;
             } else {
                 existing.update(meta.name(), meta.module(), meta.desc());
-                existing.setSource(resolveSource(existing.getSource()));
+                existing.setSource(PermissionSource.ANNOTATION);
                 existing.activate();
                 permissionRepo.save(existing);
                 updated++;
             }
         }
 
-        Set<String> scannedCodes = scanned.stream()
+        Set<String> scannedCodes = normalized.stream()
                 .map(PermissionMeta::code)
                 .collect(Collectors.toSet());
         permissionRepo.deprecateAnnotationByCodesNotIn(scannedCodes);
@@ -97,18 +104,18 @@ public class PermissionDomainService {
         if (permissions == null || permissions.isEmpty()) {
             return;
         }
-        for (PermissionMeta meta : permissions) {
+        for (PermissionMeta meta : PermissionCatalogNormalizer.normalize(permissions)) {
             Permission permission = permissionRepo.findByCode(meta.code())
                     .orElseGet(() -> Permission.create(meta.code(), meta.name(), meta.module(), meta.desc(), PermissionSource.MANUAL));
+            if (isAnnotationSource(permission.getSource())
+                    && permission.getStatus() == PermissionStatus.ACTIVE) {
+                continue;
+            }
             permission.update(meta.name(), meta.module(), meta.desc());
             permission.setSource(PermissionSource.MANUAL);
             permission.activate();
             permissionRepo.save(permission);
         }
-    }
-
-    private PermissionSource resolveSource(PermissionSource source) {
-        return source == null ? PermissionSource.ANNOTATION : source;
     }
 
     private boolean isAnnotationSource(PermissionSource source) {

@@ -6,6 +6,8 @@ import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import online.yudream.base.domain.system.menu.service.MenuDomainService;
 import online.yudream.base.domain.system.user.repo.PermissionRepo;
+import online.yudream.base.domain.system.user.aggregate.Permission;
+import online.yudream.base.domain.system.user.enumerate.PermissionSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -54,8 +56,11 @@ class MenuDomainServiceTest {
                 .code("system:report")
                 .name("报表")
                 .permission("system:report:view")
+                .type(MenuNodeType.MENU)
                 .build();
         when(menuRepo.findByCode(menu.getCode())).thenReturn(Optional.of(menu));
+        when(permissionRepo.findByCode("system:report:view")).thenReturn(Optional.of(
+                Permission.create("system:report:view", "报表", "系统管理", "", PermissionSource.MENU)));
         MenuDomainService service = new MenuDomainService(menuRepo, permissionRepo);
 
         service.deleteMenu(menu.getCode());

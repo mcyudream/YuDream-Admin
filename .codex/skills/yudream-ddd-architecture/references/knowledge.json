@@ -322,7 +322,7 @@
     },
     {
       "key": "permission-management-views",
-      "text": "权限树/只读矩阵/溯源共享 src/utils/permission-catalog.ts，按业务域→稳定资源码→动作分类→权限展示，assign-*匹配完整规范后缀；历史未知码兼容保留，搜索勾选只更新可见叶子，全选合并而不删除暂失效插件码。overview用户/菜单分别校验system:user:view与system:menu:view，全量统计由轻量仓储聚合不按分页，菜单关系复用真实可见码算法。SaTokenUserContextStore只能读取本人tokenSession；他人展示contextSource=DEFAULT默认部门/角色，不冒充真实在线会话。规范见docs/system/permission-management.md。"
+      "text": "权限树/矩阵/溯源共享 src/utils/permission-catalog.ts，按业务域→稳定资源码→动作分类→权限展示，assign-*匹配完整规范后缀；历史入口与接口动作按SystemMenuModule真实绑定归同资源独立叶子，resourceAliases不得按中文同名猜测，插件嵌套码归稳定owner，中文标签按完整目录稳定归一。历史未知码兼容保留，搜索勾选只更新可见叶子，全选合并而不删除暂失效插件码。权限树按叶子分页叠加YdTree虚拟窗口，目录/搜索索引缓存、搜索防抖，勾选只merge本页可见叶、保留跨页与未知授权，明确区分本页与全目录操作；矩阵默认只读，可明确开启差量编辑；角色权限/用户角色以原完整数组CAS，冲突保留意图拒绝覆盖，用户新增角色校验已有部门并在CAS中复核，SUPER_ADMIN和历史*锁定单项操作。overview用户/菜单分别校验system:user:view与system:menu:view，全量统计由轻量仓储聚合不按分页，菜单关系复用真实可见码算法。SaTokenUserContextStore只能读取本人tokenSession；他人展示contextSource=DEFAULT默认部门/角色，不冒充真实在线会话。目录同码元数据稳定归一，真实ANNOTATION优先实际注册MANUAL、MENU只补缺，CATEGORY/LAYOUT不登记；重建sysPermission先可回读备份、完整计划验证、写失败恢复，并验证角色/用户/菜单指纹不变，不重新播种或启停插件。规范见docs/system/permission-management.md。"
     },
     {
       "key": "plugin-menu-business-categories",

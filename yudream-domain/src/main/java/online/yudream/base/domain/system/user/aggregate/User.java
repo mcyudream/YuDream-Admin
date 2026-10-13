@@ -19,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.function.Function;
 
 
@@ -109,6 +111,31 @@ public class User extends BaseDomain {
 
     public void replaceRoles(List<RoleID> roleIds) {
         this.roles = roleIds == null ? new ArrayList<>() : new ArrayList<>(roleIds);
+    }
+
+    /** 按角色配置快照增量分配，不顺手清除未被明确撤销的历史角色。 */
+    public boolean applyRoleChanges(List<RoleID> expectedRoles, List<RoleID> grant, List<RoleID> revoke) {
+        List<RoleID> current = roles == null ? List.of() : roles;
+        if (expectedRoles == null || !current.equals(expectedRoles)) {
+            throw new BizException("用户角色已变化，请刷新后重试");
+        }
+        List<RoleID> grants = grant == null ? List.of() : grant;
+        Set<RoleID> revokes = new HashSet<>(revoke == null ? List.of() : revoke);
+        if (grants.stream().anyMatch(revokes::contains)) {
+            throw new BizException("同一角色不能同时分配和移除");
+        }
+        List<RoleID> next = new ArrayList<>(current);
+        next.removeIf(revokes::contains);
+        for (RoleID role : grants) {
+            if (!next.contains(role)) {
+                next.add(role);
+            }
+        }
+        if (current.equals(next)) {
+            return false;
+        }
+        roles = next;
+        return true;
     }
 
     public void replaceNamespaceTags(String namespace, List<UserTag> next) {

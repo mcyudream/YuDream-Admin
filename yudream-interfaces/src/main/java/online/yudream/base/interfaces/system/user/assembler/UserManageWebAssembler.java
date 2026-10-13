@@ -4,10 +4,12 @@ import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
 import online.yudream.base.application.system.user.cmd.DeptUpdateCmd;
 import online.yudream.base.application.system.user.cmd.RoleCreateCmd;
 import online.yudream.base.application.system.user.cmd.RoleUpdateCmd;
+import online.yudream.base.application.system.user.cmd.RolePermissionChangesCmd;
 import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
 import online.yudream.base.application.system.user.cmd.UserPasswordChangeCmd;
 import online.yudream.base.application.system.user.cmd.UserUpdateCmd;
+import online.yudream.base.application.system.user.cmd.UserRoleChangesCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
 import online.yudream.base.application.system.user.dto.MessagingIdentityDTO;
 import online.yudream.base.application.system.user.dto.OptionDTO;
@@ -19,11 +21,13 @@ import online.yudream.base.interfaces.system.user.request.DeptCreateRequest;
 import online.yudream.base.interfaces.system.user.request.DeptUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.RoleCreateRequest;
 import online.yudream.base.interfaces.system.user.request.RoleUpdateRequest;
+import online.yudream.base.interfaces.system.user.request.RolePermissionChangesRequest;
 import online.yudream.base.interfaces.system.user.request.UserAssignDeptsRequest;
 import online.yudream.base.interfaces.system.user.request.UserCreateRequest;
 import online.yudream.base.interfaces.system.user.request.UserDeptAssignRequest;
 import online.yudream.base.interfaces.system.user.request.UserPasswordChangeRequest;
 import online.yudream.base.interfaces.system.user.request.UserUpdateRequest;
+import online.yudream.base.interfaces.system.user.request.UserRoleChangesRequest;
 import online.yudream.base.interfaces.system.user.res.DeptManageRes;
 import online.yudream.base.interfaces.system.user.res.OptionRes;
 import online.yudream.base.interfaces.system.user.res.PermissionRes;
@@ -83,6 +87,15 @@ public class UserManageWebAssembler {
         return request.getDepts().stream().map(UserManageWebAssembler::toCmd).toList();
     }
 
+    public static UserRoleChangesCmd toCmd(Long id, UserRoleChangesRequest request) {
+        UserRoleChangesCmd cmd = new UserRoleChangesCmd();
+        cmd.setId(id);
+        cmd.setExpectedRoleIds(request.getExpectedRoleIds());
+        cmd.setGrant(request.getGrant());
+        cmd.setRevoke(request.getRevoke());
+        return cmd;
+    }
+
     public static RoleCreateCmd toCmd(RoleCreateRequest request) {
         RoleCreateCmd cmd = new RoleCreateCmd();
         cmd.setName(request.getName());
@@ -102,6 +115,15 @@ public class UserManageWebAssembler {
         cmd.setLevel(request.getLevel());
         cmd.setStatus(request.getStatus());
         cmd.setPermissions(request.getPermissions());
+        return cmd;
+    }
+
+    public static RolePermissionChangesCmd toCmd(Long id, RolePermissionChangesRequest request) {
+        RolePermissionChangesCmd cmd = new RolePermissionChangesCmd();
+        cmd.setId(id);
+        cmd.setExpectedPermissions(request.getExpectedPermissions());
+        cmd.setGrant(request.getGrant());
+        cmd.setRevoke(request.getRevoke());
         return cmd;
     }
 

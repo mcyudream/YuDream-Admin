@@ -26,7 +26,7 @@ class PermissionOverviewControllerTest {
     @Test
     void overviewRequiresRoleViewBeforeCallingTheApplication() {
         PermissionOverviewAppService service = mock(PermissionOverviewAppService.class);
-        RoleManageController controller = new RoleManageController(null, service);
+        RoleManageController controller = new RoleManageController(null, service, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.checkPermission("system:role:view")).thenThrow(new IllegalStateException("禁止查看"));
             assertThrows(IllegalStateException.class, () -> controller.permissionOverview(new PermissionOverviewQuery()));
@@ -39,7 +39,7 @@ class PermissionOverviewControllerTest {
         PermissionOverviewAppService service = mock(PermissionOverviewAppService.class);
         PermissionOverviewQuery query = new PermissionOverviewQuery();
         when(service.overview(query, true, false)).thenReturn(emptyOverview(true, false));
-        RoleManageController controller = new RoleManageController(null, service);
+        RoleManageController controller = new RoleManageController(null, service, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.hasPermission("system:user:view")).thenReturn(true);
             auth.when(() -> StpUtil.hasPermission("system:menu:view")).thenReturn(false);
@@ -52,7 +52,7 @@ class PermissionOverviewControllerTest {
     @Test
     void userDetailRequiresUserViewAndReusesTheOriginalResponse() {
         UserManageAppService service = mock(UserManageAppService.class);
-        UserManageController controller = new UserManageController(service, null, null);
+        UserManageController controller = new UserManageController(service, null, null, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.checkPermission("system:user:view")).thenThrow(new IllegalStateException("禁止查看"));
             assertThrows(IllegalStateException.class, () -> controller.get(9007199254740993L));
