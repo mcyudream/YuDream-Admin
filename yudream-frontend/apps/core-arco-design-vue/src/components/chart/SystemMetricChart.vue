@@ -6,7 +6,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { init, use } from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, useId, watch } from 'vue'
-import { buildMetricChartOption, formatMetric } from './metric-chart-options'
+import { buildMetricChartOption, formatMetric, metricCategoryAxis } from './metric-chart-options'
 import { readMetricChartTheme } from './metric-chart-theme'
 
 const props = withDefaults(defineProps<{
@@ -43,7 +43,7 @@ function render() {
   if (!chart) {
     chart = init(element, undefined, { renderer: 'svg' })
     chart.on('updateAxisPointer', (event: unknown) => {
-      const axis = (event as { axesInfo?: { axisDim: string, value: number }[] }).axesInfo?.find(axis => axis.axisDim === (props.kind === 'ranking' ? 'y' : 'x'))
+      const axis = (event as { axesInfo?: { axisDim: string, value: number }[] }).axesInfo?.find(axis => axis.axisDim === metricCategoryAxis(props.kind, canvas.value?.clientHeight))
       const index = axis?.value
       if (index !== undefined && Number.isInteger(index) && index >= 0 && index < props.points.length) {
         keyboardIndex = index
@@ -54,10 +54,10 @@ function render() {
   }
   chart.resize({ animation: { duration: 0 } })
   const theme = readMetricChartTheme(surface.value)
-  const nextSignature = JSON.stringify([props.points, props.kind, props.unit, element.clientWidth, theme])
+  const nextSignature = JSON.stringify([props.points, props.kind, props.unit, element.clientWidth, element.clientHeight, theme])
   if (signature !== nextSignature) {
     signature = nextSignature
-    chart.setOption(buildMetricChartOption({ points: props.points, kind: props.kind, unit: props.unit, theme, width: element.clientWidth }), { notMerge: true })
+    chart.setOption(buildMetricChartOption({ points: props.points, kind: props.kind, unit: props.unit, theme, width: element.clientWidth, height: element.clientHeight }), { notMerge: true })
   }
 }
 

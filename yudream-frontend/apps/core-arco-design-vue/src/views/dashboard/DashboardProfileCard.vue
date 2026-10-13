@@ -245,4 +245,27 @@ const week = computed(() => {
     white-space: normal;
   }
 }
+
+@container dashboard-card (max-height: 250px) {
+  .dashboard-profile {
+    gap: 8px;
+  }
+
+  .dashboard-profile__week {
+    display: none;
+  }
+
+  .dashboard-profile__copy h3 {
+    font-size: 22px;
+  }
+
+  .dashboard-profile__chips {
+    gap: 4px 10px;
+  }
+
+  .dashboard-profile__chips span {
+    min-height: 24px;
+    font-size: 11px;
+  }
+}
 </style>

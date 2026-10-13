@@ -547,6 +547,10 @@
     {
       "key": "site-theme-login-contrast",
       "text": "登录页必须同时验证无插件与启用 SITE 主题。主题在 .login-page 内同时桥接 --color-* 和组件语义变量，避免后台浅色令牌在深色主题上造成不可读文字。相对资源 URL 在插件自己的 CSS 选择器内消费，不能经变量传入宿主样式后按宿主 URL 解析。匹配 text-primary 必须使用完整类名，避免误伤 text-primary-foreground 主按钮。"
+    },
+    {
+      "key": "dashboard-all-card-size-audit",
+      "text": "工作台视觉验收必须在内置浏览器加入全部当前可用卡片（含默认隐藏的插件卡片），逐卡检查默认、最小、宽而矮和宽而高尺寸，以及桌面/390/320px手机。通过标准同时包含正文client/scroll尺寸和关键操作边界；禁止仅移除滚动条而把内容裁掉。卡片内容按宿主命名size容器适配，不能只依据窗口断点。"
     }
   ]
 }

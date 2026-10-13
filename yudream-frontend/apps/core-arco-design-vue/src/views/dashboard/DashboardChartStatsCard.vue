@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChartDataset } from '@/api/modules/platform-dataviz'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
+import { YdCountTo } from '@yudream/components'
 import apiDataviz from '@/api/modules/platform-dataviz'
 import { formatMetric, metricPoints, shortMetricDate } from '@/components/chart/metric-chart-options'
 import SystemMetricChart from '@/components/chart/SystemMetricChart.vue'
@@ -18,7 +19,8 @@ const config = computed(() => ({
 }[props.card.component || ''] || { source: 'capability', metric: 'type', unit: '项平台能力', action: '查看能力', empty: '暂时没有平台能力' }))
 const isCategory = computed(() => config.value.source === 'capability')
 const kind = computed(() => isCategory.value ? 'ranking' : config.value.metric === 'log-activity' ? 'line' : 'bar')
-const rows = computed(() => metricPoints(dataset.value?.dimensions || ['name', 'value'], dataset.value?.source || []))
+const categoryLabels: Record<string, string> = { AI: 'AI', CONTENT: '内容', DISTRIBUTION: '分发', DOCUMENT: '文档', DOCUMENTATION: '知识库', GRAPH: '图谱', INTEGRATION: '集成', MESSAGING: '消息', REALTIME: '实时' }
+const rows = computed(() => metricPoints(dataset.value?.dimensions || ['name', 'value'], dataset.value?.source || []).map(row => isCategory.value ? { ...row, label: categoryLabels[row.label] || row.label } : row))
 const hasValues = computed(() => rows.value.some(row => row.value !== null))
 const total = computed(() => rows.value.reduce((sum, row) => sum + (row.value ?? 0), 0))
 const allZero = computed(() => rows.value.length > 0 && rows.value.every(row => row.value === 0))
@@ -48,7 +50,7 @@ async function load() {
 </script>
 
 <template>
-  <div class="dashboard-card__content dashboard-chart-stats" :aria-busy="loading">
+  <div class="dashboard-card__content dashboard-chart-stats" :class="{ 'dashboard-chart-stats--category': isCategory }" :aria-busy="loading">
     <div v-if="loading" class="trend-state">
       <FaIcon name="morph:loader-circle" class="animate-spin" />正在读取数据
     </div>
@@ -61,13 +63,21 @@ async function load() {
     <template v-else>
       <div class="trend-summary">
         <div class="trend-total">
-          <strong>{{ hasValues ? formatMetric(total) : '—' }}</strong>
+          <strong :aria-label="hasValues ? formatMetric(total) : '未上报'">
+            <YdCountTo v-if="hasValues" :end-val="total" :duration="700" aria-hidden="true" />
+            <template v-else>—</template>
+          </strong>
           <span>{{ config.unit }}</span>
         </div>
         <span class="trend-period">{{ period }}</span>
       </div>
       <SystemMetricChart v-if="rows.length" :points="rows" :kind="kind" :unit="config.unit" :zero-message="config.empty" :label="`${card.title}，${period}`" @select="selected = $event" />
-      <div v-else class="trend-state">
+      <dl v-if="isCategory" class="trend-compact-categories" aria-label="能力分类数量">
+        <div v-for="row in rows" :key="row.label">
+          <dt>{{ row.label }}</dt><dd>{{ row.value ?? '—' }}</dd>
+        </div>
+      </dl>
+      <div v-if="!rows.length" class="trend-state">
         <FaIcon name="morph:chart-no-axes-combined" />暂无统计记录
       </div>
       <div class="trend-footer">
@@ -166,5 +176,55 @@ async function load() {
   justify-content: center;
   font-size: 12px;
   color: var(--color-text-3);
+}
+
+.trend-compact-categories {
+  display: none;
+}
+
+@container dashboard-card (max-height: 250px) {
+  .dashboard-chart-stats--category {
+    gap: 4px;
+  }
+
+  .dashboard-chart-stats--category :deep(.system-metric-chart) {
+    display: none;
+  }
+
+  .dashboard-chart-stats--category .trend-total strong {
+    font-size: 24px;
+  }
+
+  .trend-compact-categories {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 12px;
+    align-content: center;
+    min-height: 48px;
+    margin: 0;
+  }
+
+  .trend-compact-categories > div {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--color-text-3);
+  }
+
+  .trend-compact-categories dd {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-1);
+  }
+
+  .dashboard-chart-stats--category .trend-footer :deep(button) {
+    height: 24px;
+    font-size: 11px;
+  }
 }
 </style>
