@@ -9,6 +9,12 @@ export type YdMarkdownImageUploadHandler = (
   callback: (images: YdMarkdownImage[]) => void,
 ) => void | Promise<void>
 
+export interface YdMarkdownLinkClick {
+  href: string
+  anchor: HTMLAnchorElement
+  event: MouseEvent
+}
+
 export interface YdMarkdownEditorInstance {
   focus: () => void
   blur: () => void

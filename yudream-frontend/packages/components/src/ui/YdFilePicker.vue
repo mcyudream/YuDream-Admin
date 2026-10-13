@@ -6,6 +6,7 @@ defineOptions({ name: 'YdFilePicker', inheritAttrs: false })
 const props = withDefaults(defineProps<{
   accept?: string
   multiple?: boolean
+  directory?: boolean
   disabled?: boolean
   label?: string
   id?: string
@@ -58,6 +59,7 @@ defineExpose({ open, reset, focus, blur, element: inputRef })
       type="file"
       :accept="props.accept"
       :multiple="props.multiple"
+      :webkitdirectory="props.directory || undefined"
       :disabled="props.disabled"
       tabindex="-1"
       aria-hidden="true"

@@ -16,6 +16,10 @@ const props = defineProps<{
   class?: HTMLAttributes['class']
   itemClass?: HTMLAttributes['class']
   labelClass?: HTMLAttributes['class']
+  ariaLabel?: string
+  ariaLabelledby?: string
+  ariaDescribedby?: string
+  ariaInvalid?: boolean | 'true' | 'false' | 'grammar' | 'spelling'
 }>()
 
 const emit = defineEmits<{
@@ -33,7 +37,7 @@ watch(value, (newValue) => {
 
 <template>
   <div :class="cn('flex-center-start gap-2', props.class)">
-    <Checkbox :id="checkboxId" v-model="value" :disabled="disabled" :class="props.itemClass" />
+    <Checkbox :id="checkboxId" v-model="value" :disabled="disabled" :class="props.itemClass" :aria-label="props.ariaLabel" :aria-labelledby="props.ariaLabelledby" :aria-describedby="props.ariaDescribedby" :aria-invalid="props.ariaInvalid" />
     <Label
       :for="checkboxId"
       :class="

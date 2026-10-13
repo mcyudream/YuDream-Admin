@@ -1,4 +1,8 @@
 export type * from './types'
+export { useYdFilePicker } from './useYdFilePicker'
+export type { YdFilePickerOptions } from './useYdFilePicker'
+export { useYdDomAction } from './useYdDomAction'
+export type { YdDomActionInstance, YdDomActionOptions, YdDomActionUpdate } from './useYdDomAction'
 export { default as YdAction } from './YdAction.vue'
 export { default as YdForm } from './YdForm.vue'
 export { default as YdFormItem } from './YdFormItem.vue'
