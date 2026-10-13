@@ -22,6 +22,7 @@ trap 'rm -rf "$PACK_DIR" "$EXTRACT_DIR"' EXIT INT TERM
 mkdir -p "$PACK_DIR"
 
 echo "[verify-contract-package-tarballs] packing @yudream/plugin-sdk"
+pnpm --config.engine-strict=false --dir yudream-frontend run check:ui-docs
 pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/plugin-sdk pack --pack-destination "$PACK_DIR" >/dev/null
 
 echo "[verify-contract-package-tarballs] packing @yudream/components"

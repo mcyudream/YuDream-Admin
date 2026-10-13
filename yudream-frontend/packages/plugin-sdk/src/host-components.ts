@@ -1,4 +1,10 @@
 const components = shared('components')
+export const YdAction = components.YdAction
+export const YdForm = components.YdForm
+export const YdFormItem = components.YdFormItem
+export const YdInputTag = components.YdInputTag
+export const YdRate = components.YdRate
+export const YdUiProvider = components.YdUiProvider
 export const YdAgentWorkbench = components.YdAgentWorkbench
 export const YdAgentContextPanel = components.YdAgentContextPanel
 export const YdAgentAnswer = components.YdAgentAnswer

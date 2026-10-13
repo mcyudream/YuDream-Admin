@@ -1,97 +1,71 @@
-# 组件库 @yudream/components
+# YD 组件库 @yudream/components
 
-宿主共享组件库，版本 **1.3.0**，是所有页面（含插件前端）的统一 UI 基础。
+YD 是宿主页面、共享业务组件与插件的唯一公开 UI 入口。内部延续 Fantastic-admin 的主题、基础交互与组件实现；业务使用 `Yd*` 和 `useYd*`，不直接使用 Fa、Arco、Reka 或裸通用交互控件。现有能力无法覆盖时，先补齐 YD 封装、主题、公开契约和预览，再接入页面。
 
-## 安装与使用
+## 契约状态
 
-```bash
-pnpm add @yudream/components
-```
-
-后端由 YuDream 原创，前端使用 [Fantastic-admin](https://fantastic-admin.hurui.me/)。组件按来源与职责分工如下，业务代码请优先使用项目组件，不要直接绕过组件层使用底层 UI 控件。
-
-## 推荐导入入口
-
-- `Fa*` 推荐从 `@yudream/components` 导入；也支持 unplugin 自动导入，resolver 导出前缀为 `Fa`：
-
-  ```ts
-  import { FaResolver } from '@yudream/components/resolver'
-  // Components({ resolvers: [FaResolver()] })
-  ```
-
-- `Yd*` 为 YuDream 原创组件：AI 对话元件推荐从 `@yudream/components/ai` 导入（该入口名称沿用历史命名）；数据与表单元件 `YdGraphCanvas`、`YdTablePicker`、`YdIconPicker`、`YdDatePicker`、`YdRangePicker`、`YdTimePicker` 与 `Fa*` 一样从根入口 `@yudream/components` 导入，且已注册进 resolver（`Fa`/`Yd` 前缀均支持自动导入）。
-
-显式导入示例：
-
-```vue
-<script setup>
-import { FaButton, YdDatePicker, YdGraphCanvas, YdIconPicker, YdTablePicker } from '@yudream/components'
-import { YdBubble } from '@yudream/components/ai'
-</script>
-```
-
-## 组件来源与分工
-
-| 系列 | 数量 | 定位与来源 |
-|---|---|---|
-| `Fa*` | 47 个 | Fantastic-admin 框架自带的通用后台 UI 基础组件（reka-ui 封装 + Tailwind 样式，shadcn 风格）；`FaResponsiveTable` 是 YuDream 原创的例外，统一从 `@yudream/components` 导入 |
-| `Yd*` | 22 个组件 + 3 个 composable | YuDream 原创组件与 composable；AI 对话元件从 `@yudream/components/ai` 导入，数据与表单元件（`YdGraphCanvas`、`YdTablePicker`、`YdIconPicker`、`YdDatePicker`、`YdRangePicker`、`YdTimePicker`）从根入口导入 |
-
-业务代码**优先使用 Fa\*/Yd\***；ESLint 规则 `yudream/prefer-fa-component` 会检测 Arco `<a-*>` 直接使用并给出替代建议。
-
-## 样式约定
-
-- 业务样式只用中性语义变量：`--color-bg-*`、`--color-text-*`、`--color-border-*`、`--color-fill-*`。
-- 禁止手写品牌色与 `--primary-N` 色阶 token（规则 `yudream/no-brand-color-token`）；主题、主色、深浅模式由后台主题配置统一控制。
-- 运行 `pnpm audit:ui` 生成审计报告，DevTools 浮窗「审查」页可视化展示违规项。
-
-::: warning 关于本目录的在线演示
-以下组件页中的交互演示为**效果示意**（用等价原生控件模拟外观与行为），源码区展示的是组件在项目中的**真实用法**；API 表从组件源码提取，以实际类型定义为准。完整可运行的示例还可在主前端仓 `apps/component-showcase` 与各组件 `_examples/` 目录中找到。
+::: warning 发布准备与生产可用分开
+当前工作区准备发布 `@yudream/components 1.4.0` 与 `@yudream/plugin-sdk 1.9.0`，包含 **127 个 YD 组件入口**。这不是远程发布或验签成功的声明。只有对应 publish / verify 流水线通过后，插件才能升级依赖并进行全局迁移；状态统一维护在 [契约发布记录](yd-contract-releases.md)。
 :::
 
-## 组件总览
+源码目录、包版本与宿主运行时版本是不同概念。插件不得复制宿主组件、伪造版本或在 remoteEntry 内另外捆绑组件库。先使用已有发布且验签的契约，准备中的新能力只在当前工作区验证。
 
-### 基础控件
+## 规范与 API
 
-- [FaButton 按钮](/components/fa-button) · [FaInput 输入框](/components/fa-input) · [FaTextarea 文本域](/components/fa-textarea) · [FaInputOTP 验证码输入](/components/input-otp)
-- [FaSelect 选择器](/components/fa-select) · [FaCheckbox 复选框](/components/fa-checkbox) · [FaSwitch 开关](/components/fa-switch) · [FaSlider 滑块](/components/slider)
-- [FaLabel 标签](/components/label) · [FaPasswordStrength 密码强度](/components/password-strength) · [FaKbd 键盘按键](/components/kbd) · [FaKbdGroup 按键组](/components/kbd-group)
+| 内容 | 入口 |
+| --- | --- |
+| 视觉语言、场景选型与持续维护 | [YD 视觉与组件使用规范](yd-ui-guidelines.md) |
+| 基础、集合、日历、动效、流程等组件 API | [YD 通用组件库](yd-components.md) |
+| 表单、标签、评分、动作与根装配 | [YD 表单与基础装配契约](yd-form-components.md) |
+| Harness、Skills、MCP、工作区与回答协议 | [YD Agent 工作台](yd-agent-workbench.md) |
+| 灵动 / 雅致 / 紧凑与主题插件 | [后台外观预设与动效](frontend-appearance.md) |
+| 发布、远程验签与插件同步 | [YD 契约发布记录](yd-contract-releases.md) |
 
-### 数据展示
+以上公开页面直接包含仓库 `docs/` 的权威文档，不维护第二份 API 与选型正文。新增或改变组件的同一工作项必须同步组件、规范、resolver、SDK、预览和检查规则。
 
-- [FaTag 标签](/components/tag) · [FaBadge 徽标](/components/badge) · [FaAvatar 头像](/components/avatar) · [FaAlert 警告提示](/components/alert)
-- [FaTrend 趋势](/components/trend) · [FaDescriptions 描述列表](/components/descriptions) · [FaDivider 分割线](/components/divider)
-- [FaTable 表格](/components/fa-table) · [FaTabs 标签页](/components/fa-tabs) · [FaProgress 进度条](/components/fa-progress) · [FaPagination 分页](/components/pagination)
-- [FaResponsiveTable 响应式表格](/components/responsive-table) · [FaSearchBar 搜索栏](/components/search-bar)
+## 导入与自动导入
 
-### 浮层与反馈
+宿主从根入口导入 YD 组件；AI 类型与元件也支持 `@yudream/components/ai` 子入口。插件通过 SDK 的宿主共享桥使用相同入口。
 
-- [FaModal 对话框](/components/fa-modal) · [FaDrawer 抽屉](/components/fa-drawer) · [FaToast 轻提示](/components/toast)
-- [FaTooltip 工具提示](/components/tooltip) · [FaPopover 弹出面板](/components/popover) · [FaHoverCard 悬停卡片](/components/hover-card)
-- [FaDropdown 下拉菜单](/components/dropdown) · [FaContextMenu 右键菜单](/components/context-menu) · [FaCollapsible 折叠面板](/components/collapsible)
+```vue
+<script setup lang="ts">
+import { YdButton, YdCard, YdInput } from '@yudream/components'
+import { ref } from 'vue'
 
-### 布局与其他
+const name = ref('')
+</script>
 
-- [FaPageHeader 页头](/components/page-header) · [FaPageMain 页面主体](/components/page-main) · [FaFixedBar 固定栏](/components/fixed-bar)
-- [FaScrollArea 滚动区域](/components/scroll-area) · [FaButtonGroup 按钮组](/components/button-group) · [FaIcon 图标](/components/fa-icon)
-- [FaImagePreview 图片预览](/components/fa-image-preview) · [FaFileUpload 文件上传](/components/fa-file-upload) · [FaImageUpload 图片上传](/components/fa-image-upload)
+<template>
+  <YdCard title="项目名称">
+    <YdInput v-model="name" placeholder="输入名称" />
+    <YdButton :disabled="!name">保存</YdButton>
+  </YdCard>
+</template>
+```
 
-### 功能函数
+当前真实 resolver 名称为 `ComponentsResolver`，组合式自动导入映射为 `ComponentsAutoImports`；不能使用历史文档中的不存在入口 `FaResolver`。
 
-| 函数 | 文档 |
-|---|---|
-| `useFaToast()` | [FaToast 轻提示](/components/toast)（vue-sonner 封装） |
-| `useFaModal()` | [命令式弹窗](/components/use-fa-modal) |
-| `useFaDrawer()` | [命令式抽屉](/components/use-fa-drawer) |
-| `useFaImagePreview()` | [命令式图片预览](/components/fa-image-preview) |
-| `useIsMobile()` | 移动端断点判断（见包内 README） |
+```ts
+import { ComponentsAutoImports, ComponentsResolver } from '@yudream/components/resolver'
 
-### Yd* YuDream 原创组件
+// Components({ resolvers: [ComponentsResolver()] })
+// AutoImport({ imports: [ComponentsAutoImports] })
+```
 
-- [YdBubble 气泡](/components/yd-bubble) · [YdChatSender 输入发送器](/components/yd-chat-sender) · [YdChatMessageList 消息列表](/components/yd-chat-message-list) · [YdChatWindow 对话窗口](/components/yd-chat-window)
-- [YdChatSessionList 会话列表](/components/yd-chat-session-list) · [YdChatProcess 执行过程](/components/yd-chat-process) · [YdChatGraph 关系图谱](/components/yd-chat-graph) · [YdChatActions 操作栏](/components/yd-chat-actions)
-- [YdChatReasoning 思维链](/components/yd-chat-reasoning) · [YdChatLoading 加载态](/components/yd-chat-loading) · [YdThoughtChain 步骤链](/components/yd-thought-chain)
-- [YdSuggestion 建议](/components/yd-suggestion) · [YdPrompts 提示词](/components/yd-prompts) · [YdCitationList 引用列表](/components/yd-citation-list)
-- [YdAttachmentList 附件列表](/components/yd-attachment-list) · [YdWelcome 欢迎](/components/yd-welcome)
-- [YdGraphCanvas 关系图谱画布](/components/yd-graph-canvas) · [YdTablePicker 弹出式选择输入框](/components/yd-table-picker) · [YdIconPicker 系统图标选择器](/components/yd-icon-picker)
-- [YdDatePicker 日期选择器](/components/yd-date-picker) · [YdRangePicker 日期范围选择器](/components/yd-range-picker) · [YdTimePicker 时间选择器](/components/yd-time-picker)
+页面与预览加载共享 `@yudream/components/appearance.css`。主色、字体与明暗由 FA 主题运行时管理；组件消费统一令牌，ADMIN 主题插件在根变量层覆盖。业务样式只用中性语义变量，不手写品牌色或控件强调态。
+
+## 按任务选择组件
+
+普通操作使用 `YdButton` 与 YD 表单控件；业务列表使用 `YdResponsiveTable` 的移动卡片槽。层级浏览/勾选用 `YdTree`，逐级单值选择用 `YdCascader`，远程分页集合选择用 `YdTablePicker`。步骤位置、历史和顺序任务分别用 `YdSteps`、`YdTimeline`、`YdMultiStepLoader`。浮层按内容规模和是否保留上下文选择 Popover、Modal 或 Drawer。
+
+动效分为功能反馈和视觉装饰。三套外观均保留已启用的功能动画；雅致与紧凑的减少动态效果偏好只柔化速度、幅度与密度，不冻结加载、计数或流光。完整决策与不兼容 API 边界见 [选型规范](yd-ui-guidelines.md)。
+
+## 历史 Fa API 兼容参考
+
+本目录已有 Fa 页面保留，供理解存量契约和迁移时核对参数，**不再作为业务选型推荐**。47 个基础 YD adapter 保留相应 Fa 的行为契约并增加统一外观；例如新页面使用 `YdButton`，历史 `FaButton` 页面可用作其基础参数参考。组件入口迁移仍需核对 props、model、事件、插槽与方法。
+
+Arco 或 FA Pro 的同名参数不能直接复制到 YD，表格、树、多选、日期、上传与命令式浮层尤其需要显式适配。旧组件页的原生控件演示是历史效果示意，不能作为新页面使用裸控件的依据。真实组件与主题验证以主前端 `apps/component-showcase` 的可交互预览为准。
+
+- [历史 FaButton 参数](/components/fa-button)、[FaInput 参数](/components/fa-input)、[FaTable 参数](/components/fa-table)
+- [历史 FaModal 参数](/components/fa-modal)、[FaDrawer 参数](/components/fa-drawer)、[FaResponsiveTable 参数](/components/responsive-table)
+- [插件宿主共享与工程化](/plugin/frontend-remote)、[插件 SDK](/plugin/sdk/)

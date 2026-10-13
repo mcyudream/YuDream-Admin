@@ -2,7 +2,7 @@
 
 宿主注入给插件前端页面的 SDK。插件页面组件通过 props 接收 `{ sdk, route }`，**不要**在插件内捆绑私有 axios 实例。
 
-- npm 包版本：**1.5.0**（发布于 `nexus.yudream.online/repository/npm-public/`）；peerDependencies 仅 `vue`、`vue-router`——一切运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`（依赖 `unocss` 等构建期包，仅在 Vite 构建时使用，不进入插件运行时）。1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot()`。
+- 当前工作区准备发布 npm 包 **1.9.0**，远程 publish / verify 尚未完成时，生产插件不得据此升级；状态见 [YD 契约发布记录](/components/yd-contract-releases)。peerDependencies 仅 `vue`、`vue-router`——运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`，1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot()`。
 - 宿主启动时挂载两个全局对象：
   - `window.__YUDREAM_PLUGIN_SHARED__ = { vue, vueRouter, components }`（宿主的 Vue/VueRouter/@yudream/components 单例）；
   - `window.__YUDREAM_PLUGIN_SDK__ = { version, create(pluginCode) => YuDreamPluginSdk }`。
@@ -264,7 +264,7 @@ const providers = await sdk.ai.providers()
 |---|---|
 | `@yudream/plugin-sdk/host-vue`（经 alias 后即 `vue`） | 重导出宿主 Vue 全部 API（ref/computed/watch/onMounted…约 170 项） |
 | host-vue-router（alias `vue-router`） | `useRoute/useRouter/RouterLink/RouterView/createRouter…` |
-| host-components（alias `@yudream/components`） | Fantastic-admin 自带的 `Fa*` 组件（`FaResponsiveTable` 为 YuDream 原创例外）与 `useFaModal/useFaDrawer/useFaToast/useFaImagePreview/useIsMobile`，以及 YuDream 原创的 `Yd*` 组件与 composable |
+| host-components（alias `@yudream/components`） | YD 组件与组合式能力的宿主共享单例；业务只使用 `Yd*` / `useYd*`。Fa 历史导出保留兼容，底层 Fa / Reka / Arco 不作为插件业务入口。选型与可用性见 [YD 规范](/components/yd-ui-guidelines) |
 
 共享单例缺失时报错：`YuDream plugin shared runtime is missing: {name}`。
 
@@ -285,5 +285,5 @@ import { yuDreamPluginUnoCss, yuDreamPluginUnoConfig } from '@yudream/plugin-sdk
 `yuDreamPluginUnoCss()` 返回配置好的 UnoCSS Vite 插件，预设与宿主完全一致（presetWind4 关闭 reset、shadcn 主题映射、attributify/icons/typography），让插件组件直接使用 `p-5`、`text-muted-foreground`、`i-ri:*` 等工具类。产物经 lib `cssFileName: 'style'` 固定为 `dist/style.css`，由 `@PluginFrontend(styles = {"style.css"})` 声明加载。插件只引用宿主注入的主题 CSS 变量，不要重新定义 `:root` 变量或引入全局 reset。`extraContent` 选项可追加扫描 glob。
 
 ::: tip 版本说明
-当前 npm 包版本 **1.7.0**（新增 `sdk.site` 公开主题上下文；1.6.0 产物样式降入 `@layer yudream-plugin`；1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot`；1.4.0 起含构建期 `./uno-config`），宿主注入的运行时行为版本为 **1.7.0**。以 `yudream-frontend/packages/plugin-sdk/package.json` 为准；后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本。源码升版不等于已发布到 Nexus。
+工作区 npm 包准备版本与当前源码宿主注入的 SDK 行为版本均为 **1.9.0**，与本次 YD 宿主共享桥契约一致。部署时仍以目标宿主实际注入的行为版本为准，后端 `@PluginFrontend.sdkVersion` 不得仅根据本地 package.json 填写。1.7.0 增加 `sdk.site`；1.6.0 产物样式降入 `@layer yudream-plugin`。源码升版不等于已发布到 Nexus，下游须等待 [发布记录](/components/yd-contract-releases) 中的验签与同步结果。
 :::

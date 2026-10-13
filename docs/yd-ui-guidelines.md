@@ -61,7 +61,9 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 业务主操作使用 `YdButton`，同一局部区域保持明确主操作。次要操作用 outline/ghost 等已有变体；危险操作使用 destructive 并按业务决定是否需确认。只有图标的操作必须有可访问名称，禁用态必须说明原因。复制功能优先 `YdCopyButton`，而不是在每个页面重写复制与成功反馈。
 
-文本用 `YdInput` / `YdTextarea`，数值用 `YdNumberField`，开关用 `YdSwitch`，区间调节用 `YdSlider`；密码强度是 `YdPasswordStrength` 的附加反馈，不替代密码输入。表单标签、帮助、必填、校验与错误布局必须由统一的 YD 表单能力承载。未封装的表单引擎不能直接出现在业务页面；标签输入、评分等缺口按第 8 节流程补齐。
+文本用 `YdInput` / `YdTextarea`，数值用 `YdNumberField`，开关用 `YdSwitch`，区间调节用 `YdSlider`；密码强度是 `YdPasswordStrength` 的附加反馈，不替代密码输入。表单用 `YdForm` / `YdFormItem` 承载标签、帮助、必填、校验与错误；标签数组用 `YdInputTag`，评分用 `YdRate`。契约见 [YD 表单与交互](yd-form-components.md)。
+
+`YdAction` 是保留原生按钮语义的基础动作容器，用于导航、卡片选择、编辑器工具等专门组合的可点击区域；它统一键盘、焦点和禁用行为，视觉由组合组件控制。普通 CRUD、表单提交与危险操作继续使用 `YdButton`，不能用 YdAction 到处自造主色按钮。
 
 `YdSelect` 与 Fa 基础实现同契约，不等于 Arco Select。它的 `options` 使用 `{ label, value, disabled? }` 或分组对象。不得通过裸 `Option` 子节点、任意字符串替换或传递不支持的远程搜索参数完成迁移。尤其多选必须验证模型、标签回显、删除和空态；当前基础实现的展示查找以标量为主，不能直接承诺任意多选行为。
 
@@ -167,8 +169,8 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 类别 | 公开入口 |
 | --- | --- |
 | 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer` |
-| 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton` |
-| 输入 | `YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention` |
+| 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction` |
+| 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate` |
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup` |
 | 层级与专用选择 | `YdTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
@@ -185,6 +187,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 装饰与互动 | `YdAnimatedBeam`、`YdBorderBeam`、`YdFlipCard`、`YdGlowyCard`、`YdGlowyCardWrapper`、`YdGradientButton`、`YdInteractiveButton`、`YdParticlesBg`、`YdPatternBg`、`YdSpotlightCard`、`YdScratchOff` |
 | Agent 组合 | `YdAgentWorkbench`、`YdAgentContextPanel`、`YdAgentAnswer` |
 | 聊天与回答元件 | `YdChatGraphView`、`YdChatMessageList`、`YdChatProcess`、`YdChatSender`、`YdCitationList`、`YdAttachmentList`、`YdChatSessionList`、`YdWelcome`、`YdChatWindow`、`YdBubble`、`YdPrompts`、`YdThoughtChain`、`YdChatActions`、`YdSuggestion`、`YdChatLoading`、`YdChatReasoning` |
+| 根装配（仅宿主/预览） | `YdUiProvider` |
 
 组合式公开入口包括 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdMotion`、`useYdChat`、`useYdChatStream`、`provideYdChatConfig`、`useYdChatConfig`。`useIsMobile` 是现有断点能力，不为改前缀另实现重复观察器。组件与模型详细边界见 [YD 通用组件库](yd-components.md)。
 
@@ -194,10 +197,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 | 缺口 / 规划入口（未完成前不可使用） | 迁移要求 |
 | --- | --- |
-| 统一表单引擎与表单项，规划 `YdForm` / `YdFormItem` | 保留校验、字段、disabled、提交、实例方法与标签关联；不能把 Arco Form 直接替成 YdCard |
-| 标签输入，规划 `YdInputTag`；完整多选搜索待确定契约 | 保留数组模型、可创建候选、去重、删除、键盘与远程加载；不硬塞单值 Combobox |
-| 评分输入，规划 `YdRate` | 封装可编辑/只读、键盘、清空与状态；不能用数值文本伪装评分 |
-| UI 根装配，规划 `YdUiProvider` | 提供宿主/预览统一的主题与必要第三方 provider 装配；业务不再次嵌入裸 ConfigProvider |
+| 完整多选搜索与远程候选契约 | 保留数组模型、候选标签、删除、键盘与远程加载；不硬塞单值 Combobox。标签自由录入已使用 `YdInputTag` |
 | 特殊上传/文件候选与颜色选择 | 缺少当前公开上传器能力时，新增受控 adapter，不回退裸 input |
 | 专门代码/Markdown 编辑器 | 封装编辑模型、主题、语言、错误与实例方法；不是 YdCode 展示组件 |
 | 编辑型工作流画布、可视化构建器 | 保留节点、边、拖拽、缩放、历史、导入导出等真实能力；不是 YdGraphCanvas |
@@ -223,6 +223,8 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 4. 在实时预览提供可交互示例，包含真实的空/加载/失败/禁用/选中/取消等适用状态；演示与真实执行明确区分。
 5. 更新本文件的选型与目录、对应 API 文档、根与前端/插件 AGENTS，以及受影响的 architecture skill / knowledge 规则。
 6. 运行组件和受影响 app 的类型检查、定向 lint、构建及必要行为测试；在三套外观、深浅、移动和插件变量覆盖下检查视觉与交互。
+
+在宿主 `yudream-frontend` 运行 `pnpm sync:ui-docs`，自动更新相邻插件仓的规则副本；完成前运行 `pnpm check:ui-docs`。检查同时核对公开组件目录、resolver、根导出与 SDK 桥；新增组件漏写目录或副本过期都会失败。CI 不挂载插件仓时仍核对宿主目录与契约。插件仓位置不同可向脚本传入 `--plugins=<仓库路径>`，不要在文档写死开发机路径。
 
 全局扫描需要覆盖模板、脚本导入、别名、render/JSX、通用原生交互与业务样式。规则应报告不符合 YD-only 的业务用法；不能通过行级禁用规则、临时白名单或把组件挪成局部文件规避。组件实现和框架装配的边界例外按路径与职责集中记录，并有测试，不能任意扩张。
 

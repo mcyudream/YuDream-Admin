@@ -16,6 +16,8 @@
     "lint:eslint": "eslint . --cache --fix",
     "lint:stylelint": "stylelint \"{apps,packages}/**/*.{css,scss,vue}\" --cache --fix",
     "audit:ui": "node scripts/audit-ui.mjs",
+    "sync:ui-docs": "node scripts/sync-yd-ui-docs.mjs",
+    "check:ui-docs": "node scripts/sync-yd-ui-docs.mjs --check",
     "test:eslint-rules": "node --test \"eslint-rules/__tests__/*.test.mjs\"",
     "preinstall": "npx only-allow pnpm",
     "postinstall": "simple-git-hooks",
