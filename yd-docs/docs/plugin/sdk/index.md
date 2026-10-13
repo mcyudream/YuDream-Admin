@@ -2,7 +2,7 @@
 
 宿主注入给插件前端页面的 SDK。插件页面组件通过 props 接收 `{ sdk, route }`，**不要**在插件内捆绑私有 axios 实例。
 
-- 当前工作区准备发布 npm 包 **1.9.0**，远程 publish / verify 尚未完成时，生产插件不得据此升级；状态见 [YD 契约发布记录](/components/yd-contract-releases)。peerDependencies 仅 `vue`、`vue-router`——运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`，1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot()`。
+- npm 包 **1.9.0** 已发布到 Nexus 并通过远程验签，与 components **1.4.0** 配套使用；证据见 [YD 契约发布记录](/components/yd-contract-releases)。peerDependencies 仅 `vue`、`vue-router`——运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`，1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot()`。
 - 宿主启动时挂载两个全局对象：
   - `window.__YUDREAM_PLUGIN_SHARED__ = { vue, vueRouter, components }`（宿主的 Vue/VueRouter/@yudream/components 单例）；
   - `window.__YUDREAM_PLUGIN_SDK__ = { version, create(pluginCode) => YuDreamPluginSdk }`。

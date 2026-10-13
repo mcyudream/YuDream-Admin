@@ -4,8 +4,8 @@ YD 是宿主页面、共享业务组件与插件的唯一公开 UI 入口。内�
 
 ## 契约状态
 
-::: warning 发布准备与生产可用分开
-当前工作区准备发布 `@yudream/components 1.4.0` 与 `@yudream/plugin-sdk 1.9.0`，包含 **127 个 YD 组件入口**。这不是远程发布或验签成功的声明。只有对应 publish / verify 流水线通过后，插件才能升级依赖并进行全局迁移；状态统一维护在 [契约发布记录](yd-contract-releases.md)。
+::: tip 已发布并完成远程验签
+`@yudream/components 1.4.0` 与 `@yudream/plugin-sdk 1.9.0` 已发布到 Nexus，包含 **127 个 YD 组件入口**。发布与远程验签流水线全部通过，插件可以升级到这组契约。当前宿主工作区有 **131 个源码入口**；`YdFilePicker`、`YdMultiSelect`、`YdMarkdownEditor`、`YdCodeEditor` 尚未发布，也未包含在插件已验签包中。证据与下游状态统一维护在 [契约发布记录](yd-contract-releases.md)。
 :::
 
 源码目录、包版本与宿主运行时版本是不同概念。插件不得复制宿主组件、伪造版本或在 remoteEntry 内另外捆绑组件库。先使用已有发布且验签的契约，准备中的新能力只在当前工作区验证。
