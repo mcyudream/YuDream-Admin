@@ -109,7 +109,8 @@ useHotkeyBindings({
         }
 
         .menu-item-container-icon {
-          font-size: 20px !important;
+          flex-shrink: 0;
+          font-size: 26px !important;
           transition: translate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
         }
       }
