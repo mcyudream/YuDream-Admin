@@ -499,7 +499,7 @@ function cardProps(card: DashboardCard) {
 <template>
   <div class="dashboard-page">
     <div class="dashboard-shell">
-      <div class="dashboard-header">
+      <div class="dashboard-header" :class="{ 'dashboard-header--editing': editMode }">
         <div class="dashboard-greeting">
           <div class="dashboard-greeting__title">
             <h1>工作台</h1>
@@ -508,18 +508,15 @@ function cardProps(card: DashboardCard) {
           <p v-if="editMode" class="dashboard-edit-hint">
             拖动标题调整位置，拖动右下角缩放；也可用卡片菜单调整。
           </p>
-          <p v-else class="dashboard-edit-hint">
-            从这里开始今天的工作。
-          </p>
         </div>
         <div class="dashboard-toolbar">
-          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="ghost" size="sm" @click="openPublicHome">
+          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="ghost" size="sm" class="dashboard-home-action" aria-label="访问首页" @click="openPublicHome">
             <FaIcon name="morph:house" />
-            访问首页
+            <span>访问首页</span>
           </FaButton>
-          <FaButton v-if="!editMode" size="sm" :disabled="!workspace || loading" @click="startEdit">
+          <FaButton v-if="!editMode" size="sm" aria-label="自定义工作台" :disabled="!workspace || loading" @click="startEdit">
             <FaIcon name="morph:sliders-horizontal" />
-            自定义工作台
+            <span class="dashboard-customize-label">自定义<span>工作台</span></span>
           </FaButton>
           <FaDropdown v-if="!editMode && canConfigureDefault" :items="[[{ label: '配置默认工作台', icon: 'morph:users', handle: startDefaultEdit }]]" align="end">
             <FaButton variant="ghost" size="icon-sm" aria-label="工作台设置" :disabled="loading">
@@ -1143,13 +1140,28 @@ function cardProps(card: DashboardCard) {
   }
 
   .dashboard-header {
-    flex-direction: column;
-    align-items: stretch;
+    gap: 8px;
+    align-items: center;
   }
 
   .dashboard-toolbar {
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .dashboard-header--editing {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-header--editing .dashboard-toolbar {
+    justify-content: flex-end;
     width: 100%;
+  }
+
+  .dashboard-header:not(.dashboard-header--editing) .dashboard-layout-label,
+  .dashboard-home-action span,
+  .dashboard-customize-label > span {
+    display: none;
   }
 
   .dashboard-greeting h1 {

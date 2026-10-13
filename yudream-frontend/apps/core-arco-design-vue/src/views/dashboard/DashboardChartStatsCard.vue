@@ -76,6 +76,14 @@ async function load() {
           {{ config.empty }}
         </p>
       </div>
+      <div v-else-if="rows.length && total === 0" class="trend-zero">
+        <p>{{ config.empty }}</p>
+        <ol class="trend-zero-history" aria-label="每日统计">
+          <li v-for="row in rows" :key="row.label" :aria-label="`${row.label}：${format(row.value)}${config.unit}`">
+            <strong>{{ format(row.value) }}</strong><span>{{ shortDate(row.label) }}</span>
+          </li>
+        </ol>
+      </div>
       <div v-else class="trend-plot">
         <div class="trend-caption" aria-live="polite">
           <span>{{ total === 0 ? config.empty : (active ? `${shortDate(active.label)} · ${format(active.value)}${config.unit}` : '暂无数据') }}</span>
@@ -125,7 +133,7 @@ async function load() {
 }
 
 .trend-summary strong {
-  font-size: clamp(30px, 9cqi, 44px);
+  font-size: clamp(36px, 11cqi, 48px);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
@@ -137,13 +145,59 @@ async function load() {
 .trend-caption,
 .trend-dates,
 .trend-footer > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-3);
 }
 
 .trend-period {
   flex-shrink: 0;
   padding-bottom: 4px;
+}
+
+.trend-zero {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-around;
+  min-height: 0;
+}
+
+.trend-zero p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-3);
+}
+
+.trend-zero-history {
+  display: flex;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.trend-zero-history li {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 0 0;
+  text-align: center;
+  border-top: 2px solid var(--color-border-2);
+}
+
+.trend-zero-history strong {
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-2);
+}
+
+.trend-zero-history span {
+  font-size: 11px;
+  color: var(--color-text-3);
 }
 
 .trend-plot {
