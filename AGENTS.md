@@ -5,6 +5,7 @@
 - 后端 DDD 分层、平台能力、插件架构、Excel、中文文本、Git 工作流：`.codex/skills/yudream-ddd-architecture/SKILL.md` 与 `references/knowledge.json`
 - SPI/SDK/components 契约发布与下游同步：`.codex/skills/yudream-contract-release/SKILL.md`、`references/file-map.md`、`references/release-workflow.md`
 - 前端框架与 monorepo 规范：`yudream-frontend/AGENTS.md`
+- YD 视觉语言、组件选型与持续维护：`docs/yd-ui-guidelines.md`（宿主权威规范，插件仓保留同步副本）
 
 ## 1. 工作范围与模块布局
 
@@ -74,10 +75,13 @@
 
 ## 7. 前端组件与主题
 
-- 前端实现优先复用项目既有的 `Fa*`、`Yd*` 组件和既有组合式能力；仅在现有组件无法覆盖明确需求时才引入 Arco 原生组件或自定义控件，并说明原因。
-- 新增通用控件以 `Yd*` 作为页面与插件的统一公开入口；YD 内部复用 Fa/Reka，复杂集合行为可复用 Arco，但必须封装属性、插槽、主题外观和弹出层，业务页面不直接使用 Arco 原生控件。基础 Fa 入口保留兼容。
+- 宿主和插件业务 UI **只使用 `@yudream/components` 的公开 `Yd*` / `useYd*` 入口**。禁止业务直接使用 `Fa*` / `useFa*`、Arco/TDesign/Reka 等通用 UI 原生入口，禁止自行制作通用按钮、输入、选择器、弹层、表格、加载与通知。允许原生语义内容与布局元素；技术编辑器/图形引擎必须经有类型的 YD 适配组件承载。Fa 与第三方仅是共享组件内部实现及明确的框架启动装配边界，不能作为页面例外。
+- 缺少组件时先在共享组件库封装为 YD，补齐属性、模型、事件、插槽、ref 方法、键盘/焦点、主题与弹出层，再使用；不得只改标签或把不兼容的 Arco API 硬套到 YD。新增公开入口同步根导出、resolver、SDK host-components、实时预览和组件文档。插件仅从契约包公开入口显式导入，不复制宿主实现。
 - YD 外观默认值统一在共享 `@yudream/components/appearance.css` 的 `yudream-base` 根节点层声明；宿主与预览共用 FA 主题运行时。ADMIN 插件通过根变量覆盖；三套外观均保留已启用的功能动画，灵动完整，雅致与紧凑的减少动态效果偏好仅柔化动作、速度与装饰密度，禁止统一冻结动画。
 - 不在业务页面自行指定主色、品牌色或固定色板；主题、主色、深浅模式由后台主题配置与组件体系统一控制。业务样式仅使用中性语义变量（如 `--color-bg-*`、`--color-text-*`、`--color-border-*`、`--color-fill-*`），不直接模拟主题组件的激活/强调态。
+- 选型：普通业务优先基础 YD；阶段用 `YdSteps`、异步进度用 `YdMultiStepLoader`/`YdProgress`、履历用 `YdTimeline`；层级用 `YdTree`；少量选项用 `YdSelect`、搜索单选用 `YdCombobox`、级联用 `YdCascader`、远程分页资源选择用 `YdTablePicker`。短任务用 `YdModal`，上下文详情用 `YdDrawer`，轻量锚点信息用 `YdPopover`，独立长流程用路由页。装饰动效仅用于迎宾、重点提示或可视化，不遮挡表单、表格、错误和危险确认。
+- 完整分类、能力边界、视觉状态与决策表遵循 `docs/yd-ui-guidelines.md`。后台管理列表使用 `YdResponsiveTable` 与 `#card` 窄屏视图，不另造双端分页/选中逻辑，不以装饰卡片替代管理表格；系统可查询的内部 ID 使用带标签选择器，长 ID 保持字符串。
+- 规范是持续维护的契约：每次组件新增/变更/废弃，同一工作项更新选型文档、预览、导出/resolver/SDK桥、检查映射、受影响的 AGENTS/skill/知识条目与插件副本；完成前运行严格 UI 检查和目标 typecheck/build，验收三套外观×浅/深模式及窄屏。不得通过禁用规则、全局忽略或未发布依赖掩盖缺口。
 
 ## 8. 构建与验证
 
