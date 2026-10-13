@@ -1,6 +1,9 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginMenuMode;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuCategory;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuPolicy;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.PluginMobileAdminCard;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
@@ -15,12 +18,18 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 public class PluginYamlDescriptorReader {
 
     public PluginDescriptor read(InputStream inputStream) {
+        return readManifest(inputStream).descriptor();
+    }
+
+    /** 导航策略只由宿主消费，保持第三方插件 SPI Descriptor 的二进制契约。 */
+    public Manifest readManifest(InputStream inputStream) {
         if (inputStream == null) {
             throw new BizException("插件 JAR 缺少 plugin.yml");
         }
@@ -30,7 +39,7 @@ public class PluginYamlDescriptorReader {
         }
         String code = required(values, "name");
         String displayName = value(values, "displayName");
-        return new PluginDescriptor(
+        PluginDescriptor descriptor = new PluginDescriptor(
                 code,
                 StringUtils.hasText(displayName) ? displayName : code,
                 required(values, "version"),
@@ -42,6 +51,65 @@ public class PluginYamlDescriptorReader {
                 optionalGitUrl(values),
                 optionalMobileSupport(values)
         );
+        return new Manifest(descriptor, menuPolicy(values));
+    }
+
+    public record Manifest(PluginDescriptor descriptor, PluginMenuPolicy menuPolicy) {
+    }
+
+    private PluginMenuPolicy menuPolicy(Map<?, ?> values) {
+        if (!values.containsKey("menu")) {
+            return PluginMenuPolicy.legacy();
+        }
+        Object menu = values.get("menu");
+        Map<?, ?> menuValues;
+        if (menu == null) {
+            menuValues = Map.of();
+        } else if (menu instanceof Map<?, ?> map) {
+            menuValues = map;
+        } else {
+            throw new BizException("plugin.yml 的 menu 必须是 YAML 对象");
+        }
+        String declaredMode = value(menuValues, "mode");
+        PluginMenuMode mode;
+        try {
+            mode = declaredMode.isBlank() ? PluginMenuMode.CATEGORY
+                    : PluginMenuMode.valueOf(declaredMode.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new BizException("plugin.yml 的 menu.mode 只允许 CATEGORY、LEGACY 或 INDEPENDENT");
+        }
+        return new PluginMenuPolicy(mode, menuCategory(menuValues.get("category")));
+    }
+
+    private PluginMenuCategory menuCategory(Object category) {
+        if (category == null) {
+            return PluginMenuCategory.named("other");
+        }
+        if (category instanceof String code) {
+            return PluginMenuCategory.named(code);
+        }
+        if (!(category instanceof Map<?, ?> values)) {
+            throw new BizException("plugin.yml 的 menu.category 必须是分类编码或 YAML 对象");
+        }
+        String code = requiredFieldValue(values, "plugin.yml 的 menu.category", "code");
+        PluginMenuCategory defaults = PluginMenuCategory.named(code);
+        String name = value(values, "name");
+        String icon = value(values, "icon");
+        return new PluginMenuCategory(code,
+                name.isBlank() ? defaults.name() : name,
+                icon.isBlank() ? defaults.icon() : icon,
+                categorySort(values.get("sort"), defaults.sort()));
+    }
+
+    private Integer categorySort(Object sort, Integer defaultSort) {
+        if (sort == null) {
+            return defaultSort;
+        }
+        try {
+            return Integer.valueOf(String.valueOf(sort).trim());
+        } catch (NumberFormatException e) {
+            throw new BizException("plugin.yml 的 menu.category.sort 必须是整数");
+        }
     }
 
     private String required(Map<?, ?> values, String key) {

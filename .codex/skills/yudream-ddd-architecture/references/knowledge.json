@@ -323,6 +323,10 @@
     {
       "key": "permission-management-views",
       "text": "权限树/只读矩阵/溯源共享 src/utils/permission-catalog.ts，按业务域→稳定资源码→动作分类→权限展示，assign-*匹配完整规范后缀；历史未知码兼容保留，搜索勾选只更新可见叶子，全选合并而不删除暂失效插件码。overview用户/菜单分别校验system:user:view与system:menu:view，全量统计由轻量仓储聚合不按分页，菜单关系复用真实可见码算法。SaTokenUserContextStore只能读取本人tokenSession；他人展示contextSource=DEFAULT默认部门/角色，不冒充真实在线会话。规范见docs/system/permission-management.md。"
+    },
+    {
+      "key": "plugin-menu-business-categories",
+      "text": "新插件必须在plugin.yml声明menu块，menu.mode缺省CATEGORY、menu.category以主要业务大类mc/todo/social/other或自定义code/name/icon/sort归组；共享一级CATEGORY代码plugin-category:{code}由宿主拥有，无路由/权限，不随单插件停用。模块和功能放分类下，parentCode显式优先；INDEPENDENT仅明确个例，缺整个menu或LEGACY保留旧插件结构，持久化菜单不自动搬移或覆盖。菜单管理新建根默认分类，前端分类生成必须兼容有path的旧根MENU/LINK。详见docs/plugin-system/specification.md第10节。"
     }
   ],
   "utilities": [

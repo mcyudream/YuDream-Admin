@@ -44,11 +44,9 @@ export function flattenBackendRouteGroups<T extends AuthRouteNode>(routes: T[]):
  * 菜单管理把插件 CATEGORY 挂到系统 LAYOUT 下是合法操作，未拍平时 createRouterMatcher 会抛错。
  */
 export function collectBackendMatcherRoutes<T extends AuthRouteNode>(
-  routesRaw: Array<{ children?: T[] }>,
+  routesRaw: T[],
 ): AuthRouteNode[] {
-  return flattenBackendRouteGroups(
-    routesRaw.flatMap(route => route.children ?? []),
-  )
+  return flattenBackendRouteGroups(routesRaw)
 }
 
 export function mergeBackendStructuralRoutes<T extends AuthRouteNode>(routes: T[]): T[] {

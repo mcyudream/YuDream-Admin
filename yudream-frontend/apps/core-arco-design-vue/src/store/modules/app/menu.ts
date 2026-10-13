@@ -1,9 +1,9 @@
-import type { MenuRecordMainRaw, MenuRecordRaw, RouteRecordMainRaw } from '@fantastic-admin/types'
-import type { RouteRecordRaw } from 'vue-router'
+import type { MenuRecordMainRaw, MenuRecordRaw } from '@fantastic-admin/types'
 import type { AuthRouteNode } from './route-auth'
 import { cloneDeep } from 'es-toolkit'
 import { resolveRoutePath } from '@/utils'
 import { findBestMenuGroupIndex } from './menu-match'
+import { projectRouteMenus } from './menu-projection'
 import { filterBackendMenuTreeByAuth } from './route-auth'
 
 export const useAppMenuStore = defineStore(
@@ -12,60 +12,12 @@ export const useAppMenuStore = defineStore(
     const appSettingsStore = useAppSettingsStore()
     const appRouteStore = useAppRouteStore()
 
-    // 将原始路由转换成导航菜单
-    function convertRouteToMenu(routes: RouteRecordMainRaw[]): MenuRecordMainRaw[] {
-      const returnMenus: MenuRecordMainRaw[] = []
-      routes.forEach((item) => {
-        if (item.children.length > 0) {
-          if (appSettingsStore.settings.menu.mode === 'single') {
-            returnMenus.length === 0 && returnMenus.push({
-              meta: {},
-              children: [],
-            })
-            returnMenus[0].children.push(...convertRouteToMenuRecursive(item.children))
-          }
-          else {
-            const menuItem: MenuRecordMainRaw = {
-              meta: {
-                title: item?.meta?.title,
-                icon: item?.meta?.icon,
-                auth: item?.meta?.auth,
-              },
-              children: [],
-            }
-            menuItem.children = convertRouteToMenuRecursive(item.children)
-            returnMenus.push(menuItem)
-          }
-        }
-      })
-      return returnMenus
-    }
-    function convertRouteToMenuRecursive(routes: RouteRecordRaw[], basePath = ''): MenuRecordRaw[] {
-      const returnMenus: MenuRecordRaw[] = []
-      routes.forEach((item) => {
-        const meta = {
-          auth: item?.meta?.auth,
-          title: item?.meta?.title,
-          icon: item?.meta?.icon,
-          menu: item?.meta?.menu,
-          expand: item?.meta?.expand,
-          link: item?.meta?.link,
-          menuCode: (item.meta as Record<string, unknown> | undefined)?.menuCode,
-        }
-        const menuItem: MenuRecordRaw = {
-          path: resolveRoutePath(basePath, item.path),
-          meta,
-        }
-        if (item.children) {
-          menuItem.children = convertRouteToMenuRecursive(item.children, menuItem.path)
-        }
-        returnMenus.push(menuItem)
-      })
-      return returnMenus
-    }
-
     // 完整导航数据
-    const allMenus = computed(() => filterAsyncMenus(convertRouteToMenu(appRouteStore.routesRaw)))
+    const allMenus = computed(() => filterAsyncMenus(projectRouteMenus(
+      appRouteStore.routesRaw,
+      appSettingsStore.settings.menu.mode,
+      resolveRoutePath,
+    )))
 
     function normalizeActivedIndex(index: number) {
       if (allMenus.value.length === 0) {

@@ -1,7 +1,7 @@
 import type { RouteRecordMainRaw } from '@fantastic-admin/types'
 import type { RouteRecordRaw, RouterMatcher } from 'vue-router'
-import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
 import type { AuthRouteNode } from './route-auth'
+import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
 import { cloneDeep } from 'es-toolkit'
 import { createRouterMatcher } from 'vue-router'
 import apiApp from '@/api/modules/app'
@@ -27,9 +27,10 @@ export const useAppRouteStore = defineStore(
         routesRaw.value.forEach((item) => {
           const tmpRoutes = cloneDeep(item.children) as RouteRecordRaw[]
           if (appSettingsStore.settings.app.routeBaseOn === 'backend') {
-            returnRoutes.push(...flattenBackendRouteGroups([
-              { children: tmpRoutes as unknown as AuthRouteNode[] },
-            ]) as RouteRecordRaw[])
+            returnRoutes.push(...flattenBackendRouteGroups([{
+              ...cloneDeep(item),
+              children: tmpRoutes as unknown as AuthRouteNode[],
+            }]) as RouteRecordRaw[])
           }
           else {
             tmpRoutes.forEach((v) => {
@@ -238,7 +239,7 @@ export const useAppRouteStore = defineStore(
         pluginManifest.modules,
         pluginManifest.sdkVersion,
       ) as any
-        // 设置 routes 数据
+      // 设置 routes 数据
       routesRaw.value = sortAsyncRoutes(staticRoutes)
       routesMatcher.value = createRouterMatcher(
         collectBackendMatcherRoutes(routesRaw.value as unknown as AuthRouteNode[]) as RouteRecordRaw[],

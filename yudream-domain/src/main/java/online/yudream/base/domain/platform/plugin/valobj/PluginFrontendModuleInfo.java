@@ -18,8 +18,17 @@ public record PluginFrontendModuleInfo(
         PluginMenuOverrideInfo menuOverride,
         List<String> styles,
         List<String> scripts,
-        String assetRevision
+        String assetRevision,
+        PluginMenuPolicy menuPolicy
 ) {
+    public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
+                                    String integrity, String menuTitle, String menuIcon, Integer menuSort,
+                                    List<PluginFrontendRouteInfo> routes, PluginMenuOverrideInfo menuOverride,
+                                    List<String> styles, List<String> scripts, String assetRevision) {
+        this(pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon, menuSort, routes,
+                menuOverride, styles, scripts, assetRevision, PluginMenuPolicy.legacy());
+    }
+
     public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
                                     String integrity, String menuTitle, String menuIcon, Integer menuSort,
                                     List<PluginFrontendRouteInfo> routes, PluginMenuOverrideInfo menuOverride) {
@@ -99,6 +108,7 @@ public record PluginFrontendModuleInfo(
         styles = styles == null ? List.of() : List.copyOf(styles);
         scripts = scripts == null ? List.of() : List.copyOf(scripts);
         assetRevision = assetRevision == null ? "" : assetRevision;
+        menuPolicy = menuPolicy == null ? PluginMenuPolicy.legacy() : menuPolicy;
     }
 
     public static PluginFrontendModuleInfo withMenuOverride(PluginFrontendModuleInfo declaration,
@@ -107,7 +117,7 @@ public record PluginFrontendModuleInfo(
         return new PluginFrontendModuleInfo(
                 declaration.pluginCode(), declaration.entry(), declaration.moduleName(), declaration.sdkVersion(),
                 declaration.integrity(), override.name(), override.icon(), override.sort(), routes, override,
-                declaration.styles(), declaration.scripts(), declaration.assetRevision()
+                declaration.styles(), declaration.scripts(), declaration.assetRevision(), declaration.menuPolicy()
         );
     }
 
@@ -116,7 +126,8 @@ public record PluginFrontendModuleInfo(
         return new PluginFrontendModuleInfo(
                 pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon,
                 overriddenMenuSort, overriddenRoutes,
-                menuOverride == null ? null : menuOverride.withSort(overriddenMenuSort), styles, scripts, assetRevision
+                menuOverride == null ? null : menuOverride.withSort(overriddenMenuSort), styles, scripts, assetRevision,
+                menuPolicy
         );
     }
 
@@ -128,8 +139,13 @@ public record PluginFrontendModuleInfo(
                 module.pluginCode(), module.entry(), module.moduleName(), module.sdkVersion(),
                 module.integrity(), module.menuTitle(), module.menuIcon(), module.menuSort(),
                 module.routes().stream().filter(PluginFrontendRouteInfo::publicAccess).toList(),
-                module.menuOverride(), module.styles(), module.scripts(), module.assetRevision()
+                module.menuOverride(), module.styles(), module.scripts(), module.assetRevision(), module.menuPolicy()
         );
+    }
+
+    public PluginFrontendModuleInfo withMenuPolicy(PluginMenuPolicy policy) {
+        return new PluginFrontendModuleInfo(pluginCode, entry, moduleName, sdkVersion, integrity,
+                menuTitle, menuIcon, menuSort, routes, menuOverride, styles, scripts, assetRevision, policy);
     }
 
     public String parentCode() { return menuOverride == null ? null : menuOverride.parentCode(); }

@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginMenuMode;
 import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
@@ -233,7 +234,23 @@ class JarPluginRuntimeGatewayTest {
                 && module.styles().equals(List.of("assets/programmatic.css"))
                 && module.scripts().equals(List.of("assets/programmatic.js"))));
         assertTrue(modules.stream().allMatch(module -> module.assetRevision().startsWith("1.0.0-")));
+        assertTrue(modules.stream().allMatch(module -> module.menuPolicy().mode() == PluginMenuMode.LEGACY));
         gateway.unload("frontend-assets");
+    }
+
+    @Test
+    void yamlMenuPolicyIsAppliedToBothAnnotatedAndProgrammaticFrontendModules() throws IOException {
+        Path jar = writePluginJar("categorized.jar", "categorized", FrontendAssetsPlugin.class.getName(),
+                "menu:\n  category: social\n");
+        JarPluginRuntimeGateway gateway = newGateway();
+        try {
+            gateway.enable(module("categorized", jar));
+            assertEquals(2, gateway.frontendModules().size());
+            assertTrue(gateway.frontendModules().stream().allMatch(frontend ->
+                    frontend.menuPolicy().categorized() && "social".equals(frontend.menuPolicy().category().code())));
+        } finally {
+            gateway.unload("categorized");
+        }
     }
 
     @PluginFrontend(moduleName = "annotated", styles = {"assets/annotated.css"}, scripts = {"assets/annotated.js"})
@@ -341,10 +358,14 @@ class JarPluginRuntimeGatewayTest {
     }
 
     private Path writePluginJar(String fileName, String pluginCode, String mainClass) throws IOException {
+        return writePluginJar(fileName, pluginCode, mainClass, "");
+    }
+
+    private Path writePluginJar(String fileName, String pluginCode, String mainClass, String menu) throws IOException {
         Path jar = pluginDir.resolve(fileName);
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
             output.putNextEntry(new JarEntry("plugin.yml"));
-            String yaml = "name: " + pluginCode + "\nversion: 1.0.0\nmain: " + mainClass + "\n";
+            String yaml = "name: " + pluginCode + "\nversion: 1.0.0\nmain: " + mainClass + "\n" + menu;
             output.write(yaml.getBytes(StandardCharsets.UTF_8));
             output.closeEntry();
         }

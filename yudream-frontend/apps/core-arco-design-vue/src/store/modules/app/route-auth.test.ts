@@ -127,6 +127,38 @@ test('backend routes merge duplicated plugin layout paths and retain every child
   ])
 })
 
+test('matcher routes retain an independent root layout and its default page', () => {
+  const flattened = collectBackendMatcherRoutes([{
+    path: '/legacy/page',
+    component: 'Layout',
+    meta: { title: '独立入口' },
+    children: [{ path: '', name: 'legacy-page', component: 'legacy/Page' }],
+  }])
+  const matcher = createRouterMatcher(flattened as never, {})
+  const matched = matcher.resolve({ path: '/legacy/page' }, undefined!).matched
+
+  assert.equal(matched.length, 2)
+  assert.equal(matched.at(-1)?.name, 'legacy-page')
+})
+
+test('matcher routes flatten a shared category while keeping every plugin page', () => {
+  const flattened = collectBackendMatcherRoutes([{
+    meta: { title: 'MC' },
+    children: [{
+      meta: { title: '服务器' },
+      children: [{ path: '/platform/plugins/minecraft-server/admin', component: 'server/Admin' }],
+    }, {
+      meta: { title: '皮肤' },
+      children: [{ path: '/platform/plugins/blessing-skin/admin', component: 'skin/Admin' }],
+    }],
+  }])
+  const matcher = createRouterMatcher(flattened as never, {})
+
+  for (const pluginPath of ['/platform/plugins/minecraft-server/admin', '/platform/plugins/blessing-skin/admin']) {
+    assert.equal(matcher.resolve({ path: pluginPath }, undefined!).matched.length, 1)
+  }
+})
+
 test('backend menu keeps an unauthorized structural parent with an authorized child only', () => {
   const menus = [{
     path: '/system/personnel',

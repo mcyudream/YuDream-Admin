@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuCategory;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuSource;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,10 @@ public class PluginMenuProjectionService {
         ProjectionPlan plan = validate(pluginCode, modules);
 
         for (ModulePlan modulePlan : plan.modules()) {
+            // 新模式中只有公开路由/无管理路由的插件不贡献后台分类。
+            if (modulePlan.module().menuPolicy().categorized() && modulePlan.routes().isEmpty()) {
+                continue;
+            }
             String declaredParentCode = blankToNull(modulePlan.module().parentCode());
             String moduleParentCode;
             if (declaredParentCode == null) {
@@ -38,7 +44,12 @@ public class PluginMenuProjectionService {
                         pluginCode,
                         modulePlan.moduleName(),
                         modulePlan.registrationKey(),
-                        moduleDefaults(pluginCode, modulePlan)
+                        () -> {
+                            String categoryParent = modulePlan.module().menuPolicy().categorized()
+                                    ? sharedCategory(modulePlan.module().menuPolicy().category()).getCode()
+                                    : null;
+                            return moduleDefaults(pluginCode, modulePlan, categoryParent);
+                        }
                 );
                 moduleParentCode = moduleMenu.getCode();
             } else {
@@ -102,6 +113,9 @@ public class PluginMenuProjectionService {
     private Set<String> declaredRegistrationKeys(ProjectionPlan plan) {
         Set<String> keys = new HashSet<>();
         for (ModulePlan module : plan.modules()) {
+            if (module.module().menuPolicy().categorized() && module.routes().isEmpty()) {
+                continue;
+            }
             keys.add(module.registrationKey());
             module.parents().values().forEach(parent -> keys.add(parent.registrationKey()));
             module.routes().forEach(route -> keys.add(route.registrationKey()));
@@ -213,16 +227,45 @@ public class PluginMenuProjectionService {
                                  String moduleName,
                                  String registrationKey,
                                  Menu defaults) {
-        return menuRepo.findByCode(defaults.getCode()).orElseGet(() -> {
+        return createIfMissing(pluginCode, moduleName, registrationKey, () -> defaults);
+    }
+
+    private Menu createIfMissing(String pluginCode,
+                                 String moduleName,
+                                 String registrationKey,
+                                 Supplier<Menu> defaultsSupplier) {
+        return saveIfMissing(menuCode(pluginCode, registrationKey), () -> {
+            Menu defaults = defaultsSupplier.get();
             defaults.setSource(MenuSource.PLUGIN);
             defaults.setPluginCode(pluginCode);
             defaults.setPluginModuleName(moduleName);
             defaults.setPluginRegistrationKey(registrationKey);
             defaults.setRuntimeAvailable(true);
+            return defaults;
+        });
+    }
+
+    private Menu sharedCategory(PluginMenuCategory category) {
+        return saveIfMissing(category.menuCode(), () -> Menu.builder()
+                .code(category.menuCode())
+                .name(category.name())
+                .type(MenuNodeType.CATEGORY)
+                .module(category.name())
+                .icon(category.icon())
+                .sort(category.sort())
+                .visible(true)
+                .status(MenuStatus.ACTIVE)
+                .source(MenuSource.SYSTEM)
+                .build());
+    }
+
+    private Menu saveIfMissing(String code, Supplier<Menu> defaultsSupplier) {
+        return menuRepo.findByCode(code).orElseGet(() -> {
+            Menu defaults = defaultsSupplier.get();
             try {
                 return menuRepo.save(defaults);
             } catch (RuntimeException saveFailure) {
-                Menu concurrentlyCreated = menuRepo.findByCode(defaults.getCode()).orElse(null);
+                Menu concurrentlyCreated = menuRepo.findByCode(code).orElse(null);
                 if (concurrentlyCreated != null) {
                     return concurrentlyCreated;
                 }
@@ -231,13 +274,13 @@ public class PluginMenuProjectionService {
         });
     }
 
-    private Menu moduleDefaults(String pluginCode, ModulePlan plan) {
+    private Menu moduleDefaults(String pluginCode, ModulePlan plan, String parentCode) {
         PluginFrontendModuleInfo module = plan.module();
         return Menu.builder()
                 .code(menuCode(pluginCode, plan.registrationKey()))
                 .name(defaultText(module.menuTitle(), plan.moduleName()))
                 .type(MenuNodeType.CATEGORY)
-                .parentCode(blankToNull(module.parentCode()))
+                .parentCode(parentCode)
                 .module(plan.moduleName())
                 .icon(module.menuIcon())
                 .sort(defaultSort(module.menuSort()))
