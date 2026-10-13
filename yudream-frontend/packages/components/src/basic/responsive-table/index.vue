@@ -1,9 +1,13 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
-import type { RowData } from '@tanstack/vue-table'
-import { useMediaQuery } from '@vueuse/core'
-import { computed, useAttrs, useSlots } from 'vue'
-import FaCard from '../card/index.vue'
+import type { RowData, RowSelectionState, Table as TanStackTable } from '@tanstack/vue-table'
+import type { RadioGroupOption } from '../radio-group/index.vue'
 import type { TableColumn, TableProps } from '../table/index.vue'
+import { useMediaQuery } from '@vueuse/core'
+import { computed, ref, useAttrs, useSlots, watch } from 'vue'
+import { YdCheckbox, YdRadioGroup } from '../../adapters/index'
+import FaCard from '../card/index.vue'
+import FaTable from '../table/index.vue'
+import { createYdResponsiveCardSelection } from './card-selection'
 
 const props = withDefaults(defineProps<TableProps<TData> & {
   /** 移动端断点，视口宽度小于等于该值时切换为卡片列表 */
@@ -36,11 +40,50 @@ const props = withDefaults(defineProps<TableProps<TData> & {
   tree: undefined,
 })
 
+const emit = defineEmits<{ selectionChange: [rows: TData[], selection: RowSelectionState] }>()
 const slots = useSlots()
 const isMobile = useMediaQuery(() => props.mobileBreakpoint || '(max-width: 768px)')
+const rowSelection = defineModel<RowSelectionState>('rowSelection', { default: () => ({}) })
+const tableRef = ref<{ table: TanStackTable<TData> }>()
 
-// 本组件不声明 emits，父组件传入的事件监听（onSelectionChange 等）会落入 attrs；
-// 默认透传只会挂到根 div 上永远收不到，需显式转发给 FaTable。
+function sameSelection(left: RowSelectionState, right: RowSelectionState) {
+  const leftKeys = Object.keys(left).filter(key => left[key])
+  const rightKeys = Object.keys(right).filter(key => right[key])
+  return leftKeys.length === rightKeys.length && leftKeys.every(key => right[key])
+}
+function syncSelection(selection: RowSelectionState) {
+  const table = tableRef.value?.table
+  if (table && !sameSelection(table.getState().rowSelection, selection)) {
+    table.setRowSelection({ ...selection })
+  }
+}
+watch(() => rowSelection.value, syncSelection, { deep: true, immediate: true })
+watch(() => tableRef.value?.table, () => syncSelection(rowSelection.value), { flush: 'post' })
+function onSelectionChange(rows: TData[], selection: RowSelectionState) {
+  if (!sameSelection(rowSelection.value, selection)) {
+    rowSelection.value = { ...selection }
+  }
+  emit('selectionChange', rows, selection)
+}
+const engineRows = computed(() => new Map(tableRef.value?.table.getCoreRowModel().flatRows.map(row => [row.original, row]) ?? []))
+function cardSelection(row: TData) {
+  const engineRow = engineRows.value.get(row)
+  return {
+    ...createYdResponsiveCardSelection(engineRow),
+    table: tableRef.value?.table,
+  }
+}
+function hasSelectionColumnIn(columns: TableColumn<TData>[]): boolean {
+  return columns.some(column => column.type === 'selection' || (Array.isArray(column.columns) && hasSelectionColumnIn(column.columns)))
+}
+const hasSelectionColumn = computed(() => props.selectable && hasSelectionColumnIn(props.columns))
+defineExpose({
+  get table() {
+    return tableRef.value?.table
+  },
+})
+
+// 通用表格事件转发；selectionChange 由模型桥同步后单独发出。
 const attrs = useAttrs()
 const tableListeners = computed(() => {
   const result: Record<string, unknown> = {}
@@ -79,8 +122,8 @@ function childrenOf(node: TData): TData[] {
 }
 
 /** 树型数据在移动端展开为带层级的扁平列表，保证子级也能展示 */
-function flattenTree(nodes: TData[], depth = 0): Array<{ node: TData; depth: number }> {
-  const result: Array<{ node: TData; depth: number }> = []
+function flattenTree(nodes: TData[], depth = 0): Array<{ node: TData, depth: number }> {
+  const result: Array<{ node: TData, depth: number }> = []
   for (const node of nodes) {
     result.push({ node, depth })
     const children = childrenOf(node)
@@ -94,6 +137,41 @@ function flattenTree(nodes: TData[], depth = 0): Array<{ node: TData; depth: num
 const cardRows = computed(() => props.tree
   ? flattenTree(props.data)
   : props.data.map(node => ({ node, depth: 0 })))
+
+interface ResponsiveCardRadioOption extends RadioGroupOption {
+  row: TData
+  index: number
+  depth: number
+}
+
+const singleSelectionOptions = computed<ResponsiveCardRadioOption[]>(() => cardRows.value.map(({ node, depth }, index) => {
+  const selection = cardSelection(node)
+  return {
+    id: `responsive-card-${selection.selectionId || index}`,
+    label: `选择第 ${index + 1} 行`,
+    value: selection.selectionId || String(index),
+    disabled: selection.selectDisabled,
+    row: node,
+    index,
+    depth,
+  }
+}))
+
+const singleSelectedId = computed(() => Object.keys(rowSelection.value).find(id => rowSelection.value[id]))
+
+function hasCustomCardSlot() {
+  return Boolean(slots.card)
+}
+
+function selectSingleCard(value: unknown) {
+  if (value == null) {
+    return
+  }
+  const row = tableRef.value?.table.getRow(String(value))
+  if (row?.getCanSelect()) {
+    row.toggleSelected(true)
+  }
+}
 
 function columnLabel(column: TableColumn<TData, any>): string {
   if ('header' in column && typeof column.header === 'string') {
@@ -130,37 +208,72 @@ function columnKey(column: TableColumn<TData, any>): string {
 
 <template>
   <div>
-    <FaTable v-if="!isMobile" v-bind="{ ...tableProps, ...tableListeners }">
+    <FaTable v-show="!isMobile" ref="tableRef" v-bind="{ ...tableProps, ...tableListeners }" @selection-change="onSelectionChange">
       <template v-for="(_, name) in tableSlots" :key="name" #[name]="scope">
         <slot :name="name" v-bind="scope || {}" />
       </template>
     </FaTable>
 
-    <div v-else class="flex flex-col gap-3">
-      <slot name="toolbar" />
+    <div v-if="isMobile" class="flex flex-col gap-3">
+      <slot name="toolbar" :table="tableRef?.table" />
       <FaCard v-if="cardRows.length === 0" class="w-full">
-        <div class="flex items-center justify-center py-10 text-sm text-secondary-foreground/50">
+        <div class="text-sm text-secondary-foreground/50 py-10 flex items-center justify-center">
           {{ emptyText || '暂无数据' }}
         </div>
       </FaCard>
-      <div
-        v-for="(row, index) in cardRows"
-        :key="index"
-        class="w-full"
-        :style="{ paddingLeft: `${Math.min(row.depth, 6) * 16}px` }"
+      <YdRadioGroup
+        v-if="cardRows.length > 0 && hasSelectionColumn && !multiple && !hasCustomCardSlot()"
+        :model-value="singleSelectedId"
+        :options="singleSelectionOptions"
+        class="responsive-table-card-radio-list"
+        option-class="responsive-table-card-radio-option"
+        item-class="responsive-table-card-radio-control"
+        @update:model-value="selectSingleCard"
       >
-        <div v-if="row.depth > 0" class="tree-card-connector" />
-        <slot name="card" :row="row.node" :index="index" :depth="row.depth">
-          <FaCard class="w-full">
-            <div class="flex flex-col gap-2">
-              <div v-for="column in cardColumns" :key="columnKey(column)" class="flex items-start justify-between gap-3 text-sm">
-                <span class="shrink-0 text-secondary-foreground/60">{{ columnLabel(column) }}</span>
-                <span class="break-all text-right font-medium">{{ displayValue(rowValue(row.node, column)) }}</span>
+        <template #option="{ option }">
+          <div class="w-full" :style="{ paddingLeft: `${Math.min(option.depth, 6) * 16}px` }">
+            <div v-if="option.depth > 0" class="tree-card-connector" />
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-2">
+                <div v-for="column in cardColumns" :key="columnKey(column)" class="text-sm flex gap-3 items-start justify-between">
+                  <span class="text-secondary-foreground/60 shrink-0">{{ columnLabel(column) }}</span>
+                  <span class="font-medium text-right break-all">{{ displayValue(rowValue(option.row, column)) }}</span>
+                </div>
               </div>
-            </div>
-          </FaCard>
-        </slot>
-      </div>
+            </FaCard>
+          </div>
+        </template>
+      </YdRadioGroup>
+      <template v-else>
+        <div
+          v-for="(row, index) in cardRows"
+          :key="index"
+          class="w-full"
+          :style="{ paddingLeft: `${Math.min(row.depth, 6) * 16}px` }"
+        >
+          <div v-if="row.depth > 0" class="tree-card-connector" />
+          <slot name="card" :row="row.node" :index="index" :depth="row.depth" v-bind="cardSelection(row.node)">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-2">
+                <div v-if="hasSelectionColumn" class="flex justify-end">
+                  <YdCheckbox
+                    v-if="multiple"
+                    :model-value="cardSelection(row.node).selected"
+                    :disabled="cardSelection(row.node).selectDisabled"
+                    :aria-label="`选择第 ${index + 1} 行`"
+                    @click.stop
+                    @update:model-value="cardSelection(row.node).toggleSelected($event === true)"
+                  />
+                </div>
+                <div v-for="column in cardColumns" :key="columnKey(column)" class="text-sm flex gap-3 items-start justify-between">
+                  <span class="text-secondary-foreground/60 shrink-0">{{ columnLabel(column) }}</span>
+                  <span class="font-medium text-right break-all">{{ displayValue(rowValue(row.node, column)) }}</span>
+                </div>
+              </div>
+            </FaCard>
+          </slot>
+        </div>
+      </template>
     </div>
   </div>
 </template>

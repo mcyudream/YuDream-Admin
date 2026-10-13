@@ -49,7 +49,7 @@ test('展开分组选项不修改候选结构，禁用已选项仍可回显', ()
 })
 
 test('未知多选 primitive 回显真实值，未知 null 不新增可读标签，也不改模型', () => {
-  const model: SelectModelValue = ['legacy-id', 19, 22n, null, 'admin']
+  const model = ['legacy-id', 19, 22n, null, 'admin'] satisfies SelectModelValue
   const before = [...model]
   assert.deepEqual(resolveSelectSelection(groups, model, true), [
     { label: 'legacy-id', value: 'legacy-id' },

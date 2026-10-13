@@ -6,7 +6,7 @@ Coding Agent 会话、Harness、Skills、MCP、工作区以及回答引用/工�
 
 YD 在既有 FA 组件、主题变量和交互基础上提供自己的外观层，并按 [FA Pro 公开组件目录](https://fantastic-admin.hurui.me/components/pro/FaAnimatedBeam.html) 的 47 个参考项独立实现通用交互、日历和动效能力。参考目录用于确定功能范围；YD 没有复制闭源 Pro 源码，也不承诺 FA Pro 的属性、插槽或事件兼容。下方矩阵记录当前实现的能力与边界。
 
-新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。当前工作区源码目录已有 131 个 YD 组件入口；其中 `YdFilePicker`、`YdMultiSelect`、`YdMarkdownEditor`、`YdCodeEditor` 属于未发布入口，不包含在已发布并验签的 components 1.4.0 / plugin-sdk 1.9.0 的 127 个入口中。插件只能使用已发布验签的契约。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)。
+新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。当前工作区源码目录已有 136 个 YD 组件入口；`YdSortableTree`、`YdWorkflowCanvas`、`YdWorkflowHandle`、`YdLoadingOverlay` 和 `YdPageBuilder` 准备随 components 1.6.0 / plugin-sdk 1.11.0 发布，不包含在已发布并验签的 components 1.5.0 / plugin-sdk 1.10.0 的 131 个入口中。插件只能使用已发布验签的契约。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)。
 
 ## 接入与基础二次封装
 
@@ -35,16 +35,31 @@ const name = ref('')
 | 页面与数据 | `YdCard`、`YdPageHeader`、`YdPageMain`、`YdDescriptions`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdSearchBar`、`YdPagination`、`YdTable`、`YdResponsiveTable`、`YdTabs`、`YdCollapsible` |
 | 浮层与文件 | `YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdDrawer`、`YdModal`、`YdImagePreview`、`YdImageUpload`、`YdFileUpload` |
 | 技术编辑器 | `YdCodeEditor`、`YdMarkdownEditor` |
+| 技术页面构建器 | `YdPageBuilder` |
+| 可排序层级 | `YdSortableTree` |
+| 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 
-对应组合式入口为 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`。基础组件的具体参数仍以对应 Fa 源码契约为准；列表手机端使用 `YdResponsiveTable` 的 `#card` 插槽。
+`YdLoadingOverlay` 以 `loading` 控制容器遮罩，可设置 `text`、`type`、`size` 和 `blockInteraction`。内容始终保持挂载并参与尺寸布局；默认遮罩期间将内容设为 inert、拦截交互，并在解除时恢复原焦点。用于网格或 flex 项时，让原内容节点保留自己的布局 class；外层 overlay 无需复制内容的 grid/flex、间距或装饰 class。
+
+`useYdDomAction(container, options)` 是非 Vue DOM 宿主的语义动作桥，供 GrapesJS BlockManager 或主题运行时等外部引擎挂载 YD 按钮。参数包含 `type`、`disabled`、必需 `ariaLabel`、`title`、`class`、`pressed`、`text`、可选 `icon`（YD 图标名）、`content`（返回非交互 `VNodeChild` 图形）与 `onClick(MouseEvent)`。它用 Vue `render` 挂载 `YdAction`，`element` 只暴露实际 `HTMLButtonElement`；`update(partial)` 更新属性/文本/图形/回调，`dispose()` 幂等地卸载 Vue 实例、事件并移除该次调用创建的 host。每个调用独立拥有 host；活动 effect scope 销毁时自动 dispose，目标 DOM 提前移除后再 dispose 也安全。`content` 仅用于图形内容，不放嵌套交互控件或原始 HTML。该组合式入口待 components 1.6 统一发布验签后供插件使用。
+
+`YdResponsiveTable` 的 `v-model:row-selection` 可受控保存 TanStack `RowSelectionState`。桌面表格始终保持挂载，仅用显示状态切换窄屏卡片，断点变化不会重建表格实例或丢失选择。`#card` 插槽除 `row`、`index`、`depth` 外还收到 `selected`、`selectable`、`selectDisabled`、`toggleSelected(value?)` 与 `table`；卡片可使用这些状态绘制选择器并调用 toggle。`selectionChange(rows, rowSelection)` 在桌面选择及卡片选择后均返回完整所选行与同一受控选择模型。
+
+对应组合式入口为 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdFilePicker` 与 `useYdDomAction`。基础组件的具体参数仍以对应 Fa 源码契约为准；列表手机端使用 `YdResponsiveTable` 的 `#card` 插槽。
 
 `YdCombobox` 与 `YdMention` 使用 Reka 交互基础并由 YD 绘制控件；`YdTree` 和多列模式的 `YdCascader` 仍在组件内部复用 Arco 的树及级联交互，控件和弹出层消费 YD 主题样式。业务调用方使用 YD 的模型、数据结构和插槽，无需直接引入 Arco 原生控件。
 
-搜索型受控多选使用 `YdMultiSelect`，`modelValue` 为 `string[]`，选项为 `{ label, value, disabled? }[]`；支持本地搜索、标签删除、`maxTagCount`、`option` / `empty` 插槽及键盘选择。文件输入控件仅需触发系统选择并接收 `File[]` 时使用 `YdFilePicker`；完整上传队列继续使用 `YdFileUpload`。
+搜索型受控多选使用 `YdMultiSelect`，`modelValue` 为 `string[]`，选项为 `{ label, value, disabled? }[]`；支持本地搜索、标签删除、`maxTagCount`、`option` / `empty` 插槽及键盘选择。文件输入控件仅需触发系统选择并接收 `File[]` 时使用 `YdFilePicker`；`directory` 会设置浏览器的 `webkitdirectory`，选择结果仍是原生 `File[]`，每个 `File.webkitRelativePath` 保留浏览器给出的目录相对路径。组合式入口 `useYdFilePicker(options?)` 提供 `open(options?)`（返回 `Promise<File[]>`）、`cancel()` 与 `dispose()`；再次 `open()` 会先以空数组结算并清理上次选择器，Vue effect scope 销毁时也会结算待处理 promise 并移除临时 input。SSR 下 `open()` 返回空数组，不访问 DOM。完整上传队列继续使用 `YdFileUpload`。
 
-`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。此入口目前仅存在于工作区，待统一发布验签后插件才能使用。
+`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。此入口目前仅存在于工作区，待统一发布验签后插件才能使用。
 
 `YdCodeEditor` 使用 CodeMirror 6 承载 JSON、HTML、CSS 和 JavaScript 编辑，可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁 EditorView。此入口同样只存在于当前工作区。
+
+`YdPageBuilder` 在共享组件内部异步创建并销毁 GrapesJS。`builderProjectJson` 是首选恢复来源，缺失或无效时回退 `htmlContent` / `cssContent`；三个模型以 `update:*` 与 `change(snapshot)` 同步。受控父级回显不会重新载入项目，外部模型变更才更新编辑器。`setup(editor)` 在初始内容加载前注册业务块/类型，`upload(files)` 注入业务媒体上传并返回 `{ src, type?, name? }`；引擎选项在初始化时传入。`ready` 提供有类型的 editor facade，支持快照、加载项目、设置 HTML/CSS 和释放实例。调用 facade 的 `dispose()` 后，该 facade 的属性与所有方法均抛出 `Error`，包括 `getSnapshot()`，以免把已销毁引擎伪装成有效快照；通过组件 ref 调用 `dispose()` 后先前发出的 facade 同样失效。未完成的媒体上传仅会回调启动时对应且仍存活的编辑器实例，卸载后上传错误不会继续发出 `error` 事件。`readOnly` 与 `disabled` 冻结画布交互，但不限制宿主通过 facade 加载受控内容；`error` 报告解析、初始化与有效实例上的上传错误。CMS 主题、AI、API 与媒体权限逻辑继续留在宿主。该入口目前只存在于工作区。
+
+`YdSortableTree` 为需要持久化重排的目录/导航提供独立契约，不改变 `YdTree` 的勾选/筛选用途。节点使用全局唯一字符串 `key`、`label`、可选 `children`/`disabled`/`lazy`，额外业务字段随节点和插槽保留。`selectedKey`、`expandedKeys` 受控；拖拽或 Alt + 方向键只发出 `drop` 提案，包含完整拖动/落点节点、位置 `-1/0/1`（上方/成为子级/下方）、原父级/目标父级、层级和触发方式，不直接改写 `data`。组件内置禁用节点、环和 `maxDepth` 拒绝，`canDrop` 可添加业务约束；调用方经 `moveYdSortableTreeNode` 或自身模型接受并保存提案。`lazy` 节点通过 `loadChildren(node)` 加载，结果在实例内缓存，并发出 `load` / `loadError`。键盘支持方向导航、Home/End、Enter/Space 选中及 Alt + 上/下同级排序、Alt + 左/右调整层级；当前不提供虚拟列表。
+
+`YdWorkflowCanvas` 为流程图/技术画布提供 VueFlow 适配，节点和边通过 `v-model:nodes` / `v-model:edges` 受控，连接事件只暴露 source/target 与 handle ID，点击事件只暴露稳定 ID。`#node-{type}` 插槽只收到 `id/data/selected/connectable`，节点连接点使用 `YdWorkflowHandle` 与 `YdWorkflowPosition`，业务文件无需导入画布引擎。ref facade 提供 `addNodes`、`addEdges`、`updateNodeData`、`screenToCanvasCoordinate`、`fitView`、`setCenter`；初始化后引擎随 Vue 生命周期卸载清理。背景、控件和 MiniMap 可分别关闭或配置；`readonly` 禁止拖节点/创建连接，`disabled` 禁止画布交互，`theme` 可继承或指定浅/深变量。当前只发布内部引擎 adapter，不暴露 VueFlow 类型。
 
 ## 主题、预设与动效
 
@@ -141,7 +156,7 @@ ADMIN 主题插件经既有 `@PluginTheme(scopes = ADMIN)` 和声明式 `style.c
 | `FaTextShiny` | `YdTextShiny` | 主题语义色扫光文字、秒数和延迟；内容由默认插槽提供。 |
 | `FaTimeAgo` | `YdTimeAgo` | Intl 相对时间、更新间隔、秒级选项及原时间 title；月 / 年按近似秒数分段。 |
 | `FaTimeline` | `YdTimeline` | 泛型时间项、日期显示、相邻同日合并标签、项目插槽；保持输入顺序，不自动排序或滚动激活节点。 |
-| `FaTree` | `YdTree` | 字符串 key 树、选中 / 勾选 / 展开模型、筛选保留祖先、虚拟列表及批量方法；当前无拖动重排或远程懒加载接口。 |
+| `FaTree` | `YdTree` | 字符串 key 树、选中 / 勾选 / 展开模型、筛选保留祖先、虚拟列表及批量方法；checkable 默认以节点文字切换级联勾选，需同时选中节点时设 `selectable`；当前无拖动重排或远程懒加载接口。 |
 
 额外提供 `YdCopyButton(text, label?, disabled?)`，发出 `copied` / `error`，供代码、链接或普通文字复用复制反馈。
 
@@ -209,13 +224,15 @@ const max = parseDate('2026-12-31')
 
 | 入口 | 核心模型 / 参数 | 插槽、事件和方法 |
 | --- | --- | --- |
-| `YdCombobox` | `v-model: string | number | undefined`；`options` 为 `{ label, value, disabled? }` 或 `{ label, options }` 分组；`virtualList`、`filter(search, option)`、`clearable`、`loading` | `#option={ option }`、`#empty`、`#loading`；`change`、`clear`、`search` |
+| `YdCombobox` | `v-model: string | number | undefined`；`options` 为 `{ label, value, disabled? }` 或 `{ label, options }` 分组；`virtualList`、`filter(search, option)`、`clearable`、`loading`、可选 `allowCreate` | `#option={ option }`、`#empty`、`#loading`；`change`、`clear`、`search`；`allowCreate` 时仅对未匹配的非空输入提供“使用这个编码”，选择后发出 `create(string)`，由调用方处理持久化并回填受控模型 |
 | `YdMultiSelect` | `v-model: string[]`；`options: { label, value: string, disabled? }[]`；`allowSearch`、`maxTagCount`、`disabled`、`id`、`ariaInvalid`、`ariaDescribedby`、`ariaLabel` | `#option={ option }`、`#empty`；`change(string[])`、`search(string)`；ref `focus()` / `blur()` / `element`；保留已选的隐藏/禁用 ID，陌生 ID 不进入模型 |
 | `YdCascader` | 相同单值模型；递归 `options`；`leafOnly=true`、`panelMode='multi'|'single'`、`triggerMode='click'|'hover'` | `#option={ option }`、`#empty`；`change`、`clear`。triggerMode 作用于多列模式 |
-| `YdTree` | `data: YdTreeNode[]`；`selectedKeys`、`checkedKeys`、`expandedKeys` 三个字符串数组模型；`checkable`、`filterable`、`virtualList`、`defaultExpandAll`、`filterMethod` | 默认槽 `{ node, expanded }`、`#empty`；`selectionChange(node|null)`、`checkChange(nodes)`；ref 的 `expand(keys?)`、`collapse(keys?)`、`checkAll(on)`、`setSelection(key)`、`clearSelection()` |
+| `YdTree` | `data: YdTreeNode[]`；`selectedKeys`、`checkedKeys`、`expandedKeys` 三个字符串数组模型；`checkable`、`selectable`、`filterable`、`virtualList`、`defaultExpandAll`、`filterMethod` | 默认槽 `{ node, expanded }`、`#empty`；`selectionChange(node|null)`、`checkChange(nodes)`；ref 的 `expand(keys?)`、`collapse(keys?)`、`checkAll(on)`、`setSelection(key)`、`clearSelection()` |
+| `YdSortableTree` | `data: YdSortableTreeNode[]`；`selectedKey`、`expandedKeys`；`draggable`、`keyboardReorder`、`disabled`、`maxDepth`、`canDrop`、`loadChildren` | `#title={ node, depth, expanded, selected, disabled, loading }`；`selectionChange(node|null)`、`drop(event)`、`dropRejected(reason)`、`load` / `loadError`；ref 的 `focus(key)`、`expand(keys?)`、`collapse(keys?)`；drop 提案由父级应用/保存 |
+| `YdWorkflowCanvas` | `v-model:nodes: YdWorkflowNode<TData>[]`、`v-model:edges: YdWorkflowEdge<EData>[]`；`readonly`、`disabled`、`theme`、`snapToGrid`、背景/控件/MiniMap选项 | `#node-{type}={ id, data, selected, connectable }`；`connect(source/target/handle IDs)`、`nodeClick(id)`、`edgeClick(id)`、`paneClick`、`init`；ref `addNodes` / `addEdges` / `updateNodeData` / `screenToCanvasCoordinate` / `fitView` / `setCenter` |
 | `YdMention` | `v-model` 文本、`v-model:value` 去重后的提及 ID 数组；`items: YdMentionOption[]`；trigger 默认 `@`，inputAs 默认 textarea | `#option={ option }`、`#empty`；`change(text)`、`search(query)`、`select(option)`；ref 的 `focus()` / `blur()` |
 
-ID 与树 key 使用字符串，包含 Java Long / Snowflake ID；不要为匹配组件而转为 Number。树筛选保留命中节点的祖先，默认全展开只用于首次有数据的初始化，之后 `collapse()` 可正常折叠。禁用父节点的后代同样不允许选中或勾选。
+ID 与树 key 使用字符串，包含 Java Long / Snowflake ID；不要为匹配组件而转为 Number。树筛选保留命中节点的祖先，默认全展开只用于首次有数据的初始化，之后 `collapse()` 可正常折叠。禁用父节点的后代同样不允许选中或勾选。`checkable` 默认关闭独立节点选中，点击节点文字会按父子级联切换勾选；若业务需要同时使用 `selectedKeys` 与 `checkedKeys`，设 `selectable`，点击文字会同步切换两种状态。
 
 ```vue
 <script setup lang="ts">
@@ -237,7 +254,7 @@ const people: YdMentionOption[] = [
 </script>
 
 <template>
-  <YdTree v-model:selected-keys="selectedKeys" v-model:checked-keys="checkedKeys" :data="nodes" checkable filterable>
+  <YdTree v-model:selected-keys="selectedKeys" v-model:checked-keys="checkedKeys" :data="nodes" checkable selectable filterable>
     <template #default="{ node, expanded }">
       <span>{{ node?.label }}{{ expanded ? ' · 已展开' : '' }}</span>
     </template>
@@ -346,7 +363,7 @@ type 可选 plane/chase/bounce/wave/pulse/flow/swing/circle/circle-fade/grid/fol
 | `YdCode` | code、language、title、copyable 默认 true、lineNumbers；高亮器转义输入代码，组件不执行代码 |
 | `YdCodePreview` | code、language 默认 xml、title；默认插槽直接承载已编写的 Vue 示例 |
 | `YdCodeEditor` | `modelValue`、`defaultValue`、`language: json/html/css/javascript/text`、`completions`、`placeholder`、`height`、`readonly`、`disabled`、`lineNumbers`、`error`；`update:modelValue`、`focus`、`blur`、`formatError`；ref `focus()` / `blur()` / `format()` / `resetToDefault()` / `element` |
-| `YdMarkdownEditor` | `modelValue`、`placeholder`、`height`、`language`、`previewTheme`、`codeTheme`、`readonly`、`disabled`、`error`、`ariaLabel`；`update:modelValue`、`uploadError`；`imageUpload(files, callback)` 注入图片上传；ref `focus()` / `blur()` / `element` |
+| `YdMarkdownEditor` | `modelValue`、`placeholder`、`height`、`language`、`previewTheme`、`codeTheme`、`readonly`、`disabled`、`error`、`ariaLabel`；`update:modelValue`、`uploadError`、`linkClick(YdMarkdownLinkClick)`；`imageUpload(files, callback)` 注入图片上传；ref `focus()` / `blur()` / `element` |
 | `YdLinkPreview` | url、title、description、image、target；默认槽是链接内容，`#preview` 可完全替换预览卡 |
 | `YdQrcode` | value、size 默认180且限制64..2048、margin 默认4、errorCorrectionLevel 默认M、foreground/background、label；ready(dataUrl)、error(Error)；ref.download(filename?) / refresh() / dataUrl |
 | `YdStorageBox<T>` | uniqueKey、boxId、data:T、title、limit 默认20；takeOut(data)、error(error)；默认槽可替换打开按钮 |

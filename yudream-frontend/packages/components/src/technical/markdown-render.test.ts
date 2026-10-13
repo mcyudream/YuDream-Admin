@@ -2,12 +2,25 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { sanitizeYdMarkdownHtml, shouldUploadYdMarkdownImages } from './markdown-render'
+import { shouldEnableYdMarkdownHtml } from './markdown-engine-config'
 
 test('Markdown sanitizer preserves normal formatting while removing active HTML and event handlers', () => {
   const sanitized = sanitizeYdMarkdownHtml('<p>safe <strong>text</strong><img src="x" onerror="alert(1)"></p><script>alert(2)</script>')
   assert.match(sanitized, /<strong>text<\/strong>/)
   assert.doesNotMatch(sanitized, /<script|onerror/i)
   assert.doesNotMatch(sanitized, /alert\(/i)
+})
+
+test('Markdown sanitizer allows encoded wiki links and rejects executable URL protocols', () => {
+  const sanitized = sanitizeYdMarkdownHtml('<a href="wiki://Page%20Title">page</a><a href="javascript:alert(1)">unsafe</a>')
+  assert.match(sanitized, /href="wiki:\/\/Page%20Title"/)
+  assert.doesNotMatch(sanitized, /javascript:/)
+})
+
+test('raw HTML parsing is enabled only for YD Markdown editor instances', () => {
+  assert.equal(shouldEnableYdMarkdownHtml('yd-markdown-editor-v-0'), true)
+  assert.equal(shouldEnableYdMarkdownHtml('agent-answer-v-0'), false)
+  assert.equal(shouldEnableYdMarkdownHtml('md-editor-v3'), false)
 })
 
 test('Markdown sanitizer keeps safe generated SVG icons and strips script, handlers, and references', () => {

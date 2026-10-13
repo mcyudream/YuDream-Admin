@@ -2,6 +2,7 @@
 import { ComboboxAnchor, ComboboxContent, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxLabel, ComboboxPortal, ComboboxRoot, ComboboxTrigger, ComboboxViewport, ComboboxVirtualizer } from 'reka-ui'
 import { computed, ref } from 'vue'
 import FaIcon from '../basic/icon/index.vue'
+import { getYdComboboxCreateValue } from './combobox-create-model'
 import './extended.css'
 
 export interface YdComboboxOption {
@@ -21,12 +22,14 @@ const props = withDefaults(defineProps<{
   emptyText?: string
   virtualList?: boolean
   loading?: boolean
+  allowCreate?: boolean
   filter?: (search: string, option: YdComboboxOption) => boolean
 }>(), { placeholder: '搜索并选择', emptyText: '没有匹配项' })
 const emit = defineEmits<{
   change: [value: string | number | undefined]
   clear: []
   search: [value: string]
+  create: [value: string]
 }>()
 const value = defineModel<string | number>()
 const open = ref(false)
@@ -43,6 +46,8 @@ const groups = computed(() => props.options.map((item) => {
   }
 }).filter(group => group.options.length))
 const visibleOptions = computed(() => groups.value.flatMap(group => group.options))
+const createValue = computed(() => props.allowCreate && !props.loading ? getYdComboboxCreateValue(query.value, flatOptions.value) : undefined)
+const createOption = Object.freeze({ __ydComboboxCreate: true as const })
 const virtualValues = computed(() => visibleOptions.value.map(option => option.value))
 function optionFor(key: string | number) {
   return optionMap.value.get(key)
@@ -64,6 +69,16 @@ function select(next: unknown) {
   value.value = next
   query.value = ''
   emit('change', next)
+}
+function create() {
+  const candidate = createValue.value
+  if (props.disabled || props.loading || !candidate) {
+    return
+  }
+  // Handle selection before Reka closes the popup and clears the search query.
+  emit('create', candidate)
+  query.value = ''
+  open.value = false
 }
 function clear() {
   if (props.disabled) {
@@ -100,7 +115,7 @@ function changeOpen(next: boolean) {
               正在加载…
             </slot>
           </div>
-          <div v-else-if="!visibleOptions.length" class="yd-collection-empty">
+          <div v-else-if="!visibleOptions.length && !createValue" class="yd-collection-empty">
             <slot name="empty">
               {{ emptyText }}
             </slot>
@@ -122,6 +137,9 @@ function changeOpen(next: boolean) {
               </ComboboxItem>
             </ComboboxGroup>
           </template>
+          <ComboboxItem v-if="createValue" :value="createOption" class="yd-collection-option yd-combobox-create-option" @select.prevent="create">
+            使用这个编码：<strong>{{ createValue }}</strong>
+          </ComboboxItem>
         </ComboboxViewport>
       </ComboboxContent>
     </ComboboxPortal>

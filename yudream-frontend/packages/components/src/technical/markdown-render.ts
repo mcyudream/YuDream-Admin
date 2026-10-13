@@ -102,6 +102,15 @@ const markdownSanitizerOptions = {
   css: false,
   stripIgnoreTagBody: ['script', 'style', 'iframe', 'object', 'embed', 'template', 'foreignobject'],
   onTagAttr(tag: string, name: string, value: string) {
+    if (tag === 'a' && name === 'href' && /^wiki:\/\/(?:[A-Za-z0-9_.!~*'()-]|%[\da-f]{2})*$/i.test(value)) {
+      try {
+        decodeURIComponent(value.slice('wiki://'.length))
+        return `href="${value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`
+      }
+      catch {
+        return ''
+      }
+    }
     if (tag === 'details' && name === 'data-line') {
       return finiteNumber(value) && Number(value) >= 0 ? `${name}="${value}"` : ''
     }

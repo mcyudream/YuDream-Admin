@@ -35,7 +35,7 @@
 
 ## 文件选择
 
-`YdFilePicker` 只负责调用系统文件选择器并返回原生 `File` 对象，不上传文件。`accept` 原样传给浏览器，`multiple` 与 `disabled` 控制原生选择器；`select(files: File[])` 将 `FileList` 转成数组。默认提供可访问的“选择文件”按钮，也可用默认插槽提供 `{ open, reset, disabled, triggerAttrs }`，自定义按钮应绑定 `triggerAttrs`，让表单 `id`、错误和说明关联落在可聚焦触发器上。实例暴露 `open()`、`reset()`、`focus()`、`blur()` 和原生 input `element`；重置原生 input 后，同一文件可再次选中。上传、校验与业务状态由调用方负责，图片上传仍使用 `YdImageUpload`。
+`YdFilePicker` 只负责调用系统文件选择器并返回原生 `File` 对象，不上传文件。`accept` 原样传给浏览器，`multiple` 与 `disabled` 控制原生选择器；`directory` 启用浏览器目录选择，返回的 `File[]` 保留每个文件原有的 `webkitRelativePath`。`select(files: File[])` 将 `FileList` 转成数组。默认提供可访问的“选择文件”按钮，也可用默认插槽提供 `{ open, reset, disabled, triggerAttrs }`，自定义按钮应绑定 `triggerAttrs`，让表单 `id`、错误和说明关联落在可聚焦触发器上。实例暴露 `open()`、`reset()`、`focus()`、`blur()` 和原生 input `element`；重置原生 input 后，同一文件可再次选中。需要从非组件逻辑打开选择器时，`useYdFilePicker({ accept?, multiple?, directory? })` 的 `open(options?)` 返回 `Promise<File[]>`，并提供 `cancel()` / `dispose()`；再次打开或 effect scope 销毁会以空数组结算旧请求并释放临时 input，SSR 下安全返回空数组。上传、校验与业务状态由调用方负责，图片上传仍使用 `YdImageUpload`。
 
 ```vue
 <YdFilePicker accept=".zip,application/zip" multiple @select="files => queue.push(...files)">
@@ -47,7 +47,7 @@
 
 ## 自定动作与根 Provider
 
-`YdAction` 是低视觉干预的语义按钮：默认 type=button，支持 disabled、属性和原生事件透传、focus/blur/element 实例能力。只用来承载导航项或自定卡片布局；普通保存、删除、确认继续用 `YdButton`。使用 class 编排布局、中性色与内容；页面不绘制私有品牌选中态，图标动作仍需 aria-label。
+`YdAction` 是低视觉干预的语义按钮：默认 type=button，支持 disabled、属性和原生事件透传、focus/blur/element 实例能力。只用来承载导航项或自定卡片布局；普通保存、删除、确认继续用 `YdButton`。使用 class 编排布局、中性色与内容；页面不绘制私有品牌选中态，图标动作仍需 aria-label。对于 GrapesJS BlockManager、主题运行时等由外部引擎创建 DOM 的场景，用 `useYdDomAction(container, options)` 挂载同一语义按钮；通过 `update(partial)` 同步 `pressed`、文案或状态，以 `dispose()` / effect scope 清理实例。自定义 `content()` 只能返回不含交互控件的 VNode 图形。该新入口待 components 1.6 发布验签后再供插件使用。
 
 `YdUiProvider` 统一内部 Arco / Reka provider，接受 locale（zh-CN/en-US）、size、dir、updateAtScroll、scrollToClose、exchangeTime。它不切换主色/明暗，也不重建 FA 主题引擎；宿主与预览根节点仍加载共享 appearance.css 并由主题运行时写入变量。插件继承宿主配置，不重复包 provider 重置系统选项。
 

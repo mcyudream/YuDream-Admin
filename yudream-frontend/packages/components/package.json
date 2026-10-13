@@ -1,7 +1,7 @@
 {
   "name": "@yudream/components",
   "type": "module",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "files": [
     "src",
     "resolver.ts"
@@ -41,6 +41,7 @@
     }
   },
   "dependencies": {
+    "@arco-design/web-vue": "catalog:arco-design-vue",
     "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-css": "catalog:",
@@ -50,11 +51,16 @@
     "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
-    "@arco-design/web-vue": "catalog:arco-design-vue",
     "@iconify/vue": "catalog:",
+    "@internationalized/date": "catalog:",
     "@lucide/vue": "catalog:",
     "@sigma/node-image": "catalog:",
     "@tanstack/vue-table": "catalog:",
+    "@types/qrcode": "catalog:",
+    "@vue-flow/background": "catalog:",
+    "@vue-flow/controls": "catalog:",
+    "@vue-flow/core": "catalog:",
+    "@vue-flow/minimap": "catalog:",
     "axios": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -62,19 +68,18 @@
     "es-toolkit": "catalog:",
     "filesize": "catalog:",
     "graphology": "catalog:",
+    "highlight.js": "catalog:",
     "lucide": "catalog:",
     "md-editor-v3": "catalog:",
     "morphicons": "catalog:",
+    "qrcode": "catalog:",
     "reka-ui": "catalog:",
     "sigma": "catalog:",
     "tailwind-merge": "catalog:",
     "vue-input-otp": "catalog:",
     "vue-sonner": "catalog:",
-    "@internationalized/date": "catalog:",
-    "qrcode": "catalog:",
-    "highlight.js": "catalog:",
-    "@types/qrcode": "catalog:",
-    "xss": "catalog:"
+    "xss": "catalog:",
+    "grapesjs": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

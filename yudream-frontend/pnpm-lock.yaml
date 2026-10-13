@@ -236,8 +236,8 @@ catalogs:
       specifier: ^0.45.5
       version: 0.45.5
     md-editor-v3:
-      specifier: 6.5.3
-      version: 6.5.3
+      specifier: 7.1.0
+      version: 7.1.0
     mitt:
       specifier: ^3.0.1
       version: 3.0.1
@@ -672,7 +672,7 @@ importers:
         version: 0.45.5
       md-editor-v3:
         specifier: 'catalog:'
-        version: 6.5.3(vue@3.5.38(typescript@6.0.3))
+        version: 7.1.0(vue@3.5.38(typescript@6.0.3))
       mitt:
         specifier: 'catalog:'
         version: 3.0.1
@@ -984,6 +984,18 @@ importers:
       '@types/qrcode':
         specifier: 'catalog:'
         version: 1.5.6
+      '@vue-flow/background':
+        specifier: 'catalog:'
+        version: 1.3.2(@vue-flow/core@1.48.2(vue@3.5.38(typescript@6.0.3)))(vue@3.5.38(typescript@6.0.3))
+      '@vue-flow/controls':
+        specifier: 'catalog:'
+        version: 1.1.3(@vue-flow/core@1.48.2(vue@3.5.38(typescript@6.0.3)))(vue@3.5.38(typescript@6.0.3))
+      '@vue-flow/core':
+        specifier: 'catalog:'
+        version: 1.48.2(vue@3.5.38(typescript@6.0.3))
+      '@vue-flow/minimap':
+        specifier: 'catalog:'
+        version: 1.5.4(@vue-flow/core@1.48.2(vue@3.5.38(typescript@6.0.3)))(vue@3.5.38(typescript@6.0.3))
       '@vueuse/components':
         specifier: 'catalog:'
         version: 14.3.0(vue@3.5.38(typescript@6.0.3))
@@ -1008,6 +1020,9 @@ importers:
       filesize:
         specifier: 'catalog:'
         version: 11.0.17
+      grapesjs:
+        specifier: 'catalog:'
+        version: 0.23.2
       graphology:
         specifier: 'catalog:'
         version: 0.26.0(graphology-types@0.24.8)
@@ -1019,7 +1034,7 @@ importers:
         version: 1.52.0
       md-editor-v3:
         specifier: 'catalog:'
-        version: 6.5.3(vue@3.5.38(typescript@6.0.3))
+        version: 7.1.0(vue@3.5.38(typescript@6.0.3))
       morphicons:
         specifier: 'catalog:'
         version: 1.7.1(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)(vue@3.5.38(typescript@6.0.3))
@@ -4493,8 +4508,8 @@ packages:
   '@vavt/copy2clipboard@1.0.3':
     resolution: {integrity: sha512-HtG48r2FBYp9eRvGB3QGmtRBH1zzRRAVvFbGgFstOwz4/DDaNiX0uZc3YVKPydqgOav26pibr9MtoCaWxn7aeA==}
 
-  '@vavt/markdown-theme@5.0.2':
-    resolution: {integrity: sha512-cGYEV2VIUmhT9p8Wua9yXh7sKN1f3cbztTFHlkYyH9SzbpiKUnQrcbDts/0fP6cmvZPOe9SWWsDujmyuHepJdQ==}
+  '@vavt/markdown-theme@6.0.1':
+    resolution: {integrity: sha512-S6HClmYtnrBuAm+6aeAKRtMwy6cTv+7QlGQYlpNHwumoFr3x86X6uGtJbvrv3ReoKx40vCOJR7h+1OiflKJOWA==}
 
   '@vavt/util@2.1.2':
     resolution: {integrity: sha512-L3UbSJthJwr3wq0x93O5TrCepimrmVZaIl2ciZbeL18G5++gBhJXNhcH7RcVk/6rr3SavWOvwhig0mqRLoR7dw==}
@@ -7490,8 +7505,8 @@ packages:
   mathml-tag-names@4.0.0:
     resolution: {integrity: sha512-aa6AU2Pcx0VP/XWnh8IGL0SYSgQHDT6Ucror2j2mXeFAlN3ahaNs8EZtG1YiticMkSLj3Gt6VPFfZogt7G5iFQ==}
 
-  md-editor-v3@6.5.3:
-    resolution: {integrity: sha512-hVCgw8OXkGcmAn9jUP+1dg2hOTV1HS8gvmpp3YG7iWZOJ3VjNTUb2U/VCa0TvPK8M/iqLZ7T/Kn9x0Gy6dNuyQ==}
+  md-editor-v3@7.1.0:
+    resolution: {integrity: sha512-+byIdwES9aGEeDDxcxx7LiVX8g31VgwJqETtfFvGjsGuwEAuMeuPZ6vV8/vltNa+SCBrigbwQxLb1R47mxaWfg==}
     peerDependencies:
       vue: ^3.5.3
 
@@ -13932,7 +13947,7 @@ snapshots:
 
   '@vavt/copy2clipboard@1.0.3': {}
 
-  '@vavt/markdown-theme@5.0.2': {}
+  '@vavt/markdown-theme@6.0.1': {}
 
   '@vavt/util@2.1.2': {}
 
@@ -17243,7 +17258,7 @@ snapshots:
 
   mathml-tag-names@4.0.0: {}
 
-  md-editor-v3@6.5.3(vue@3.5.38(typescript@6.0.3)):
+  md-editor-v3@7.1.0(vue@3.5.38(typescript@6.0.3)):
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/commands': 6.10.4
@@ -17257,9 +17272,10 @@ snapshots:
       '@lucide/vue': 1.17.0(vue@3.5.38(typescript@6.0.3))
       '@types/markdown-it': 14.1.2
       '@vavt/copy2clipboard': 1.0.3
-      '@vavt/markdown-theme': 5.0.2
+      '@vavt/markdown-theme': 6.0.1
       '@vavt/util': 2.1.2
       codemirror: 6.0.2
+      json5: 2.2.3
       markdown-it: 14.3.0
       markdown-it-image-figures: 2.1.1(markdown-it@14.3.0)
       markdown-it-sub: 2.0.0

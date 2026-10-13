@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { YdMarkdownImage, YdMarkdownImageUploadHandler } from './markdown-editor.types'
+import type { YdMarkdownImage, YdMarkdownImageUploadHandler, YdMarkdownLinkClick } from './markdown-editor.types'
 import { MdEditor, MdPreview } from 'md-editor-v3'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { resolveYdEditorFieldAttrs } from './code-editor-model'
+import { createYdMarkdownUploadCallback, createYdMarkdownUploadLifecycle } from './markdown-editor-lifecycle'
 import { resolveYdMarkdownEditorTheme } from './markdown-editor.types'
 import { sanitizeYdMarkdownHtml, shouldUploadYdMarkdownImages } from './markdown-render'
+import './markdown-engine-config'
 import 'md-editor-v3/lib/style.css'
 
 defineOptions({ name: 'YdMarkdownEditor', inheritAttrs: false })
@@ -37,9 +39,13 @@ const props = withDefaults(defineProps<{
   ariaLabel: 'Markdown 编辑器',
 })
 
+const uploadLifecycle = createYdMarkdownUploadLifecycle()
+watch(() => [props.readonly, props.disabled] as const, () => uploadLifecycle.invalidate(), { flush: 'sync' })
+
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'uploadError': [error: unknown]
+  'linkClick': [payload: YdMarkdownLinkClick]
 }>()
 
 const root = ref<HTMLElement | null>(null)
@@ -51,7 +57,7 @@ const editorValue = computed({
 const fieldAttrs = computed(() => resolveYdEditorFieldAttrs({ id: props.id, invalid: props.ariaInvalid, describedby: props.ariaDescribedby, error: props.error }))
 const errorId = computed(() => props.id ? `${props.id}-error` : undefined)
 const isReadOnly = computed(() => props.readonly || props.disabled)
-
+const mdEditorId = `yd-markdown-editor-${useId()}`
 function editorInput() {
   return root.value?.querySelector<HTMLElement>('.md-editor-input, [contenteditable="true"], textarea, [role="textbox"]')
 }
@@ -62,10 +68,10 @@ function syncAccessibility() {
     if (!preview) {
       return
     }
-    preview.setAttribute('role', 'textbox')
+    preview.setAttribute('role', 'region')
     preview.setAttribute('tabindex', props.disabled ? '-1' : '0')
     preview.setAttribute('aria-label', props.ariaLabel)
-    preview.setAttribute('aria-readonly', 'true')
+    preview.removeAttribute('aria-readonly')
     preview.setAttribute('aria-disabled', String(props.disabled))
     preview.setAttribute('aria-invalid', String(fieldAttrs.value.invalid))
     if (fieldAttrs.value.id) {
@@ -133,18 +139,34 @@ function blur() {
   }
 }
 
+function handlePreviewClick(event: MouseEvent) {
+  if (!isReadOnly.value || !(event.target instanceof Element)) {
+    return
+  }
+  const anchor = event.target.closest<HTMLAnchorElement>('a[href]')
+  if (!anchor || !root.value?.contains(anchor)) {
+    return
+  }
+  emit('linkClick', { href: anchor.getAttribute('href') ?? '', anchor, event })
+}
+
 async function handleUploadImage(files: File[], callback: (images: YdMarkdownImage[]) => void) {
+  const ticket = uploadLifecycle.ticket()
+  const complete = createYdMarkdownUploadCallback(uploadLifecycle, ticket, callback)
   if (!shouldUploadYdMarkdownImages(props.readonly, props.disabled, files.length) || !props.imageUpload) {
-    callback([])
+    complete([])
     return
   }
 
   try {
-    await props.imageUpload(files, callback)
+    await props.imageUpload(files, complete)
   }
   catch (error) {
+    if (!uploadLifecycle.isActive(ticket)) {
+      return
+    }
     emit('uploadError', error)
-    callback([])
+    complete([])
   }
 }
 
@@ -170,6 +192,7 @@ onMounted(() => {
 watch([() => props.id, () => props.ariaLabel, () => props.error, () => props.ariaInvalid, () => props.ariaDescribedby, isReadOnly], syncAccessibility)
 
 onBeforeUnmount(() => {
+  uploadLifecycle.dispose()
   editorObserver?.disconnect()
   themeObserver?.disconnect()
 })
@@ -178,6 +201,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="root"
+    @click.capture="handlePreviewClick"
     class="yd-markdown-editor"
     :class="{ 'yd-markdown-editor--disabled': disabled, 'yd-markdown-editor--invalid': Boolean(error) }"
     :style="isReadOnly ? { minHeight: height } : undefined"
@@ -188,6 +212,7 @@ onBeforeUnmount(() => {
       :language="language"
       :preview-theme="previewTheme"
       :code-theme="codeTheme"
+      :id="mdEditorId"
       :theme="resolveYdMarkdownEditorTheme(darkMode)"
       :sanitize="sanitizeYdMarkdownHtml"
       no-img-zoom-in
@@ -200,6 +225,7 @@ onBeforeUnmount(() => {
       :language="language"
       :preview-theme="previewTheme"
       :code-theme="codeTheme"
+      :id="mdEditorId"
       :theme="resolveYdMarkdownEditorTheme(darkMode)"
       :placeholder="placeholder"
       :style="{ height }"

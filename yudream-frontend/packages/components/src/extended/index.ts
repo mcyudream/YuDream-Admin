@@ -1,6 +1,28 @@
 export type { YdCalendarProps, YdCalendarShortcut, YdCalendarValue, YdDateRange } from './calendar'
 export { useYdLoading } from './loading'
 export { useYdMotion } from './motion'
+export type { YdSortableTreeDropEvent, YdSortableTreeDropPosition, YdSortableTreeDropRejection, YdSortableTreeDropResult, YdSortableTreeNode } from './sortable-tree-model'
+export { moveYdSortableTreeNode, resolveYdSortableTreeDrop } from './sortable-tree-model'
+export type {
+  YdWorkflowBackgroundOptions,
+  YdWorkflowCanvasInstance,
+  YdWorkflowCanvasNodeSlot,
+  YdWorkflowCenterOptions,
+  YdWorkflowClickEdge,
+  YdWorkflowClickNode,
+  YdWorkflowConnection,
+  YdWorkflowControlPosition,
+  YdWorkflowControlsOptions,
+  YdWorkflowEdge,
+  YdWorkflowHandleConnectable,
+  YdWorkflowHandleType,
+  YdWorkflowMiniMapOptions,
+  YdWorkflowNode,
+  YdWorkflowPoint,
+  YdWorkflowPosition,
+  YdWorkflowViewportOptions,
+} from './workflow-canvas-model'
+export { canEditYdWorkflowCanvas, normalizeYdWorkflowConnection } from './workflow-canvas-model'
 export { default as YdAnimatedBeam } from './YdAnimatedBeam.vue'
 export { default as YdAnimatedCountTo } from './YdAnimatedCountTo.vue'
 export { default as YdAnimatedCountToGroup } from './YdAnimatedCountToGroup.vue'
@@ -34,12 +56,13 @@ export { default as YdLayoutContainer } from './YdLayoutContainer.vue'
 export type { YdLayoutPanel } from './YdLayoutContainer.vue'
 export { default as YdLinkPreview } from './YdLinkPreview.vue'
 export { default as YdLoading } from './YdLoading.vue'
+export { default as YdLoadingOverlay } from './YdLoadingOverlay.vue'
 export type { YdLoadingType } from './YdLoading.vue'
 export { default as YdMarquee } from './YdMarquee.vue'
 export { default as YdMention } from './YdMention.vue'
+export type { YdMentionOption } from './YdMention.vue'
 export { default as YdMultiSelect } from './YdMultiSelect.vue'
 export type { YdMultiSelectInstance, YdMultiSelectOption } from './YdMultiSelect.vue'
-export type { YdMentionOption } from './YdMention.vue'
 export { default as YdMultiStepLoader } from './YdMultiStepLoader.vue'
 export type { YdLoaderContext, YdLoaderStep } from './YdMultiStepLoader.vue'
 export { default as YdParticlesBg } from './YdParticlesBg.vue'
@@ -48,6 +71,7 @@ export { default as YdQrcode } from './YdQrcode.vue'
 export { default as YdScratchOff } from './YdScratchOff.vue'
 export { default as YdScrollingText } from './YdScrollingText.vue'
 export { default as YdSmoothSwipe } from './YdSmoothSwipe.vue'
+export { default as YdSortableTree } from './YdSortableTree.vue'
 export { default as YdSparklesText } from './YdSparklesText.vue'
 export { default as YdSparkline } from './YdSparkline.vue'
 export { default as YdSpotlightCard } from './YdSpotlightCard.vue'
@@ -60,5 +84,7 @@ export { default as YdTimeAgo } from './YdTimeAgo.vue'
 export { default as YdTimeline } from './YdTimeline.vue'
 export { default as YdTree } from './YdTree.vue'
 export type { YdTreeNode } from './YdTree.vue'
+export { default as YdWorkflowCanvas } from './YdWorkflowCanvas.vue'
+export { default as YdWorkflowHandle } from './YdWorkflowHandle.vue'
 export { CalendarDate, CalendarDateTime, getLocalTimeZone, parseDate, parseDateTime, today } from '@internationalized/date'
 export type { DateValue } from '@internationalized/date'

@@ -1006,6 +1006,7 @@ defineExpose({
                   />
                   <Checkbox
                     v-else-if="shouldRenderSelectionHeader(header)"
+                    aria-label="选择本页所有可选行"
                     :model-value="getHeaderCheckboxValue()"
                     class="translate-y-[2px]"
                     @click.stop
@@ -1072,6 +1073,7 @@ defineExpose({
                     <template v-else-if="isSelectionColumn(cell.column) && selectable">
                       <Checkbox
                         v-if="multiple"
+                        :aria-label="`选择第 ${row.index + 1} 行`"
                         :model-value="row.getIsSelected()"
                         :disabled="!row.getCanSelect()"
                         class="translate-y-[2px]"
@@ -1080,6 +1082,7 @@ defineExpose({
                       />
                       <RadioGroupItem
                         v-else
+                        :aria-label="`选择第 ${row.index + 1} 行`"
                         :value="row.id"
                         :disabled="!row.getCanSelect()"
                         class="translate-y-[2px]"
@@ -1102,6 +1105,7 @@ defineExpose({
                   <template v-else-if="isSelectionColumn(cell.column) && selectable">
                     <Checkbox
                       v-if="multiple"
+                      :aria-label="`选择第 ${row.index + 1} 行`"
                       :model-value="row.getIsSelected()"
                       :disabled="!row.getCanSelect()"
                       class="translate-y-[2px]"
@@ -1110,6 +1114,7 @@ defineExpose({
                     />
                     <RadioGroupItem
                       v-else
+                      :aria-label="`选择第 ${row.index + 1} 行`"
                       :value="row.id"
                       :disabled="!row.getCanSelect()"
                       class="translate-y-[2px]"
