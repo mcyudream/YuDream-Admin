@@ -4,7 +4,7 @@
 
 ## 本次 YD 组件与 Agent 能力
 
-状态：首次发布流水线在 tarball 验证前失败，发布作业未执行；修复 CI 依赖安装步骤后重试。未完成远程发布与验签前，不更新插件依赖或宣称生产可用。
+状态：发布与远程验签均已通过。`@yudream/components 1.4.0` 与 `@yudream/plugin-sdk 1.9.0` 已发布到 Nexus `https://nexus.yudream.online/repository/npm-public/`。工作区随后新增的能力不属于这两个已发布版本，必须单独验证和发布后才能用于生产插件。
 
 | 契约 | 发布版本 | 变化 | 流水线 tag |
 | --- | --- | --- | --- |
@@ -12,6 +12,13 @@
 | `@yudream/plugin-sdk` | `1.9.0` | 同步全部 YD 公开组件与组合式能力的宿主共享桥 | `psdk-1.9.0-1`（重试标签） |
 
 首次尝试 [components #377](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/377) / [SDK #378](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/378) 使用提交 `664d5791`。失败原因为 tarball 作业尚无依赖安装，pnpm 的 `verifyDepsBeforeRun: prompt` 在 CI 非交互环境退出；已添加 `pnpm install --frozen-lockfile`，保留原标签及失败记录，不移动标签或为尚未发布的包无意义改版本。
+
+修复提交 `00a2e408` 的重试结果：
+
+| 包 | 流水线 | 发布作业 | 远程验签作业 | 结果 |
+| --- | --- | --- | --- | --- |
+| components `1.4.0` | [#379](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/379) | [#3495](https://gitlab.yudream.online/yudream/yudreamadmin/-/jobs/3495) | [#3496](https://gitlab.yudream.online/yudream/yudreamadmin/-/jobs/3496) | 8 个作业全部通过 |
+| plugin-sdk `1.9.0` | [#380](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/380) | [#3503](https://gitlab.yudream.online/yudream/yudreamadmin/-/jobs/3503) | [#3504](https://gitlab.yudream.online/yudream/yudreamadmin/-/jobs/3504) | 8 个作业全部通过 |
 
 发布前验证组件/SDK 类型与构建、包结构、tarball 及 CI 发布配置；发布后验证对应 `publish:npm-*` 和 `verify:npm-contracts` jobs，再更新插件仓 catalog/lockfile 并执行下游检查。SPI 没有本次变更，不重复发布。
 
