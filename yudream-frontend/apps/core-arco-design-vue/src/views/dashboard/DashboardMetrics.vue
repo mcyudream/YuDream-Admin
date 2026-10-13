@@ -48,18 +48,41 @@ defineEmits<{
 
 .dashboard-metrics__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 24px;
-  margin: 6px 0 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 0 24px;
+  align-content: center;
+  margin: 0;
 }
 
 .dashboard-metrics__item {
-  display: grid;
-  gap: 6px;
-  align-content: start;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
   min-width: 0;
-  padding: 0 0 12px;
+  padding: 12px 0;
   border-bottom: 1px solid var(--color-border-1);
+}
+
+.dashboard-metrics__item:first-child {
+  flex-direction: column-reverse;
+  grid-row: span 3;
+  gap: 9px;
+  align-items: flex-start;
+  justify-content: center;
+  padding-right: 16px;
+  border-right: 1px solid var(--color-border-1);
+  border-bottom: 0;
+}
+
+.dashboard-metrics__item:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-metrics__item:first-child dd {
+  font-size: clamp(40px, 14cqi, 64px);
+  line-height: 1;
 }
 
 .dashboard-metrics__item dt {
@@ -71,7 +94,7 @@ defineEmits<{
 .dashboard-metrics__item dd {
   min-width: 0;
   margin: 0;
-  font-size: 30px;
+  font-size: 19px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -137,12 +160,16 @@ defineEmits<{
 }
 
 @container (max-width: 260px) {
+  .dashboard-metrics__grid {
+    gap: 0 12px;
+  }
+
   .dashboard-metrics__item {
-    padding: 10px;
+    gap: 5px;
   }
 
   .dashboard-metrics__item dd {
-    font-size: 22px;
+    font-size: 16px;
   }
 }
 

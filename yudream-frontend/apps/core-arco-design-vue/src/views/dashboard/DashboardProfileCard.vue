@@ -34,6 +34,15 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   day: 'numeric',
   weekday: 'long',
 }).format(now.value))
+const week = computed(() => {
+  const start = new Date(now.value)
+  start.setDate(start.getDate() - (start.getDay() + 6) % 7)
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    return { day: '一二三四五六日'[index], date: date.getDate(), today: date.toDateString() === now.value.toDateString() }
+  })
+})
 </script>
 
 <template>
@@ -52,6 +61,11 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
       </FaAvatar>
     </div>
 
+    <div class="dashboard-profile__week" aria-label="本周日历">
+      <div v-for="day in week" :key="day.day" :class="{ 'is-today': day.today }" :aria-current="day.today ? 'date' : undefined">
+        <span>{{ day.day }}</span><strong>{{ day.date }}</strong><i v-if="day.today" aria-hidden="true" />
+      </div>
+    </div>
     <div class="dashboard-profile__chips">
       <span>
         <FaIcon name="morph:shield-user" />
@@ -73,9 +87,49 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
 <style scoped>
 .dashboard-profile {
   display: grid;
-  gap: 18px;
+  gap: 12px;
   align-content: space-between;
-  padding-top: 12px;
+  padding-top: 0;
+}
+
+.dashboard-profile__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.dashboard-profile__week > div {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 9px 0 11px;
+  color: var(--yd-dashboard-feature-muted);
+  border-radius: 10px;
+}
+
+.dashboard-profile__week span {
+  font-size: 10px;
+}
+
+.dashboard-profile__week strong {
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-profile__week .is-today {
+  color: var(--yd-dashboard-feature-text);
+  background: color-mix(in srgb, var(--yd-dashboard-feature-text) 13%, transparent);
+}
+
+.dashboard-profile__week i {
+  position: absolute;
+  bottom: 5px;
+  width: 3px;
+  height: 3px;
+  background: currentcolor;
+  border-radius: 50%;
 }
 
 .dashboard-profile__welcome {
@@ -142,7 +196,7 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   flex-wrap: wrap;
   gap: 4px 16px;
   min-width: 0;
-  padding-top: 14px;
+  padding-top: 4px;
   border-top: 1px solid color-mix(in srgb, var(--yd-dashboard-feature-text) 18%, transparent);
 }
 

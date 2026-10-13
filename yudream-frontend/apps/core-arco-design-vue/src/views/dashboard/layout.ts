@@ -104,6 +104,10 @@ export function arrangeLayout(items: DashboardLayoutItem[], cards: DashboardCard
           w = columns === 12 ? 8 : columns === 8 ? 5 : columns
           h = 3
         }
+        else if (card.component?.startsWith('DATAVIZ_')) {
+          w = Math.min(4, columns)
+          h = Math.max(3, card.minH)
+        }
         else if (columns === 8) {
           w = card.defaultW > 4 ? 8 : 4
         }

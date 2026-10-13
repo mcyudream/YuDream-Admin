@@ -29,9 +29,9 @@ defineProps<Props>()
     </div>
 
     <div class="dashboard-module__actions">
-      <FaButton v-if="card.actionPath" size="sm" @click="onOpen?.(card)">
-        <FaIcon name="morph:arrow-right" />
-        打开
+      <FaButton v-if="card.actionPath" variant="ghost" size="sm" @click="onOpen?.(card)">
+        查看详情
+        <FaIcon name="morph:arrow-up-right" />
       </FaButton>
     </div>
   </div>
