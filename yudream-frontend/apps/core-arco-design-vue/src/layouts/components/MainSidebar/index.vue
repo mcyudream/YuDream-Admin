@@ -46,17 +46,13 @@ useHotkeyBindings({
               <FaTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="right">
                 <button
                   type="button"
+                  :aria-label="generateTitle(item.meta?.title)"
                   :aria-pressed="index === appMenuStore.actived"
-                  class="group menu-item-container text-[var(--g-main-sidebar-menu-color)] py-4 border-0 rounded-lg bg-transparent flex gap-1 h-full w-full cursor-pointer items-center justify-between relative hover-(text-[var(--g-main-sidebar-menu-hover-color)] bg-[var(--g-main-sidebar-menu-hover-bg)]) px-2!" :class="{
+                  class="group menu-item-container text-[var(--g-main-sidebar-menu-color)] py-4 border-0 rounded-lg bg-transparent flex gap-1 h-full w-full cursor-pointer items-center justify-center relative hover-(text-[var(--g-main-sidebar-menu-hover-color)] bg-[var(--g-main-sidebar-menu-hover-bg)]) px-2!" :class="{
                     'text-[var(--g-main-sidebar-menu-active-color)]! bg-[var(--g-main-sidebar-menu-active-bg)]!': index === appMenuStore.actived,
                   }" @click="switchTo(index)"
                 >
-                  <span class="inline-flex flex-1 flex-col gap-1 w-full items-center justify-center">
-                    <FaIcon v-if="item.meta?.icon" :name="item.meta.icon" class="menu-item-container-icon" />
-                    <span class="text-sm text-center flex-1 w-full truncate transition-height transition-opacity transition-width empty:hidden">
-                      {{ generateTitle(item.meta?.title) }}
-                    </span>
-                  </span>
+                  <FaIcon :name="item.meta?.icon || 'morph:folder'" class="menu-item-container-icon" aria-hidden="true" />
                 </button>
               </FaTooltip>
             </div>
