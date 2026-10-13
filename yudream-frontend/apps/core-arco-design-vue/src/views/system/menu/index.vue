@@ -32,7 +32,7 @@ const editing = ref<MenuManageItem | null>(null)
 const form = reactive<MenuPayload>({
   code: '',
   name: '',
-  type: 'MENU',
+  type: 'CATEGORY',
   parentCode: undefined,
   module: DEFAULT_MODULE,
   icon: '',
@@ -200,7 +200,7 @@ function openCreate(parent?: MenuManageItem) {
   Object.assign(form, {
     code: '',
     name: '',
-    type: parent?.type === 'MENU' ? 'BUTTON' : 'MENU',
+    type: !parent ? 'CATEGORY' : parent.type === 'MENU' ? 'BUTTON' : 'MENU',
     parentCode: parent?.code,
     module: parent?.module || selectedMenu.value?.module || DEFAULT_MODULE,
     icon: '',
@@ -804,6 +804,9 @@ function importMenus() {
             <a-form-item label="类型" required>
               <FaSelect v-model="form.type" :options="typeOptions" class="w-full" />
             </a-form-item>
+            <p class="form-help-text">
+              一级大图标导航默认使用业务分类（如 MC、待办、社交），功能菜单归入分类。旧菜单和明确需要独立入口的个例可保留原结构。
+            </p>
           </a-grid-item>
           <a-grid-item>
             <a-form-item label="上级菜单">
@@ -1052,11 +1055,6 @@ function importMenus() {
 
 :deep(.arco-tree-node-title:hover) {
   background: var(--color-fill-1);
-}
-
-:deep(.arco-tree-node-selected .arco-tree-node-title) {
-  color: rgb(var(--primary-6));
-  background: rgb(var(--primary-1));
 }
 
 :deep(.arco-table-th),

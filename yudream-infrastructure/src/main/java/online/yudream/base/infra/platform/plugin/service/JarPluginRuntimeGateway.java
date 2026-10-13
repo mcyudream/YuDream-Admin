@@ -945,7 +945,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             throw new BizException("仅开发模式配置的插件允许从目录加载：" + module.getCode());
         }
         try {
-            PluginDescriptor descriptor = readYamlDescriptor(pluginPath);
+            PluginYamlDescriptorReader.Manifest manifest = readYamlManifest(pluginPath);
+            PluginDescriptor descriptor = manifest.descriptor();
             if (!module.getCode().equals(descriptor.code())) {
                 throw new BizException("插件编码不匹配：" + descriptor.code());
             }
@@ -973,7 +974,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                                         module.getCode(), routePath, visible),
                                 extensionRegistry
                         ),
-                        assetRevision(module.getCode(), pluginPath, descriptor)
+                        assetRevision(module.getCode(), pluginPath, descriptor),
+                        manifest.menuPolicy()
                 );
             } catch (RuntimeException | Error e) {
                 // 实例化失败时释放 ClassLoader，避免句柄泄漏在 Windows 下锁住插件 JAR
@@ -1017,13 +1019,17 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     private PluginDescriptor readYamlDescriptor(Path pluginPath) throws IOException {
+        return readYamlManifest(pluginPath).descriptor();
+    }
+
+    private PluginYamlDescriptorReader.Manifest readYamlManifest(Path pluginPath) throws IOException {
         if (Files.isDirectory(pluginPath)) {
             Path yaml = pluginPath.resolve("plugin.yml");
             if (!Files.isRegularFile(yaml)) {
                 throw new BizException("插件开发目录缺少 plugin.yml：" + pluginPath);
             }
             try (InputStream inputStream = Files.newInputStream(yaml)) {
-                return new PluginYamlDescriptorReader().read(inputStream);
+                return new PluginYamlDescriptorReader().readManifest(inputStream);
             }
         }
         try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(pluginPath.toFile())) {
@@ -1032,7 +1038,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 throw new BizException("插件 JAR 缺少 plugin.yml");
             }
             try (InputStream inputStream = jarFile.getInputStream(entry)) {
-                return new PluginYamlDescriptorReader().read(inputStream);
+                return new PluginYamlDescriptorReader().readManifest(inputStream);
             }
         }
     }
@@ -1205,7 +1211,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 module.styles(),
                 module.scripts(),
                 assetRevision
-        );
+        ).withMenuPolicy(holder == null ? null : holder.getMenuPolicy());
     }
 
     private PluginFrontendRouteInfo toInfo(PluginFrontendRoute route, String pluginIcon) {

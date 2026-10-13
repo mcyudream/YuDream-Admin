@@ -48,6 +48,39 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
+    void routeTreePrunesEmptyNestedCategoriesEvenForWildcardPermission() {
+        Menu root = systemMenu("plugin-category:mc", null, MenuNodeType.CATEGORY);
+        Menu emptyModule = pluginMenu("plugin:old:module:admin", root.getCode(), true);
+        emptyModule.setType(MenuNodeType.CATEGORY);
+        Menu activePage = systemMenu("server-list", root.getCode(), MenuNodeType.MENU);
+        List<Menu> menus = List.of(root, emptyModule, activePage);
+        when(menuRepo.findAll()).thenReturn(menus);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+
+        var routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            var children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name")).containsExactly(activePage.getCode());
+        });
+        assertThat(emptyModule.getRuntimeAvailable()).isTrue();
+        assertThat(emptyModule.getParentCode()).isEqualTo(root.getCode());
+    }
+
+    @Test
+    void routeTreeOmitsSharedCategoryWhenItsOnlyModuleIsEmpty() {
+        Menu root = systemMenu("plugin-category:mc", null, MenuNodeType.CATEGORY);
+        Menu emptyModule = pluginMenu("plugin:old:module:admin", root.getCode(), true);
+        emptyModule.setType(MenuNodeType.CATEGORY);
+        List<Menu> menus = List.of(root, emptyModule);
+        when(menuRepo.findAll()).thenReturn(menus);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+
+        assertThat(service.buildRouteTree(List.of("*"))).isEmpty();
+    }
+
+    @Test
     void managementTreeShowsAvailablePluginMenusUnderSystemParents() {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu pluginMenu = pluginMenu("plugin:wallet:home", systemParent.getCode(), true);
