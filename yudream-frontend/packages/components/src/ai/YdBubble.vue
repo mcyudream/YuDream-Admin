@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { YdChatCitation, YdChatMessage } from './useYdChatStream'
-import { computed } from 'vue'
 import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
+import { computed } from 'vue'
 import FaIcon from '../basic/icon/index.vue'
+import { useYdChatConfig } from './chat-context'
 import YdAttachmentList from './YdAttachmentList.vue'
 import YdChatActions from './YdChatActions.vue'
 import YdChatLoading from './YdChatLoading.vue'
 import YdChatReasoning from './YdChatReasoning.vue'
 import YdCitationList from './YdCitationList.vue'
-import { useYdChatConfig } from './chat-context'
+import 'md-editor-v3/lib/style.css'
 
 const props = withDefaults(defineProps<{
   message: YdChatMessage
@@ -68,7 +68,9 @@ function rendered(content: string): string {
   <div v-if="message.role === 'user'" class="yd-bubble-row yd-bubble-row--user">
     <div class="yd-bubble-row__body yd-bubble-row__body--user">
       <YdAttachmentList :attachments="message.attachments ?? []" />
-      <div class="yd-bubble yd-bubble--user">{{ message.content }}</div>
+      <div class="yd-bubble yd-bubble--user">
+        {{ message.content }}
+      </div>
     </div>
   </div>
 
@@ -146,47 +148,47 @@ function rendered(content: string): string {
 
 .yd-bubble-row__avatar {
   display: grid;
-  width: 32px;
-  height: 32px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 10px;
-  background: rgba(var(--primary-6), 0.12);
-  color: rgb(var(--primary-6));
+  width: 32px;
+  height: 32px;
   font-size: 16px;
+  color: var(--yd-emphasis, oklch(var(--primary)));
+  background: color-mix(in oklab, var(--yd-emphasis, oklch(var(--primary))) 12%, transparent);
+  border-radius: 10px;
 }
 
 .yd-bubble-row__body {
-  max-width: 82%;
   min-width: 0;
+  max-width: 82%;
 }
 
 .yd-bubble {
   padding: 10px 14px;
-  border-radius: 14px;
   font-size: 14px;
   line-height: 1.7;
+  border-radius: 14px;
 }
 
 .yd-bubble--user {
   max-width: 100%;
-  border-bottom-right-radius: 4px;
-  background: rgb(var(--primary-6));
   color: oklch(var(--primary-foreground));
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
-  word-break: break-word;
+  background: var(--yd-emphasis, oklch(var(--primary)));
+  border-bottom-right-radius: 4px;
 }
 
 .yd-bubble--assistant {
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-top-left-radius: 4px;
-  background: var(--color-bg-1);
 }
 
 .yd-bubble--error {
-  border-color: rgb(var(--danger-6, 245 63 63) / 33%);
-  background: rgb(var(--danger-6, 245 63 63) / 6%);
   color: rgb(var(--danger-6, 245 63 63));
+  background: rgb(var(--danger-6, 245 63 63) / 6%);
+  border-color: rgb(var(--danger-6, 245 63 63) / 33%);
 }
 
 .yd-bubble__markdown :deep(.md-editor-preview-wrapper) {
@@ -194,9 +196,9 @@ function rendered(content: string): string {
 }
 
 .yd-bubble__markdown :deep(.md-editor-preview) {
-  background: transparent;
-  color: inherit;
   font-size: 14px;
+  color: inherit;
+  background: transparent;
 }
 
 .yd-bubble__caret {
@@ -204,14 +206,16 @@ function rendered(content: string): string {
   width: 8px;
   height: 16px;
   margin-left: 2px;
-  border-radius: 2px;
-  background: rgb(var(--primary-6));
   vertical-align: text-bottom;
+  background: var(--yd-emphasis, oklch(var(--primary)));
+  border-radius: 2px;
   animation: yd-bubble-blink 1s infinite;
 }
 
 @keyframes yd-bubble-blink {
-  0%, 60%, 100% { opacity: 0.25; }
+  0%,
+ 60%,
+ 100% { opacity: 0.25; }
   30% { opacity: 1; }
 }
 </style>

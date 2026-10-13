@@ -58,6 +58,7 @@ declare global {
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
   const provide: typeof import('vue').provide
+  const provideYdChatConfig: typeof import('@yudream/components').provideYdChatConfig
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
@@ -106,6 +107,9 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
+  const useYdChat: typeof import('@yudream/components').useYdChat
+  const useYdChatConfig: typeof import('@yudream/components').useYdChatConfig
+  const useYdChatStream: typeof import('@yudream/components').useYdChatStream
   const useYdDrawer: typeof import('@yudream/components').useYdDrawer
   const useYdImagePreview: typeof import('@yudream/components').useYdImagePreview
   const useYdLoading: typeof import('@yudream/components').useYdLoading

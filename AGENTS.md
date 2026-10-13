@@ -64,6 +64,7 @@
 - 技能框架级统一管理：`platformAgentSkill`（`MongoAgentSkillRepository implements AgentSkillRepository`）是所有 Harness Agent 的技能源，启用技能随每轮推理进入 `<available_skills>`；管理端 `/api/platform/agent-skills`（view/create/edit/delete 按动作词表拆分）。
 - Agent 路径（ReActAgent/HarnessAgent）的 system prompt 必须经 `sysPrompt`/`onSystemPrompt` 注入，输入消息列表禁止携带 SYSTEM 消息；模型可见工具名一律 `ToolSchemas.safeName`。
 - SSE 必须端到端真流式；事件使用可扩展信封（`ai.message`/`ai.tool`/`ai.result`/`ai.error` 等，含 `event/action/module/traceId/timestamp/payload`）。发送结构化 `ai.error` 后正常 complete，不得再 `completeWithError`。
+- YD Agent 工作台只呈现 Harness 的运行与权限状态；回答按 version 1 的 markdown/reference/tool 块校验、渲染，引用原文与工具卡片独立于推理。Markdown HTML 局部清理，外链仅 HTTP(S)，文件引用与工具重试交宿主事件；Skills、MCP、工作区和审批的演示不得冒充真实连接。组件契约见 `docs/yd-agent-workbench.md`。
 - CMS 改动必须是完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面/模板元数据，以及 GrapesJS 可视化构建兼容存储（`htmlContent`/`cssContent`/`builderProjectJson`）。
 
 ## 6. Excel / 导入导出

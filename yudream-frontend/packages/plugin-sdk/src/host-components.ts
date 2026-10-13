@@ -1,4 +1,31 @@
 const components = shared('components')
+export const YdAgentWorkbench = components.YdAgentWorkbench
+export const YdAgentContextPanel = components.YdAgentContextPanel
+export const YdAgentAnswer = components.YdAgentAnswer
+export const parseYdAgentRenderDocument = components.parseYdAgentRenderDocument
+export const YdChatGraphView = components.YdChatGraphView
+export const YdChatMessageList = components.YdChatMessageList
+export const YdChatProcess = components.YdChatProcess
+export const YdChatSender = components.YdChatSender
+export const YdCitationList = components.YdCitationList
+export const YdAttachmentList = components.YdAttachmentList
+export const YdChatSessionList = components.YdChatSessionList
+export const YdWelcome = components.YdWelcome
+export const YdChatWindow = components.YdChatWindow
+export const YdBubble = components.YdBubble
+export const YdPrompts = components.YdPrompts
+export const YdThoughtChain = components.YdThoughtChain
+export const YdChatActions = components.YdChatActions
+export const YdSuggestion = components.YdSuggestion
+export const YdChatLoading = components.YdChatLoading
+export const YdChatReasoning = components.YdChatReasoning
+export const provideYdChatConfig = components.provideYdChatConfig
+export const useYdChatConfig = components.useYdChatConfig
+export const ydChatConfigKey = components.ydChatConfigKey
+export const useYdChat = components.useYdChat
+export const ydRequest = components.ydRequest
+export const readYdStream = components.readYdStream
+export const useYdChatStream = components.useYdChatStream
 
 function shared(name: string) {
   const modules = (globalThis as any).__YUDREAM_PLUGIN_SHARED__

@@ -17,17 +17,17 @@ withDefaults(defineProps<{
 <style scoped>
 .yd-chat-loading {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
-  color: var(--color-text-3);
+  align-items: center;
   font-size: 13px;
+  color: var(--color-text-3);
 }
 
 .yd-chat-loading__dot {
   width: 6px;
   height: 6px;
+  background: var(--yd-emphasis, oklch(var(--primary)));
   border-radius: 50%;
-  background: rgb(var(--primary-6));
   animation: yd-chat-loading-blink 1.2s infinite;
 }
 
@@ -44,7 +44,9 @@ withDefaults(defineProps<{
 }
 
 @keyframes yd-chat-loading-blink {
-  0%, 60%, 100% { opacity: 0.25; }
+  0%,
+ 60%,
+ 100% { opacity: 0.25; }
   30% { opacity: 1; }
 }
 </style>
