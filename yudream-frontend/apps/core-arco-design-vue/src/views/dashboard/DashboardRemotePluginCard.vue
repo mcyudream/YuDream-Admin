@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
-import apiPlugin from '@/api/modules/platform-plugin'
+import type { Component } from 'vue'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
-import { acquirePluginRemoteModule, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
+import type { PluginRemoteModuleLease } from '@/plugins/remote-loader'
+import apiPlugin from '@/api/modules/platform-plugin'
+import { acquirePluginRemoteModule } from '@/plugins/remote-loader'
 import { createPluginSdk } from '@/plugins/sdk'
 
 interface Props {
@@ -108,7 +109,7 @@ function resolveLoadError(error: any) {
 </script>
 
 <template>
-  <div v-if="remoteComponent" :data-yudream-plugin="card.pluginCode">
+  <div v-if="remoteComponent" class="dashboard-card__content dashboard-remote-host" :data-yudream-plugin="card.pluginCode">
     <component
       :is="remoteComponent"
       :sdk="sdk"
@@ -129,6 +130,19 @@ function resolveLoadError(error: any) {
 </template>
 
 <style scoped>
+.dashboard-remote-host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-remote-host > :deep(.dashboard-card__content) {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+
 .dashboard-remote-state {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -150,15 +164,15 @@ function resolveLoadError(error: any) {
 }
 
 .dashboard-remote-state strong {
-  color: var(--color-text-1);
   font-size: 13px;
+  color: var(--color-text-1);
 }
 
 .dashboard-remote-state span {
   overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 12px;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 

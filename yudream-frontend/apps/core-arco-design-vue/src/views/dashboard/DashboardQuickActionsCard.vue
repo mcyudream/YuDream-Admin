@@ -30,16 +30,13 @@ defineProps<Props>()
         type="button"
         variant="ghost"
         class="dashboard-quick__item"
+        :title="action.description || action.category"
         @click="onOpen?.(action)"
       >
         <span class="dashboard-quick__icon" :class="toneIconClass(action.tone || card.tone)">
           <FaIcon :name="action.icon || 'morph:arrow-right'" />
         </span>
-        <span class="dashboard-quick__main">
-          <strong>{{ action.title }}</strong>
-          <span>{{ action.description || action.category }}</span>
-        </span>
-        <FaIcon name="morph:chevron-right" class="dashboard-quick__arrow" />
+        <span class="dashboard-quick__label">{{ action.title }}</span>
       </FaButton>
     </div>
     <div v-else class="dashboard-quick__empty">
@@ -56,46 +53,40 @@ defineProps<Props>()
 
 .dashboard-quick__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
-  gap: 10px;
-  align-content: start;
+  grid-template-rows: repeat(2, minmax(80px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 4px;
+  align-content: stretch;
 }
 
 .dashboard-quick__item {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
+  justify-content: center;
   min-width: 0;
   height: auto;
-  min-height: 62px;
-  padding: 12px;
+  min-height: 80px;
+  padding: 8px 4px;
   color: var(--color-text-1);
-  text-align: left;
+  text-align: center;
   cursor: pointer;
-  background: var(--color-fill-1);
-  border: 1px solid transparent;
+  background: transparent;
+  border: 0;
   border-radius: calc(var(--yd-surface-radius, 18px) * 0.66);
-  transition: border-color var(--yd-motion-duration-fast, 140ms) ease, background var(--yd-motion-duration-fast, 140ms) ease, transform var(--yd-motion-duration-normal, 240ms) var(--yd-motion-ease, ease);
+  box-shadow: none;
+  transition: background var(--yd-motion-duration-fast, 140ms) ease;
 }
 
 .dashboard-quick__item:hover,
 .dashboard-quick__item:focus-visible {
-  background: var(--color-fill-2);
-  border-color: var(--color-border-2);
+  background: var(--color-fill-1);
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .dashboard-quick__item:hover {
-    transform: translateY(var(--yd-motion-lift, -3px));
-  }
-
   .dashboard-quick__item:hover .dashboard-quick__icon {
-    transform: rotate(-7deg) scale(1.08);
-  }
-
-  .dashboard-quick__item:hover .dashboard-quick__arrow {
-    opacity: 1;
-    transform: translateX(2px);
+    transform: translateY(-3px);
   }
 }
 
@@ -107,44 +98,24 @@ defineProps<Props>()
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border-1);
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  background: var(--color-fill-2);
+  border: 0;
+  border-radius: 14px;
   transition: transform var(--yd-motion-duration-normal, 240ms) var(--yd-motion-ease, ease);
 }
 
-.dashboard-quick__main {
-  display: grid;
-  flex: 1;
-  gap: 2px;
+.dashboard-quick__label {
   min-width: 0;
-}
-
-.dashboard-quick__main strong {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.4;
   white-space: nowrap;
-}
-
-.dashboard-quick__main span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 11px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-}
-
-.dashboard-quick__arrow {
-  flex: 0 0 auto;
-  font-size: 14px;
-  color: var(--color-text-3);
-  opacity: 0.55;
-  transition: opacity var(--yd-motion-duration-fast, 140ms) ease, transform var(--yd-motion-duration-normal, 240ms) var(--yd-motion-ease, ease);
 }
 
 .dashboard-quick__empty {
@@ -157,21 +128,35 @@ defineProps<Props>()
   border-radius: 8px;
 }
 
-@container (max-width: 360px) {
-  .dashboard-quick__grid {
-    grid-template-columns: 1fr;
+@container (max-width: 400px) {
+  .dashboard-quick__icon {
+    width: 40px;
+    height: 40px;
+    font-size: 21px;
+    border-radius: 12px;
+  }
+
+  .dashboard-quick__label {
+    font-size: 12px;
   }
 }
 
-:root[data-admin-motion="reduced"] .dashboard-quick__item:hover .dashboard-quick__icon,
-:root[data-admin-motion="reduced"] .dashboard-quick__item:hover .dashboard-quick__arrow {
+@container (max-width: 260px) {
+  .dashboard-quick__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+:root[data-admin-motion="reduced"] .dashboard-quick__item,
+:root[data-admin-motion="reduced"] .dashboard-quick__item:hover .dashboard-quick__icon {
   transform: none;
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dashboard-quick__item,
-  .dashboard-quick__icon,
-  .dashboard-quick__arrow {
+  .dashboard-quick__icon {
+    transform: none;
     transition: none;
   }
 }
