@@ -401,7 +401,7 @@
     },
     {
       "key": "admin-appearance-presets",
-      "text": "后台内置灵动/雅致/紧凑预设以 settings.appearance 保存到既有 appSettings JSON，宿主 normalizer 兼容旧值。root 的 data-admin-style/data-admin-motion 驱动 yudream-base 层 --yd-* tokens；ADMIN 主题插件的根变量可覆盖，禁止 inline 或子布局重定义默认值。系统/用户减少动效优先，GridStack 只动画内部卡片，详见 docs/frontend-appearance.md。"
+      "text": "后台内置灵动/雅致/紧凑预设以 settings.appearance 保存到既有 appSettings JSON，宿主 normalizer 兼容旧值。共享 @yudream/components/appearance.css 在 yudream-base 根层声明 --yd-* tokens，宿主 admin-appearance.css 仅导入；宿主和预览共用 @fantastic-admin/themes/runtime 主色转换。ADMIN 插件可覆盖根变量，禁止 inline 或子布局重定义默认值。三套外观均保留已启用的功能动画，灵动完整，雅致/紧凑的系统/用户减少动态效果偏好仅柔化动作、速度与装饰密度，禁止统一冻结动画；GridStack 只动画内部卡片。新增页面/插件通用控件用 Yd* 公开入口，内部复用 Fa/Reka，复杂 Arco 行为必须封装属性/插槽/全部视觉和私有弹层，不在页面裸用 Arco。根导出、resolver、SDK host-components 同步；详见 docs/frontend-appearance.md、docs/yd-components.md。"
     }
   ],
   "pitfalls": [

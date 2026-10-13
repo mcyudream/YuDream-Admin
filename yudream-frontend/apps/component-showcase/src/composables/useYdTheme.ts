@@ -1,4 +1,5 @@
-import { generate, getRgbStr } from '@arco-design/color'
+import { settingsDefault } from '@fantastic-admin/settings'
+import { applyPrimaryColor as applyFaPrimaryColor } from '@fantastic-admin/themes/runtime'
 import { computed, ref, watch } from 'vue'
 
 /**
@@ -6,8 +7,8 @@ import { computed, ref, watch } from 'vue'
  * - 明暗：documentElement 的 `.dark` class + `color-scheme`（shadcn），
  *   body 的 `arco-theme="dark"`（Arco），对应主应用 `store/modules/app/settings.ts` 与 `ui/provider/index.vue`。
  * - 主色：hex 转 oklch 写入 `--primary` / `--ring` / `--primary-foreground`（shadcn），
- *   同时用 `@arco-design/color` 生成 10 级 `--primary-1..10`（Arco RGB 三元组），
- *   使 Arco 与 Fa 两套组件在示例中跟随同一主色。
+ *   共用 @fantastic-admin/themes/runtime 的主色转换与色阶生成。
+ *   YD 控件和内部基础能力消费同一组 FA 语义变量。
  * - 圆角：0..1 系数写入 shadcn `--radius: {n}rem`，并同步 Arco `--border-radius-*`。
  * - 色弱：对应主应用 `theme.colorAmblyopia`，写入 `filter: invert(80%)`。
  */
@@ -27,14 +28,15 @@ export const themeColorSchemeOptions: { label: string, value: ThemeColorScheme }
 ]
 
 export const primaryColorPresets: PrimaryColorPreset[] = [
-  { name: 'arcoblue', label: 'Arco 蓝', value: '#165DFF' },
+  { name: 'default', label: 'Fa 默认', value: settingsDefault.theme.primaryColor },
+  { name: 'blue', label: '湖蓝', value: '#165DFF' },
   { name: 'green', label: '绿', value: '#00B42A' },
   { name: 'purple', label: '紫', value: '#722ED1' },
   { name: 'orange', label: '橙', value: '#FF7D00' },
   { name: 'red', label: '红', value: '#F53F3F' },
 ]
 
-const STORAGE_KEY = 'component-showcase:theme'
+const STORAGE_KEY = 'component-showcase:theme:v2'
 
 interface ThemeSetting {
   colorScheme: ThemeColorScheme
@@ -44,18 +46,18 @@ interface ThemeSetting {
 }
 
 const defaultSetting: ThemeSetting = {
-  colorScheme: 'light',
-  primaryColor: '#165DFF',
-  radius: 0.5,
-  colorAmblyopia: false,
+  colorScheme: settingsDefault.theme.colorScheme,
+  primaryColor: settingsDefault.theme.primaryColor,
+  radius: settingsDefault.theme.radius,
+  colorAmblyopia: settingsDefault.theme.colorAmblyopia,
 }
 
 function normalizeHex(color: string): string | null {
   const value = color.trim()
-  if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+  if (/^#[0-9a-f]{6}$/i.test(value)) {
     return value.toUpperCase()
   }
-  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+  if (/^#[0-9a-f]{3}$/i.test(value)) {
     return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toUpperCase()
   }
   return null
@@ -110,36 +112,6 @@ const resolvedScheme = computed<'light' | 'dark'>(() => {
   return colorScheme.value
 })
 
-/** 与主应用 settings.ts 相同的 hex → oklch 转换 */
-function hexToOklch(hex: string) {
-  const color = normalizeHex(hex)
-  if (!color) {
-    return null
-  }
-  const r = Number.parseInt(color.slice(1, 3), 16) / 255
-  const g = Number.parseInt(color.slice(3, 5), 16) / 255
-  const b = Number.parseInt(color.slice(5, 7), 16) / 255
-  const toLinear = (value: number) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-  const lr = toLinear(r)
-  const lg = toLinear(g)
-  const lb = toLinear(b)
-  const l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb
-  const m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb
-  const s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb
-  const lRoot = Math.cbrt(l)
-  const mRoot = Math.cbrt(m)
-  const sRoot = Math.cbrt(s)
-  const okL = 0.2104542553 * lRoot + 0.793617785 * mRoot - 0.0040720468 * sRoot
-  const okA = 1.9779984951 * lRoot - 2.428592205 * mRoot + 0.4505937099 * sRoot
-  const okB = 0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.808675766 * sRoot
-  const chroma = Math.sqrt(okA ** 2 + okB ** 2)
-  const hue = (Math.atan2(okB, okA) * 180 / Math.PI + 360) % 360
-  return {
-    primary: `${okL.toFixed(3)} ${chroma.toFixed(3)} ${hue.toFixed(3)}`,
-    foreground: okL > 0.65 ? '0.145 0 0' : '0.985 0 0',
-  }
-}
-
 function applyColorScheme() {
   const isDark = resolvedScheme.value === 'dark'
   document.documentElement.classList.toggle('dark', isDark)
@@ -155,18 +127,7 @@ function applyColorScheme() {
 }
 
 function applyPrimaryColor() {
-  const oklch = hexToOklch(primaryColor.value)
-  if (oklch) {
-    document.documentElement.style.setProperty('--primary', oklch.primary)
-    document.documentElement.style.setProperty('--ring', oklch.primary)
-    document.documentElement.style.setProperty('--primary-foreground', oklch.foreground)
-  }
-
-  // Arco 10 级色板（暗色模式使用暗色色板）
-  const palette = generate(primaryColor.value, { list: true, dark: resolvedScheme.value === 'dark' })
-  palette.forEach((hex, index) => {
-    document.body.style.setProperty(`--primary-${index + 1}`, getRgbStr(hex))
-  })
+  applyFaPrimaryColor(primaryColor.value)
 }
 
 function applyRadius() {

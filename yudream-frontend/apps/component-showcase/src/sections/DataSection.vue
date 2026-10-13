@@ -217,14 +217,14 @@ const edges: YdGraphEdge[] = [
 </script>
 
 <template>
-  <DemoCard title="FaCard" description="标题 / 描述 / 自定义头尾">
+  <DemoCard title="YdCard" description="标题 / 描述 / 自定义头尾">
     <div class="demo-row !items-start">
-      <FaCard title="卡片标题" description="这是一段卡片描述文字" class="w-72">
+      <YdCard title="卡片标题" description="这是一段卡片描述文字" class="w-72">
         卡片内容区域，可放置任意内容。
-      </FaCard>
-      <FaCard class="w-96">
+      </YdCard>
+      <YdCard class="w-96">
         <template #header>
-          <div class="flex items-center justify-between gap-4">
+          <div class="flex gap-4 items-center justify-between">
             <div>
               <div class="text-base font-semibold">
                 自定义头部
@@ -233,61 +233,61 @@ const edges: YdGraphEdge[] = [
                 header slot 会覆盖 title 和 description
               </div>
             </div>
-            <FaIcon name="morph:badge-check" class="size-5 text-primary" />
+            <YdIcon name="morph:badge-check" class="text-primary size-5" />
           </div>
         </template>
 
         卡片内容区域
 
         <template #footer>
-          <div class="flex w-full justify-end gap-2">
-            <FaButton variant="outline">
+          <div class="flex gap-2 w-full justify-end">
+            <YdButton variant="outline">
               取消
-            </FaButton>
-            <FaButton>确定</FaButton>
+            </YdButton>
+            <YdButton>确定</YdButton>
           </div>
         </template>
-      </FaCard>
+      </YdCard>
     </div>
   </DemoCard>
 
-  <DemoCard title="FaTabs" description="list + 插槽面板">
-    <FaTabs v-model="activeTab" :list="tabList" class="max-w-xl">
+  <DemoCard title="YdTabs" description="list + 插槽面板">
+    <YdTabs v-model="activeTab" :list="tabList" class="max-w-xl">
       <template #profile>
-        <div class="rounded-md bg-muted/50 p-4 text-sm">
+        <div class="text-sm p-4 rounded-md bg-muted/50">
           这里展示用户基础资料。
         </div>
       </template>
       <template #account>
-        <div class="rounded-md bg-muted/50 p-4 text-sm">
+        <div class="text-sm p-4 rounded-md bg-muted/50">
           这里展示账号安全设置。
         </div>
       </template>
       <template #notice>
-        <div class="rounded-md bg-muted/50 p-4 text-sm">
+        <div class="text-sm p-4 rounded-md bg-muted/50">
           这里展示消息通知偏好。
         </div>
       </template>
-    </FaTabs>
+    </YdTabs>
   </DemoCard>
 
-  <DemoCard title="FaPagination" description="页码 / 每页条数 / 总数">
-    <FaPagination v-model:page="page" v-model:size="size" :total="total" />
+  <DemoCard title="YdPagination" description="页码 / 每页条数 / 总数">
+    <YdPagination v-model:page="page" v-model:size="size" :total="total" />
   </DemoCard>
 
-  <DemoCard title="FaProgress" description="不同进度值">
-    <div class="grid max-w-xl gap-3">
-      <FaProgress v-model="progress" />
-      <FaProgress :model-value="66" />
-      <FaProgress :model-value="100" />
+  <DemoCard title="YdProgress" description="不同进度值">
+    <div class="gap-3 grid max-w-xl">
+      <YdProgress v-model="progress" />
+      <YdProgress :model-value="66" />
+      <YdProgress :model-value="100" />
     </div>
     <div class="demo-row">
-      <FaButton size="sm" variant="outline" @click="progress = Math.max(0, progress - 10)">
+      <YdButton size="sm" variant="outline" @click="progress = Math.max(0, progress - 10)">
         -10%
-      </FaButton>
-      <FaButton size="sm" variant="outline" @click="progress = Math.min(100, progress + 10)">
+      </YdButton>
+      <YdButton size="sm" variant="outline" @click="progress = Math.min(100, progress + 10)">
         +10%
-      </FaButton>
+      </YdButton>
     </div>
   </DemoCard>
 
@@ -310,7 +310,7 @@ const edges: YdGraphEdge[] = [
         <template #overlay>
           <div class="atlas__side">
             <div class="atlas__search">
-              <FaInput v-model="query" clearable placeholder="搜索节点…" />
+              <YdInput v-model="query" clearable placeholder="搜索节点…" />
               <div v-if="query && suggestions.length" class="atlas__suggestions">
                 <button
                   v-for="item in suggestions"
@@ -328,7 +328,7 @@ const edges: YdGraphEdge[] = [
 
             <div class="atlas__panel">
               <div class="atlas__panel-title">
-                <FaIcon name="morph:info" />
+                <YdIcon name="morph:info" />
                 图谱说明
               </div>
               <p class="atlas__panel-text">
@@ -343,7 +343,7 @@ const edges: YdGraphEdge[] = [
 
             <div class="atlas__panel">
               <div class="atlas__panel-title">
-                <FaIcon name="morph:layout-grid" />
+                <YdIcon name="morph:layout-grid" />
                 聚类
               </div>
               <button
@@ -357,7 +357,7 @@ const edges: YdGraphEdge[] = [
                 <span class="atlas__cluster-dot" :style="{ background: cluster.color }" />
                 <span class="atlas__cluster-label">{{ cluster.label }}</span>
                 <span class="atlas__cluster-count">{{ cluster.count }}</span>
-                <FaIcon :name="hiddenClusters.has(cluster.key) ? 'morph:eye-off' : 'morph:eye'" />
+                <YdIcon :name="hiddenClusters.has(cluster.key) ? 'morph:eye-off' : 'morph:eye'" />
               </button>
             </div>
           </div>
@@ -366,21 +366,21 @@ const edges: YdGraphEdge[] = [
     </div>
   </DemoCard>
 
-  <DemoCard title="FaScrollArea" description="固定高度纵向滚动">
-    <FaScrollArea class="h-56 w-64 border rounded-md">
-      <div v-for="item in 20" :key="item" class="p-3 text-sm">
+  <DemoCard title="YdScrollArea" description="固定高度纵向滚动">
+    <YdScrollArea class="border rounded-md h-56 w-64">
+      <div v-for="item in 20" :key="item" class="text-sm p-3">
         滚动内容 {{ item }}
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </DemoCard>
 </template>
 
 <style scoped>
 .atlas {
   overflow: hidden;
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: var(--color-bg-1);
 }
 
 .atlas__canvas {
@@ -393,10 +393,10 @@ const edges: YdGraphEdge[] = [
   right: 14px;
   z-index: 2;
   display: flex;
-  width: 264px;
-  max-height: calc(100% - 28px);
   flex-direction: column;
   gap: 10px;
+  width: 264px;
+  max-height: calc(100% - 28px);
   overflow-y: auto;
 }
 
@@ -406,32 +406,32 @@ const edges: YdGraphEdge[] = [
 
 .atlas__suggestions {
   position: absolute;
-  z-index: 3;
   top: calc(100% + 4px);
   right: 0;
   left: 0;
+  z-index: 3;
   overflow: hidden;
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: var(--color-bg-1);
   box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
 }
 
 .atlas__suggestion {
   display: flex;
+  gap: 8px;
+  align-items: center;
   width: 100%;
   min-width: 0;
-  align-items: center;
-  gap: 8px;
   padding: 8px 10px;
-  border: 0;
-  border-bottom: 1px solid var(--color-border-2);
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-2);
   text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .atlas__suggestion:last-child {
@@ -439,85 +439,85 @@ const edges: YdGraphEdge[] = [
 }
 
 .atlas__suggestion:hover {
-  background: var(--color-fill-2);
   color: var(--color-text-1);
+  background: var(--color-fill-2);
 }
 
 .atlas__suggestion-dot {
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  flex: 0 0 auto;
   border-radius: 50%;
 }
 
 .atlas__suggestion-label {
-  overflow: hidden;
   flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .atlas__suggestion-cluster {
-  color: var(--color-text-3);
   font-size: 11px;
+  color: var(--color-text-3);
 }
 
 .atlas__panel {
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: var(--color-bg-1);
   box-shadow: 0 2px 10px rgb(0 0 0 / 6%);
 }
 
 .atlas__panel-title {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-2);
-  color: var(--color-text-1);
   font-size: 13px;
   font-weight: 600;
+  color: var(--color-text-1);
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .atlas__panel-text {
-  margin: 0;
   padding: 10px 12px;
-  color: var(--color-text-3);
+  margin: 0;
   font-size: 12px;
   line-height: 1.7;
+  color: var(--color-text-3);
 }
 
 .atlas__selection {
   display: grid;
   gap: 4px;
-  margin: 0 12px 12px;
   padding: 10px;
+  margin: 0 12px 12px;
+  font-size: 11px;
+  color: var(--color-text-3);
+  background: var(--color-fill-2);
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: var(--color-fill-2);
-  color: var(--color-text-3);
-  font-size: 11px;
 }
 
 .atlas__selection strong {
-  color: var(--color-text-1);
   font-size: 13px;
+  color: var(--color-text-1);
 }
 
 .atlas__cluster {
   display: flex;
-  width: 100%;
-  align-items: center;
   gap: 8px;
+  align-items: center;
+  width: 100%;
   padding: 8px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-2);
   text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
 }
 
 .atlas__cluster:hover {
@@ -529,9 +529,9 @@ const edges: YdGraphEdge[] = [
 }
 
 .atlas__cluster-dot {
+  flex: 0 0 auto;
   width: 10px;
   height: 10px;
-  flex: 0 0 auto;
   border-radius: 50%;
 }
 
@@ -540,11 +540,11 @@ const edges: YdGraphEdge[] = [
 }
 
 .atlas__cluster-count {
-  color: var(--color-text-3);
   font-size: 11px;
+  color: var(--color-text-3);
 }
 
-@media (max-width: 720px) {
+@media (width <= 720px) {
   .atlas__canvas {
     height: 480px;
   }

@@ -10,9 +10,9 @@
 { "preset": "vibrant", "motion": "system" }
 ```
 
-`preset` 可选 `vibrant` / `calm` / `compact`；`motion` 可选 `system` / `reduced`。旧配置与未知值自动回落默认值。`motion=system` 尊重操作系统的 `prefers-reduced-motion`，不会强制播放动画。外观配置是宿主扩展，不变更 SPI、SDK 或共享组件契约。
+`preset` 可选 `vibrant` / `calm` / `compact`；`motion` 可选 `system` / `reduced`。旧配置与未知值自动回落默认值。三套外观都保留已启用的功能动画，包括计数、翻词、加载、流光、跑马灯和轮播。灵动保留完整动效；雅致与紧凑在 `motion=reduced` 或操作系统 `prefers-reduced-motion: reduce` 时柔化动作、降低装饰密度、放慢循环，不统一停用动画或将计数直接跳到终值。外观设置继续由宿主持久化，YD 组件读取根节点设置，不增加 SPI 主题字段。
 
-应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在 `src/assets/styles/admin-appearance.css` 的 `@layer yudream-base` 中声明；消费范围为后台布局、工作台、主题设置与登录页，不重写公开站、业务表格和插件页面的选择器。
+应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在共享 `@yudream/components/appearance.css` 的 `@layer yudream-base` 根节点中声明，宿主 `src/assets/styles/admin-appearance.css` 仅导入该文件。YD 控件、后台布局和实时预览均消费这些变量；业务页面仍只使用中性语义变量。宿主和预览共用 `@fantastic-admin/themes/runtime` 的主色转换，默认值从 FA settings 读取，为 `#18181b`。
 
 ## ADMIN 主题插件
 
@@ -24,6 +24,11 @@
 | `--yd-control-radius` | 导航项圆角 | `12px` |
 | `--yd-surface-shadow` / `--yd-surface-shadow-hover` | 卡片静态与聚焦/悬停阴影 | 中性色阴影 |
 | `--yd-workspace-gap` | 工作台外侧间距 | `24px` |
+| `--yd-surface-padding` / `--yd-content-gap` | YD 卡片内边距与内容间距 | `24px` / `16px` |
+| `--yd-control-height` / `--yd-control-font-size` | 默认控件高度与字号，显式 size 优先 | `40px` / `14px` |
+| `--yd-decoration-duration` | 装饰流光和闪烁节奏 | `4s` |
+| `--yd-motion-loop-scale` | 循环时长倍率；雅致/紧凑减少偏好默认 `1.6` | `1` |
+| `--yd-emphasis` | 文字与装饰强调色，深色模式提升可读性 | 从 FA 主色与前景色派生 |
 | `--yd-motion-duration-fast` / `normal` / `slow` | 按压、常规过渡、入场时长 | `140ms` / `260ms` / `440ms` |
 | `--yd-motion-ease` / `--yd-motion-ease-spring` | 常规与轻弹缓动曲线 | 缓出 / 轻弹 |
 | `--yd-motion-lift` | 可交互元素悬停位移（负数向上） | `-3px` |
@@ -41,14 +46,14 @@
 }
 ```
 
-ADMIN 插件仍通过插件管理启停，停用后恢复已选内置预设；SITE 插件仍通过内容站点主题中心管理，两者继续由现有主题运行时按路由切换样式 `media`。系统或用户选择减少动态效果时，位移、按压、时长和错峰变量优先被归零，插件不应绕过该偏好。
+ADMIN 插件仍通过插件管理启停，停用后恢复已选内置预设；SITE 插件仍通过内容站点主题中心管理，两者继续由现有主题运行时按路由切换样式 `media`。雅致或紧凑下系统/用户选择减少动态效果时，采用非零的柔和过渡、较小位移与按压幅度，循环时长增加。默认令牌仍位于基础层，插件可以覆盖；插件应延续功能动画持续运行、减少偏好柔化动作的约定。
 
 ## 实现约束
 
 登录页采用通栏品牌区与表单区，站点名称为主标题，描述和插图来自站点配置。移动端先展示精简品牌区，再进入表单；不使用固定底栏或装饰性循环动画。SITE 主题可在 `.login-page` 内桥接 `--color-*` 与组件语义变量。深色图片遮罩上的标题必须单独保证对比度，不能直接继承后台浅色模式文字。相对图片 URL 必须在插件自身的选择器声明中消费，避免跨样式表消费变量时按宿主路径解析。每次登录页修改均需验证无插件和启用 SITE 插件两种状态。
 
 - 复用 Fa/Yd 控件，新增视觉只使用主题和中性语义变量。
-- 页面使用 Vue Transition；卡片使用 CSS 入场，最多八个错峰节奏步，不引入常驻装饰动画或额外动画库。
+- 页面使用 Vue Transition；工作台卡片使用 CSS 入场，最多八个错峰节奏步。流光、粒子、跑马灯等装饰动效由共享 YD 组件显式提供，消费主题变量与同一减少动效政策，不给所有业务页面自动添加循环动画或额外动画库。
 - GridStack 的拖拽定位由其自身管理，只对内部卡片做入场动画；编辑模式取消入场，动画终态不保留 transform。按钮手柄内的图标须 `pointer-events: none`，避免拖动图标时被 GridStack 的交互元素过滤忽略。
 - 悬停反馈仅在支持精确指针与 hover 的设备启用；普通信息卡不抬升，以免误示可点击。
 - 新页面可显式给合适的操作入口添加 `yd-interactive`，不全局扫描 DOM 或给所有按钮/表格强加动画。

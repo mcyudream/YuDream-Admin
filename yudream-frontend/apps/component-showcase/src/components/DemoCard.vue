@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useFaToast } from '@yudream/components'
+import { useYdToast } from '@yudream/components'
 import { ref } from 'vue'
 
 const props = withDefaults(defineProps<{
@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<{
   codeOpen: false,
 })
 
-const toast = useFaToast()
+const toast = useYdToast()
 const codeVisible = ref(props.codeOpen)
 
 async function copyCode() {
@@ -47,12 +47,12 @@ async function copyCode() {
     <footer v-if="code" class="demo-card__code">
       <div class="demo-card__code-bar">
         <button type="button" class="demo-card__code-toggle" @click="codeVisible = !codeVisible">
-          <FaIcon :name="codeVisible ? 'morph:chevron-up' : 'morph:chevron-down'" />
+          <YdIcon :name="codeVisible ? 'morph:chevron-up' : 'morph:chevron-down'" />
           {{ codeVisible ? '收起代码' : '展开代码' }}
         </button>
-        <FaButton v-if="codeVisible" size="icon-sm" variant="ghost" title="复制代码" @click="copyCode">
-          <FaIcon name="morph:copy" />
-        </FaButton>
+        <YdButton v-if="codeVisible" size="icon-sm" variant="ghost" title="复制代码" @click="copyCode">
+          <YdIcon name="morph:copy" />
+        </YdButton>
       </div>
       <div v-if="codeVisible" class="demo-card__code-body">
         <pre class="demo-card__pre"><code>{{ code }}</code></pre>
@@ -64,48 +64,48 @@ async function copyCode() {
 <style scoped>
 .demo-card {
   overflow: hidden;
+  background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: var(--border-radius-large);
-  background: var(--color-bg-1);
   box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
 }
 
 .demo-card__head {
   padding: 18px 22px 16px;
-  border-bottom: 1px solid var(--color-border-2);
   background: linear-gradient(180deg, var(--color-bg-1), var(--color-fill-1));
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .demo-card__title-row {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .demo-card__title {
   padding: 2px 8px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
-  font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, "Liberation Mono", monospace;
   font-size: 13px;
   font-weight: 600;
+  color: var(--color-text-2);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
 }
 
 .demo-card__badge {
   padding: 1px 7px;
-  border-radius: 999px;
-  background: rgba(var(--primary-6), 0.1);
-  color: rgb(var(--primary-6));
   font-size: 11px;
+  color: var(--color-text-3);
+  background: var(--color-fill-2);
+  border-radius: 999px;
 }
 
 .demo-card__desc {
   margin: 10px 0 0;
-  color: var(--color-text-3);
   font-size: 12.5px;
   line-height: 1.6;
+  color: var(--color-text-3);
 }
 
 .demo-card__body {
@@ -127,19 +127,19 @@ async function copyCode() {
 
 .demo-card__code-toggle {
   display: inline-flex;
-  align-items: center;
   gap: 5px;
+  align-items: center;
   padding: 4px 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
+  color: var(--color-text-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
 }
 
 .demo-card__code-toggle:hover {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .demo-card__code-body {
@@ -147,15 +147,15 @@ async function copyCode() {
 }
 
 .demo-card__pre {
+  padding: 16px;
   margin: 0;
   overflow-x: auto;
-  padding: 16px;
-  border-radius: 8px;
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-  font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, "Liberation Mono", monospace;
   font-size: 12.5px;
   line-height: 1.65;
+  color: var(--color-text-1);
   white-space: pre;
+  background: var(--color-fill-2);
+  border-radius: 8px;
 }
 </style>

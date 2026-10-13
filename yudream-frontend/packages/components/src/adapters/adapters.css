@@ -1,0 +1,101 @@
+@import "../theme/appearance.css";
+
+/* 外观仅属于 YD 入口。Fa 的功能和调用方式保持同一套契约。 */
+.yd-button,
+.yd-input,
+.yd-textarea,
+.yd-select,
+.yd-number-field,
+.yd-tag,
+.yd-badge,
+.yd-checkbox,
+.yd-switch {
+  border-radius: var(--yd-control-radius);
+  transition-timing-function: var(--yd-motion-ease-spring);
+  transition-duration: var(--yd-motion-duration-fast);
+}
+
+.yd-button[data-yd-auto-size] {
+  height: var(--yd-control-height);
+  font-size: var(--yd-control-font-size);
+}
+
+.yd-input,
+.yd-textarea,
+.yd-select {
+  font-size: var(--yd-control-font-size);
+  transition-property: border-color, box-shadow, background-color;
+}
+
+.yd-input,
+.yd-select {
+  min-height: var(--yd-control-height);
+}
+
+.yd-input input,
+.yd-textarea textarea {
+  font-size: inherit;
+}
+
+.yd-card,
+.yd-page-main {
+  border-radius: var(--yd-surface-radius);
+  box-shadow: var(--yd-surface-shadow);
+  transition: box-shadow var(--yd-motion-duration-normal), transform var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+}
+
+.yd-card-header,
+.yd-card-content,
+.yd-card-footer {
+  padding: var(--yd-surface-padding);
+}
+
+.yd-card-content:not(:first-child),
+.yd-card-footer:not(:first-child) {
+  padding-top: 0;
+}
+
+.yd-tabs [role="tablist"],
+.yd-tabs [role="tab"] {
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-tabs [role="tab"] {
+  min-height: var(--yd-control-height);
+  font-size: var(--yd-control-font-size);
+  transition: background var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
+}
+
+.yd-popover,
+.yd-modal,
+.yd-drawer,
+.yd-hover-card,
+.yd-dropdown,
+.yd-context-menu {
+  border-radius: var(--yd-surface-radius);
+}
+
+.yd-popover {
+  padding: var(--yd-surface-padding);
+  box-shadow: var(--yd-surface-shadow);
+}
+
+:root[data-admin-style="vibrant"] .yd-button:not(:disabled):hover {
+  translate: 0 var(--yd-motion-lift);
+}
+
+:root[data-admin-style="vibrant"] .yd-button:not(:disabled):active {
+  scale: var(--yd-motion-press);
+}
+
+:root:is([data-admin-style="calm"], [data-admin-style="compact"])[data-admin-motion="reduced"] .yd-base,
+:root:is([data-admin-style="calm"], [data-admin-style="compact"])[data-admin-motion="reduced"] .yd-base * {
+  transition-timing-function: var(--yd-motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:is([data-admin-style="calm"], [data-admin-style="compact"]) .yd-base,
+  :root:is([data-admin-style="calm"], [data-admin-style="compact"]) .yd-base * {
+    transition-timing-function: var(--yd-motion-ease);
+  }
+}
