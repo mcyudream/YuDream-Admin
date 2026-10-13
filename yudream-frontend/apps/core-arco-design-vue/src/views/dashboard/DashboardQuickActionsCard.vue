@@ -53,7 +53,7 @@ defineProps<Props>()
 
 .dashboard-quick__grid {
   display: grid;
-  grid-template-rows: repeat(2, minmax(80px, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px 4px;
   align-content: stretch;
@@ -67,7 +67,7 @@ defineProps<Props>()
   justify-content: center;
   min-width: 0;
   height: auto;
-  min-height: 80px;
+  min-height: 0;
   padding: 8px 4px;
   color: var(--color-text-1);
   text-align: center;
@@ -142,8 +142,60 @@ defineProps<Props>()
 }
 
 @container (max-width: 260px) {
+  .dashboard-quick__icon {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  .dashboard-quick__item {
+    gap: 7px;
+    padding-inline: 0;
+  }
+
+  .dashboard-quick__label {
+    font-size: 11px;
+    white-space: normal;
+  }
+}
+
+@container (max-width: 220px) {
   .dashboard-quick__grid {
+    grid-template-rows: repeat(4, minmax(0, 1fr));
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-quick__item {
+    flex-direction: row;
+    gap: 5px;
+  }
+
+  .dashboard-quick__icon {
+    width: 22px;
+    height: 22px;
+    font-size: 15px;
+  }
+}
+
+@container dashboard-card (max-height: 250px) {
+  .dashboard-quick__grid {
+    gap: 4px;
+  }
+
+  .dashboard-quick__item {
+    gap: 4px;
+    padding: 2px;
+  }
+
+  .dashboard-quick__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+    border-radius: 7px;
+  }
+
+  .dashboard-quick__label {
+    font-size: 11px;
   }
 }
 

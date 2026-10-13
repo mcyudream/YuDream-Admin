@@ -40,7 +40,8 @@ describe('system metric chart', () => {
 
   it('uses the current theme in marks, axes and tooltip, and respects reduced motion', () => {
     const option = build({ theme: { ...theme, reducedMotion: true } })
-    assert.equal(option.animation, false)
+    assert.equal(option.animation, true)
+    assert.ok(Number(option.animationDuration) < Number(build().animationDuration))
     assert.equal((option.series as any[])[0].itemStyle.color, theme.accent)
     assert.equal((option.tooltip as any).backgroundColor, theme.surface)
     assert.equal((option.xAxis as any).axisLabel.color, theme.muted)
@@ -60,5 +61,16 @@ describe('system metric chart', () => {
     assert.equal((ranking.series as any[])[0].type, 'bar')
     assert.equal((build({ points: [points[0]] }).series as any[])[0].showSymbol, true)
     assert.deepEqual((build({ points: [] }).series as any[])[0].data, [])
+  })
+
+  it('keeps all classifications in short cards and switches to horizontal bars when tall', () => {
+    const points = Array.from({ length: 9 }, (_, i) => ({ label: `分类${i}`, value: i }))
+    const short = build({ kind: 'ranking', points, height: 120, width: 240 })
+    const tall = build({ kind: 'ranking', points, height: 240 })
+    assert.equal((short.xAxis as any).type, 'category')
+    assert.equal((short.xAxis as any).axisLabel.interval, 0)
+    assert.equal((short.xAxis as any).axisLabel.hideOverlap, false)
+    assert.equal((short.xAxis as any).data.length, 9)
+    assert.equal((tall.yAxis as any).type, 'category')
   })
 })

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DashboardBreakpoint, DashboardCard, DashboardLayout, DashboardLayoutItem, DashboardWorkspace } from '@/api/modules/system-dashboard'
+import { YdBlurReveal, YdSpotlightCard } from '@yudream/components'
 import apiDashboard from '@/api/modules/system-dashboard'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import DashboardCanvas from './dashboard/DashboardCanvas.vue'
@@ -591,25 +592,29 @@ function cardProps(card: DashboardCard) {
             :style="{ '--dashboard-card-index': Math.min(index, 7) }"
             :aria-label="card.title"
           >
-            <header class="dashboard-card__header">
-              <div class="dashboard-card__heading">
-                <FaIcon v-if="editMode" name="morph:grip-vertical" class="dashboard-card__grip" />
-                <span v-else class="dashboard-card__icon" :class="toneIconClass(card.tone)">
-                  <FaIcon :name="card.icon || 'morph:layout-grid'" />
-                </span>
-                <div class="dashboard-card__title-block">
-                  <h2>{{ displayCardTitle(card) }}</h2>
+            <YdSpotlightCard class="dashboard-card__surface" :gradient-opacity="editMode ? 0 : 0.08" :gradient-size="320">
+              <header class="dashboard-card__header">
+                <div class="dashboard-card__heading">
+                  <FaIcon v-if="editMode" name="morph:grip-vertical" class="dashboard-card__grip" />
+                  <span v-else class="dashboard-card__icon" :class="toneIconClass(card.tone)">
+                    <FaIcon :name="card.icon || 'morph:layout-grid'" />
+                  </span>
+                  <div class="dashboard-card__title-block">
+                    <h2>{{ displayCardTitle(card) }}</h2>
+                  </div>
                 </div>
+                <FaDropdown v-if="editMode" :items="cardMenu(card)" align="end">
+                  <FaButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
+                    <FaIcon name="morph:ellipsis" />
+                  </FaButton>
+                </FaDropdown>
+              </header>
+              <div class="dashboard-card__body" :inert="editMode || undefined">
+                <YdBlurReveal class="dashboard-card__reveal" :duration="0.32" :delay="0" blur="2px" :y-offset="6">
+                  <component :is="resolveCardComponent(card)" v-if="ready" v-bind="cardProps(card)" />
+                </YdBlurReveal>
               </div>
-              <FaDropdown v-if="editMode" :items="cardMenu(card)" align="end">
-                <FaButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
-                  <FaIcon name="morph:ellipsis" />
-                </FaButton>
-              </FaDropdown>
-            </header>
-            <div class="dashboard-card__body" :inert="editMode || undefined">
-              <component :is="resolveCardComponent(card)" v-if="ready" v-bind="cardProps(card)" />
-            </div>
+            </YdSpotlightCard>
           </article>
         </template>
       </DashboardCanvas>
@@ -734,7 +739,7 @@ function cardProps(card: DashboardCard) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  container-type: inline-size;
+  container: dashboard-card / size;
   overflow: hidden;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
@@ -816,12 +821,41 @@ function cardProps(card: DashboardCard) {
   min-height: 0;
 }
 
+.dashboard-card__surface {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+}
+
+.dashboard-card__surface :deep(.yd-spotlight-content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.dashboard-card__reveal {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
 .dashboard-card__body :deep(.dashboard-card__content) {
   flex: 1;
   min-width: 0;
   min-height: 0;
   margin: 0 20px 20px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .dashboard-card__body :deep(.dashboard-remote-host > .dashboard-card__content) {

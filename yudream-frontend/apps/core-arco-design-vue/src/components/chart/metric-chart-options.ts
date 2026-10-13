@@ -18,6 +18,8 @@ export type MetricChartOption = ComposeOption<LineSeriesOption | BarSeriesOption
 export const formatMetric = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
 export const shortMetricDate = (label: string) => label.replace(/^\d{4}[-/](\d{1,2})[-/](\d{1,2})$/, '$1/$2')
 
+export const metricCategoryAxis = (kind: MetricChartKind, height = 220) => kind === 'ranking' && height >= 190 ? 'y' : 'x'
+
 export function metricPoints(dimensions: string[], source: (unknown[] | Record<string, unknown>)[]): MetricPoint[] {
   return source.map((row) => {
     const cells = Array.isArray(row) ? row : dimensions.map(key => row[key])
@@ -33,9 +35,11 @@ export function buildMetricChartOption(input: {
   unit: string
   theme: MetricChartTheme
   width: number
+  height?: number
 }): MetricChartOption {
-  const { points, kind, unit, theme, width } = input
-  const ranking = kind === 'ranking'
+  const { points, kind, unit, theme, width, height = 220 } = input
+  const category = kind === 'ranking'
+  const ranking = metricCategoryAxis(kind, height) === 'y'
   const allZero = points.length > 0 && points.every(point => point.value === 0)
   const labels = points.map(point => point.label)
   const labelStep = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(width / 65))))
@@ -68,11 +72,11 @@ export function buildMetricChartOption(input: {
     backgroundColor: 'transparent',
     color: [theme.accent],
     textStyle: { fontFamily: theme.font, color: theme.text },
-    animation: !theme.reducedMotion,
-    animationDuration: 600,
-    animationDurationUpdate: 240,
+    animation: true,
+    animationDuration: theme.reducedMotion ? 350 : 600,
+    animationDurationUpdate: theme.reducedMotion ? 160 : 240,
     animationEasing: 'cubicOut',
-    grid: { top: 12, right: ranking ? 32 : 22, bottom: 2, left: 2, containLabel: true },
+    grid: { top: category && !ranking ? 22 : 12, right: ranking ? 32 : category ? 2 : 22, bottom: 2, left: 2, containLabel: true },
     tooltip: {
       trigger: 'axis',
       triggerOn: 'mousemove|click',
@@ -95,18 +99,18 @@ export function buildMetricChartOption(input: {
       ? valueAxis
       : {
           ...categoryAxis,
-          boundaryGap: kind === 'bar' && !allZero,
-          axisLabel: { ...categoryAxis.axisLabel, interval: labelStep - 1, showMinLabel: true, showMaxLabel: true, formatter: shortMetricDate },
+          boundaryGap: (kind === 'bar' || category) && !allZero,
+          axisLabel: { ...categoryAxis.axisLabel, interval: category ? 0 : labelStep - 1, hideOverlap: !category, rotate: category && width < 300 ? 45 : 0, fontSize: category ? 10 : 11, showMinLabel: true, showMaxLabel: true, formatter: shortMetricDate },
         },
     yAxis: ranking
       ? {
           ...categoryAxis,
           inverse: true,
           axisLine: { show: false },
-          axisLabel: { ...categoryAxis.axisLabel, color: theme.text, width: Math.min(92, width * 0.3), overflow: 'truncate', interval: 0 },
+          axisLabel: { ...categoryAxis.axisLabel, color: theme.text, hideOverlap: false, width: Math.min(92, width * 0.3), overflow: 'truncate', interval: 0 },
         }
       : valueAxis,
-    series: kind === 'line' || (allZero && !ranking)
+    series: kind === 'line' || (allZero && !category)
       ? [{
           ...baseSeries,
           type: 'line',
@@ -127,7 +131,7 @@ export function buildMetricChartOption(input: {
           type: 'bar',
           barMaxWidth: ranking ? 14 : 22,
           itemStyle: { color: theme.accent, borderRadius: ranking ? [0, 3, 3, 0] : [3, 3, 0, 0] },
-          label: { show: ranking, position: 'right', color: theme.text, fontSize: 12, formatter: params => params.value === null ? '—' : formatMetric(Number(params.value)) },
+          label: { show: category, position: ranking ? 'right' : 'top', color: theme.text, fontSize: 11, formatter: params => params.value === null ? '—' : formatMetric(Number(params.value)) },
         }],
   }
 }
