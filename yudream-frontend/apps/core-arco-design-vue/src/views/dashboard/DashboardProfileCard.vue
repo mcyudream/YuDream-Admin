@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DashboardCard } from '@/api/modules/system-dashboard'
+import { useNow } from '@vueuse/core'
 
 interface Props {
   card: DashboardCard
@@ -14,8 +15,9 @@ interface Props {
 const props = defineProps<Props>()
 
 const displayName = computed(() => props.account || '朋友')
+const now = useNow({ interval: 60_000 })
 const greeting = computed(() => {
-  const hour = new Date().getHours()
+  const hour = now.value.getHours()
   if (hour < 6) {
     return '夜深了'
   }
@@ -31,16 +33,16 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   month: 'long',
   day: 'numeric',
   weekday: 'long',
-}).format(new Date()))
+}).format(now.value))
 </script>
 
 <template>
   <div class="dashboard-card__content dashboard-profile">
     <div class="dashboard-profile__welcome">
       <div class="dashboard-profile__copy">
-        <span>{{ todayText }}</span>
+        <span class="dashboard-profile__date"><FaIcon name="morph:calendar-days" />{{ todayText }}</span>
         <h3>{{ greeting }}，{{ displayName }}</h3>
-        <p>{{ dept || '未选择部门' }} · {{ role || '未选择角色' }}</p>
+        <p>欢迎回来，从这里开始今天的工作。</p>
       </div>
       <FaAvatar
         :src="avatar || ''"
@@ -72,7 +74,7 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
 <style scoped>
 .dashboard-profile {
   display: grid;
-  gap: 12px;
+  gap: 18px;
   align-content: space-between;
 }
 
@@ -86,33 +88,37 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
 
 .dashboard-profile__copy {
   display: grid;
-  gap: 7px;
+  gap: 10px;
   min-width: 0;
 }
 
-.dashboard-profile__copy span {
-  color: var(--color-text-3);
+.dashboard-profile__date {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
   font-size: 12px;
+  color: var(--color-text-3);
 }
 
 .dashboard-profile__copy h3 {
   margin: 0;
   overflow: hidden;
-  color: var(--color-text-1);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.22;
   text-overflow: ellipsis;
+  font-size: clamp(22px, 4.8cqi, 30px);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text-1);
+  letter-spacing: -0.04em;
   white-space: nowrap;
 }
 
 .dashboard-profile__copy p {
   margin: 0;
   overflow: hidden;
-  color: var(--color-text-3);
+  text-overflow: ellipsis;
   font-size: 13px;
   line-height: 1.45;
-  text-overflow: ellipsis;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
@@ -120,16 +126,15 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   overflow: hidden;
-  color: var(--color-text-1);
   font-size: 26px;
-  background:
-    linear-gradient(135deg, rgb(var(--primary-6) / 0.12), rgb(var(--success-6) / 0.08)),
-    var(--color-fill-2);
+  color: var(--color-text-1);
+  background: var(--color-fill-2);
   border: 1px solid var(--color-border-2);
-  border-radius: 16px;
+  border-radius: var(--yd-surface-radius, 18px);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-text-1) 6%, transparent);
 }
 
 .dashboard-profile__chips {
@@ -144,12 +149,12 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   gap: 6px;
   align-items: center;
   max-width: 100%;
-  min-height: 28px;
-  padding: 0 9px;
+  min-height: 30px;
+  padding: 0 10px;
   overflow: hidden;
-  color: var(--color-text-2);
-  font-size: 12px;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-2);
   white-space: nowrap;
   background: var(--color-fill-2);
   border: 1px solid var(--color-border-1);
@@ -171,12 +176,18 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   border-radius: 6px;
 }
 
-@container (max-width: 320px) {
+@container (max-width: 280px) {
   .dashboard-profile__welcome {
-    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .dashboard-profile__avatar {
+    width: 44px;
+    height: 44px;
   }
 
   .dashboard-profile__copy h3 {
+    overflow-wrap: anywhere;
     white-space: normal;
   }
 }

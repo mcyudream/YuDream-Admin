@@ -34,7 +34,7 @@ watch(scrollOnHide, (val) => {
 <template>
   <Transition name="topbar">
     <div
-      v-if="enable" ref="topbarRef" class="flex flex-col w-full shadow-[0_1px_0_0_oklch(var(--border))] transition-transform-300"
+      v-if="enable" ref="topbarRef" class="admin-topbar flex flex-col w-full"
     >
       <Tabbar v-if="enableTabbar" class="z-2" />
       <Toolbar v-if="enableToolbar" class="z-1" />
@@ -43,10 +43,15 @@ watch(scrollOnHide, (val) => {
 </template>
 
 <style scoped>
+.admin-topbar {
+  box-shadow: 0 1px 0 var(--color-border-2), 0 4px 16px color-mix(in srgb, var(--color-text-1) 3%, transparent);
+  transition: transform var(--yd-motion-duration-normal) var(--yd-motion-ease);
+}
+
 /* 顶栏动画 */
 .topbar-enter-active,
 .topbar-leave-active {
-  transition: transform 0.3s;
+  transition: transform var(--yd-motion-duration-slow) var(--yd-motion-ease);
 }
 
 .topbar-enter-from,

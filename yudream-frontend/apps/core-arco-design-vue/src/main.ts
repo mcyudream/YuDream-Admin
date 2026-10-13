@@ -1,13 +1,13 @@
+import formCreate from '@form-create/arco-design'
+import FcDesigner from 'form-create-designer-arco-design'
+import { loadingFadeOut } from 'virtual:app-loading'
+
 // 加载 iconify 图标
 import { downloadAndInstall } from '@/iconify'
 import icons from '@/iconify/index.json'
 // 自定义指令
 import directive from '@/utils/directive'
-
 import App from './App.vue'
-import formCreate from '@form-create/arco-design'
-import FcDesigner from 'form-create-designer-arco-design'
-import { loadingFadeOut } from 'virtual:app-loading'
 import { bootstrapPluginThemes, watchPluginThemeScope } from './plugins/theme-runtime'
 import router from './router'
 import { applyStartupBranding, initializeStartupBranding } from './startup-branding'
@@ -19,6 +19,7 @@ import '@/utils/storage'
 import 'virtual:uno.css'
 // 全局样式
 import '@/assets/styles/globals.css'
+import '@/assets/styles/admin-appearance.css'
 import 'material-symbols/outlined.css'
 
 const app = createApp(App)
@@ -29,10 +30,10 @@ const appSettingsStore = useAppSettingsStore(pinia)
 
 async function bootstrap() {
   const branding = initializeStartupBranding(
-    () => appSettingsStore.loadSiteSettings(),
+    // 正常响应先应用预设再展示页面，接口缓慢时共享 1.5s 启动窗口，随后异步更新。
+    () => Promise.all([appSettingsStore.loadSiteSettings(), appSettingsStore.loadThemeSettings()]),
     () => applyStartupBranding(document, appSettingsStore.siteName),
   )
-  appSettingsStore.loadThemeSettings()
   // 与站点名并行拉取插件主题：公开站启动页要等 SITE CSS 注入后再淡出，
   // 否则全局换页动画会一直停在宿主彩虹方块上。
   await Promise.all([branding, bootstrapPluginThemes()])
