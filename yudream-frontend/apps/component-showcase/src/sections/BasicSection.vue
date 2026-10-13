@@ -15,107 +15,107 @@ function closeTag(id: number) {
 </script>
 
 <template>
-  <DemoCard title="FaButton" description="variant / size / loading / 图标按钮 / 禁用">
+  <DemoCard title="YdButton" description="variant / size / loading / 图标按钮 / 禁用">
     <p class="demo-label">
       变体
     </p>
     <div class="demo-row">
-      <FaButton>默认按钮</FaButton>
-      <FaButton variant="destructive">
+      <YdButton>默认按钮</YdButton>
+      <YdButton variant="destructive">
         危险按钮
-      </FaButton>
-      <FaButton variant="outline">
+      </YdButton>
+      <YdButton variant="outline">
         边框按钮
-      </FaButton>
-      <FaButton variant="secondary">
+      </YdButton>
+      <YdButton variant="secondary">
         次要按钮
-      </FaButton>
-      <FaButton variant="ghost">
+      </YdButton>
+      <YdButton variant="ghost">
         幽灵按钮
-      </FaButton>
-      <FaButton variant="link">
+      </YdButton>
+      <YdButton variant="link">
         链接按钮
-      </FaButton>
+      </YdButton>
     </div>
 
     <p class="demo-label">
       尺寸
     </p>
     <div class="demo-row">
-      <FaButton size="sm">
+      <YdButton size="sm">
         小按钮
-      </FaButton>
-      <FaButton>默认尺寸</FaButton>
-      <FaButton size="lg">
+      </YdButton>
+      <YdButton>默认尺寸</YdButton>
+      <YdButton size="lg">
         大按钮
-      </FaButton>
-      <FaButton size="icon-sm" variant="outline">
-        <FaIcon name="morph:search" />
-      </FaButton>
-      <FaButton size="icon" variant="outline">
-        <FaIcon name="morph:settings" />
-      </FaButton>
-      <FaButton size="icon-lg" variant="outline">
-        <FaIcon name="morph:plus" />
-      </FaButton>
+      </YdButton>
+      <YdButton size="icon-sm" variant="outline">
+        <YdIcon name="morph:search" />
+      </YdButton>
+      <YdButton size="icon" variant="outline">
+        <YdIcon name="morph:settings" />
+      </YdButton>
+      <YdButton size="icon-lg" variant="outline">
+        <YdIcon name="morph:plus" />
+      </YdButton>
     </div>
 
     <p class="demo-label">
       加载 / 禁用
     </p>
     <div class="demo-row">
-      <FaButton loading>
+      <YdButton loading>
         加载中
-      </FaButton>
-      <FaButton variant="outline" loading>
+      </YdButton>
+      <YdButton variant="outline" loading>
         保存中
-      </FaButton>
-      <FaButton disabled>
+      </YdButton>
+      <YdButton disabled>
         禁用按钮
-      </FaButton>
+      </YdButton>
     </div>
   </DemoCard>
 
-  <DemoCard title="FaTag" description="variant / 图标 / 可关闭">
+  <DemoCard title="YdTag" description="variant / 图标 / 可关闭">
     <p class="demo-label">
       变体
     </p>
     <div class="demo-row">
-      <FaTag>默认标签</FaTag>
-      <FaTag variant="destructive">
+      <YdTag>默认标签</YdTag>
+      <YdTag variant="destructive">
         危险标签
-      </FaTag>
-      <FaTag variant="outline">
+      </YdTag>
+      <YdTag variant="outline">
         边框标签
-      </FaTag>
-      <FaTag variant="secondary">
+      </YdTag>
+      <YdTag variant="secondary">
         次要标签
-      </FaTag>
+      </YdTag>
     </div>
 
     <p class="demo-label">
       带图标
     </p>
     <div class="demo-row">
-      <FaTag icon="morph:check">
+      <YdTag icon="morph:check">
         成功
-      </FaTag>
-      <FaTag icon="morph:triangle-alert" variant="destructive">
+      </YdTag>
+      <YdTag icon="morph:triangle-alert" variant="destructive">
         警告
-      </FaTag>
-      <FaTag icon="morph:info" variant="outline">
+      </YdTag>
+      <YdTag icon="morph:info" variant="outline">
         信息
-      </FaTag>
-      <FaTag icon="morph:star" variant="secondary">
+      </YdTag>
+      <YdTag icon="morph:star" variant="secondary">
         收藏
-      </FaTag>
+      </YdTag>
     </div>
 
     <p class="demo-label">
       可关闭
     </p>
     <div class="demo-row">
-      <FaTag
+      <YdTag
         v-for="tag in tags"
         :key="tag.id"
         :variant="tag.variant"
@@ -123,36 +123,36 @@ function closeTag(id: number) {
         @close="closeTag(tag.id)"
       >
         {{ tag.label }}
-      </FaTag>
+      </YdTag>
     </div>
   </DemoCard>
 
-  <DemoCard title="FaBadge" description="圆点 / 数字 / 文本 / 变体">
+  <DemoCard title="YdBadge" description="圆点 / 数字 / 文本 / 变体">
     <div class="demo-row !gap-8">
-      <FaBadge :value="true">
-        <FaIcon name="morph:bell" class="text-xl" />
-      </FaBadge>
-      <FaBadge :value="99">
-        <FaIcon name="morph:bell" class="text-xl" />
-      </FaBadge>
-      <FaBadge value="新">
-        <FaIcon name="morph:mail" class="text-xl" />
-      </FaBadge>
-      <FaBadge value="9" variant="secondary">
-        <FaIcon name="morph:message-square" class="text-xl" />
-      </FaBadge>
-      <FaBadge value="9" variant="destructive">
-        <FaIcon name="morph:alarm-clock" class="text-xl" />
-      </FaBadge>
+      <YdBadge :value="true">
+        <YdIcon name="morph:bell" class="text-xl" />
+      </YdBadge>
+      <YdBadge :value="99">
+        <YdIcon name="morph:bell" class="text-xl" />
+      </YdBadge>
+      <YdBadge value="新">
+        <YdIcon name="morph:mail" class="text-xl" />
+      </YdBadge>
+      <YdBadge value="9" variant="secondary">
+        <YdIcon name="morph:message-square" class="text-xl" />
+      </YdBadge>
+      <YdBadge value="9" variant="destructive">
+        <YdIcon name="morph:alarm-clock" class="text-xl" />
+      </YdBadge>
     </div>
   </DemoCard>
 
-  <DemoCard title="FaAvatar" description="图片 / 文字兜底">
+  <DemoCard title="YdAvatar" description="图片 / 文字兜底">
     <div class="demo-row">
-      <FaAvatar src="https://fantastic-admin.hurui.me/logo.svg" />
-      <FaAvatar src="https://fantastic-admin.hurui.me/logo.svg" class="size-12" />
-      <FaAvatar src="" fallback="雨梦" />
-      <FaAvatar src="" fallback="Fa" class="size-12" />
+      <YdAvatar src="https://fantastic-admin.hurui.me/logo.svg" />
+      <YdAvatar src="https://fantastic-admin.hurui.me/logo.svg" class="size-12" />
+      <YdAvatar src="" fallback="雨梦" />
+      <YdAvatar src="" fallback="Fa" class="size-12" />
     </div>
   </DemoCard>
 </template>

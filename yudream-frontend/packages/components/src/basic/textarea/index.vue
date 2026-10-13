@@ -7,6 +7,7 @@ import { Textarea } from './textarea'
 
 defineOptions({
   name: 'BuiltInTextarea',
+  inheritAttrs: false,
 })
 
 const props = withDefaults(defineProps<{

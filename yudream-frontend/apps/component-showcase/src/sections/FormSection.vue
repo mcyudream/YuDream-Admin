@@ -17,7 +17,7 @@ const switchOn = ref(true)
 const selectOptions = [
   { label: 'Vue 3', value: '1' },
   { label: 'TypeScript', value: '2' },
-  { label: 'Arco Design', value: '3' },
+  { label: 'YD 组件', value: '3' },
 ]
 
 interface PluginItem {
@@ -85,35 +85,35 @@ const pickerCode = `<YdTablePicker
 </script>
 
 <template>
-  <DemoCard title="FaInput" description="基础 / 可清空 / 密码 / 禁用">
+  <DemoCard title="YdInput" description="基础 / 可清空 / 密码 / 禁用">
     <div class="gap-3 grid max-w-md">
-      <FaInput v-model="inputBasic" placeholder="请输入内容" />
-      <FaInput v-model="inputClearable" clearable placeholder="可清空" />
-      <FaInput v-model="inputPassword" type="password" placeholder="请输入密码" />
-      <FaInput model-value="禁用状态" disabled />
+      <YdInput v-model="inputBasic" placeholder="请输入内容" />
+      <YdInput v-model="inputClearable" clearable placeholder="可清空" />
+      <YdInput v-model="inputPassword" type="password" placeholder="请输入密码" />
+      <YdInput model-value="禁用状态" disabled />
     </div>
   </DemoCard>
 
-  <DemoCard title="FaTextarea" description="基础 / 禁用">
+  <DemoCard title="YdTextarea" description="基础 / 禁用">
     <div class="gap-3 grid max-w-md">
-      <FaTextarea v-model="textareaValue" :rows="3" placeholder="请输入多行内容" />
-      <FaTextarea model-value="禁用状态的多行文本" :rows="2" disabled />
+      <YdTextarea v-model="textareaValue" :rows="3" placeholder="请输入多行内容" />
+      <YdTextarea model-value="禁用状态的多行文本" :rows="2" disabled />
     </div>
   </DemoCard>
 
-  <DemoCard title="FaSelect" description="单选 / 多选 / 禁用">
+  <DemoCard title="YdSelect" description="单选 / 多选 / 禁用">
     <div class="gap-3 grid max-w-md">
-      <FaSelect v-model="selectSingle" :options="selectOptions" />
-      <FaSelect v-model="selectMultiple" :options="selectOptions" multiple />
-      <FaSelect model-value="1" :options="selectOptions" disabled />
+      <YdSelect v-model="selectSingle" :options="selectOptions" />
+      <YdSelect v-model="selectMultiple" :options="selectOptions" multiple />
+      <YdSelect model-value="1" :options="selectOptions" disabled />
     </div>
   </DemoCard>
 
-  <DemoCard title="FaSwitch" description="基础 / 禁用">
+  <DemoCard title="YdSwitch" description="基础 / 禁用">
     <div class="demo-row">
-      <FaSwitch v-model="switchValue" />
-      <FaSwitch v-model="switchOff" disabled />
-      <FaSwitch v-model="switchOn" disabled />
+      <YdSwitch v-model="switchValue" />
+      <YdSwitch v-model="switchOff" disabled />
+      <YdSwitch v-model="switchOn" disabled />
     </div>
   </DemoCard>
 
@@ -139,7 +139,7 @@ const pickerCode = `<YdTablePicker
           :initial-labels="{ 'p-003': pluginPool[2].name, 'p-018': pluginPool[17].name }"
         >
           <template #filters>
-            <FaSelect
+            <YdSelect
               v-model="pickerCategory"
               :options="[{ label: '全部分类', value: '' }, ...pluginCategories.map(item => ({ label: item, value: item }))]"
               class="w-32"
@@ -176,14 +176,14 @@ const pickerCode = `<YdTablePicker
 <style scoped>
 .picker-label {
   margin-bottom: 6px;
-  color: var(--color-text-2);
   font-size: 12px;
+  color: var(--color-text-2);
 }
 
 .picker-echo {
   margin-top: 6px;
-  color: var(--color-text-3);
   font-size: 12px;
+  color: var(--color-text-3);
   word-break: break-all;
 }
 </style>

@@ -1,0 +1,183 @@
+@import "../theme/appearance.css";
+@import "./collection.css";
+
+/* 只消费根部令牌：插件可覆盖变量，不在组件内重复声明默认主题。 */
+.yd-surface {
+  color: oklch(var(--card-foreground));
+  background: oklch(var(--card));
+  border: 1px solid oklch(var(--border));
+  border-radius: var(--yd-surface-radius);
+  box-shadow: var(--yd-surface-shadow);
+}
+
+.yd-pad {
+  padding: var(--yd-surface-padding);
+}
+
+.yd-stack {
+  display: grid;
+  gap: var(--yd-content-gap);
+  min-width: 0;
+}
+
+.yd-row {
+  display: flex;
+  gap: var(--yd-content-gap);
+  align-items: center;
+  min-width: 0;
+}
+
+.yd-muted {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-control {
+  min-height: var(--yd-control-height);
+  font-size: var(--yd-control-font-size);
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-focus:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: 3px;
+}
+
+.yd-calendar {
+  width: max-content;
+  max-width: 100%;
+  padding: var(--yd-surface-padding);
+}
+
+.yd-calendar table {
+  border-spacing: 3px;
+  border-collapse: separate;
+}
+
+.yd-calendar th {
+  height: 2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-calendar td {
+  padding: 0;
+  text-align: center;
+}
+
+.yd-calendar-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yd-control-height);
+  height: var(--yd-control-height);
+  padding: 0 0.5rem;
+  font-size: var(--yd-control-font-size);
+  cursor: pointer;
+  border-radius: var(--yd-control-radius);
+  transition: background var(--yd-motion-duration-fast), scale var(--yd-motion-duration-fast);
+}
+
+.yd-calendar-cell:hover {
+  background: oklch(var(--accent));
+}
+
+.yd-calendar-cell[data-selected],
+.yd-calendar-cell[data-selection-start],
+.yd-calendar-cell[data-selection-end] {
+  color: oklch(var(--primary-foreground));
+  background: oklch(var(--primary));
+}
+
+.yd-calendar-cell[data-highlighted]:not([data-selection-start], [data-selection-end]) {
+  background: oklch(var(--accent));
+}
+
+.yd-calendar-cell[data-today] {
+  box-shadow: inset 0 0 0 1px oklch(var(--ring));
+}
+
+.yd-calendar-cell[data-outside-view] {
+  opacity: 0.4;
+}
+
+.yd-calendar-cell[data-disabled],
+.yd-calendar-cell[data-unavailable] {
+  text-decoration: line-through;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.yd-calendar-cell:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: 1px;
+}
+
+.yd-calendar-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.yd-calendar-nav button {
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-calendar-nav button:hover {
+  background: oklch(var(--accent));
+}
+
+.yd-calendar-months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--yd-content-gap);
+}
+
+.yd-calendar-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.yd-collection {
+  color: oklch(var(--foreground));
+  background: oklch(var(--background));
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-collection .arco-tree-node-title,
+.yd-collection .arco-select-view-single,
+.yd-collection .arco-input-wrapper,
+.yd-collection .arco-textarea-wrapper {
+  font-size: var(--yd-control-font-size);
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-collection .arco-tree-node-title {
+  min-height: var(--yd-control-height);
+}
+
+.yd-motion {
+  transition-timing-function: var(--yd-motion-ease-spring);
+  transition-duration: var(--yd-motion-duration-normal);
+}
+
+@media (width <= 768px) {
+  .yd-calendar {
+    padding: 12px;
+  }
+
+  .yd-calendar table {
+    border-spacing: 2px;
+  }
+
+  .yd-calendar-cell {
+    min-width: 32px;
+    height: 32px;
+    padding-inline: 4px;
+  }
+}

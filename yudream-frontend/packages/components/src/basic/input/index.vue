@@ -10,6 +10,7 @@ import { InputGroup, InputGroupAddon } from './input-group'
 
 defineOptions({
   name: 'BuiltInInput',
+  inheritAttrs: false,
 })
 
 const props = withDefaults(defineProps<{

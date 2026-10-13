@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { YdChatAction, YdChatCitation, YdChatGraphNode, YdChatMessage, YdChatRetrievalHit, YdPromptItem, YdSuggestionItem, YdThoughtChainItem } from '@yudream/components'
-import { useFaToast, YdBubble, YdChatLoading, YdChatMessageList, YdChatProcess, YdChatReasoning, YdChatSender, YdChatSessionList, YdCitationList, YdPrompts, YdSuggestion, YdThoughtChain, YdWelcome } from '@yudream/components'
+import { useYdToast, YdBubble, YdChatLoading, YdChatMessageList, YdChatProcess, YdChatReasoning, YdChatSender, YdChatSessionList, YdCitationList, YdPrompts, YdSuggestion, YdThoughtChain, YdWelcome } from '@yudream/components'
 import { onUnmounted, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const demoCitations: YdChatCitation[] = [
   { title: '快速上手 · 安装与启动', path: '/guide/getting-started', nodeId: 'doc-1' },
@@ -293,8 +293,8 @@ function onActionClick(action: YdChatAction) {
         @citation-click="onCitationClick"
       >
         <template #empty>
-          <div class="grid justify-items-center gap-2">
-            <FaIcon name="morph:sparkles" class="text-2xl text-primary" />
+          <div class="gap-2 grid justify-items-center">
+            <YdIcon name="morph:sparkles" class="text-2xl text-primary" />
             <span>向示例知识库提问吧</span>
           </div>
         </template>
@@ -310,22 +310,22 @@ function onActionClick(action: YdChatAction) {
   </DemoCard>
 
   <DemoCard title="YdSuggestion 快捷指令" description="输入 / 唤起快捷指令（对齐 antd-x Suggestion），支持方向键与 Enter 选择">
-    <div class="grid max-w-md gap-3">
-      <FaInput v-model="suggestionText" placeholder="输入 / 唤起快捷指令" />
+    <div class="gap-3 grid max-w-md">
+      <YdInput v-model="suggestionText" placeholder="输入 / 唤起快捷指令" />
       <YdSuggestion :text="suggestionText" :items="suggestionItems" @select="toast.info(`选中指令：${$event.label}`)" />
     </div>
   </DemoCard>
 
   <DemoCard title="YdThoughtChain 思维链 + YdChatReasoning 深度思考" description="推理步骤时间线（对齐 antd-x ThoughtChain）与可折叠的推理内容块（对齐 tdesign ChatReasoning）">
-    <div class="grid max-w-xl gap-4">
+    <div class="gap-4 grid max-w-xl">
       <YdThoughtChain :items="chainItems" title="回答生成过程" />
       <YdChatReasoning content="用户想知道知识库结构，我先检索目录页，再按主题归纳输出。" pending />
     </div>
   </DemoCard>
 
   <DemoCard title="YdChatLoading 加载态 + YdChatProcess 执行过程" description="等待首字节的三点动画，以及检索/图谱等过程时间线">
-    <div class="grid max-w-xl gap-4">
-      <div class="flex items-center gap-6 border border-[var(--color-border-2)] rounded-lg p-4">
+    <div class="gap-4 grid max-w-xl">
+      <div class="p-4 border border-[var(--color-border-2)] rounded-lg flex gap-6 items-center">
         <YdChatLoading text="正在检索并思考…" />
         <YdChatLoading text="" />
       </div>
@@ -334,8 +334,8 @@ function onActionClick(action: YdChatAction) {
   </DemoCard>
 
   <DemoCard title="YdCitationList 引用来源" description="独立的引用来源，带序号，可折叠">
-    <div class="max-w-xl border border-[var(--color-border-2)] rounded-lg p-4">
-      <p class="m-0 text-sm text-[var(--color-text-2)]">
+    <div class="p-4 border border-[var(--color-border-2)] rounded-lg max-w-xl">
+      <p class="text-sm text-[var(--color-text-2)] m-0">
         这是一段回答正文，下方是引用来源：
       </p>
       <YdCitationList :citations="demoCitations" @select="onCitationClick" />
@@ -343,46 +343,54 @@ function onActionClick(action: YdChatAction) {
   </DemoCard>
 
   <DemoCard title="YdChatProvider 全局配置" description="provideYdChatConfig 在应用根部统一提供占位文案、思考提示、免责声明等默认值（对齐 antd-x XProvider / tdesign ChatProvider）" :code="providerCode">
-    <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-      <div class="rounded-lg border border-[var(--color-border-2)] p-3">
-        <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-          <FaIcon name="morph:settings-2" class="text-primary" /> 统一文案
+    <div class="text-sm gap-2 grid grid-cols-1 sm:grid-cols-2">
+      <div class="p-3 border border-[var(--color-border-2)] rounded-lg">
+        <p class="font-medium m-0 mb-1 flex gap-1 items-center">
+          <YdIcon name="morph:settings-2" class="text-primary" /> 统一文案
         </p>
-        <p class="m-0 text-xs text-[var(--color-text-3)]">placeholder / thinkingText / disclaimer 一次配置全站生效。</p>
+        <p class="text-xs text-[var(--color-text-3)] m-0">
+          placeholder / thinkingText / disclaimer 一次配置全站生效。
+        </p>
       </div>
-      <div class="rounded-lg border border-[var(--color-border-2)] p-3">
-        <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-          <FaIcon name="morph:arrow-left-right" class="text-primary" /> 内容转换
+      <div class="p-3 border border-[var(--color-border-2)] rounded-lg">
+        <p class="font-medium m-0 mb-1 flex gap-1 items-center">
+          <YdIcon name="morph:arrow-left-right" class="text-primary" /> 内容转换
         </p>
-        <p class="m-0 text-xs text-[var(--color-text-3)]">transformContent 全局处理 wikilink 等自定义协议。</p>
+        <p class="text-xs text-[var(--color-text-3)] m-0">
+          transformContent 全局处理 wikilink 等自定义协议。
+        </p>
       </div>
     </div>
   </DemoCard>
 
   <DemoCard title="useYdChatStream / useYdChat / ydRequest / readYdStream" description="AG-UI 协议适配 + 聊天数据管理 + 请求与流原语（对齐 antd-x useXAgent / useXChat / XRequest / XStream）" :code="`${aguiCode}\n\n${streamCode}`">
-    <div class="grid gap-3 text-sm">
+    <div class="text-sm gap-3 grid">
       <div class="flex flex-wrap gap-2">
-        <FaTag>RUN_STARTED</FaTag>
-        <FaTag>TEXT_MESSAGE_CHUNK</FaTag>
-        <FaTag>THINKING_TEXT_MESSAGE_*</FaTag>
-        <FaTag>TOOL_CALL_START</FaTag>
-        <FaTag>TOOL_CALL_RESULT</FaTag>
-        <FaTag>ACTIVITY_SNAPSHOT</FaTag>
-        <FaTag>RUN_FINISHED</FaTag>
-        <FaTag>RUN_ERROR</FaTag>
+        <YdTag>RUN_STARTED</YdTag>
+        <YdTag>TEXT_MESSAGE_CHUNK</YdTag>
+        <YdTag>THINKING_TEXT_MESSAGE_*</YdTag>
+        <YdTag>TOOL_CALL_START</YdTag>
+        <YdTag>TOOL_CALL_RESULT</YdTag>
+        <YdTag>ACTIVITY_SNAPSHOT</YdTag>
+        <YdTag>RUN_FINISHED</YdTag>
+        <YdTag>RUN_ERROR</YdTag>
       </div>
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div class="rounded-lg border border-[var(--color-border-2)] p-3">
-          <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-            <FaIcon name="morph:rss" class="text-primary" /> SSE
+      <div class="gap-2 grid grid-cols-1 sm:grid-cols-2">
+        <div class="p-3 border border-[var(--color-border-2)] rounded-lg">
+          <p class="font-medium m-0 mb-1 flex gap-1 items-center">
+            <YdIcon name="morph:rss" class="text-primary" /> SSE
           </p>
-          <p class="m-0 text-xs text-[var(--color-text-3)]">fetch + ReadableStream 增量解析，适合单向流式问答。</p>
+          <p class="text-xs text-[var(--color-text-3)] m-0">
+            fetch + ReadableStream 增量解析，适合单向流式问答。
+          </p>
         </div>
-        <div class="rounded-lg border border-[var(--color-border-2)] p-3">
-          <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-            <FaIcon name="morph:arrow-left-right" class="text-primary" /> WebSocket
+        <div class="p-3 border border-[var(--color-border-2)] rounded-lg">
+          <p class="font-medium m-0 mb-1 flex gap-1 items-center">
+            <YdIcon name="morph:arrow-left-right" class="text-primary" /> WebSocket
           </p>
-          <p class="m-0 text-xs text-[var(--color-text-3)]">一问一连接，支持双向交互与结构化 AG-UI 事件。</p>
+          <p class="text-xs text-[var(--color-text-3)] m-0">
+            一问一连接，支持双向交互与结构化 AG-UI 事件。
+          </p>
         </div>
       </div>
     </div>
@@ -392,11 +400,11 @@ function onActionClick(action: YdChatAction) {
 <style scoped>
 .ai-demo {
   display: flex;
+  flex-direction: column;
   overflow: hidden;
+  background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: var(--border-radius-large);
-  background: var(--color-bg-2);
-  flex-direction: column;
 }
 
 .ai-demo--bubble {

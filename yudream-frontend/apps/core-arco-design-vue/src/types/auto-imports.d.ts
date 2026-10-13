@@ -106,6 +106,12 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
+  const useYdDrawer: typeof import('@yudream/components').useYdDrawer
+  const useYdImagePreview: typeof import('@yudream/components').useYdImagePreview
+  const useYdLoading: typeof import('@yudream/components').useYdLoading
+  const useYdModal: typeof import('@yudream/components').useYdModal
+  const useYdMotion: typeof import('@yudream/components').useYdMotion
+  const useYdToast: typeof import('@yudream/components').useYdToast
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect

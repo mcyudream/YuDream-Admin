@@ -21,7 +21,8 @@
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
     "./examples": "./src/examples.ts",
-    "./resolver": "./resolver.ts"
+    "./resolver": "./resolver.ts",
+    "./appearance.css": "./src/theme/appearance.css"
   },
   "peerDependencies": {
     "@vueuse/components": "catalog:",
@@ -59,7 +60,11 @@
     "sigma": "catalog:",
     "tailwind-merge": "catalog:",
     "vue-input-otp": "catalog:",
-    "vue-sonner": "catalog:"
+    "vue-sonner": "catalog:",
+    "@internationalized/date": "catalog:",
+    "qrcode": "catalog:",
+    "highlight.js": "catalog:",
+    "@types/qrcode": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

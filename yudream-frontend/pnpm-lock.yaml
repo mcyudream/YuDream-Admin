@@ -55,6 +55,9 @@ catalogs:
     '@iconify/vue':
       specifier: ^5.0.1
       version: 5.0.1
+    '@internationalized/date':
+      specifier: 3.12.2
+      version: 3.12.2
     '@jboltai/tokui':
       specifier: ^0.1.4
       version: 0.1.4
@@ -214,6 +217,9 @@ catalogs:
     gridstack:
       specifier: ^12.6.0
       version: 12.6.0
+    highlight.js:
+      specifier: ^11.11.1
+      version: 11.12.0
     hotkeys-js:
       specifier: ^4.0.4
       version: 4.0.4
@@ -480,12 +486,18 @@ importers:
 
   apps/component-showcase:
     dependencies:
-      '@arco-design/color':
-        specifier: ^0.4.0
-        version: 0.4.0
       '@arco-design/web-vue':
         specifier: catalog:arco-design-vue
         version: 2.58.0(vue@3.5.38(typescript@6.0.3))
+      '@fantastic-admin/settings':
+        specifier: workspace:*
+        version: link:../../packages/settings
+      '@fantastic-admin/themes':
+        specifier: workspace:*
+        version: link:../../packages/themes
+      '@vueuse/core':
+        specifier: 'catalog:'
+        version: 14.3.0(vue@3.5.38(typescript@6.0.3))
       '@yudream/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -559,6 +571,9 @@ importers:
       '@fantastic-admin/settings':
         specifier: workspace:*
         version: link:../../packages/settings
+      '@fantastic-admin/themes':
+        specifier: workspace:*
+        version: link:../../packages/themes
       '@fantastic-admin/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -921,6 +936,9 @@ importers:
       '@iconify/vue':
         specifier: 'catalog:'
         version: 5.0.1(vue@3.5.38(typescript@6.0.3))
+      '@internationalized/date':
+        specifier: 'catalog:'
+        version: 3.12.2
       '@lucide/vue':
         specifier: 'catalog:'
         version: 1.17.0(vue@3.5.38(typescript@6.0.3))
@@ -930,6 +948,9 @@ importers:
       '@tanstack/vue-table':
         specifier: 'catalog:'
         version: 8.21.3(vue@3.5.38(typescript@6.0.3))
+      '@types/qrcode':
+        specifier: 'catalog:'
+        version: 1.5.6
       '@vueuse/components':
         specifier: 'catalog:'
         version: 14.3.0(vue@3.5.38(typescript@6.0.3))
@@ -957,6 +978,9 @@ importers:
       graphology:
         specifier: 'catalog:'
         version: 0.26.0(graphology-types@0.24.8)
+      highlight.js:
+        specifier: 'catalog:'
+        version: 11.12.0
       lucide:
         specifier: 'catalog:'
         version: 1.52.0
@@ -966,6 +990,9 @@ importers:
       morphicons:
         specifier: 'catalog:'
         version: 1.7.1(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)(vue@3.5.38(typescript@6.0.3))
+      qrcode:
+        specifier: 'catalog:'
+        version: 1.5.4
       reka-ui:
         specifier: 'catalog:'
         version: 2.9.10(vue@3.5.38(typescript@6.0.3))
@@ -6681,6 +6708,10 @@ packages:
 
   hermes-parser@0.36.1:
     resolution: {integrity: sha512-GApNk4zLHi2UWoWZZkx7LNCOSzLSc5lB55pZ/PhK7ycFeg7u5LcF88p/WbpIi1XUDtE0MpHE3uRR3u3KB7TjSQ==}
+
+  highlight.js@11.12.0:
+    resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
+    engines: {node: '>=12.0.0'}
 
   hoist-non-react-statics@3.3.2:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
@@ -16381,6 +16412,8 @@ snapshots:
   hermes-parser@0.36.1:
     dependencies:
       hermes-estree: 0.36.1
+
+  highlight.js@11.12.0: {}
 
   hoist-non-react-statics@3.3.2:
     dependencies:

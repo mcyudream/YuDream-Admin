@@ -1,0 +1,122 @@
+@layer yudream-base, yudream-plugin;
+
+/* 内置预设提供低优先级默认值，ADMIN 主题插件可在 :root / .dark 覆盖同名变量。 */
+@layer yudream-base {
+  :where(:root) {
+    --yd-emphasis: oklch(var(--primary));
+    --yd-surface-radius: 18px;
+    --yd-control-radius: 12px;
+    --yd-surface-shadow: 0 4px 20px color-mix(in srgb, var(--color-text-1) 5%, transparent);
+    --yd-surface-shadow-hover: 0 10px 28px color-mix(in srgb, var(--color-text-1) 9%, transparent);
+    --yd-motion-duration-fast: 140ms;
+    --yd-motion-duration-normal: 260ms;
+    --yd-motion-duration-slow: 440ms;
+    --yd-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --yd-motion-ease-spring: cubic-bezier(0.2, 1.45, 0.4, 1);
+    --yd-motion-lift: -3px;
+    --yd-motion-press: 0.975;
+    --yd-motion-enter-y: 14px;
+    --yd-motion-stagger: 45ms;
+    --yd-workspace-gap: 24px;
+    --yd-surface-padding: 24px;
+    --yd-content-gap: 16px;
+    --yd-control-height: 40px;
+    --yd-control-font-size: 14px;
+    --yd-decoration-duration: 4s;
+    --yd-motion-loop-scale: 1;
+  }
+
+  :where(:root[data-admin-style="calm"]) {
+    --yd-surface-radius: 12px;
+    --yd-control-radius: 8px;
+    --yd-surface-shadow: 0 2px 8px color-mix(in srgb, var(--color-text-1) 3%, transparent);
+    --yd-surface-shadow-hover: 0 6px 16px color-mix(in srgb, var(--color-text-1) 6%, transparent);
+    --yd-motion-duration-fast: 120ms;
+    --yd-motion-duration-normal: 200ms;
+    --yd-motion-duration-slow: 320ms;
+    --yd-motion-ease-spring: var(--yd-motion-ease);
+    --yd-motion-lift: -1px;
+    --yd-motion-press: 0.99;
+    --yd-motion-enter-y: 8px;
+    --yd-motion-stagger: 25ms;
+    --yd-workspace-gap: 20px;
+    --yd-surface-padding: 24px;
+    --yd-content-gap: 16px;
+    --yd-control-height: 38px;
+    --yd-decoration-duration: 7s;
+  }
+
+  :where(:root[data-admin-style="compact"]) {
+    --yd-surface-radius: 8px;
+    --yd-control-radius: 6px;
+    --yd-surface-shadow: none;
+    --yd-surface-shadow-hover: 0 2px 8px color-mix(in srgb, var(--color-text-1) 4%, transparent);
+    --yd-motion-duration-fast: 90ms;
+    --yd-motion-duration-normal: 150ms;
+    --yd-motion-duration-slow: 200ms;
+    --yd-motion-ease-spring: var(--yd-motion-ease);
+    --yd-motion-lift: 0px;
+    --yd-motion-press: 1;
+    --yd-motion-enter-y: 4px;
+    --yd-motion-stagger: 12ms;
+    --yd-workspace-gap: 16px;
+    --yd-surface-padding: 16px;
+    --yd-content-gap: 10px;
+    --yd-control-height: 32px;
+    --yd-control-font-size: 13px;
+    --yd-decoration-duration: 9s;
+  }
+}
+
+@layer yudream-base {
+  :where(:root.dark) {
+    --yd-emphasis: color-mix(in oklab, oklch(var(--primary)) 35%, oklch(var(--foreground)));
+  }
+}
+
+/* 在使用处显式选择加入，不向业务表格、编辑器或第三方插件注入全局动画。 */
+.yd-interactive {
+  transition:
+    translate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring),
+    scale var(--yd-motion-duration-fast) var(--yd-motion-ease),
+    box-shadow var(--yd-motion-duration-normal) var(--yd-motion-ease);
+}
+
+.yd-interactive:active:not(:disabled, [aria-disabled="true"]) {
+  scale: var(--yd-motion-press);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .yd-interactive:hover:not(:disabled, [aria-disabled="true"]) {
+    translate: 0 var(--yd-motion-lift);
+  }
+}
+
+/* 减少偏好只柔化动作，功能动画在所有外观下持续运行；插件仍可覆盖令牌。 */
+@layer yudream-base {
+  :where(:root:is([data-admin-style="calm"], [data-admin-style="compact"])[data-admin-motion="reduced"]) {
+    --yd-motion-duration-fast: 100ms;
+    --yd-motion-duration-normal: 180ms;
+    --yd-motion-duration-slow: 260ms;
+    --yd-motion-ease-spring: var(--yd-motion-ease);
+    --yd-motion-lift: -0.5px;
+    --yd-motion-press: 0.995;
+    --yd-motion-enter-y: 2px;
+    --yd-motion-stagger: 10ms;
+    --yd-motion-loop-scale: 1.6;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where(:root:is([data-admin-style="calm"], [data-admin-style="compact"])) {
+      --yd-motion-duration-fast: 100ms;
+      --yd-motion-duration-normal: 180ms;
+      --yd-motion-duration-slow: 260ms;
+      --yd-motion-ease-spring: var(--yd-motion-ease);
+      --yd-motion-lift: -0.5px;
+      --yd-motion-press: 0.995;
+      --yd-motion-enter-y: 2px;
+      --yd-motion-stagger: 10ms;
+      --yd-motion-loop-scale: 1.6;
+    }
+  }
+}

@@ -1,0 +1,513 @@
+/* 仅 YD 自身的控件与传送弹层；不影响宿主的其他 Arco 组件。 */
+.yd-collection-control {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  min-height: var(--yd-control-height);
+  padding: 0 0.65rem;
+  font-size: var(--yd-control-font-size);
+  color: oklch(var(--foreground));
+  background: oklch(var(--background));
+  border: 1px solid oklch(var(--border));
+  border-radius: var(--yd-control-radius);
+  box-shadow: 0 1px 2px oklch(var(--foreground) / 2.5%);
+  transition: border-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
+}
+
+.yd-collection-control:hover:not([data-disabled]) {
+  border-color: oklch(var(--ring) / 60%);
+}
+
+.yd-collection-control:focus-within {
+  border-color: oklch(var(--ring));
+  box-shadow: 0 0 0 3px oklch(var(--ring) / 15%);
+}
+
+.yd-collection-control[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.yd-collection-leading {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-collection-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  outline: 0;
+  background: transparent;
+  border: 0;
+}
+
+.yd-collection-input::placeholder {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-collection-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  color: oklch(var(--muted-foreground));
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-collection-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.yd-collection-icon:hover:not(:disabled) {
+  color: oklch(var(--foreground));
+  background: oklch(var(--accent));
+}
+
+.yd-collection-icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.yd-collection-icon:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: 2px;
+}
+
+.yd-collection-popup {
+  z-index: 2200;
+  min-width: 12rem;
+  padding: 5px;
+  overflow: hidden;
+  font-size: var(--yd-control-font-size);
+  color: oklch(var(--popover-foreground));
+  background: oklch(var(--popover));
+  border: 1px solid oklch(var(--border));
+  border-radius: var(--yd-surface-radius);
+  box-shadow: var(--yd-surface-shadow-hover);
+  transform-origin: var(--reka-popper-transform-origin);
+  animation: yd-collection-enter var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+}
+
+.yd-combobox-popup {
+  min-width: var(--reka-combobox-trigger-width);
+}
+
+.yd-collection-viewport {
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.yd-collection-option {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--yd-control-height);
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--yd-control-radius);
+  transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast);
+}
+
+.yd-collection-option > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yd-collection-option svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.yd-collection-option[data-highlighted],
+.yd-collection-option:focus-visible,
+.yd-collection-option:hover:not(:disabled, [data-disabled]) {
+  color: oklch(var(--accent-foreground));
+  background: oklch(var(--accent));
+}
+
+.yd-collection-option[data-state="checked"],
+.yd-collection-option[data-selected] {
+  font-weight: 600;
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 10%);
+}
+
+.yd-collection-option[data-disabled],
+.yd-collection-option:disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.yd-collection-label {
+  padding: 0.65rem 0.65rem 0.3rem;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-collection-group-hint {
+  margin-left: 0.5rem;
+  font-size: 0.8em;
+  font-weight: 400;
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-collection-empty {
+  padding: 1rem;
+  color: oklch(var(--muted-foreground));
+  text-align: center;
+}
+
+.yd-cascader-single {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.yd-cascader-trigger {
+  justify-content: space-between;
+  width: 100%;
+  font-weight: 400;
+}
+
+.yd-cascader-breadcrumb {
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid oklch(var(--border));
+}
+
+.yd-cascader-single-popup {
+  min-width: var(--reka-popper-anchor-width);
+}
+
+/* 内部复用 Arco 的级联与树行为，所有状态均由 YD 私有入口接管。 */
+.yd-cascader-control.arco-select-view {
+  min-height: var(--yd-control-height);
+  padding: 0 0.65rem;
+  font-size: var(--yd-control-font-size);
+  color: oklch(var(--foreground));
+  background: oklch(var(--background));
+  border: 1px solid oklch(var(--border));
+  border-radius: var(--yd-control-radius);
+  transition: border-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
+}
+
+.yd-cascader-control.arco-select-view:hover {
+  background: oklch(var(--background));
+  border-color: oklch(var(--ring) / 60%);
+}
+
+.yd-cascader-control.arco-select-view-focus {
+  background: oklch(var(--background));
+  border-color: oklch(var(--ring));
+  box-shadow: 0 0 0 3px oklch(var(--ring) / 15%);
+}
+
+.yd-cascader-control .arco-select-view-value {
+  color: inherit;
+}
+
+.yd-cascader-control .arco-select-view-input::placeholder {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-cascader-control .arco-select-view-suffix {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-cascader-control.arco-select-view-disabled {
+  color: oklch(var(--muted-foreground));
+  cursor: not-allowed;
+  background: oklch(var(--muted) / 50%);
+  border-color: oklch(var(--border));
+  opacity: 0.5;
+}
+
+.yd-cascader-popup .arco-cascader-panel {
+  padding: 5px;
+  overflow: hidden;
+  font-size: var(--yd-control-font-size);
+  color: oklch(var(--popover-foreground));
+  background: oklch(var(--popover));
+  border: 1px solid oklch(var(--border));
+  border-radius: var(--yd-surface-radius);
+  box-shadow: var(--yd-surface-shadow-hover);
+  animation: yd-collection-enter var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+}
+
+.yd-cascader-popup .arco-cascader-list {
+  padding: 0 4px;
+  background: transparent;
+  border-color: oklch(var(--border));
+}
+
+.yd-cascader-popup .arco-cascader-option {
+  min-height: var(--yd-control-height);
+  padding: 0.4rem 0.65rem;
+  margin: 2px 0;
+  line-height: 1.5;
+  color: oklch(var(--foreground));
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-cascader-popup .arco-cascader-option:hover,
+.yd-cascader-popup .arco-cascader-option-active {
+  color: oklch(var(--accent-foreground));
+  background: oklch(var(--accent));
+}
+
+.yd-cascader-popup .arco-cascader-option:has(.yd-cascader-label[data-selected]) {
+  font-weight: 600;
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 10%);
+}
+
+.yd-cascader-popup .arco-cascader-option-disabled {
+  color: oklch(var(--muted-foreground));
+  background: transparent;
+  opacity: 0.4;
+}
+
+.yd-cascader-popup .arco-cascader-option .arco-icon-right {
+  color: currentcolor;
+}
+
+.yd-cascader-popup .arco-empty {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-cascader-popup .arco-cascader-panel-column {
+  max-height: 280px;
+  background: transparent;
+  border-color: oklch(var(--border));
+}
+
+.yd-cascader-popup .arco-cascader-option {
+  height: auto;
+  font-size: inherit;
+  transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast);
+}
+
+.yd-cascader-popup .arco-cascader-option:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: -2px;
+}
+
+.yd-cascader-popup .arco-radio-icon {
+  background: oklch(var(--background));
+  border-color: oklch(var(--border));
+}
+
+.yd-cascader-popup .arco-radio-checked .arco-radio-icon {
+  border-color: var(--yd-emphasis);
+}
+
+.yd-cascader-popup .arco-radio-checked .arco-radio-icon::after {
+  background: oklch(var(--primary));
+}
+
+.yd-cascader-popup .arco-radio-disabled .arco-radio-icon {
+  background: oklch(var(--muted));
+  opacity: 0.5;
+}
+
+.yd-tree .arco-tree {
+  font-size: var(--yd-control-font-size);
+  color: oklch(var(--foreground));
+}
+
+.yd-tree .arco-tree-node {
+  align-items: center;
+  margin: 3px 0;
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-tree .arco-tree-node-title {
+  display: flex;
+  align-items: center;
+  min-height: var(--yd-control-height);
+  padding: 0.35rem 0.65rem;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border-radius: var(--yd-control-radius);
+  transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast);
+}
+
+.yd-tree .arco-tree-node-title:hover {
+  background: oklch(var(--accent));
+}
+
+.yd-tree .arco-tree-node-selected .arco-tree-node-title {
+  font-weight: 600;
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 10%);
+}
+
+.yd-tree .arco-tree-node-disabled {
+  opacity: 0.4;
+}
+
+.yd-tree .arco-tree-node-disabled .arco-tree-node-title {
+  color: oklch(var(--muted-foreground));
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.yd-tree .arco-tree-node-switcher {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-tree .arco-tree-node-icon-hover::before {
+  background: oklch(var(--accent));
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-tree .arco-tree-node:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: 2px;
+}
+
+.yd-tree .arco-checkbox-icon {
+  background: oklch(var(--background));
+  border-color: oklch(var(--border));
+  border-radius: calc(var(--yd-control-radius) * 0.45);
+}
+
+.yd-tree .arco-checkbox-checked .arco-checkbox-icon,
+.yd-tree .arco-checkbox-indeterminate .arco-checkbox-icon {
+  color: oklch(var(--primary-foreground));
+  background: oklch(var(--primary));
+  border-color: var(--yd-emphasis);
+}
+
+.yd-tree .arco-checkbox:hover .arco-checkbox-icon {
+  border-color: oklch(var(--ring));
+}
+
+.yd-tree .arco-checkbox:focus-within .arco-checkbox-icon {
+  box-shadow: 0 0 0 3px oklch(var(--ring) / 15%);
+}
+
+.yd-tree .arco-checkbox-disabled .arco-checkbox-icon {
+  color: oklch(var(--muted-foreground));
+  background: oklch(var(--muted));
+  border-color: oklch(var(--border));
+  opacity: 0.5;
+}
+
+.yd-mention {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.yd-mention-label {
+  font-size: 0.8rem;
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-mention-popup {
+  min-width: min(var(--reka-popper-anchor-width), 28rem);
+}
+
+.yd-mention-description {
+  font-size: 0.8em;
+  color: oklch(var(--muted-foreground));
+}
+
+@keyframes yd-collection-enter {
+  from {
+    opacity: 0;
+    scale: 0.98;
+    translate: 0 5px;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes yd-collection-enter-soft {
+  from {
+    opacity: 0.6;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+:root:is([data-admin-style="calm"], [data-admin-style="compact"])[data-admin-motion="reduced"] .yd-collection-popup,
+:root:is([data-admin-style="calm"], [data-admin-style="compact"])[data-admin-motion="reduced"] .yd-cascader-popup .arco-cascader-panel {
+  animation: yd-collection-enter-soft 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:is([data-admin-style="calm"], [data-admin-style="compact"]) .yd-collection-popup,
+  :root:is([data-admin-style="calm"], [data-admin-style="compact"]) .yd-cascader-popup .arco-cascader-panel {
+    animation: yd-collection-enter-soft 180ms ease-out;
+  }
+}
+
+/* 显式覆盖组合状态，避免基础库后加载时恢复自身色板。 */
+.yd-tree .arco-tree-node-selected .arco-tree-node-title:hover {
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 10%);
+}
+
+.yd-tree .arco-checkbox-checked:hover .arco-checkbox-icon,
+.yd-tree .arco-checkbox-indeterminate:hover .arco-checkbox-icon {
+  background: oklch(var(--primary));
+  border-color: var(--yd-emphasis);
+}
+
+.yd-tree .arco-checkbox-disabled.arco-checkbox-checked:hover .arco-checkbox-icon,
+.yd-tree .arco-checkbox-disabled.arco-checkbox-indeterminate:hover .arco-checkbox-icon {
+  background: oklch(var(--muted));
+  border-color: oklch(var(--border));
+}
+
+.yd-tree .arco-checkbox-icon-check {
+  color: oklch(var(--primary-foreground));
+}
+
+.yd-tree .arco-checkbox-indeterminate .arco-checkbox-icon::after {
+  background: oklch(var(--primary-foreground));
+}
+
+.yd-cascader-popup .arco-radio-checked:hover .arco-radio-icon {
+  border-color: var(--yd-emphasis);
+}
+
+.yd-cascader-popup .arco-radio-disabled.arco-radio-checked:hover .arco-radio-icon {
+  background: oklch(var(--muted));
+  border-color: oklch(var(--border));
+}

@@ -75,7 +75,8 @@
     "vee-validate": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@fantastic-admin/themes": "workspace:*"
   },
   "devDependencies": {
     "@arco-design/web-vue": "catalog:arco-design-vue",

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { useFaImagePreview, useFaModal, useFaToast } from '@yudream/components'
+import { useYdImagePreview, useYdModal, useYdToast } from '@yudream/components'
 import { h, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
-const toast = useFaToast()
-const modal = useFaModal()
-const imagePreview = useFaImagePreview()
+const toast = useYdToast()
+const modal = useYdModal()
+const imagePreview = useYdImagePreview()
 
 const modalOpen = ref(false)
 
 const { open: openFunctionalModal } = modal.create({
   title: '函数式调用',
-  description: '通过 useFaModal().create() 创建弹窗。',
+  description: '通过 useYdModal().create() 创建弹窗。',
   content: h('div', { class: 'text-sm text-muted-foreground leading-6' }, '这里是函数式调用渲染的内容。'),
   showCancelButton: true,
   onConfirm: () => toast.success('确认操作'),
@@ -34,59 +34,59 @@ const demoImages = [
 </script>
 
 <template>
-  <DemoCard title="FaTooltip" description="不同方位的气泡提示">
+  <DemoCard title="YdTooltip" description="不同方位的气泡提示">
     <div class="demo-row !gap-6">
-      <FaTooltip text="上方提示">
-        <FaButton variant="outline">
+      <YdTooltip text="上方提示">
+        <YdButton variant="outline">
           上方
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip text="右侧提示" side="right">
-        <FaButton variant="outline">
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip text="右侧提示" side="right">
+        <YdButton variant="outline">
           右侧
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip text="下方提示" side="bottom">
-        <FaButton variant="outline">
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip text="下方提示" side="bottom">
+        <YdButton variant="outline">
           下方
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip text="注意噢！">
-        <FaIcon name="morph:circle-question-mark" class="cursor-help text-lg" />
-      </FaTooltip>
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip text="注意噢！">
+        <YdIcon name="morph:circle-question-mark" class="text-lg cursor-help" />
+      </YdTooltip>
     </div>
   </DemoCard>
 
-  <DemoCard title="FaModal" description="模板方式 / useFaModal 函数式 / confirm 确认框">
+  <DemoCard title="YdModal" description="模板方式 / useYdModal 函数式 / confirm 确认框">
     <div class="demo-row">
-      <FaButton @click="modalOpen = true">
+      <YdButton @click="modalOpen = true">
         模板弹窗
-      </FaButton>
-      <FaButton variant="outline" @click="openFunctionalModal">
+      </YdButton>
+      <YdButton variant="outline" @click="openFunctionalModal">
         函数式弹窗
-      </FaButton>
-      <FaButton variant="destructive" @click="openConfirm">
+      </YdButton>
+      <YdButton variant="destructive" @click="openConfirm">
         确认框
-      </FaButton>
+      </YdButton>
     </div>
-    <FaModal v-model="modalOpen" title="弹窗标题" description="通过 v-model 控制显隐。">
+    <YdModal v-model="modalOpen" title="弹窗标题" description="通过 v-model 控制显隐。">
       <div class="text-sm text-muted-foreground">
         这里是弹窗内容区域，可放置任意内容。
       </div>
-    </FaModal>
+    </YdModal>
   </DemoCard>
 
-  <DemoCard title="FaImagePreview" description="useFaImagePreview 预览单张 / 多张">
+  <DemoCard title="YdImagePreview" description="useYdImagePreview 预览单张 / 多张">
     <div class="demo-row">
-      <FaButton @click="imagePreview.open(demoImages[0])">
+      <YdButton @click="imagePreview.open(demoImages[0])">
         预览单张
-      </FaButton>
-      <FaButton variant="outline" @click="imagePreview.open(demoImages)">
+      </YdButton>
+      <YdButton variant="outline" @click="imagePreview.open(demoImages)">
         预览多张
-      </FaButton>
-      <FaButton variant="outline" @click="imagePreview.open(demoImages, 1)">
+      </YdButton>
+      <YdButton variant="outline" @click="imagePreview.open(demoImages, 1)">
         预览多张（初始第 2 张）
-      </FaButton>
+      </YdButton>
     </div>
   </DemoCard>
 </template>
