@@ -67,6 +67,7 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 - 缺少能力先封装 YD，保证 props/模型/事件/插槽/ref、键盘焦点、主题与弹层；同步根导出、resolver、SDK桥、预览、文档和严格检查映射后再迁移。不能只替名、复制组件或禁用规则。
 - **开始 UI 工作前读取 `../../docs/yd-ui-guidelines.md`**。完整分类和场景选型持续维护；API 边界见 `../../docs/yd-components.md`、`../../docs/yd-agent-workbench.md`。
 - 主题、主色和深浅模式由后台主题配置与组件体系统一控制。业务页面不得自行声明品牌色、固定色板或手写主色强调态；只使用中性语义变量和组件内建状态样式。
+- 插件主题可按 `@PluginTheme` 唯一 scope 在其声明的 `style.css` 中声明 `--primary-N`：SITE 需 SITE 锚点，ADMIN 仅 `:root`/`.dark`；消费仍禁止，未证明隔离的双 scope 资产 fail-closed，详见同步规范。
 - 权限管理使用 `apps/core-arco-design-vue/src/utils/permission-catalog.ts` 的集中分类，按业务域 → 稳定资源码 → 动作分类 → 权限展示，列表/权限树/矩阵/溯源不得各自维护动作词表。整理分组保留历史权限码与搜索隐藏、暂失效插件授权，`assign-*` 覆盖完整规范动作家族；细则见 `../docs/system/permission-management.md`。
 - Agent 页面复用 `YdAgentWorkbench` / `YdAgentAnswer` 的受控状态与 version 1 渲染协议；引用原文、工具卡片、运行轨迹与真实推理分开呈现。协议先校验，Markdown HTML 局部清理，外链仅 HTTP(S)，工作区/审批/Skills/MCP 的执行与授权仍由宿主 Harness 负责。参见 `../docs/yd-agent-workbench.md`。
 - 后台预制外观由宿主 `settings.appearance` 管理（灵动/雅致/紧凑），统一消费 `--yd-*` 表面与动效变量。默认值只在共享 `@yudream/components/appearance.css` 的 `yudream-base` 层根节点声明，宿主 `admin-appearance.css` 仅导入；允许 ADMIN 主题插件覆盖，禁止内联写入这些变量或在子布局重新定义默认值。三套外观均保留已启用的功能动画；灵动完整，雅致与紧凑的减少动态效果设置仅柔化动作、速度与装饰密度，禁止统一冻结动画。详见 `../docs/frontend-appearance.md` 与 `../docs/yd-components.md`。

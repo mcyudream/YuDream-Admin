@@ -38,14 +38,26 @@ const pluginText = `${canonical.replace('# YD 视觉与组件使用规范\n\n', 
 const explicit = process.argv.find(argument => argument.startsWith('--plugins='))?.slice('--plugins='.length)
 const pluginRoot = explicit ? path.resolve(explicit) : path.resolve(root, '..', 'yudream-admin-plugins')
 const target = path.join(pluginRoot, 'docs/yd-ui-guidelines.md')
+const scannerSource = path.join(root, 'yudream-frontend/eslint-rules/ui-source-scanner.mjs')
+const scannerTarget = path.join(pluginRoot, 'yudream-frontend/scripts/ui-source-scanner.mjs')
+const brandScannerSource = path.join(root, 'yudream-frontend/scripts/brand-token-scanner.mjs')
+const brandScannerTarget = path.join(pluginRoot, 'yudream-frontend/scripts/brand-token-scanner.mjs')
 if (existsSync(path.join(pluginRoot, 'AGENTS.md'))) {
   if (process.argv.includes('--check')) {
     if (!existsSync(target) || readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== pluginText) {
       throw new Error('Plugin YD guideline mirror is stale; run pnpm sync:ui-docs')
     }
+    if (!existsSync(scannerTarget) || readFileSync(scannerSource, 'utf8').replaceAll('\r\n', '\n') !== readFileSync(scannerTarget, 'utf8').replaceAll('\r\n', '\n')) {
+      throw new Error('Plugin YD syntax scanner is stale; run pnpm sync:ui-docs')
+    }
+    if (!existsSync(brandScannerTarget) || readFileSync(brandScannerSource, 'utf8').replaceAll('\r\n', '\n') !== readFileSync(brandScannerTarget, 'utf8').replaceAll('\r\n', '\n')) {
+      throw new Error('Plugin YD brand-token scanner is stale; run pnpm sync:ui-docs')
+    }
   }
   else {
     writeFileSync(target, pluginText, 'utf8')
+    writeFileSync(scannerTarget, readFileSync(scannerSource, 'utf8'), 'utf8')
+    writeFileSync(brandScannerTarget, readFileSync(brandScannerSource, 'utf8'), 'utf8')
   }
 }
 else if (explicit) {

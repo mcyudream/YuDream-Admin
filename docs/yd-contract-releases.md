@@ -43,6 +43,8 @@
 
 ## 全局迁移收尾契约（准备发布）
 
-源码版本为 components `1.6.0` / SDK `1.11.0`，目标 tag 为 `pcomp-1.6.0` / `psdk-1.11.0`。新增五个组件入口：`YdSortableTree`、`YdWorkflowCanvas`、`YdWorkflowHandle`、`YdLoadingOverlay`、`YdPageBuilder`，总数 136；同时补充 `useYdFilePicker`（含目录选择）、`useYdDomAction`、可创建搜索选择和跨断点受控表格选择。发布和远程验签结果会在作业实际通过后更新。
+源码版本为 components `1.6.0` / SDK `1.11.0`，重试 tag 为 `pcomp-1.6.0-1` / `psdk-1.11.0-1`。新增五个组件入口：`YdSortableTree`、`YdWorkflowCanvas`、`YdWorkflowHandle`、`YdLoadingOverlay`、`YdPageBuilder`，总数 136；同时补充 `useYdFilePicker`（含目录选择）、`useYdDomAction`、可创建搜索选择和跨断点受控表格选择。发布和远程验签结果会在作业实际通过后更新。
+
+首次提交 `6676e2d5` 的 [#383](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/383) / [#384](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/384) 在 tarball 的目录一致性检查失败，尚未上传：提交遗漏了权威 `yd-ui-guidelines.md` 中的五个新增入口。补齐目录、语法树扫描及规范同步后，在完整暂存源码的隔离副本执行同一目录检查与历史基线检查通过，保留失败标签并新建重试标签。
 
 页面构建器消费 FA 主题及三套 YD 预设的变量，编辑器实例、上传与延迟初始化均由组件清理；流程画布保留受控节点、连线、节点插槽及只读/禁用语义。动态挂载使用真实 YD 动作，不能在业务中创建原生按钮。Markdown 更新官方渲染器并以实例标识隔离安全 HTML 解析，回答预览继续保留安全默认值。

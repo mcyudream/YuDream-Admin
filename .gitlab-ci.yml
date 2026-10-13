@@ -84,6 +84,25 @@ validate:contract-publish-pipeline:
   rules:
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
+validate:yd-ui:
+  stage: validate-boundary
+  image: *node_image
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm --dir "$FRONTEND_DIR" install --frozen-lockfile
+  script:
+    - pnpm --dir "$FRONTEND_DIR" test:eslint-rules
+    - pnpm --dir "$FRONTEND_DIR" audit:ui --baseline=eslint-rules/yd-only-baseline.json
+    - pnpm --dir "$FRONTEND_DIR" check:ui-docs
+  artifacts:
+    when: always
+    paths:
+      - yudream-frontend/audit-report.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pdv]/
+
 validate:plugin-repo-template:
   stage: validate-boundary
   image: alpine:3.20

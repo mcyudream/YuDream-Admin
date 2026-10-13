@@ -8,9 +8,13 @@
 
 禁止在业务页面、业务组件和插件中直接使用 Arco、Reka、shadcn、其他通用 UI 库的控件，或以局部别名绕过该要求。原生 `button`、`input`、`select`、`textarea` 等通用交互控件也必须由 YD 封装后使用。缺少能力时，先补充组件、类型、主题与可验证示例，再接入业务。不能仅因 YD 存在近似名称，就丢掉原控件的能力。
 
+品牌色令牌检查对业务样式中的 `--primary-N` 声明和消费一律报错。注册的插件主题可在其 `@PluginTheme` 声明的 `style.css` 资产中声明主题变量：`SITE` 仅允许明确 SITE 页面/公开路由锚点选择器（`.dark` 可与 SITE 锚点组合）；`ADMIN` 仅允许 `:root` 或 `.dark`。例外必须由元数据、入口 `theme.css` 导入和构建输出配置共同确认，且变量消费始终违规。作用域同时声明 SITE/ADMIN 时，除非分别证明资产与作用域隔离，否则扫描器 fail-closed，不豁免；跨域选择器和普通业务 CSS 也不获豁免。历史 SITE 主题根类由扫描器按明确集合兼容，不能任意扩张。
+
 允许原生结构与内容元素，例如 `main`、`section`、`div`、`span`、`p`、`ol`、`img`，以及有真实 `href` 的内容链接。禁止用带 `@click` 的结构元素模拟按钮、选择器或菜单。组件内部可以使用原生控件、Fa、Reka、Arco；框架主题运行时、根 provider 和路由布局的基础装配属于实现边界，不能据此在业务区继续引入裸控件。
 
 代码编辑器、Markdown 编辑器、图表引擎、流程画布和可视化构建器属于专门技术能力。它们应被 YD 适配器封装；适配器负责公开模型、事件、主题、尺寸、键盘、清理与错误状态。业务仍从 YD 入口调用。`YdCode` 是代码展示，`YdGraphCanvas` 是关系图，不能当作可编辑代码工具或工作流编辑器的替代品。
+
+`YdPageBuilder` 是 GrapesJS 的公开技术适配入口，受控管理 `htmlContent`、`cssContent`、`builderProjectJson` 与只读/禁用状态；GrapesJS 选项、初始 setup、上传回调和 editor facade 有类型边界。CMS 页面只把业务 blocks、主题配置和授权上传回调注入适配器，不能在业务组件中自行初始化/销毁引擎。
 
 ## 2. 主题与三套视觉方案
 
@@ -41,10 +45,11 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 | 桌面专属、内部小型表格 | `YdTable` | 不代替业务列表的移动端方案；列与插槽遵循 TanStack 契约 |
 | 只读详情 | `YdDescriptions`、`YdTag`、`YdBadge` | 属性值与状态；避免用可编辑输入框展示不可编辑内容 |
 | 少量枚举单选 | `YdRadioGroup` 或 `YdSelect` | 所有选项需直观看见用 radio；节省空间用 select |
-| 本地大集合搜索单选 | `YdCombobox` | 需要输入筛选、分组或虚拟列表；不是通用远程多选 |
+| 本地大集合搜索单选 | `YdCombobox` | 需要输入筛选、分组或虚拟列表；可选 `allowCreate` 显示明确的“使用这个编码”候选并发出 `create(string)`；不是通用远程多选 |
 | 少量多选 | `YdCheckboxGroup` | 选项直接可见；已有多选选择器需求先核对模型与展示能力 |
 | 按层级逐级选一个值 | `YdCascader` | 省市、分类路径等；单值，`leafOnly` 决定允许选父项还是叶子 |
 | 浏览、筛选或勾选层级 | `YdTree` | 部门、菜单、目录、权限等；数据不是关系网络 |
+| 可保存的树节点重排 | `YdSortableTree` | 受控目录/导航拖拽、键盘重排、父级元数据和可选异步子节点；禁用、环及深度上限由组件拒绝 |
 | 远程、分页、跨页数据选择 | `YdTablePicker` | 用户、角色、资源等，需要更多列帮助辨别；确认后提交所选 ID |
 | 图标选择 | `YdIconPicker` | 优先 Morphicons；不自己搭一个图标下拉网格 |
 | 日期 API 字符串输入 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker` | 普通表单日期/时间，值格式与 API 对齐 |
@@ -53,6 +58,7 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 | 顺序异步任务 | `YdMultiStepLoader` | 连续动作、结果、错误和取消；不是一般表单步骤条 |
 | 历史与事件记录 | `YdTimeline` | 按已有事件顺序展示；不是可执行流程图 |
 | 关系图与知识网络 | `YdGraphCanvas`、`YdChatGraphView` | 节点/边关系；不用于替换树或工作流编辑器 |
+| 技术工作流画布 | `YdWorkflowCanvas` | 受控流程节点/连线、可类型化节点 renderer 和引擎 ref facade；VueFlow 只在共享 YD 适配内部出现 |
 | 普通等待 | `YdLoading`、`YdProgress` | 不确定时长用 loading；有可信进度用 progress |
 | 短反馈 | `useYdToast` | 保存成功等非阻断反馈；不能承载必须处理的失败与确认 |
 | 需要持续可见的提示 | `YdAlert` | 权限限制、配置问题、可恢复错误；与对应操作放在一起 |
@@ -73,7 +79,9 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 树的 `data` 使用 `{ key: string, label: string, children?, disabled? }`；选中、勾选和展开分别为 `selectedKeys`、`checkedKeys`、`expandedKeys` 三个模型。ID 不转为 Number。启用 `checkable` 默认按父子级联勾选；需要同时节点选中时显式设置 `selectable`。筛选保留命中节点的祖先，不能因搜索过滤而删除已有业务授权。
 
-`YdTree` 当前没有公开拖拽排序、异步 `loadMore` 和任意 Arco `fieldNames` 转发契约。业务需要这些能力时先新增受控能力与示例，不能借 `$attrs` 穿透底层树冒充支持。`YdCascader` 当前也是单值；若需要多路径、多选或延迟加载，应先封装相应契约。
+`YdTree` 负责浏览、筛选与勾选；持久化重排使用独立的 `YdSortableTree`。它发出包含 drag/drop 节点、`dropPosition`、原/目标父级与深度的受控提案，拒绝禁用节点、自身子树环及 `maxDepth` 超限，支持 Alt + 方向键重排和类型化的 `loadChildren`。父级要应用并保存 `drop` 提案；组件不直接修改传入 `data`。`YdSortableTree` 当前不提供虚拟列表或 Arco `fieldNames` 兼容透传。`YdCascader` 当前也是单值；若需要多路径或多选，应先封装相应契约。
+
+流程图与关系网络使用场景不同：`YdWorkflowCanvas` 承载工作流编辑器，节点/边由调用方受控，事件只暴露 ID 与连接端点，节点 renderer 插槽使用 `#node-{type}`，连接点用 `YdWorkflowHandle`。它的 ref facade 提供画布坐标、增删改节点边和视口适配方法；`readonly` 保留查看/选择，关闭节点拖动和连线，`disabled` 冻结画布交互。技术引擎由 YD 组件在卸载时清理，业务页面不得直接导入 VueFlow 或其类型。`YdGraphCanvas` 继续用于一般关系/知识图，不替代可编辑工作流。
 
 `YdTablePicker` 是带查询、分页和确认的选择弹窗，使用其现有 API：
 
@@ -152,11 +160,17 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 
 多步骤任务接入 `AbortSignal`，取消阻止后续步骤和迟到结果；取消不自动撤销已经发生的服务端写入。重试从哪些步骤重新执行、哪些动作可重复必须由业务明确。任务成功后有明确完成反馈，失败保留已完成步骤与失败原因。异步事件属于当前任务或会话，切换上下文后不得错误写入另一个任务。
 
-只读、禁用、加载、错误、选中、部分选中、待确认、已取消等状态都由组件契约表达，不用页面私有 class 伪造。加载锁定真正受影响的操作，保持只读内容可访问。筛选后保留隐藏但仍有效的所选数据；所有 Long/Snowflake ID 全程为字符串。
+只读、禁用、加载、错误、选中、部分选中、待确认、已取消等状态都由组件契约表达，不用页面私有 class 伪造。局部刷新使用 `YdLoadingOverlay`，保留内容尺寸与状态；默认通过 inert 锁定该容器的交互并恢复原焦点，展示型遮罩可显式关闭 `blockInteraction`。不再使用裸 `v-loading`。筛选后保留隐藏但仍有效的所选数据；所有 Long/Snowflake ID 全程为字符串。
+
+`YdResponsiveTable` 通过 `v-model:row-selection` 控制选择键集合，桌面与卡片共享同一表格状态和禁用判定。`#card` 使用 `selected`、`selectDisabled`、`toggleSelected`，不另外维护移动端选中数组；切换断点不销毁表格状态。函数式旧导入入口使用 `useYdFilePicker().open()`，必须在用户动作中调用；取消、再次打开和作用域销毁释放临时输入，目录选择保留 File 的相对路径。
 
 ## 6. AI 与 Agent 界面
 
 Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPanel`，回答复用 `YdAgentAnswer`。知识库问答与简单聊天可组合 `YdChatWindow`、`YdChatMessageList`、`YdChatSender` 等元件，不为全部场景强塞工作区侧栏。
+
+生产 AI 使用统一后端持久运行快照和游标，正文、真实推理、工具与进度独立；切页或关闭窗口不取消后台任务。`YdAgentWorkbench` 的 `availableModes` 只开放宿主实际支持的模式，`attachments` 与移除事件保持宿主上传列表一致，业务范围控件放 `sender-actions` 插槽。全局助手要求登录与权限，路由/页面感知及导航/高亮可分别关闭；工具只定位已授权路由和显式注册操作，不收集表单数据或代用户点击。
+
+需要前端真实执行工具的持久 WebSocket 场景使用 `useYdPersistentChatStream`：以登录用户和稳定业务上下文保存观察状态，由宿主提供快照、取消、工具回执端口；断线只续订已有 run，不重复提交。已保存的真实工具结果只接续后端原生交互，不重复修改页面。业务工具结果放 `message-extra`，等待与重连提示放 `composer-before`；没有真实后端端口时明确说明未连接。
 
 引用必须有原文、来源标识与可定位链接。version 1 渲染协议使用 `markdown`、`reference`、`tool` 三类块，先校验再渲染。正文通过 `[[ref:id]]` 关联原文；不同回答实例锚点隔离。工作区文件通过事件交宿主定位，外链仅 HTTP(S)。Markdown 局部清理 HTML，工具输入、输出与错误是文本，不能作为任意执行界面。
 
@@ -174,16 +188,17 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction` |
 | 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate` |
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup` |
-| 层级与专用选择 | `YdTree`、`YdTablePicker`、`YdIconPicker` |
+| 层级与专用选择 | `YdTree`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
 | 查询与分页 | `YdSearchBar`、`YdPagination` |
 | 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdDescriptions`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas` |
+| 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
 | 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview` |
 | 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview` |
 | 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdProgress` |
-| 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdMultiStepLoader` |
-| 内容工具 | `YdCode`、`YdCodePreview`、`YdCodeEditor`、`YdMarkdownEditor`、`YdQrcode`、`YdStorageBox` |
+| 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdLoadingOverlay`、`YdMultiStepLoader` |
+| 内容工具 | `YdCode`、`YdCodePreview`、`YdCodeEditor`、`YdMarkdownEditor`、`YdPageBuilder`、`YdQrcode`、`YdStorageBox` |
 | 数字与内容运动 | `YdCountTo`、`YdAnimatedCountTo`、`YdAnimatedCountToGroup`、`YdCarousel`、`YdSmoothSwipe`、`YdMarquee`、`YdScrollingText` |
 | 文本动效 | `YdBlurReveal`、`YdFlipWords`、`YdSparklesText`、`YdTextHighlight`、`YdTextShiny` |
 | 装饰与互动 | `YdAnimatedBeam`、`YdBorderBeam`、`YdFlipCard`、`YdGlowyCard`、`YdGlowyCardWrapper`、`YdGradientButton`、`YdInteractiveButton`、`YdParticlesBg`、`YdPatternBg`、`YdSpotlightCard`、`YdScratchOff` |
@@ -191,7 +206,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 聊天与回答元件 | `YdChatGraphView`、`YdChatMessageList`、`YdChatProcess`、`YdChatSender`、`YdCitationList`、`YdAttachmentList`、`YdChatSessionList`、`YdWelcome`、`YdChatWindow`、`YdBubble`、`YdPrompts`、`YdThoughtChain`、`YdChatActions`、`YdSuggestion`、`YdChatLoading`、`YdChatReasoning` |
 | 根装配（仅宿主/预览） | `YdUiProvider` |
 
-组合式公开入口包括 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdMotion`、`useYdChat`、`useYdChatStream`、`provideYdChatConfig`、`useYdChatConfig`。`useIsMobile` 是现有断点能力，不为改前缀另实现重复观察器。组件与模型详细边界见 [YD 通用组件库](yd-components.md)。
+组合式公开入口包括 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdFilePicker`、`useYdMotion`、`useYdChat`、`useYdChatStream`、`useYdPersistentChatStream`、`clearYdPersistentChatOwner`、`provideYdChatConfig`、`useYdChatConfig`。`useIsMobile` 是现有断点能力，不为改前缀另实现重复观察器。组件与模型详细边界见 [YD 通用组件库](yd-components.md)。
 
 ### 7.1 当前需先封装的能力
 
@@ -228,6 +243,10 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 在宿主 `yudream-frontend` 运行 `pnpm sync:ui-docs`，自动更新相邻插件仓的规则副本；完成前运行 `pnpm check:ui-docs`。检查同时核对公开组件目录、resolver、根导出与 SDK 桥；新增组件漏写目录或副本过期都会失败。CI 不挂载插件仓时仍核对宿主目录与契约。插件仓位置不同可向脚本传入 `--plugins=<仓库路径>`，不要在文档写死开发机路径。
 
 全局扫描需要覆盖模板、脚本导入、别名、render/JSX、通用原生交互与业务样式。规则应报告不符合 YD-only 的业务用法；不能通过行级禁用规则、临时白名单或把组件挪成局部文件规避。组件实现和框架装配的边界例外按路径与职责集中记录，并有测试，不能任意扩张。
+
+两仓 GitLab 的 `validate:yd-ui` 使用相同的 AST 扫描器，覆盖完整嵌套插槽、导入与类型导入、JSX/render、原生通用控件、无链接目标的动作锚点、`v-loading` 与私有品牌令牌；规则测试覆盖误判和绕过场景。正文链接事件代理、布局、标签与图表的多键数据浏览不视为动作按钮。
+
+迁移期间 CI 使用宿主 `yudream-frontend/eslint-rules/yd-only-baseline.json`、插件 `ci/yd-ui-baseline.json` 做不回退门禁。基线记录已提交源码的 SHA；只能用 `--source=git:<已提交版本> --write-baseline` 初始化或缩减，禁止从工作区接受新增违规。每个文件/规则/消息的计数只减不增，不能用一个页面减少的数量抵消另一个页面新增的违规。全部归零后删除基线，恢复零违规阻断门禁；`audit:ui` 报告的 `summary.violationCount` 是迁移验收计数，CI 保留完整报告而不倾倒源码到日志。
 
 迁移时按独立模块收敛，每个模块验证通过后创建中文本地提交。保留用户已有修改；不批量覆盖尚未核对契约的复杂组件。生成式 CMS 内容、公开主题模板和第三方库内部生成 DOM 与业务 Vue 源码区分处理，禁止对已保存内容做无语义保证的字符串替换。
 
