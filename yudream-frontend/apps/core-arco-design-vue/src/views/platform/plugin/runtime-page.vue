@@ -7,26 +7,22 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
 
 <template>
   <div>
-    <YdPageHeader :title="String(route.meta.title || '插件页面')" class="mb-0" />
-
-    <YdPageMain>
-      <div v-if="remoteComponent" :data-yudream-plugin="plugin.pluginCode">
-        <component
-          :is="remoteComponent"
-          :sdk="sdk"
-          :route="route"
-        />
+    <div v-if="remoteComponent" :data-yudream-plugin="plugin.pluginCode">
+      <component
+        :is="remoteComponent"
+        :sdk="sdk"
+        :route="route"
+      />
+    </div>
+    <div v-else class="plugin-runtime-empty">
+      <div class="runtime-icon">
+        <YdIcon name="morph:puzzle" />
       </div>
-      <div v-else class="plugin-runtime-empty">
-        <div class="runtime-icon">
-          <YdIcon name="morph:puzzle" />
-        </div>
-        <div>
-          <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>
-          <p>{{ remoteLoading ? '正在获取远程入口并解析页面组件。' : remoteError }}</p>
-        </div>
+      <div>
+        <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>
+        <p>{{ remoteLoading ? '正在获取远程入口并解析页面组件。' : remoteError }}</p>
       </div>
-    </YdPageMain>
+    </div>
   </div>
 </template>
 
@@ -36,9 +32,10 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
+  margin: 16px;
   padding: 18px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: var(--yd-surface-radius, 12px);
   background: var(--color-bg-2);
 }
 
