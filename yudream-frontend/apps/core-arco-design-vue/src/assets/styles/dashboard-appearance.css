@@ -5,6 +5,7 @@
       radial-gradient(120% 150% at 88% -18%, color-mix(in oklab, rgb(var(--primary-6)) 58%, transparent) 0%, transparent 56%),
       radial-gradient(90% 120% at -8% 112%, color-mix(in oklab, rgb(var(--primary-8)) 46%, transparent) 0%, transparent 58%),
       linear-gradient(135deg, #1d2540 0%, #151d2e 100%);
+    --yd-dashboard-feature-accent: rgb(var(--primary-6));
     --yd-dashboard-feature-text: #f8fafc;
     --yd-dashboard-feature-muted: #c8d3df;
     --yd-dashboard-info: rgb(var(--primary-6));

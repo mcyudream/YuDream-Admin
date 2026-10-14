@@ -11,6 +11,7 @@ import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessage
 import { defaultAiAssistantPreferences, frontendContextForPreferences, parseAiAssistantPreferences, parseAiFrontendToolRequest } from '@/utils/ai-assistant-context'
 import { projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { canReconnectAiRun, isActiveAiRun, isNewAiCursor } from '@/utils/ai-run-stream'
+import { hintForMessage } from '@/utils/api-error'
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
@@ -114,7 +115,13 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     }
   }
   function setError(value: unknown) {
-    error.value = value instanceof Error ? value.message : 'AI 助手操作失败'
+    if (value instanceof Error) {
+      const backend = (value as { response?: { data?: { message?: string } } }).response?.data?.message
+      error.value = hintForMessage(backend || value.message)
+    }
+    else {
+      error.value = 'AI 助手操作失败'
+    }
   }
 
   function reset(nextOwner = '') {
