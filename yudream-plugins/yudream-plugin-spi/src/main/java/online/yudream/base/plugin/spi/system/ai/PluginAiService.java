@@ -1,6 +1,7 @@
 package online.yudream.base.plugin.spi.system.ai;
 
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public interface PluginAiService {
@@ -10,9 +11,23 @@ public interface PluginAiService {
     java.util.List<PluginAiAgentOption> agents();
     CompletionStage<PluginAiChatResponse> runAgent(String agentCode, PluginAiChatRequest request);
 
+    /** 立即返回持久运行 ID；前端通过 SDK ai.runs 观察真实增量。 */
+    default PluginAiRunHandle startChat(PluginAiChatRequest request) {
+        throw new UnsupportedOperationException("当前 AI 服务不支持持久任务");
+    }
+
+    default PluginAiRunHandle startAgent(String agentCode, PluginAiChatRequest request) {
+        throw new UnsupportedOperationException("当前 AI 服务不支持持久 Agent 任务");
+    }
+
+    /** 原调用者恢复任务；不允许读取其他用户或无执行上下文的系统任务。 */
+    default PluginAiRunSnapshot getRun(String runId, PluginAiExecutionContext executionContext) {
+        throw new UnsupportedOperationException("当前 AI 服务不支持持久任务查询");
+    }
+
     /**
-     * 流式对话：onDelta 收到模型输出增量（含 reasoning 时也可能推送思考片段）。
-     * 默认实现退化为一次性 chat 后整段回放，宿主可覆盖为真流式。
+     * 真流式对话：onDelta 只接收模型正文增量，推理与生命周期进度不得混入正文。
+     * 未提供流式实现时明确失败，禁止将一次性结果整段回放冒充流式。
      */
     default CompletionStage<PluginAiChatResponse> chatStream(PluginAiChatRequest request, Consumer<String> onDelta) {
         return chatStream(request, onDelta, null);
@@ -27,15 +42,7 @@ public interface PluginAiService {
             Consumer<String> onDelta,
             Consumer<PluginAiToolResult> onTool
     ) {
-        return chat(request).thenApply(response -> {
-            if (onDelta != null && response.content() != null && !response.content().isEmpty()) {
-                onDelta.accept(response.content());
-            }
-            if (onTool != null && response.toolResults() != null) {
-                response.toolResults().forEach(onTool);
-            }
-            return response;
-        });
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("当前 AI 服务未实现真流式对话"));
     }
 
     default CompletionStage<PluginAiChatResponse> runAgentStream(
@@ -43,11 +50,6 @@ public interface PluginAiService {
             PluginAiChatRequest request,
             Consumer<String> onDelta
     ) {
-        return runAgent(agentCode, request).thenApply(response -> {
-            if (onDelta != null && response.content() != null && !response.content().isEmpty()) {
-                onDelta.accept(response.content());
-            }
-            return response;
-        });
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("当前 AI 服务未实现真流式 Agent 运行"));
     }
 }
