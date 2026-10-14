@@ -54,6 +54,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -104,8 +105,9 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         this.invocationContexts = contexts;
     }
 
+    // 额度网关在运行期才调用；@Lazy 代理避免经 ChatQuotaAppService→CapabilityAppService→providers 形成构造期循环。
     @Autowired(required = false)
-    void setUsageQuotaGateway(AiUsageQuotaGateway usageQuotaGateway) {
+    void setUsageQuotaGateway(@Lazy AiUsageQuotaGateway usageQuotaGateway) {
         this.usageQuotaGateway = usageQuotaGateway;
     }
 
