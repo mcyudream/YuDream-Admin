@@ -105,7 +105,7 @@
 - **现象**：客户端已收到 `ai.error`，服务端随后又进入全局 JSON exception handler 并报内容类型错误。
 - **根因**：发完 SSE 错误又调用 `completeWithError`，Spring MVC 尝试在 `text/event-stream` 响应上写 JSON。
 - **规避**：发送结构化 `ai.error` 后正常 `complete()`；事件使用统一 envelope，携带 event/action/module/traceId/timestamp/payload。
-- **来源**：`knowledge.json` ai-sse 规则；`docs/platform/ai-foundation.md`。
+- **来源**：`ai-sse` 规则；`docs/platform/ai-foundation.md`。
 
 ### 异步 Agent 工具失去原用户权限或错读管理员线程权限
 

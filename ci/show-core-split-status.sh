@@ -7,14 +7,15 @@ cd "$ROOT_DIR"
 git status --short -- \
   .gitignore \
   .gitlab-ci.yml \
-  .codex/skills/yudream-contract-release \
-  .codex/skills/yudream-ddd-architecture/references/knowledge.json \
+  docs/dev/contract-release.md \
+  docs/dev/backend-architecture.md \
+  docs/dev/plugin-system.md \
+  docs/dev/repo-sync.md \
   README.md \
   ci \
   docs/plugin-system \
   docs/repository-split \
   pom.xml \
-  skills/yudream-contract-release \
   templates/plugin-repo \
   yudream-plugins/yudream-plugin-spi/pom.xml \
   yudream-frontend/packages/plugin-sdk \

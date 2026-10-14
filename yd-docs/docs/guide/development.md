@@ -3,7 +3,7 @@
 本文面向**二次开发 YuDream Admin 主框架（宿主）**的开发者，涵盖环境准备、构建验证命令、DDD 分层改造实操路径、Controller 硬规则、提交前自查清单与 Git 工作流。插件开发请直接看 [插件开发](/plugin/overview)。
 
 ::: warning 动手前必读
-修改后端代码前，请先完整阅读仓库内的 `.codex/skills/yudream-ddd-architecture/SKILL.md`，它是本仓分层与架构规则的唯一权威来源；本文是对其中第 2/8/9/11 节的整理与实操化。本文与 skill 冲突时以 skill 为准。
+修改后端代码前，先读主仓 `AGENTS.md` 与 `docs/dev/backend-architecture.md`；本文提供环境准备、构建验证和分层改造操作示例，规则权威在 `docs/dev/`，经验索引在 `docs/exp/`。跨仓规范同步按 `docs/dev/repo-sync.md` 执行。
 :::
 
 ## 环境要求
@@ -127,7 +127,7 @@ mvn -pl yudream-bootstrap -am -DskipTests compile
 pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run test:typecheck
 ```
 
-skill 中另有等价的直接调用形式（绕过 engine 校验、关闭 lib 检查）：
+也可直接调用 vue-tsc（绕过 engine 校验并关闭 lib 检查）：
 
 ```powershell
 pnpm --config.engine-strict=false --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
@@ -183,7 +183,7 @@ Java `Long`/Snowflake ID 在 JSON、TS 模型、表单与 URL 参数中一律序
 
 ## 提交前自查：定向扫描 + 清单
 
-完成后端工作前，执行 skill Review Checklist 的两条定向扫描（`rg` 即 ripgrep）：
+完成后端工作前，执行 `docs/dev/backend-architecture.md` Review Checklist 中的两条定向扫描（`rg` 即 ripgrep）：
 
 ```bash
 # 1. Controller 禁项扫描：私有转换、new Cmd、new ExcelRow、builder()
@@ -202,27 +202,23 @@ rg -n "\\u[0-9a-fA-F]{4}|\?\)" yudream-domain/src/main/java yudream-application/
 - [ ] 平台能力是否遵守双闸门（项目闸门 + 应用闸门）与依赖级联？（详见 [平台能力](/guide/platform-capabilities)）
 - [ ] 长 ID 是否全程字符串？
 - [ ] 是否完成了目标构建/测试与定向扫描，中文文案无乱码？
-- [ ] 改动架构规则时，是否在同一提交同步了对应 skill/文档？
+- [ ] 改动架构规则时，是否在同一工作项同步 `AGENTS.md`/`docs/dev/`/`docs/exp/` 与双仓映射命中的对方仓文件？
 
 ## Git 工作流
 
 - **按模块提交**：每个可独立使用的模块完成后，先运行对应验证，**只暂存该模块的文件**，创建提交后再进入下一模块。
 - **中文提交信息**：描述完成的模块或修复，例如 `feat: 完成用户管理模块`、`fix: 修复菜单图标显示`。
-- **skill 同步**：改动或修正了架构规则时，必须在**同一提交**内同步更新 `.codex/skills/yudream-ddd-architecture`（SKILL.md 或 `references/knowledge.json`），禁止代码与项目规则脱节。
+- **规范同步**：架构规则改动在同一工作项内更新 `AGENTS.md` 与对应 `docs/dev/` / `docs/exp/`，并按 `docs/dev/repo-sync.md` 检查插件仓同步面。
 - **不夹带私货**：不纳入 IDE 元数据、临时文件等与任务无关的改动。
 - **不做外部动作**：未经明确要求不执行 `push`/`tag` 等操作。
 - **受阻要报告**：模块因验证失败或工作区存在冲突的用户改动而无法提交时，先报告阻塞原因再继续。
 
-可复用的知识沉淀：当某类问题被反复纠正、发现可复用工具/组件时，用 skill 自带脚本追加到 `references/knowledge.json`：
-
-```powershell
-python .codex/skills/yudream-ddd-architecture/scripts/add_knowledge.py rule controller-no-mapping "Controller must not create Cmd/Res/ExcelRow; put conversions in interface assembler."
-```
+可复用经验按 `docs/exp/README.md` 的四项格式（现象/根因/规避/来源）追加到主题经验文件；形成稳定约束时提炼进 `docs/dev/`，不要再维护独立知识 JSON。
 
 ## 参考源码
 
 - 分层基线：`yudream-domain|yudream-application|yudream-infrastructure|yudream-interfaces/src/main/java/online/yudream/base/**/system/user/`
 - Controller 示例：`yudream-interfaces/src/main/java/online/yudream/base/interfaces/system/user/controller/UserManageController.java`
-- 架构规则权威来源：`.codex/skills/yudream-ddd-architecture/SKILL.md`、`references/knowledge.json`
-- 工程规则索引：仓库根 `AGENTS.md`（第 2/8/9/11 节）、`yudream-frontend/AGENTS.md`
+- 架构规则权威来源：`AGENTS.md` 与 `docs/dev/`；经验索引：`docs/exp/README.md`
+- 工程规则索引：仓库根 `AGENTS.md`、`docs/dev/`、`docs/exp/README.md` 与 `yudream-frontend/AGENTS.md`
 - 前端版本锁定：`yudream-frontend/package.json`、`yudream-frontend/apps/core-arco-design-vue/package.json`
