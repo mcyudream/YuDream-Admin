@@ -24,7 +24,9 @@ const config = inject<ComputedRef<{
   transition: box-shadow var(--yd-motion-duration-normal);
 }
 
-.yd-glowy-card:hover {
-  box-shadow: var(--yd-surface-shadow-hover), 0 0 0 1px oklch(var(--primary) / 25%);
+@media (hover: hover) and (pointer: fine) {
+  .yd-glowy-card:hover {
+    box-shadow: var(--yd-surface-shadow-hover), 0 0 0 1px color-mix(in srgb, var(--yd-emphasis) 25%, transparent);
+  }
 }
 </style>

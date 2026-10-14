@@ -1,5 +1,6 @@
 import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
+import { normalizeAiQuota, normalizeAiQuotaConfig, normalizeAiQuotaReservations, parseAiTokenCount } from '@/utils/ai-quota'
 
 export type ChatScopeType = 'GENERAL' | 'AGENT' | 'WIKI' | 'CONSOLE'
 
@@ -96,6 +97,8 @@ export interface ChatQuota {
   userId: string
   usageDate: string
   usedTokens: number
+  reservedTokens?: number
+  uncertainTokens?: number
   limitTokens: number
   remainingTokens: number
 }
@@ -117,9 +120,32 @@ export const createChatSession = (data: Partial<ChatSession>) => systemClient.po
 export const updateChatSession = (id: string, data: Partial<ChatSession>) => systemClient.patch<unknown, ApiResponse<ChatSession>>(`api/platform/chat/sessions/${id}`, data)
 export const deleteChatSession = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/chat/sessions/${id}`)
 export const listChatMessages = (id: string) => systemClient.get<unknown, ApiResponse<ChatMessage[]>>(`api/platform/chat/sessions/${id}/messages`)
-export const fetchMyChatQuota = () => systemClient.get<unknown, ApiResponse<ChatQuota>>('api/platform/chat/quota/me')
-export const fetchChatQuotaConfig = () => systemClient.get<unknown, ApiResponse<{ dailyTokenLimit: number }>>('api/platform/chat/quota/config')
-export const updateChatQuotaConfig = (dailyTokenLimit: number) => systemClient.put<unknown, ApiResponse<{ dailyTokenLimit: number }>>('api/platform/chat/quota/config', { dailyTokenLimit })
+export async function fetchMyChatQuota() {
+  const response = await systemClient.get<unknown, ApiResponse<unknown>>('api/platform/chat/quota/me')
+  return { ...response, data: normalizeAiQuota(response.data) }
+}
+export async function fetchChatQuotaConfig() {
+  const response = await systemClient.get<unknown, ApiResponse<unknown>>('api/platform/chat/quota/config')
+  return { ...response, data: normalizeAiQuotaConfig(response.data) }
+}
+export async function updateChatQuotaConfig(dailyTokenLimit: number, systemDailyTokenLimit?: number) {
+  const data = { dailyTokenLimit: parseAiTokenCount(dailyTokenLimit, 'dailyTokenLimit'), ...(systemDailyTokenLimit === undefined ? {} : { systemDailyTokenLimit: parseAiTokenCount(systemDailyTokenLimit, 'systemDailyTokenLimit') }) }
+  const response = await systemClient.put<unknown, ApiResponse<unknown>>('api/platform/chat/quota/config', data)
+  return { ...response, data: normalizeAiQuotaConfig(response.data) }
+}
+
+export type ChatQuotaReservation = ReturnType<typeof normalizeAiQuotaReservations>[number]
+export async function listUnresolvedChatQuota(params: { userId?: string, usageDate?: string } = {}) {
+  const response = await systemClient.get<unknown, ApiResponse<unknown>>('api/platform/chat/quota/unresolved', { params })
+  return { ...response, data: normalizeAiQuotaReservations(response.data) }
+}
+export function reconcileChatQuota(data: Pick<ChatQuotaReservation, 'reservationId' | 'userId' | 'usageDate'> & { promptTokens: number, completionTokens: number, totalTokens: number }) {
+  const promptTokens = parseAiTokenCount(data.promptTokens, 'promptTokens')
+  const completionTokens = parseAiTokenCount(data.completionTokens, 'completionTokens')
+  const totalTokens = parseAiTokenCount(data.totalTokens, 'totalTokens')
+  if (!Number.isSafeInteger(promptTokens + completionTokens) || totalTokens !== promptTokens + completionTokens) throw new Error('核对总用量必须等于输入与输出 token 用量之和')
+  return systemClient.post<unknown, ApiResponse<void>>('api/platform/chat/quota/reconcile', { ...data, promptTokens, completionTokens, totalTokens })
+}
 
 export const chatStreamEndpoint = (sessionId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/chat/sessions/${sessionId}/stream`
 

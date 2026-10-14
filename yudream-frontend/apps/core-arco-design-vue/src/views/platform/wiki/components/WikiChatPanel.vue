@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { YdChatCitation, YdChatGraphNode, YdChatRetrievalHit } from '@yudream/components'
-import { computed, inject, watch } from 'vue'
+import type { YdAgentRenderDocument, YdAgentSendRequest, YdChatCitation, YdChatGraphNode, YdChatRetrievalHit } from '@yudream/components'
+import { YdAgentWorkbench, YdAlert } from '@yudream/components'
+import { computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { useYdChatStream, YdChatMessageList, YdChatSender } from '@yudream/components'
-import { wikiChatAguiEndpoint } from '@/api/modules/platform-wiki'
-import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
-import { resolveWikiLink, wikilinksToMarkdown, wikiWorkbenchKey } from '../wiki-utils'
+import { startWikiChatRun } from '@/api/modules/platform-wiki'
+import { useAiRunTask } from '@/composables/use-ai-run-task'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
@@ -14,33 +15,47 @@ const router = useRouter()
 const spaceName = computed(() => store.space.value?.name || '')
 const spaceSlug = computed(() => store.space.value?.slug || '')
 
-// wikilink 转链接 + 站内文件地址补 dev 代理前缀
-const transformContent = (content: string) => rewriteApiFileUrls(wikilinksToMarkdown(content))
+const runtime = useAiAssistantStore()
+const sessionKey = computed(() => store.spaceId.value ? `wiki:${store.spaceId.value}` : undefined)
+const task = useAiRunTask(sessionKey)
+const messages = computed(() => sessionKey.value ? runtime.taskMessages(sessionKey.value) : [])
+const renderDocuments = computed<Record<string, YdAgentRenderDocument>>(() => Object.fromEntries(messages.value.filter(message => message.id).map((message) => {
+  const references: YdAgentRenderDocument['blocks'] = []
+  const text = message.content.replace(/\[\[([^\][|]+)(?:\|([^\]]+))?\]\]/g, (original, rawTitle: string) => {
+    const node = store.flatTree.value.find(node => node.title === rawTitle.trim())
+    if (!node?.id) {
+      return original
+    }
+    const id = `node:${node.id}`
+    if (!references.some(block => block.type === 'reference' && block.reference.id === id)) {
+      references.push({ type: 'reference', reference: { id, title: node.title, excerpt: '', path: node.path } })
+    }
+    return `[[ref:${id}]]`
+  })
+  return [message.id!, { version: 1, blocks: [{ type: 'markdown', text }, ...references, ...(message.tools || []).map((tool, index) => ({ type: 'tool' as const, tool: {
+    id: tool.toolCallId || `${message.id}:tool:${index}`,
+    name: tool.toolName || '工具调用',
+    status: tool.status === 'executing' ? 'running' as const : tool.status === 'error' ? 'error' as const : tool.status === 'cancelled' ? 'cancelled' as const : 'success' as const,
+    description: tool.message,
+    output: tool.payload ? JSON.stringify(tool.payload, null, 2) : undefined,
+  } }))] }]
+})))
+const harness = computed(() => ({ name: 'AgentScope Harness', runId: task.run.value?.id, status: task.running.value ? task.run.value?.status === 'WAITING' ? 'waiting' as const : 'running' as const : task.run.value?.status === 'FAILED' ? 'error' as const : task.run.value?.status === 'CANCELLED' ? 'cancelled' as const : task.run.value ? 'completed' as const : 'idle' as const }))
 
 const suggestions = computed(() => store.spaceId.value
   ? ['这个知识库主要讲什么？', '帮我梳理一下内容目录', '最近有哪些新摄入的内容？']
   : [])
 
-const { messages, streaming, toolHint, send, stop, clear } = useYdChatStream({
-  endpoint: () => wikiChatAguiEndpoint(store.spaceId.value),
-  protocol: 'agui',
-  transport: 'sse',
-  historyLimit: 10,
-})
-
-function ask(text: string) {
+function ask(request: YdAgentSendRequest) {
   if (!store.spaceId.value) {
     toast.warning('请先选择知识库')
     return
   }
-  void send(text)
-}
-
-function onContentClick(event: MouseEvent) {
-  const title = resolveWikiLink(event)
-  if (title) {
-    store.openPage({ title })
+  if (!sessionKey.value || task.running.value) {
+    return
   }
+  runtime.appendTaskInput(sessionKey.value, request.text)
+  void task.start(() => startWikiChatRun(store.spaceId.value, { question: request.text, sessionId: sessionKey.value! }))
 }
 
 function onCitationClick(citation: YdChatCitation) {
@@ -54,9 +69,6 @@ function onRetrievalClick(hit: YdChatRetrievalHit) {
 function onGraphNodeClick(node: YdChatGraphNode) {
   store.openPage({ nodeId: node.id, title: node.title, path: node.path })
 }
-
-// 切知识库清空对话
-watch(() => store.spaceId.value, () => clear())
 
 /** 在统一 AI 助手聊天页打开当前知识库问答 */
 function openInChatPage() {
@@ -73,47 +85,45 @@ function openInChatPage() {
         <span v-if="spaceName">基于「{{ spaceName }}」检索回答</span>
       </div>
       <div class="chat-head__side">
-        <span v-if="streaming && toolHint" class="chat-head__tool">
-          <YdIcon name="morph:loader-circle" class="chat-head__spin" /> {{ toolHint }}
-        </span>
         <YdTooltip text="在 AI 助手中打开">
           <YdButton size="icon-sm" variant="ghost" @click="openInChatPage">
             <YdIcon name="morph:external-link" />
           </YdButton>
         </YdTooltip>
-        <YdTooltip text="清空对话">
-          <YdButton size="icon-sm" variant="ghost" :disabled="!messages.length" @click="clear">
-            <YdIcon name="morph:trash-2" />
+        <YdTooltip text="恢复后端会话">
+          <YdButton size="icon-sm" variant="ghost" @click="task.reconnect">
+            <YdIcon name="morph:refresh-cw" />
           </YdButton>
         </YdTooltip>
       </div>
     </header>
 
-    <YdChatMessageList
+    <YdAlert v-if="task.failure.value" variant="destructive" :title="task.failure.value" />
+    <YdAgentWorkbench
       :messages="messages"
-      :transform-content="transformContent"
-      :image-url-resolver="resolveApiFileUrl"
-      @content-click="onContentClick"
-      @citation-click="onCitationClick"
-      @retrieval-click="onRetrievalClick"
-      @graph-node-click="onGraphNodeClick"
+      :render-documents="renderDocuments"
+      :harness="harness"
+      :available-modes="['ask']"
+      :suggestions="suggestions"
+      :disabled="!store.spaceId.value"
+      class="wiki-agent-workbench"
+      @send="ask"
+      @stop="task.stop"
+      @citation-select="onCitationClick"
+      @retrieval-select="onRetrievalClick"
+      @graph-node-select="onGraphNodeClick"
+      @reference-select="reference => store.openPage({ nodeId: reference.id.startsWith('node:') ? reference.id.slice(5) : undefined, title: reference.title, path: reference.path })"
     >
       <template #empty>
         <div class="chat-empty">
-          <div class="chat-empty__icon"><YdIcon name="morph:message-circle-more" /></div>
+          <div class="chat-empty__icon">
+            <YdIcon name="morph:message-circle-more" />
+          </div>
           <strong>向知识库提问</strong>
           <p>回答会实时流式输出，自动检索 Wiki 页面并附带来源引用，引用可点击跳转</p>
         </div>
       </template>
-    </YdChatMessageList>
-
-    <YdChatSender
-      :loading="streaming"
-      :suggestions="messages.length ? [] : suggestions"
-      @send="ask"
-      @stop="stop"
-      @suggestion-click="ask"
-    />
+    </YdAgentWorkbench>
   </div>
 </template>
 
@@ -126,48 +136,54 @@ function openInChatPage() {
   background: var(--color-fill-1);
 }
 
+.wiki-agent-workbench {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
 .chat-head {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--color-border-2);
   background: var(--color-bg-1);
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .chat-head__title {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
 .chat-head__title :deep(svg) {
-  color: rgb(var(--color-text-2));
+  color: var(--color-text-2);
 }
 
 .chat-head__title span {
   overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 12px;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
 .chat-head__side {
   display: flex;
-  align-items: center;
-  gap: 10px;
   flex-shrink: 0;
+  gap: 10px;
+  align-items: center;
 }
 
 .chat-head__tool {
   display: inline-flex;
-  align-items: center;
   gap: 5px;
-  color: rgb(var(--color-text-2));
+  align-items: center;
   font-size: 12px;
+  color: var(--color-text-2);
 }
 
 .chat-head__spin {
@@ -180,24 +196,24 @@ function openInChatPage() {
 
 .chat-empty {
   display: grid;
-  justify-items: center;
   gap: 8px;
+  justify-items: center;
 }
 
 .chat-empty__icon {
   display: grid;
+  place-items: center;
   width: 56px;
   height: 56px;
-  place-items: center;
-  border-radius: 16px;
-  background: rgba(var(--color-text-2), 0.1);
-  color: rgb(var(--color-text-2));
   font-size: 28px;
+  color: var(--color-text-2);
+  background: var(--color-fill-2);
+  border-radius: 16px;
 }
 
 .chat-empty strong {
-  color: var(--color-text-1);
   font-size: 16px;
+  color: var(--color-text-1);
 }
 
 .chat-empty p {

@@ -17,6 +17,7 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const disposePluginAiActions: typeof import('../composables/ai-assistant-actions').disposePluginAiActions
   const effectScope: typeof import('vue').effectScope
   const ensurePublicPluginRoutes: typeof import('../store/modules/app/plugin-route-runtime').ensurePublicPluginRoutes
   const filterBackendMenuTreeByAuth: typeof import('../store/modules/app/route-auth').filterBackendMenuTreeByAuth
@@ -64,6 +65,7 @@ declare global {
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const registerAiAssistantAction: typeof import('../composables/ai-assistant-actions').registerAiAssistantAction
   const resetPublicPluginRoutes: typeof import('../store/modules/app/plugin-route-runtime').resetPublicPluginRoutes
   const resolveComponent: typeof import('vue').resolveComponent
   const resolvePluginRuntimeRoute: typeof import('../store/modules/app/plugin-route-runtime').resolvePluginRuntimeRoute
@@ -81,6 +83,11 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const useAiAssistantAction: typeof import('../composables/ai-assistant-actions').useAiAssistantAction
+  const useAiAssistantActions: typeof import('../composables/ai-assistant-actions').useAiAssistantActions
+  const useAiAssistantStore: typeof import('../store/modules/ai-assistant').useAiAssistantStore
+  const useAiRunTask: typeof import('../composables/use-ai-run-task').useAiRunTask
+  const useAiSystemRunsStore: typeof import('../store/modules/ai-system-runs').useAiSystemRunsStore
   const useAppAccountStore: typeof import('../store/modules/app/account').useAppAccountStore
   const useAppAuth: typeof import('../composables/app/auth').useAppAuth
   const useAppFeatureStore: typeof import('../store/modules/app/features').useAppFeatureStore

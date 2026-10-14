@@ -1,14 +1,19 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
+import { getCurrentScope, onScopeDispose, watch } from 'vue'
+import { cancelAiRun, getAiRun, listAiRuns, respondAiInteraction, resumeAiRun, subscribeAiRun } from '@/api/modules/platform-ai-runs'
 import apiFiles from '@/api/modules/files'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPublicTheme from '@/api/modules/public-theme'
+import { registerAiAssistantAction } from '@/composables/ai-assistant-actions'
+import router from '@/router'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { pluginFrontendAssetUrl } from '@/plugins/frontend-assets'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { applyPublicSeo } from '@/utils/public-seo'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.11.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.12.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()
@@ -109,6 +114,42 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
       },
     },
     ai: {
+      runs: {
+        async list(sessionId) { return (await listAiRuns(sessionId)).data },
+        async get(id) { return (await getAiRun(id)).data },
+        subscribe(id, options) { return subscribeAiRun(id, options.after, options.signal, options.onEvent) },
+        async watch(id, listener, options) {
+          let disposed = false
+          let cleanup = () => {}
+          if (getCurrentScope()) onScopeDispose(() => { disposed = true; cleanup() })
+          if (options?.signal?.aborted) return () => {}
+          const owner = String(accountStore.userId || '')
+          if (!owner) throw new Error('请先登录')
+          const runtime = useAiAssistantStore()
+          const run = (await getAiRun(id)).data
+          if (disposed || options?.signal?.aborted || String(accountStore.userId || '') !== owner) return () => {}
+          runtime.attachRun(run)
+          const unwatch = watch(() => runtime.runs[id], (snapshot) => {
+            if (snapshot && String(accountStore.userId || '') === owner) {
+              try { listener(JSON.parse(JSON.stringify(snapshot))) }
+              catch { console.warn('插件 AI 观察回调失败', pluginCode) }
+            }
+          }, { deep: true, immediate: true })
+          const detach = () => { unwatch(); options?.signal?.removeEventListener('abort', detach) }
+          cleanup = detach
+          options?.signal?.addEventListener('abort', detach, { once: true })
+          return detach
+        },
+        async cancel(id) { return (await cancelAiRun(id)).data },
+        async resume(id) { return (await resumeAiRun(id)).data },
+        async respond(id, requestId, answer) { return (await respondAiInteraction(id, requestId, answer)).data },
+      },
+      registerAction(action, element) {
+        const name = router.currentRoute.value.name
+        if (typeof name !== 'string') throw new Error('当前页面没有可注册的路由')
+        if (!/^[a-z][a-z0-9:.-]{1,119}$/.test(action.code)) throw new Error('AI 操作标识无效')
+        return registerAiAssistantAction({ ...action, code: `plugin:${pluginCode}:${action.code}`, routeName: name }, element)
+      },
       async agents() {
         const res = await apiPlugin.aiAgentCatalog()
         return res.data || []

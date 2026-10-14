@@ -16,7 +16,7 @@ const tags = ['设计', '灵感', '代码', '动效', '体验', '创造']
     <section class="effect-hero">
       <YdPatternBg variant="dots" size="md" class="hero-pattern" />
       <YdParticlesBg :quantity="36" />
-      <YdBlurReveal :key="revealKey">
+      <YdBlurReveal :key="revealKey" :duration="0.4" :delay="0">
         <p class="eyebrow">
           YUDREAM / MOTION STUDIO
         </p>
@@ -109,6 +109,8 @@ const tags = ['设计', '灵感', '代码', '动效', '体验', '创造']
 
 .effect-hero :deep(.yd-reveal) {
   position: relative;
+  /* Pattern/particles are decorative layers; keep the demo content readable. */
+  z-index: 1;
 }
 
 .hero-pattern {
@@ -157,7 +159,7 @@ p {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: var(--yd-content-gap);
 }
 
@@ -207,9 +209,4 @@ p {
   font-size: 12px;
 }
 
-@media (width <= 768px) {
-  .card-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

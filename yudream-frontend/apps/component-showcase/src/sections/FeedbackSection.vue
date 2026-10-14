@@ -35,39 +35,57 @@ const demoImages = [
 
 <template>
   <DemoCard title="YdTooltip" description="不同方位的气泡提示">
-    <div class="demo-row !gap-6">
-      <YdTooltip text="上方提示">
-        <YdButton variant="outline">
-          上方
-        </YdButton>
-      </YdTooltip>
-      <YdTooltip text="右侧提示" side="right">
-        <YdButton variant="outline">
-          右侧
-        </YdButton>
-      </YdTooltip>
-      <YdTooltip text="下方提示" side="bottom">
-        <YdButton variant="outline">
-          下方
-        </YdButton>
-      </YdTooltip>
-      <YdTooltip text="注意噢！">
-        <YdIcon name="morph:circle-question-mark" class="text-lg cursor-help" />
-      </YdTooltip>
+    <div class="feedback-layout">
+      <div class="demo-row !gap-6">
+        <YdTooltip text="上方提示">
+          <YdButton variant="outline">
+            上方
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="右侧提示" side="right">
+          <YdButton variant="outline">
+            右侧
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="下方提示" side="bottom">
+          <YdButton variant="outline">
+            下方
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="注意噢！">
+          <YdIcon name="morph:circle-question-mark" class="text-lg cursor-help" />
+        </YdTooltip>
+      </div>
+      <aside class="feedback-note">
+        <div class="feedback-note__heading">
+          <YdTag variant="secondary">悬停 / 聚焦</YdTag>
+          <span>短说明</span>
+        </div>
+        <p>Tooltip 只承载简短提示；键盘聚焦按钮或问号图标也能触发同一说明。</p>
+      </aside>
     </div>
   </DemoCard>
 
   <DemoCard title="YdModal" description="模板方式 / useYdModal 函数式 / confirm 确认框">
-    <div class="demo-row">
-      <YdButton @click="modalOpen = true">
-        模板弹窗
-      </YdButton>
-      <YdButton variant="outline" @click="openFunctionalModal">
-        函数式弹窗
-      </YdButton>
-      <YdButton variant="destructive" @click="openConfirm">
-        确认框
-      </YdButton>
+    <div class="feedback-layout">
+      <div class="demo-row">
+        <YdButton @click="modalOpen = true">
+          模板弹窗
+        </YdButton>
+        <YdButton variant="outline" @click="openFunctionalModal">
+          函数式弹窗
+        </YdButton>
+        <YdButton variant="destructive" @click="openConfirm">
+          确认框
+        </YdButton>
+      </div>
+      <aside class="feedback-note">
+        <div class="feedback-note__heading">
+          <YdTag variant="outline">三种入口</YdTag>
+          <span>聚焦任务</span>
+        </div>
+        <p>模板弹窗保留页面状态，函数式调用适合独立动作，确认框用于需要明确决策的危险操作。</p>
+      </aside>
     </div>
     <YdModal v-model="modalOpen" title="弹窗标题" description="通过 v-model 控制显隐。">
       <div class="text-sm text-muted-foreground">
@@ -77,16 +95,65 @@ const demoImages = [
   </DemoCard>
 
   <DemoCard title="YdImagePreview" description="useYdImagePreview 预览单张 / 多张">
-    <div class="demo-row">
-      <YdButton @click="imagePreview.open(demoImages[0])">
-        预览单张
-      </YdButton>
-      <YdButton variant="outline" @click="imagePreview.open(demoImages)">
-        预览多张
-      </YdButton>
-      <YdButton variant="outline" @click="imagePreview.open(demoImages, 1)">
-        预览多张（初始第 2 张）
-      </YdButton>
+    <div class="feedback-layout">
+      <div class="demo-row">
+        <YdButton @click="imagePreview.open(demoImages[0])">
+          预览单张
+        </YdButton>
+        <YdButton variant="outline" @click="imagePreview.open(demoImages)">
+          预览多张
+        </YdButton>
+        <YdButton variant="outline" @click="imagePreview.open(demoImages, 1)">
+          预览多张（初始第 2 张）
+        </YdButton>
+      </div>
+      <aside class="feedback-note">
+        <div class="feedback-note__heading">
+          <YdTag variant="secondary">图片预览</YdTag>
+          <span>单张 / 多张</span>
+        </div>
+        <p>多图入口保留当前索引，适合连续浏览素材或从列表上下文打开详情。</p>
+      </aside>
     </div>
   </DemoCard>
 </template>
+
+<style scoped>
+.feedback-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+  gap: var(--yd-content-gap);
+  align-items: center;
+}
+
+.feedback-note {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: var(--yd-surface-padding);
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-control-radius);
+}
+
+.feedback-note__heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.feedback-note p {
+  margin: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+@media (width <= 720px) {
+  .feedback-layout {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

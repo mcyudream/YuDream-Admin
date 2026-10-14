@@ -4,6 +4,12 @@
 @layer yudream-base {
   :where(:root) {
     --yd-emphasis: oklch(var(--primary));
+    --yd-focus-ring: color-mix(in srgb, var(--yd-emphasis) 52%, transparent);
+    --yd-disabled-opacity: 0.52;
+    --yd-status-info: var(--yd-emphasis);
+    --yd-status-success: rgb(var(--success-6));
+    --yd-status-warning: rgb(var(--warning-6));
+    --yd-status-danger: rgb(var(--danger-6));
     --yd-surface-radius: 18px;
     --yd-control-radius: 12px;
     --yd-surface-shadow: 0 4px 20px color-mix(in srgb, var(--color-text-1) 5%, transparent);
@@ -71,6 +77,7 @@
 @layer yudream-base {
   :where(:root.dark) {
     --yd-emphasis: color-mix(in oklab, oklch(var(--primary)) 35%, oklch(var(--foreground)));
+    --yd-focus-ring: color-mix(in srgb, var(--yd-emphasis) 68%, transparent);
   }
 }
 
@@ -84,6 +91,17 @@
 
 .yd-interactive:active:not(:disabled, [aria-disabled="true"]) {
   scale: var(--yd-motion-press);
+}
+
+.yd-interactive:focus-visible {
+  outline: 2px solid var(--yd-focus-ring);
+  outline-offset: 3px;
+}
+
+.yd-interactive:disabled,
+.yd-interactive[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: var(--yd-disabled-opacity);
 }
 
 @media (hover: hover) and (pointer: fine) {

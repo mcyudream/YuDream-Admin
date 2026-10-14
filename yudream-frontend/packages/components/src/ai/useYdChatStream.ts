@@ -1,4 +1,4 @@
-import {onScopeDispose, reactive, ref} from 'vue'
+import { onScopeDispose, reactive, ref } from 'vue'
 import { authoritativeAguiText } from './agui-result'
 
 /**
@@ -153,6 +153,25 @@ export interface UseYdChatStreamOptions {
   onDone?: (message: YdChatMessage) => void
   /** 回答失败 */
   onError?: (message: YdChatMessage, error: unknown) => void
+  /** 宿主提供持久运行端口时，断线仅恢复订阅；上下文历史由后端 Harness 管理。 */
+  durable?: boolean
+  onRunUpdate?: (runId: string, cursor: string) => void
+  submitToolResult?: (runId: string, request: YdChatToolCallRequest, reply: YdChatToolCallReply) => Promise<void>
+}
+
+export interface YdChatRunSnapshot {
+  id: string
+  cursor: string
+  status: string
+  content?: string
+  inputText?: string
+  reasoning?: string
+  tools?: YdChatToolEvent[]
+  activities?: YdChatActivity[]
+  result?: Record<string, unknown>
+  error?: string
+  pendingFrontendTools?: Array<{ toolCallId: string, name: string, arguments: Record<string, unknown>, responseRecorded?: boolean }>
+  generations?: Array<{ callId: string, content: string, reasoning?: string, providerCode?: string, modelCode?: string }>
 }
 
 export interface YdChatToolCallRequest {
@@ -161,9 +180,9 @@ export interface YdChatToolCallRequest {
   args: Record<string, unknown>
 }
 
-export type YdChatToolCallReply =
-  | { ok: true, result?: Record<string, unknown> }
-  | { ok: false, error: string }
+export type YdChatToolCallReply
+  = | { ok: true, result?: Record<string, unknown> }
+    | { ok: false, error: string }
 
 interface SseEventFrame {
   event: string
@@ -171,8 +190,19 @@ interface SseEventFrame {
 }
 
 export function useYdChatStream(options: UseYdChatStreamOptions) {
+  const stream = createYdChatStream(options)
+  onScopeDispose(stream.stop)
+  return stream
+}
+
+/** Transport state factory. The persistent wrapper owns its lifetime independently of Vue page scopes. */
+export function createYdChatStream(options: UseYdChatStreamOptions) {
   const messages = ref<YdChatMessage[]>([])
   const streaming = ref(false)
+  const runId = ref('')
+  const cursor = ref('0')
+  const runStatus = ref('IDLE')
+  const connectionState = ref<'connected' | 'reconnecting' | 'disconnected'>('disconnected')
   /** 流式过程中的工具状态提示（如「正在检索知识库」） */
   const toolHint = ref('')
   let abortController: AbortController | null = null
@@ -184,11 +214,14 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
   }
 
   function buildHistory(): YdChatHistoryTurn[] {
+    if (options.durable) {
+      return []
+    }
     const limit = options.historyLimit ?? 10
     return messages.value
       .filter(item => !item.error && !item.pending)
       .slice(-limit)
-      .map(item => ({role: item.role, content: options.historyContent?.(item) ?? historyContent(item)}))
+      .map(item => ({ role: item.role, content: options.historyContent?.(item) ?? historyContent(item) }))
   }
 
   /** 将工具分页游标和澄清上下文带入下一轮，同时限制历史膨胀。 */
@@ -227,7 +260,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     }
     const history = buildHistory()
     const userId = `user-${Date.now()}`
-    messages.value.push({id: userId, role: 'user', content: question, attachments: attachments ?? []})
+    messages.value.push({ id: userId, role: 'user', content: question, attachments: attachments ?? [] })
     // 后续流事件必须修改响应式代理；修改 push 前的原始对象不会触发 Vue 视图更新。
     const answer = reactive<YdChatMessage>({
       id: `assistant-${Date.now()}`,
@@ -242,24 +275,33 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     streaming.value = true
     toolHint.value = ''
     manuallyStopped = false
+    runId.value = ''
+    cursor.value = '0'
+    runStatus.value = 'RUNNING'
 
     const transport = options.transport ?? 'sse'
     try {
       if (transport === 'websocket') {
         await readWebSocket(answer, question, history, attachments)
-      } else {
+      }
+      else {
         await readServerSentEvents(answer, question, history, attachments)
       }
-      if (answer.error) {
+      if (runStatus.value === 'CANCELLED') {
+        settleRunningState(answer, 'cancelled')
+      }
+      else if (answer.error) {
         options.onError?.(answer, new Error(answer.content || '问答失败，请稍后重试'))
-      } else {
+      }
+      else {
         // Custom SSE endpoints can close normally without a terminal frame. A normal
         // transport completion must not leave process rows in their running state.
         settleRunningState(answer, 'complete')
         finalizeAnswer(answer)
         options.onDone?.(answer)
       }
-    } catch (error) {
+    }
+    catch (error) {
       if (isAbort(error)) {
         // 用户主动停止：保留已生成的部分，并收敛运行中的过程状态。
         settleRunningState(answer, 'cancelled')
@@ -269,15 +311,24 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         }
         return
       }
+      if (options.durable && runId.value && ['RUNNING', 'WAITING'].includes(runStatus.value)) {
+        connectionState.value = 'disconnected'
+        toolHint.value = '进度连接已断开，任务仍保存在后端；可恢复连接'
+        options.onError?.(answer, error)
+        return
+      }
       answer.pending = false
       answer.error = true
       settleRunningState(answer, 'error')
       answer.content = stripInternalContext(answer.content || (error instanceof Error ? error.message : '问答失败，请稍后重试'))
       options.onError?.(answer, error)
-    } finally {
+    }
+    finally {
       closeTransport()
-      streaming.value = false
-      toolHint.value = ''
+      streaming.value = options.durable === true && ['RUNNING', 'WAITING'].includes(runStatus.value)
+      if (!streaming.value) {
+        toolHint.value = ''
+      }
     }
   }
 
@@ -319,6 +370,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
   async function replyToolCall(request: YdChatToolCallRequest) {
     // 固定本轮请求对应的 socket；工具执行期间不要依赖全局引用是否被其他收尾逻辑清空。
     const current = socket
+    const executingRunId = runId.value
     let reply: YdChatToolCallReply
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     try {
@@ -327,17 +379,22 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         : Promise.resolve<YdChatToolCallReply>({ ok: false, error: '当前客户端未注册画布工具执行器' })
       const timeout = new Promise<YdChatToolCallReply>((resolve) => {
         const timeoutMs = request.toolName === 'cms.ask.user' ? 14 * 60 * 1000 : 20000
-        timeoutId = setTimeout(() => resolve({ ok: false, error: request.toolName === 'cms.ask.user' ? '等待用户选择超时' : '客户端画布工具执行超时' }), timeoutMs)
+        timeoutId = setTimeout(resolve, timeoutMs, { ok: false, error: request.toolName === 'cms.ask.user' ? '等待用户选择超时' : '客户端画布工具执行超时' })
       })
-      reply = await Promise.race([execution, timeout])
-    } catch (error) {
+      reply = options.durable ? await execution : await Promise.race([execution, timeout])
+    }
+    catch (error) {
       reply = { ok: false, error: error instanceof Error ? error.message : '工具执行失败' }
-    } finally {
+    }
+    finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId)
       }
     }
-    if (current && current.readyState === WebSocket.OPEN) {
+    if (options.submitToolResult && executingRunId) {
+      await options.submitToolResult(executingRunId, request, reply)
+    }
+    else if (current && current.readyState === WebSocket.OPEN) {
       current.send(JSON.stringify({
         type: 'TOOL_RESULT',
         toolCallId: request.toolCallId,
@@ -355,7 +412,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     const token = localStorage.getItem('token')
     const body = options.buildBody
       ? options.buildBody(question, history, attachments)
-      : {question, history, attachments}
+      : { question, history, attachments }
     let terminal: 'finished' | 'error' | null = null
 
     const response = await fetch(resolveEndpoint(), {
@@ -364,7 +421,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         'Accept': 'text/event-stream',
         'Content-Type': 'application/json',
         'Accept-Language': 'zh-CN',
-        ...(token ? {Authorization: token} : {}),
+        ...(token ? { Authorization: token } : {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -377,11 +434,11 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     const decoder = new TextDecoder()
     let buffer = ''
     while (!terminal) {
-      const {done, value} = await reader.read()
+      const { done, value } = await reader.read()
       if (done) {
         break
       }
-      buffer += decoder.decode(value, {stream: true})
+      buffer += decoder.decode(value, { stream: true })
       const frames = parseSseFrames(buffer)
       buffer = frames.rest
       for (const frame of frames.items) {
@@ -420,107 +477,148 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         const line = rawLine.replace(/\r$/, '')
         if (line.startsWith('event:')) {
           event = line.slice(6).trim() || 'message'
-        } else if (line.startsWith('data:')) {
+        }
+        else if (line.startsWith('data:')) {
           dataLines.push(line.slice(5).replace(/^ /, ''))
-        } else if (line.startsWith(':')) {
+        }
+        else if (line.startsWith(':')) {
           // 心跳注释行，忽略
           continue
         }
       }
       if (dataLines.length) {
-        frames.push({event, data: dataLines.join('\n')})
+        frames.push({ event, data: dataLines.join('\n') })
       }
     }
-    return {items: frames, rest}
+    return { items: frames, rest }
   }
 
   // ---------------------------------------------------------------- WebSocket
 
-  function readWebSocket(answer: YdChatMessage, question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[]): Promise<void> {
+  function readWebSocket(answer: YdChatMessage, question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[], resume = false, attempt = 0): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       void (async () => {
-      const endpoint = toWebSocketUrl(resolveEndpoint(), await options.getWebSocketToken?.())
-      let settled = false
-      let terminalReceived = false
-      let currentSocket: WebSocket
-      let heartbeatId: ReturnType<typeof setInterval> | undefined
+        const endpoint = toWebSocketUrl(resolveEndpoint(), await options.getWebSocketToken?.())
+        let settled = false
+        let terminalReceived = false
+        let currentSocket: WebSocket
+        let heartbeatId: ReturnType<typeof setInterval> | undefined
 
-      function finish(error?: unknown) {
-        if (settled) {
-          return
-        }
-        settled = true
-        if (heartbeatId !== undefined) {
-          clearInterval(heartbeatId)
-          heartbeatId = undefined
-        }
-        if (socket === currentSocket) {
-          socket = null
-        }
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-
-      try {
-        currentSocket = new WebSocket(endpoint)
-        socket = currentSocket
-      } catch (error) {
-        finish(error)
-        return
-      }
-
-      currentSocket.onopen = () => {
-        const payload = options.buildMessage
-          ? options.buildMessage(question, history, attachments)
-          : options.buildBody
-            ? options.buildBody(question, history, attachments)
-            : {question, history, attachments}
-        currentSocket.send(JSON.stringify(payload))
-        // 模型推理和客户端工具等待可能长时间没有正文帧；PING/PONG 防止代理层按空闲连接回收 WebSocket。
-        heartbeatId = setInterval(() => {
-          if (currentSocket.readyState === WebSocket.OPEN) {
-            currentSocket.send(JSON.stringify({type: 'PING', timestamp: Date.now()}))
+        function finish(error?: unknown) {
+          if (settled) {
+            return
           }
-        }, 15000)
-      }
+          settled = true
+          if (heartbeatId !== undefined) {
+            clearInterval(heartbeatId)
+            heartbeatId = undefined
+          }
+          if (socket === currentSocket) {
+            socket = null
+          }
+          if (error) {
+            reject(error)
+          }
+          else {
+            resolve()
+          }
+        }
 
-      currentSocket.onmessage = (event) => {
-        let parsed: unknown
         try {
-          parsed = JSON.parse(String(event.data))
-        } catch {
+          currentSocket = new WebSocket(endpoint)
+          socket = currentSocket
+        }
+        catch (error) {
+          finish(error)
           return
         }
-        const result = handleAguiEvent(parsed, answer)
-        if (result === 'finished' || result === 'error') {
-          terminalReceived = true
-          currentSocket.close()
+
+        currentSocket.onopen = () => {
+          connectionState.value = 'connected'
+          const payload = resume && runId.value
+            ? { resumeRunId: runId.value, after: cursor.value }
+            : options.buildMessage
+              ? options.buildMessage(question, history, attachments)
+              : options.buildBody
+                ? options.buildBody(question, history, attachments)
+                : { question, history, attachments }
+          currentSocket.send(JSON.stringify(payload))
+          // 模型推理和客户端工具等待可能长时间没有正文帧；PING/PONG 防止代理层按空闲连接回收 WebSocket。
+          heartbeatId = setInterval(() => {
+            if (currentSocket.readyState === WebSocket.OPEN) {
+              currentSocket.send(JSON.stringify({ type: 'PING', timestamp: Date.now() }))
+            }
+          }, 15000)
+        }
+
+        currentSocket.onmessage = (event) => {
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(String(event.data))
+          }
+          catch {
+            return
+          }
+          const frame = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+          if (options.durable && typeof frame.cursor === 'string' && /^\d+$/.test(frame.cursor)) {
+            if (BigInt(frame.cursor) <= BigInt(cursor.value)) {
+              return
+            }
+            cursor.value = frame.cursor
+          }
+          if (frame.type === 'RUN_STARTED' && typeof frame.runId === 'string') {
+            runId.value = frame.runId
+            answer.id = `run:${frame.runId}`
+          }
+          if (options.durable && runId.value) {
+            options.onRunUpdate?.(runId.value, cursor.value)
+          }
+          const result = handleAguiEvent(parsed, answer)
+          if (result === 'finished' || result === 'error') {
+            terminalReceived = true
+            currentSocket.close()
+            finish()
+          }
+        }
+
+        currentSocket.onerror = () => {
+        // onclose 会随后触发；这里仅记录，避免重复 reject
+        }
+
+        currentSocket.onclose = (event) => {
+          if (settled) {
+            return
+          }
+          if (manuallyStopped) {
+            finish(abortError())
+            return
+          }
+          if (!terminalReceived) {
+            if (options.durable && runId.value && attempt < 5) {
+              if (heartbeatId !== undefined) {
+                clearInterval(heartbeatId)
+              }
+              if (socket === currentSocket) {
+                socket = null
+              }
+              settled = true
+              connectionState.value = 'reconnecting'
+              setTimeout(() => {
+                if (manuallyStopped) {
+                  reject(abortError())
+                }
+                else {
+                  void readWebSocket(answer, question, history, attachments, true, attempt + 1).then(resolve, reject)
+                }
+              }, Math.min(1000 * 2 ** attempt, 15000))
+              return
+            }
+            const detail = `code=${event.code}${event.reason ? `, reason=${event.reason}` : ''}`
+            finish(new Error(`WebSocket 在回答完成前中断（${detail}）`))
+            return
+          }
           finish()
         }
-      }
-
-      currentSocket.onerror = () => {
-        // onclose 会随后触发；这里仅记录，避免重复 reject
-      }
-
-      currentSocket.onclose = (event) => {
-        if (settled) {
-          return
-        }
-        if (manuallyStopped) {
-          finish(abortError())
-          return
-        }
-        if (!terminalReceived) {
-          const detail = `code=${event.code}${event.reason ? `, reason=${event.reason}` : ''}`
-          finish(new Error(`WebSocket 在回答完成前中断（${detail}）`))
-          return
-        }
-        finish()
-      }
       })().catch((error) => {
         reject(error)
       })
@@ -538,12 +636,20 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
 
   // ---------------------------------------------------------------- 事件分发
 
+  function notifyLatestTool(answer: YdChatMessage) {
+    const latestTool = answer.tools?.at(-1)
+    if (latestTool) {
+      options.onTool?.(latestTool)
+    }
+  }
+
   function handleFrame(frame: SseEventFrame, answer: YdChatMessage): 'finished' | 'error' | null {
     if (options.protocol === 'agui') {
       let parsed: unknown
       try {
         parsed = JSON.parse(frame.data)
-      } catch {
+      }
+      catch {
         return null
       }
       const result = handleAguiEvent(parsed, answer)
@@ -554,7 +660,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     let event: Record<string, unknown>
     try {
       event = JSON.parse(frame.data)
-    } catch {
+    }
+    catch {
       return null
     }
     switch (event.type) {
@@ -573,7 +680,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
           status: 'executing',
         })
         toolHint.value = (typeof event.message === 'string' && event.message) || '正在调用工具…'
-        options.onTool?.(answer.tools?.at(-1)!)
+        notifyLatestTool(answer)
         break
       case 'citations':
         if (Array.isArray(event.citations)) {
@@ -597,6 +704,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     const type = String(event.type ?? '')
     switch (type) {
       case 'RUN_STARTED':
+        runStatus.value = 'RUNNING'
         return 'continue'
       case 'TEXT_MESSAGE_CHUNK':
         // 同上：正文增量不解除 pending
@@ -614,7 +722,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
           status: 'executing',
         })
         toolHint.value = `正在调用${answer.tools?.at(-1)?.toolName ?? '工具'}…`
-        options.onTool?.(answer.tools?.at(-1)!)
+        notifyLatestTool(answer)
         return 'continue'
       case 'TOOL_CALL_REQUEST': {
         // v2 客户端工具：服务端挂起模型循环，等待本端在画布真实执行后回传结果
@@ -623,8 +731,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         const args = (event.content && typeof event.content === 'object' ? event.content : {}) as Record<string, unknown>
         upsertTool(answer, { toolCallId, toolName, status: 'executing' })
         toolHint.value = `正在执行${toolName || '画布工具'}…`
-        options.onTool?.(answer.tools?.at(-1)!)
-        void replyToolCall({ toolCallId, toolName, args })
+        notifyLatestTool(answer)
+        void replyToolCall({ toolCallId, toolName, args }).catch(error => options.onError?.(answer, error))
         return 'continue'
       }
       case 'TOOL_CALL_RESULT': {
@@ -649,10 +757,30 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
             title: typeof content?.message === 'string' ? content.message : undefined,
           }, answer.id))
         }
-        options.onTool?.(answer.tools?.at(-1)!)
+        notifyLatestTool(answer)
         return 'continue'
       }
       case 'ACTIVITY_SNAPSHOT': {
+        const rawActivity = event.content && typeof event.content === 'object' ? event.content as Record<string, unknown> : {}
+        if (event.activityType === 'ai.input') {
+          if (options.durable && typeof rawActivity.content === 'string') {
+            installInput(runId.value, rawActivity.content)
+          }
+          return 'continue'
+        }
+        if (event.activityType === 'ai.generation' && typeof rawActivity.callId === 'string') {
+          const activityType = rawActivity.action === 'reasoning' ? 'ai.generation.reasoning' : 'ai.generation'
+          const id = `${answer.id}:${rawActivity.callId}`
+          const current = answer.activities?.find(activity => activity.messageId === id && activity.activityType === activityType)
+          upsertActivity(answer, { messageId: id, activityType, title: rawActivity.action === 'reasoning' ? '后台模型思考' : '后台模型输出', phase: [rawActivity.providerCode, rawActivity.modelCode].filter(Boolean).join(' / '), status: 'running', content: (current?.content || '') + (typeof rawActivity.content === 'string' ? rawActivity.content : '') })
+          return 'continue'
+        }
+        if (rawActivity.status === 'waiting') {
+          runStatus.value = 'WAITING'
+        }
+        else if (rawActivity.status === 'running') {
+          runStatus.value = 'RUNNING'
+        }
         const activity = normalizeActivity(
           event.content,
           typeof event.messageId === 'string' ? event.messageId : answer.id,
@@ -671,19 +799,23 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
           applyActivityPatch(answer, messageId, patch, typeof event.activityType === 'string' ? event.activityType : undefined)
           const activity = answer.activities?.find(item => (item.messageId || answer.id) === (messageId || answer.id) && item.activityType === event.activityType)
             ?? answer.activities?.find(item => (item.messageId || answer.id) === (messageId || answer.id))
-          if (activity) updateToolHint(activity)
+          if (activity) {
+            updateToolHint(activity)
+          }
         }
         return 'continue'
       }
       case 'RUN_FINISHED':
+        runStatus.value = 'COMPLETED'
         applyAguiResult(event, answer)
         settleRunningState(answer, 'complete')
         answer.pending = false
         return 'finished'
       case 'RUN_ERROR':
-        settleRunningState(answer, 'error')
+        runStatus.value = event.action === 'cancelled' || event.code === 'CANCELLED' ? 'CANCELLED' : 'FAILED'
+        settleRunningState(answer, runStatus.value === 'CANCELLED' ? 'cancelled' : 'error')
         answer.pending = false
-        answer.error = true
+        answer.error = runStatus.value === 'FAILED'
         answer.content = answer.content || String(event.message || '问答失败，请稍后重试')
         return 'error'
       default:
@@ -755,16 +887,20 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
         ? parsed as Record<string, unknown>
         : null
-    } catch {
+    }
+    catch {
       return null
     }
   }
 
   function parseJsonContent(content: unknown): unknown {
-    if (typeof content !== 'string') return content
+    if (typeof content !== 'string') {
+      return content
+    }
     try {
       return JSON.parse(content)
-    } catch {
+    }
+    catch {
       return content
     }
   }
@@ -828,10 +964,14 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       return []
     }
     return raw.flatMap((item) => {
-      if (!item || typeof item !== 'object') return []
+      if (!item || typeof item !== 'object') {
+        return []
+      }
       const source = item as Record<string, unknown>
       const title = typeof source.title === 'string' ? source.title : ''
-      if (!title) return []
+      if (!title) {
+        return []
+      }
       return [{
         title,
         score: typeof source.score === 'number' ? source.score : undefined,
@@ -852,72 +992,98 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
 
   function normalizeGraph(raw: unknown): YdChatGraph | undefined {
     const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null
-    if (!source) return undefined
-    const nodes = Array.isArray(source.nodes) ? source.nodes.flatMap((item) => {
-      if (!item || typeof item !== 'object') return []
-      const node = item as Record<string, unknown>
-      const id = node.id == null ? '' : String(node.id)
-      const title = typeof node.title === 'string' ? node.title : ''
-      return id && title ? [{
-        id,
-        title,
-        type: typeof node.type === 'string' ? node.type : undefined,
-        role: typeof node.role === 'string' ? node.role : undefined,
-        score: typeof node.score === 'number' ? node.score : undefined,
-        path: node.path == null ? undefined : String(node.path),
-      }] : []
-    }) : []
-    const edges = Array.isArray(source.edges) ? source.edges.flatMap((item) => {
-      if (!item || typeof item !== 'object') return []
-      const edge = item as Record<string, unknown>
-      const sourceId = edge.source == null ? '' : String(edge.source)
-      const target = edge.target == null ? '' : String(edge.target)
-      return sourceId && target ? [{
-        source: sourceId,
-        target,
-        weight: typeof edge.weight === 'number' ? edge.weight : undefined,
-        signal: typeof edge.signal === 'string' ? edge.signal : undefined,
-      }] : []
-    }) : []
-    return {query: typeof source.query === 'string' ? source.query : undefined, nodes, edges}
+    if (!source) {
+      return undefined
+    }
+    const nodes = Array.isArray(source.nodes)
+      ? source.nodes.flatMap((item) => {
+          if (!item || typeof item !== 'object') {
+            return []
+          }
+          const node = item as Record<string, unknown>
+          const id = node.id == null ? '' : String(node.id)
+          const title = typeof node.title === 'string' ? node.title : ''
+          return id && title
+            ? [{
+                id,
+                title,
+                type: typeof node.type === 'string' ? node.type : undefined,
+                role: typeof node.role === 'string' ? node.role : undefined,
+                score: typeof node.score === 'number' ? node.score : undefined,
+                path: node.path == null ? undefined : String(node.path),
+              }]
+            : []
+        })
+      : []
+    const edges = Array.isArray(source.edges)
+      ? source.edges.flatMap((item) => {
+          if (!item || typeof item !== 'object') {
+            return []
+          }
+          const edge = item as Record<string, unknown>
+          const sourceId = edge.source == null ? '' : String(edge.source)
+          const target = edge.target == null ? '' : String(edge.target)
+          return sourceId && target
+            ? [{
+                source: sourceId,
+                target,
+                weight: typeof edge.weight === 'number' ? edge.weight : undefined,
+                signal: typeof edge.signal === 'string' ? edge.signal : undefined,
+              }]
+            : []
+        })
+      : []
+    return { query: typeof source.query === 'string' ? source.query : undefined, nodes, edges }
   }
 
   function upsertActivity(answer: YdChatMessage, patch: YdChatActivity | null) {
-    if (!patch) return
+    if (!patch) {
+      return
+    }
     answer.activities ??= []
     const key = patch.messageId || answer.id
     const existing = answer.activities.find(item => (item.messageId || answer.id) === key && item.activityType === patch.activityType)
     if (existing) {
       Object.assign(existing, patch)
-      if (patch.hits?.length) existing.hits = patch.hits
-      if (patch.graph) existing.graph = patch.graph
+      if (patch.hits?.length) {
+        existing.hits = patch.hits
+      }
+      if (patch.graph) {
+        existing.graph = patch.graph
+      }
       return
     }
     // A new structured activity advances the visible lifecycle. Close the previous
     // progress step so accepted/retrieve/generate do not keep spinning forever.
     const runningProgress = [...answer.activities].reverse().find(item => item.activityType === 'wiki-progress' && (!item.status || item.status === 'running'))
-    if (runningProgress) runningProgress.status = 'completed'
-    answer.activities.push({...patch, messageId: key})
+    if (runningProgress) {
+      runningProgress.status = 'completed'
+    }
+    answer.activities.push({ ...patch, messageId: key })
   }
 
   function updateToolHint(activity: YdChatActivity) {
     toolHint.value = [activity.title, activity.content].filter(Boolean).join('：') || '正在处理…'
   }
 
-  type JsonPatchOperation = { op: 'add' | 'remove' | 'replace', path: string, value?: unknown }
+  interface JsonPatchOperation { op: 'add' | 'remove' | 'replace', path: string, value?: unknown }
 
   function normalizePatch(content: unknown): JsonPatchOperation[] {
     const parsed = parseJsonContent(content)
     const source = parseStructuredContent(parsed)
     const raw = Array.isArray(parsed) ? parsed : (source?.patch ?? source?.operations)
-    if (!Array.isArray(raw)) return []
+    if (!Array.isArray(raw)) {
+      return []
+    }
     return raw.flatMap((item) => {
-      if (!item || typeof item !== 'object') return []
+      if (!item || typeof item !== 'object') {
+        return []
+      }
       const operation = item as Record<string, unknown>
       const op = operation.op
       const path = operation.path
       return (op === 'add' || op === 'remove' || op === 'replace') && typeof path === 'string'
-        ? [{op, path, value: operation.value}]
+        ? [{ op, path, value: operation.value }]
         : []
     })
   }
@@ -925,27 +1091,44 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
   function applyActivityPatch(answer: YdChatMessage, messageId: string | undefined, patches: JsonPatchOperation[], activityType?: string) {
     answer.activities ??= []
     const current = answer.activities.find(item => (item.messageId || answer.id) === (messageId || answer.id) && (!activityType || item.activityType === activityType))
-      ?? {messageId: messageId || answer.id, activityType: activityType || 'wiki-progress'}
-    if (!answer.activities.includes(current)) answer.activities.push(current)
-    for (const patch of patches) applyObjectPatch(current as unknown as Record<string, unknown>, patch)
+      ?? { messageId: messageId || answer.id, activityType: activityType || 'wiki-progress' }
+    if (!answer.activities.includes(current)) {
+      answer.activities.push(current)
+    }
+    for (const patch of patches) {
+      applyObjectPatch(current as unknown as Record<string, unknown>, patch)
+    }
   }
 
   function applyObjectPatch(target: Record<string, unknown>, patch: JsonPatchOperation) {
     const parts = patch.path.split('/').slice(1).map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'))
-    if (!parts.length) return
+    if (!parts.length) {
+      return
+    }
     let parent: Record<string, unknown> | unknown[] = target
     for (const part of parts.slice(0, -1)) {
       const key = Array.isArray(parent) ? Number(part) : part
       const value = parent[key as never]
-      if (!value || typeof value !== 'object') parent[key as never] = {} as never
+      if (!value || typeof value !== 'object') {
+        parent[key as never] = {} as never
+      }
       parent = parent[key as never] as Record<string, unknown> | unknown[]
     }
     const key = Array.isArray(parent) ? (patch.path.endsWith('/-') ? parent.length : Number(parts.at(-1))) : parts.at(-1)!
     if (patch.op === 'remove') {
-      if (Array.isArray(parent)) parent.splice(Number(key), 1)
-      else delete parent[key as string]
-    } else if (Array.isArray(parent) && patch.op === 'add') parent.splice(Number(key), 0, patch.value)
-    else parent[key as never] = patch.value as never
+      if (Array.isArray(parent)) {
+        parent.splice(Number(key), 1)
+      }
+      else {
+        delete parent[key as string]
+      }
+    }
+    else if (Array.isArray(parent) && patch.op === 'add') {
+      parent.splice(Number(key), 0, patch.value)
+    }
+    else {
+      parent[key as never] = patch.value as never
+    }
   }
 
   function normalizeCitations(raw: unknown[]): YdChatCitation[] {
@@ -990,7 +1173,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       const text = await response.text()
       const parsed = JSON.parse(text) as { message?: string, msg?: string }
       return parsed.message || parsed.msg || `请求失败（${response.status}）`
-    } catch {
+    }
+    catch {
       return `请求失败（${response.status}）`
     }
   }
@@ -998,6 +1182,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
   /** 停止当前生成 */
   function stop(): void {
     manuallyStopped = true
+    runStatus.value = 'CANCELLED'
+    streaming.value = false
     abortController?.abort()
     socket?.close()
   }
@@ -1009,7 +1195,55 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     toolHint.value = ''
   }
 
-  onScopeDispose(stop)
+  function installInput(id: string, text: string) {
+    if (!id || messages.value.some(message => message.id === `input:${id}`)) {
+      return
+    }
+    const optimistic = messages.value.findLast(message => message.role === 'user' && message.content === text && message.id?.startsWith('user-'))
+    if (optimistic) {
+      optimistic.id = `input:${id}`
+    }
+    else {
+      messages.value.push({ id: `input:${id}`, role: 'user', content: text })
+    }
+  }
+
+  async function resumeRun(snapshot: YdChatRunSnapshot) {
+    if (runId.value === snapshot.id && socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return
+    }
+    runId.value = snapshot.id
+    cursor.value = snapshot.cursor || '0'
+    runStatus.value = snapshot.status
+    if (snapshot.inputText) {
+      installInput(snapshot.id, snapshot.inputText)
+    }
+    let answer = messages.value.find(message => message.id === `run:${snapshot.id}`)
+    if (!answer) {
+      messages.value.push({ id: `run:${snapshot.id}`, role: 'assistant', content: '' })
+      answer = messages.value.at(-1)!
+    }
+    const generationActivities: YdChatActivity[] = (snapshot.generations || []).flatMap(generation => [{ messageId: `${answer.id}:${generation.callId}`, activityType: 'ai.generation', title: '后台模型输出', phase: [generation.providerCode, generation.modelCode].filter(Boolean).join(' / '), status: ['RUNNING', 'WAITING'].includes(snapshot.status) ? 'running' : 'complete', content: generation.content }, ...(generation.reasoning ? [{ messageId: `${answer.id}:${generation.callId}`, activityType: 'ai.generation.reasoning', title: '后台模型思考', status: ['RUNNING', 'WAITING'].includes(snapshot.status) ? 'running' : 'complete', content: generation.reasoning }] : [])])
+    Object.assign(answer, { content: snapshot.content || '', reasoning: snapshot.reasoning, tools: snapshot.tools || [], activities: [...(snapshot.activities || []), ...generationActivities], pending: ['RUNNING', 'WAITING'].includes(snapshot.status), error: snapshot.status === 'FAILED' })
+    if (snapshot.error && !answer.content) {
+      answer.content = snapshot.error
+    }
+    streaming.value = ['RUNNING', 'WAITING'].includes(snapshot.status)
+    if (!streaming.value) {
+      return
+    }
+    manuallyStopped = false
+    try {
+      await readWebSocket(answer, '', [], undefined, true)
+      answer.pending = false
+      streaming.value = false
+    }
+    catch (error) {
+      connectionState.value = 'disconnected'
+      toolHint.value = '进度连接已断开，任务仍保存在后端；可恢复连接'
+      options.onError?.(answer, error)
+    }
+  }
 
   return {
     messages,
@@ -1018,5 +1252,10 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     send,
     stop,
     clear,
+    runId,
+    cursor,
+    runStatus,
+    connectionState,
+    resumeRun,
   }
 }

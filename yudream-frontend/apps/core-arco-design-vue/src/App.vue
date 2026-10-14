@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalAiAssistant from '@/components/GlobalAiAssistant/index.vue'
 import dayjs from '@/utils/dayjs'
 import { ua } from '@/utils/ua'
 import Provider from './ui/provider/index.vue'
@@ -57,5 +58,6 @@ onMounted(() => {
     <AppBackToTop />
     <YdToast :theme="appSettingsStore.currentColorScheme" />
     <AppSystemInfo />
+    <GlobalAiAssistant />
   </Provider>
 </template>

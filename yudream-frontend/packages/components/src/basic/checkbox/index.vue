@@ -33,16 +33,34 @@ const checkboxId = computed(() => props.id || generatedId)
 watch(value, (newValue) => {
   emit('change', newValue)
 })
+
+function handleContainerClick() {
+  if (props.disabled) {
+    return
+  }
+
+  value.value = value.value !== true
+}
 </script>
 
 <template>
-  <div :class="cn('flex-center-start gap-2', props.class)">
+  <div
+    :data-state="value === true ? 'checked' : value === 'indeterminate' ? 'indeterminate' : 'unchecked'"
+    :data-disabled="props.disabled ? '' : undefined"
+    :class="
+      cn(
+        'flex-center-start min-w-0 min-h-9 gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors cursor-pointer hover:bg-accent/50 data-[state=checked]:border-border data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:border-border data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-accent-foreground data-[disabled]:cursor-not-allowed data-[disabled]:hover:bg-transparent',
+        props.class,
+      )
+    "
+    @click.self="handleContainerClick"
+  >
     <Checkbox :id="checkboxId" v-model="value" :disabled="disabled" :class="props.itemClass" :aria-label="props.ariaLabel" :aria-labelledby="props.ariaLabelledby" :aria-describedby="props.ariaDescribedby" :aria-invalid="props.ariaInvalid" />
     <Label
       :for="checkboxId"
       :class="
         cn(
-          'text-sm cursor-pointer empty:hidden',
+          'min-w-0 flex-1 text-sm cursor-pointer empty:hidden',
           props.disabled && 'cursor-not-allowed opacity-60',
           props.labelClass,
         )

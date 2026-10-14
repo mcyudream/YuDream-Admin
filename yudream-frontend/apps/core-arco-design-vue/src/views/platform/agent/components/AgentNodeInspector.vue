@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { AgentFlowNode, AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
-import AgentJsonCodeEditor from './AgentJsonCodeEditor.vue'
 import { agentModelKind, extractOutputSchemaDefault, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
+import AgentJsonCodeEditor from './AgentJsonCodeEditor.vue'
 
 const props = defineProps<{
   node: AgentFlowNode
@@ -229,6 +229,9 @@ function changeClasses(value: unknown) {
           <small v-if="node.data.toolMode === 'NONE'">当前模型不会调用工具。</small>
           <small v-else>应用授权会从所有模型节点的选择自动汇总。</small>
         </label>
+        <YdCheckbox v-if="node.data.kind === 'llm'" :model-value="Boolean(node.data.workspace)" class="check-line" @update:model-value="emit('update', { workspace: $event === true })">
+          <span><b>启用文件工作区</b><small>节点经 Harness 会话运行，模型可读写工作区文件（按运行用户隔离、跨运行复用）；不勾选则保持无状态生成。</small></span>
+        </YdCheckbox>
       </section>
 
       <section v-if="node.data.kind === 'understand'" class="form-section compatibility-section">
@@ -399,6 +402,11 @@ function changeClasses(value: unknown) {
 .form-section > .form-field:first-of-type { margin-top: 0; }
 .form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }
 .form-field small { color: var(--color-text-3); font-size: 9px; line-height: 1.55; }
+.check-line { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: start; gap: 8px; margin-top: 12px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 11px; cursor: pointer; }
+.check-line :deep([data-slot="checkbox"]) { margin-top: 2px; }
+.check-line span { display: grid; gap: 2px; }
+.check-line b { color: var(--color-text-1); font-weight: 500; }
+.check-line small { color: var(--color-text-3); font-size: 9px; line-height: 1.55; }
 .form-field .field-error { color: rgb(var(--danger-6)); }
 .form-field.disabled { opacity: 0.65; }
 .form-grid { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }

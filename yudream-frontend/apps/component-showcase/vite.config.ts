@@ -7,7 +7,7 @@ import autoImport from 'unplugin-auto-import/vite'
 import components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
 
@@ -18,12 +18,12 @@ export default defineConfig({
         FantasticAdminComponentsAutoImports,
         FantasticAdminComposablesAutoImports,
       ],
-      dts: './src/types/auto-imports.d.ts',
+      dts: command === 'serve' ? './src/types/auto-imports.d.ts' : false,
     }),
 
     // https://github.com/unplugin/unplugin-vue-components
     components({
-      dts: './src/types/components.d.ts',
+      dts: command === 'serve' ? './src/types/components.d.ts' : false,
       resolvers: [
         FantasticAdminComponentsResolver(),
       ],
@@ -47,4 +47,4 @@ export default defineConfig({
     port: 5188,
     strictPort: true,
   },
-})
+}))

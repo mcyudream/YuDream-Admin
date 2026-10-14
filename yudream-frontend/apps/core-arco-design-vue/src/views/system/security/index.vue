@@ -196,11 +196,11 @@ const oauthScopeColumns: TableColumn<OAuthScopePickerRow>[] = [
   { accessorKey: 'code', header: '范围码', minWidth: 220 },
   { accessorKey: 'module', header: '分组', minWidth: 120 },
 ]
+
 const permissionMultiSelectOptions = computed(() => permissionSelectOptions.value.flatMap(group => group.options.map(option => ({
   label: `${group.label} · ${option.label}`,
   value: option.value,
 }))))
-
 
 const permissionNameMap = computed(() => new Map(permissions.value.map(item => [item.code, item.name])))
 
@@ -873,7 +873,7 @@ function normalizeDateTime(value?: string) {
           </div>
         </div>
         <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-
+          
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
           table-class="min-w-[980px]"

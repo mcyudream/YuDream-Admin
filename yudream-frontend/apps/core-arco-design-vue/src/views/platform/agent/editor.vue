@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type { YdTablePickerQuery, YdTablePickerResult, YdWorkflowCanvasInstance, YdWorkflowConnection, YdWorkflowEdge, YdWorkflowNode } from '@yudream/components'
-import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
-import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
+import type { AgentApplicationPayload, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
+import { useAiRunTask } from '@/composables/use-ai-run-task'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { projectAiRunActivity } from '@/utils/ai-run-projection'
 import AgentApplicationInspector from './components/AgentApplicationInspector.vue'
 import AgentDebugPanel from './components/AgentDebugPanel.vue'
 import AgentEdgeInspector from './components/AgentEdgeInspector.vue'
 import AgentNodeInspector from './components/AgentNodeInspector.vue'
 import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
-import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentNodePaletteGroups, agentNodeTemplates, findAgentNodeTemplate } from './config/agent-node-catalog'
 import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
 import { buildAgentRunInput } from './config/agent-run-input'
@@ -34,11 +36,13 @@ const customTools = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
 const agentModels = ref<AgentModelOption[]>([])
 const knowledgeSpaces = ref<AgentKnowledgeSpaceOption[]>([])
-const debugRunning = ref(false)
-const debugMessages = ref<AgentDebugMessage[]>([])
-const activeDebugMessageId = ref('')
+const aiRuntime = useAiAssistantStore()
+const debugTask = useAiRunTask(() => id.value ? `agent-debug:${id.value}` : undefined)
+const debugPreparing = ref(false)
+const debugRunning = computed(() => debugPreparing.value || debugTask.running.value)
+const debugMessages = computed(() => id.value ? aiRuntime.taskMessages(`agent-debug:${id.value}`) : [])
+const debugHarness = computed(() => ({ name: 'AgentScope Harness', runId: debugTask.run.value?.id, status: debugRunning.value ? debugTask.run.value?.status === 'WAITING' ? 'waiting' as const : 'running' as const : debugTask.run.value?.status === 'FAILED' ? 'error' as const : debugTask.run.value?.status === 'CANCELLED' ? 'cancelled' as const : debugTask.run.value ? 'completed' as const : 'idle' as const }))
 const nodeDebugStatus = reactive<Record<string, AgentDebugStatus | undefined>>({})
-let debugAbortController: AbortController | null = null
 const form = reactive<AgentApplicationPayload>({
   name: '',
   code: '',
@@ -90,7 +94,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  debugAbortController?.abort()
 })
 
 async function fetchToolCandidates(query: YdTablePickerQuery): Promise<YdTablePickerResult<AgentToolCandidate>> {
@@ -444,10 +447,6 @@ function nodeName(nodeId?: string) {
   return nodes.value.find(node => node.id === nodeId)?.data.title || nodeId || '-'
 }
 
-function activeDebugMessage() {
-  return debugMessages.value.find(message => message.id === activeDebugMessageId.value)
-}
-
 function resetDebugCanvas() {
   Object.keys(nodeDebugStatus).forEach(key => delete nodeDebugStatus[key])
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
@@ -483,55 +482,24 @@ function focusDebugNode(nodeId: string) {
   void canvas.value?.setCenter(node.position.x + 115, node.position.y + 70, { zoom: 1, duration: 260 })
 }
 
-function handleDebugEvent(event: AgentDebugStreamEvent) {
-  const message = activeDebugMessage()
-  if (!message) {
-    return
+watch(() => debugTask.run.value?.activities, (activities) => {
+  for (const key of Object.keys(nodeDebugStatus)) {
+    delete nodeDebugStatus[key]
   }
-  if (event.type.startsWith('NODE_') && event.nodeId && event.status) {
-    nodeDebugStatus[event.nodeId] = event.status
-    const step = message.steps?.find(item => item.nodeId === event.nodeId)
-    const nextStep = {
-      nodeId: event.nodeId,
-      nodeTitle: event.nodeTitle || nodeName(event.nodeId),
-      nodeKind: event.nodeKind || 'unknown',
-      status: event.status,
-      message: event.message || '节点状态已更新',
+  let activeNode = ''
+  for (const raw of activities || []) {
+    const activity = projectAiRunActivity(raw, debugTask.run.value?.id || '')
+    if (!activity?.nodeId || !['RUNNING', 'COMPLETED', 'SKIPPED', 'FAILED'].includes(activity.nodeStatus || '')) {
+      continue
     }
-    if (step) {
-      Object.assign(step, nextStep)
-    }
-    else {
-      message.steps?.push(nextStep)
-    }
-    refreshDebugEdges()
-    focusDebugNode(event.nodeId)
-    return
+    nodeDebugStatus[activity.nodeId] = activity.nodeStatus as AgentDebugStatus
   }
-  if (event.type === 'TEXT_MESSAGE_CHUNK' && event.delta) {
-    message.content += event.delta
-    return
+  activeNode = Object.keys(nodeDebugStatus).find(nodeId => nodeDebugStatus[nodeId] === 'RUNNING') || ''
+  refreshDebugEdges()
+  if (activeNode) {
+    focusDebugNode(activeNode)
   }
-  if (event.type === 'TOOL_CALL_RESULT' && event.tool) {
-    message.tools?.push({
-      toolName: event.tool.toolName || '工具',
-      action: event.tool.action,
-      message: event.tool.message,
-    })
-    return
-  }
-  if (event.type === 'RUN_FINISHED') {
-    if (!message.content && event.result?.content) {
-      message.content = event.result.content
-    }
-    message.status = 'completed'
-    return
-  }
-  if (event.type === 'RUN_ERROR') {
-    message.status = 'failed'
-    message.content = message.content || event.message || 'Agent 调试失败'
-  }
-}
+}, { deep: true })
 
 async function startDebug(content: string, attachments: AgentDebugAttachment[] = []) {
   if (debugRunning.value) {
@@ -554,33 +522,22 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
     toast.error('当前工作流未开启文本附件输入')
     return
   }
-  const applicationId = await save(false, false)
-  if (!applicationId) {
-    return
-  }
-
-  rightMode.value = 'debug'
-  resetDebugCanvas()
-  const assistantId = `assistant-${Date.now()}`
-  const debugInput = buildAgentRunInput(content, attachments)
-  const imageDataUrl = attachments.find(item => item.type.startsWith('image/'))?.dataUrl
-  const messageAttachments = attachments.map(item => ({
-    id: item.id,
-    name: item.name,
-    type: item.type,
-    size: item.size,
-    dataUrl: item.type.startsWith('image/') ? item.dataUrl : undefined,
-  }))
-  debugMessages.value.push(
-    { id: `user-${Date.now()}`, role: 'user', content, attachments: messageAttachments },
-    { id: assistantId, role: 'assistant', content: '', status: 'streaming', steps: [], tools: [] },
-  )
-  activeDebugMessageId.value = assistantId
-  debugRunning.value = true
-  debugAbortController = new AbortController()
-
+  debugPreparing.value = true
+  const started = aiRuntime.lifecycleVersion()
   try {
-    const request = await apiAgent.debugStreamRequest(applicationId, {
+    const applicationId = await save(false, false)
+    if (started !== aiRuntime.lifecycleVersion()) {
+      return
+    }
+    if (!applicationId) {
+      return
+    }
+    rightMode.value = 'debug'
+    resetDebugCanvas()
+    const debugInput = buildAgentRunInput(content, attachments)
+    const imageDataUrl = attachments.find(item => item.type.startsWith('image/'))?.dataUrl
+    aiRuntime.appendTaskInput(`agent-debug:${applicationId}`, debugInput)
+    await debugTask.start(() => apiAgent.startDebugRun(applicationId, {
       input: debugInput,
       imageDataUrl,
       attachments: attachments
@@ -591,47 +548,26 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
           size: item.size,
           dataUrl: item.dataUrl!,
         })),
-    })
-    const response = await fetch(apiAgent.debugStreamEndpoint(applicationId), {
-      ...request,
-      signal: debugAbortController.signal,
-    })
-    await consumeAgentDebugStream(response, raw => handleDebugEvent(raw as AgentDebugStreamEvent))
-    const message = activeDebugMessage()
-    if (message?.status === 'streaming') {
-      message.status = 'failed'
-      message.content = message.content || '调试连接已结束，但未收到完成事件'
-    }
+    }))
   }
   catch (error) {
-    const message = activeDebugMessage()
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      if (message) {
-        message.status = 'cancelled'
-      }
-    }
-    else {
-      if (message) {
-        message.status = 'failed'
-        message.content = message.content || (error instanceof Error ? error.message : 'Agent 调试失败')
-      }
-      toast.error('Agent 调试失败')
-    }
+    toast.error(error instanceof Error ? error.message : 'Agent 调试失败')
   }
   finally {
-    debugRunning.value = false
-    debugAbortController = null
+    debugPreparing.value = false
   }
 }
 
 function stopDebug() {
-  debugAbortController?.abort()
+  if (debugPreparing.value) {
+    toast.warning('调试任务仍在登记，请稍后再次停止')
+    return
+  }
+  void debugTask.stop()
 }
 
 function clearDebug() {
-  debugMessages.value = []
-  activeDebugMessageId.value = ''
-  resetDebugCanvas()
+  void debugTask.reconnect()
 }
 
 async function save(publish = false, notify = true): Promise<string> {
@@ -805,19 +741,22 @@ function validateCurrentWorkflow() {
         </main>
 
         <AgentDebugPanel
-        v-if="rightMode === 'debug'"
-        class="inspector-panel"
-        :messages="debugMessages"
-        :running="debugRunning"
-        :allow-image="debugAllowsImage"
-        :allow-files="debugAllowsTextFiles"
-        :model-label="debugModelLabel"
-        @send="startDebug"
-        @stop="stopDebug"
-        @clear="clearDebug"
-        @close="rightMode = 'config'"
-      />
-      <AgentNodeInspector
+          v-if="rightMode === 'debug'"
+          class="inspector-panel"
+          :messages="debugMessages"
+          :harness="debugHarness"
+          :run-id="debugTask.run.value?.id"
+          :failure="debugTask.failure.value"
+          :running="debugRunning"
+          :allow-image="debugAllowsImage"
+          :allow-files="debugAllowsTextFiles"
+          :model-label="debugModelLabel"
+          @send="startDebug"
+          @stop="stopDebug"
+          @clear="clearDebug"
+          @close="rightMode = 'config'"
+        />
+        <AgentNodeInspector
           v-else-if="selectedNode"
           class="inspector-panel"
           :node="selectedNode"

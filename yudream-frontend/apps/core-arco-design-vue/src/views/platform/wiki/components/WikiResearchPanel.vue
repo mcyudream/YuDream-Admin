@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { WikiResearchPlan } from '@/api/modules/platform-wiki'
-import { inject, ref } from 'vue'
+import { YdAgentAnswer, YdAlert, YdChatReasoning, YdThoughtChain } from '@yudream/components'
+import { computed, inject, ref, watch } from 'vue'
 import { planWikiResearch, startWikiResearch } from '@/api/modules/platform-wiki'
+import { useAiRunTask } from '@/composables/use-ai-run-task'
+import { readCompletedAiJsonField, readCompletedAiJsonItems } from '@/utils/ai-structured-stream'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
@@ -9,30 +12,51 @@ const toast = useYdToast()
 
 const seed = ref('')
 const plan = ref<WikiResearchPlan | null>(null)
-const planning = ref(false)
 const starting = ref(false)
+const dismissedRunId = ref('')
+const task = useAiRunTask(() => store.spaceId.value ? `wiki-research:${store.spaceId.value}` : undefined)
+const { run: aiRun, running: planning, activities, failure } = task
+const draft = computed<WikiResearchPlan | null>(() => {
+  const source = aiRun.value?.structuredContent || ''
+  const topic = readCompletedAiJsonField(source, 'topic')
+  const rationale = readCompletedAiJsonField(source, 'rationale')
+  const queries = readCompletedAiJsonItems(source, 'queries').filter((query): query is string => typeof query === 'string')
+  return typeof topic === 'string' || typeof rationale === 'string' || queries.length
+    ? { topic: typeof topic === 'string' ? topic : '', rationale: typeof rationale === 'string' ? rationale : '', queries }
+    : null
+})
+const displayPlan = computed(() => aiRun.value?.id === dismissedRunId.value ? null : plan.value || draft.value)
+const summaryDocument = computed(() => ({ version: 1 as const, blocks: [{ type: 'markdown' as const, text: [displayPlan.value?.topic ? `## ${displayPlan.value.topic}` : '', displayPlan.value?.rationale || ''].filter(Boolean).join('\n\n') }] }))
+watch(() => [aiRun.value?.id, aiRun.value?.status, aiRun.value?.result], () => {
+  const result = aiRun.value?.result
+  if (aiRun.value?.status === 'COMPLETED' && typeof result?.topic === 'string' && typeof result.rationale === 'string' && Array.isArray(result.queries)) {
+    plan.value = { topic: result.topic, rationale: result.rationale, queries: result.queries.filter((query): query is string => typeof query === 'string') }
+  }
+  else {
+    plan.value = null
+  }
+}, { immediate: true })
 
 async function makePlan() {
+  if (planning.value) {
+    return
+  }
   if (!store.spaceId.value || !seed.value.trim()) {
     toast.warning('请输入研究主题')
     return
   }
-  planning.value = true
   plan.value = null
-  try {
-    const res = await planWikiResearch(store.spaceId.value, seed.value.trim())
-    plan.value = res.data || null
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '生成研究计划失败')
-  }
-  finally {
-    planning.value = false
-  }
+  dismissedRunId.value = aiRun.value?.id || ''
+  await task.start(() => planWikiResearch(store.spaceId.value, seed.value.trim()))
 }
 
 function removeQuery(index: number) {
   plan.value?.queries.splice(index, 1)
+}
+
+function dismissPlan() {
+  dismissedRunId.value = aiRun.value?.id || ''
+  plan.value = null
 }
 
 async function start() {
@@ -43,7 +67,7 @@ async function start() {
   try {
     await startWikiResearch(store.spaceId.value, { topic: plan.value.topic, queries: plan.value.queries })
     toast.success('研究任务已启动，可在摄入队列查看进度')
-    plan.value = null
+    dismissPlan()
     seed.value = ''
     store.openPanel('ingest')
   }
@@ -75,26 +99,40 @@ async function start() {
           </div>
         </YdCard>
 
-        <YdCard v-if="plan" class="res-plan">
+        <YdAlert v-if="failure" variant="destructive" :title="failure">
+          <YdButton variant="outline" size="sm" @click="task.reconnect">
+            恢复后端进度
+          </YdButton>
+        </YdAlert>
+        <YdCard v-if="aiRun" class="res-plan">
+          <p class="res-run-status">
+            {{ planning ? '计划正在生成，切换页面后任务继续执行' : aiRun.status === 'COMPLETED' ? '计划已完成' : aiRun.status === 'CANCELLED' ? '计划已停止' : '计划生成失败' }}
+          </p>
+          <YdChatReasoning v-if="aiRun.reasoning" :content="aiRun.reasoning" :pending="planning" />
+          <YdThoughtChain v-if="activities.length" :items="activities" title="研究计划进度" :default-expanded="false" />
+          <YdButton v-if="planning" variant="outline" size="sm" @click="task.stop">
+            停止生成
+          </YdButton>
+        </YdCard>
+        <YdCard v-if="displayPlan" class="res-plan">
           <div class="res-plan__head">
             <YdIcon name="morph:file-text" class="res-plan__icon" />
             <div>
-              <strong>{{ plan.topic }}</strong>
-              <p>{{ plan.rationale }}</p>
+              <YdAgentAnswer :document="summaryDocument" />
             </div>
           </div>
           <div class="res-plan__queries">
-            <span class="res-plan__queries-label">检索查询（{{ plan.queries.length }}）</span>
-            <span v-for="(query, index) in plan.queries" :key="query" class="res-query">
+            <span class="res-plan__queries-label">检索查询（{{ displayPlan.queries.length }}）</span>
+            <span v-for="(query, index) in displayPlan.queries" :key="query" class="res-query">
               <YdIcon name="morph:search" /> {{ query }}
-              <YdIcon name="morph:x" class="res-query__remove" @click="removeQuery(index)" />
+              <YdButton variant="ghost" size="icon-sm" :disabled="planning || !plan" aria-label="移除检索查询" @click="removeQuery(index)"><YdIcon name="morph:x" /></YdButton>
             </span>
           </div>
           <div class="res-plan__actions">
-            <YdButton :loading="starting" :disabled="!plan.queries.length" @click="start">
+            <YdButton :loading="starting" :disabled="planning || !plan?.queries.length" @click="start">
               <YdIcon name="morph:rocket" /> 启动研究
             </YdButton>
-            <YdButton variant="outline" @click="plan = null">
+            <YdButton variant="outline" :disabled="planning" @click="dismissPlan">
               放弃计划
             </YdButton>
           </div>
@@ -119,8 +157,8 @@ async function start() {
   display: grid;
   gap: 14px;
   max-width: 860px;
-  margin: 0 auto;
   padding: 16px;
+  margin: 0 auto;
 }
 
 .res-hero {
@@ -129,14 +167,14 @@ async function start() {
 
 .res-hero__icon {
   display: grid;
+  place-items: center;
   width: 52px;
   height: 52px;
   margin: 6px auto 12px;
-  place-items: center;
-  border-radius: 14px;
-  background: rgba(var(--color-text-2), 0.1);
-  color: rgb(var(--color-text-2));
   font-size: 26px;
+  color: var(--color-text-2);
+  background: var(--color-fill-2);
+  border-radius: 14px;
 }
 
 .res-hero strong {
@@ -146,9 +184,9 @@ async function start() {
 .res-hero > p {
   max-width: 460px;
   margin: 8px auto 0;
-  color: var(--color-text-3);
   font-size: 13px;
   line-height: 1.7;
+  color: var(--color-text-3);
 }
 
 .res-hero__bar {
@@ -166,8 +204,8 @@ async function start() {
 
 .res-plan__icon {
   margin-top: 2px;
-  color: rgb(var(--color-text-2));
   font-size: 20px;
+  color: var(--color-text-2);
 }
 
 .res-plan__head strong {
@@ -176,9 +214,9 @@ async function start() {
 
 .res-plan__head p {
   margin: 6px 0 0;
-  color: var(--color-text-3);
   font-size: 13px;
   line-height: 1.7;
+  color: var(--color-text-3);
 }
 
 .res-plan__queries {
@@ -190,29 +228,24 @@ async function start() {
 
 .res-plan__queries-label {
   width: 100%;
-  color: var(--color-text-3);
   font-size: 12px;
+  color: var(--color-text-3);
 }
 
 .res-query {
   display: inline-flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(var(--color-text-2), 0.08);
-  color: rgb(var(--color-text-2));
   font-size: 12px;
-}
-
-.res-query__remove {
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.res-query__remove:hover {
   color: var(--color-text-2);
-  opacity: 1;
+  background: var(--color-fill-2);
+  border-radius: 999px;
+}
+
+.res-run-status {
+  font-size: 12px;
+  color: var(--color-text-3);
 }
 
 .res-plan__actions {

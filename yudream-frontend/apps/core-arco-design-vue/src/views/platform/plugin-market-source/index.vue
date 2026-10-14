@@ -462,7 +462,7 @@ function openPublicMarket() {
               <YdInput v-model="form.token" type="password" :placeholder="editing?.tokenConfigured ? '已配置，留白表示保留' : '私有源的 Bearer 令牌'" />
             </YdFormItem>
             <YdFormItem label="排序">
-              <YdNumberField :model-value="form.sortOrder ?? 100" @update:model-value="form.sortOrder = $event" :min="0" class="w-full" />
+              <YdNumberField :model-value="form.sortOrder ?? 100" :min="0" class="w-full" @update:model-value="form.sortOrder = $event" />
             </YdFormItem>
           </div>
         </YdForm>

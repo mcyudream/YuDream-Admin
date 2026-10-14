@@ -1,319 +1,166 @@
 <script setup lang="ts">
-import type { YdChatAttachment, YdChatCitation, YdChatMessage, YdChatRetrievalHit, YdSuggestionItem } from '@yudream/components'
-import { provideYdChatConfig, useYdChatStream, YdChatMessageList, YdChatSender, YdChatSessionList, YdWelcome } from '@yudream/components'
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession, uploadChatAttachment, type ChatMessage, type ChatQuota, type ChatScopeType, type ChatSession, chatStreamEndpoint } from '@/api/modules/platform-chat'
-import apiAgent, { type AgentApplication, type AgentCatalog } from '@/api/modules/platform-agent'
-import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
+import type { YdAgentSession, YdAgentSendRequest, YdChatAttachment, YdChatCitation, YdChatRetrievalHit } from '@yudream/components'
+import { YdAgentWorkbench } from '@yudream/components'
+import type { AgentApplication, AgentCatalog } from '@/api/modules/platform-agent'
+import type { ChatScopeType } from '@/api/modules/platform-chat'
+import apiAgent from '@/api/modules/platform-agent'
+import { uploadChatAttachment } from '@/api/modules/platform-chat'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 
-provideYdChatConfig({ placeholder: '尽管问，或让我帮你做点什么…', thinkingText: '余梦正在思考…', reasoningTitle: '深度思考', disclaimer: '内容由余梦 AI 生成，请核对重要信息' })
-
-const activeId = ref('')
-const sessions = ref<ChatSession[]>([])
-const sessionsLoading = ref(false)
-const quota = ref<ChatQuota | null>(null)
-const agentCode = ref('')
-const baseScopeType = ref<Extract<ChatScopeType, 'GENERAL' | 'WIKI' | 'CONSOLE'>>('GENERAL')
-const consoleProfile = ref<'general' | 'cms-builder'>('general')
-const wikiContextSlug = ref<string | null>(null)
-const providerCode = ref('')
-const modelCode = ref('')
-const attachments = ref<YdChatAttachment[]>([])
-const agents = ref<AgentApplication[]>([])
-const catalog = ref<AgentCatalog | null>(null)
-const attachUploading = ref(false)
-const wikiMenuOpen = ref(false)
-const sessionDrawerVisible = ref(false)
-const router = useRouter()
+const assistant = useAiAssistantStore()
+const account = useAppAccountStore()
+const { auth } = useAppAuth()
 const route = useRoute()
-
-const { messages, streaming, send, stop } = useYdChatStream({
-  endpoint: () => chatStreamEndpoint(activeId.value),
-  protocol: 'agui',
-  transport: 'sse',
-  historyLimit: 10,
-  buildBody: (question, history, currentAttachments) => ({
-    sessionId: activeId.value,
-    scopeType: agentCode.value ? 'AGENT' : baseScopeType.value,
-    agentCode: baseScopeType.value === 'CONSOLE'
-      ? consoleProfile.value
-      : (agentCode.value || undefined),
-    spaceSlug: wikiContextSlug.value && wikiContextSlug.value !== '__all__' ? wikiContextSlug.value : undefined,
-    contextRefs: wikiContextSlug.value ? [{ type: 'wiki', target: wikiContextSlug.value === '__all__' ? 'all' : wikiContextSlug.value, label: wikiContextLabel.value }] : [],
-    providerCode: providerCode.value || undefined,
-    modelCode: modelCode.value || undefined,
-    question,
-    history,
-    attachments: currentAttachments,
-  }),
-})
-
-const chatModels = computed(() => (catalog.value?.models ?? []).filter(item => item.configured && item.kind === 'chat'))
-const wikiSpaces = computed(() => catalog.value?.knowledgeSpaces ?? [])
-const activeAgent = computed(() => agents.value.find(item => item.code === agentCode.value))
-const activeModel = computed(() => chatModels.value.find(item => item.providerCode === providerCode.value && item.modelCode === modelCode.value))
-const modelOptions = computed(() => chatModels.value.map(item => ({
-  fullLabel: `${item.providerName} · ${item.modelName}`,
-  label: item.modelName,
-  value: `${item.providerCode}::${item.modelCode}`,
-})))
-const wikiContextLabel = computed(() => wikiContextSlug.value === '__all__' ? '全部知识库' : wikiSpaces.value.find(item => item.slug === wikiContextSlug.value)?.name ?? '')
-const consoleMenuOpen = ref(false)
-const consoleProfileLabel = computed(() => baseScopeType.value === 'CONSOLE'
-  ? (consoleProfile.value === 'cms-builder' ? '控制台·CMS 构建' : '控制台·通用')
-  : '控制台')
-function selectConsoleProfile(profile: 'general' | 'cms-builder' | null) {
-  consoleMenuOpen.value = false
-  if (profile === null) {
-    baseScopeType.value = 'GENERAL'
-    return
-  }
-  consoleProfile.value = profile
-  baseScopeType.value = 'CONSOLE'
-}
-const welcomeTitle = computed(() => activeAgent.value?.name || '今天想让我帮你做什么？')
-const isEmpty = computed(() => messages.value.length === 0)
-const modelValue = computed({
-  get: () => providerCode.value && modelCode.value ? `${providerCode.value}::${modelCode.value}` : '',
-  set: (value: string | number | boolean | undefined) => {
-    const [provider, model] = String(value ?? '').split('::')
-    providerCode.value = provider ?? ''
-    modelCode.value = model ?? ''
-  },
-})
-const wikiMentionItems = computed<YdSuggestionItem[]>(() => [
-  { key: '__all__', label: 'wiki 全部知识库', description: '检索所有可用知识库', icon: 'morph:globe', value: 'wiki 全部知识库' },
-  ...wikiSpaces.value.map(space => ({ key: space.slug, label: `wiki ${space.name}`, description: space.slug, icon: 'morph:library', value: `wiki ${space.name}` })),
-])
+const router = useRouter()
+const canEdit = computed(() => auth('platform:chat:session:edit'))
+const scope = ref<ChatScopeType>('GENERAL')
+const selectedAgent = ref('')
+const consoleProfile = ref('general')
+const wikiSlug = ref('')
+const agents = ref<AgentApplication[]>([])
+const catalog = ref<AgentCatalog>()
+const attachments = ref<YdChatAttachment[]>([])
+const uploading = ref(false)
+const renameOpen = ref(false)
+const removeOpen = ref(false)
+const targetSession = ref<YdAgentSession>()
+const title = ref('')
 const suggestions = ['帮我写一份项目周报', '梳理一下知识库内容', '分析当前数据并给出建议', '帮我审查这段代码']
 
-function normalizeWikiContext(slug?: string | null): string | null {
-  if (!slug) return null
-  return slug === 'all' ? '__all__' : slug
+async function perform(action: () => Promise<unknown>) {
+  try { await action() }
+  catch (error) { assistant.setError(error) }
 }
 
-function selectWikiContext(slug: string | null) {
-  wikiContextSlug.value = normalizeWikiContext(slug)
-  wikiMenuOpen.value = false
-}
-
-function onMentionSelect(item: YdSuggestionItem) {
-  const key = String(item.key)
-  selectWikiContext(key === '__all__' ? '__all__' : key)
-}
-
-async function loadSessions(selectFirst = true) {
-  sessionsLoading.value = true
-  try {
-    sessions.value = (await listChatSessions()).data
-    if (selectFirst && !activeId.value && sessions.value.length) await selectSession(sessions.value[0].id)
-  } finally {
-    sessionsLoading.value = false
-  }
-}
-
-async function loadQuota() {
-  try { quota.value = (await fetchMyChatQuota()).data } catch { quota.value = null }
-}
-
-async function loadCatalog() {
-  try {
-    const [catalogRes, agentsRes] = await Promise.all([apiAgent.catalog(), apiAgent.available()])
-    catalog.value = catalogRes.data
-    agents.value = agentsRes.data
-    const fallback = chatModels.value.find(item => item.defaultModel) ?? chatModels.value[0]
-    if (fallback && !providerCode.value) {
-      providerCode.value = fallback.providerCode
-      modelCode.value = fallback.modelCode
-    }
-  } catch {
-    catalog.value = null
-    agents.value = []
-  }
-}
-
-async function selectSession(id: string) {
-  if (id === activeId.value) return
-  stop()
-  sessionDrawerVisible.value = false
-  activeId.value = id
-  const session = sessions.value.find(item => item.id === id)
-  if (session) {
-    agentCode.value = session.agentCode ?? ''
-    baseScopeType.value = session.scopeType === 'WIKI' ? 'WIKI' : 'GENERAL'
-    wikiContextSlug.value = normalizeWikiContext(session.spaceSlug)
-    providerCode.value = session.providerCode ?? providerCode.value
-    modelCode.value = session.modelCode ?? modelCode.value
-  }
-  messages.value = (await listChatMessages(id)).data.map(toYdMessage)
-}
-
-function isActiveProcessStatus(status?: string): boolean {
-  const normalized = status?.trim().toLowerCase().replaceAll('_', '-')
-  return !normalized || ['running', 'pending', 'started', 'executing', 'processing', 'in-progress'].includes(normalized)
-}
-
-function restoredProcessStatus(status: ChatMessage['status'], processStatus?: string): 'cancelled' | 'complete' | 'error' | 'executing' | undefined {
-  const normalized = processStatus?.trim().toLowerCase().replaceAll('_', '-')
-  if (!isActiveProcessStatus(normalized)) {
-    if (normalized === 'complete' || normalized === 'completed') return 'complete'
-    if (normalized === 'error' || normalized === 'failed') return 'error'
-    if (normalized === 'cancelled' || normalized === 'canceled' || normalized === 'skipped') return 'cancelled'
-    return undefined
-  }
-  if (status === 'FAILED') return 'error'
-  if (status === 'CANCELLED') return 'cancelled'
-  return status === 'COMPLETED' ? 'complete' : 'executing'
-}
-
-function toYdMessage(message: ChatMessage): YdChatMessage {
-  return {
-    id: message.id,
-    role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
-    content: message.content,
-    reasoning: message.reasoning,
-    citations: message.citations?.map(citation => ({ ...citation })) ?? [],
-    tools: message.tools?.map(tool => ({ ...tool, status: restoredProcessStatus(message.status, tool.status) })) ?? [],
-    activities: (message.activities ?? [])
-      .filter(activity => activity.activityType)
-      .map(activity => ({ ...activity, activityType: activity.activityType as string, status: restoredProcessStatus(message.status, activity.status) })),
-    attachments: message.attachments ?? [],
-    error: message.status === 'FAILED',
-    pending: false,
-  }
-}
-
-async function createSession() {
-  const created = (await createChatSession({
-    title: '新的对话',
-    scopeType: agentCode.value ? 'AGENT' : baseScopeType.value,
-    agentCode: agentCode.value || undefined,
-    spaceSlug: wikiContextSlug.value || undefined,
-    providerCode: providerCode.value || undefined,
-    modelCode: modelCode.value || undefined,
-  })).data
-  sessions.value.unshift(created)
-  await selectSession(created.id)
-}
-
-async function renameSession(session: { id: string, title: string }) {
-  const title = window.prompt('请输入会话标题', session.title)
-  if (!title) return
-  const updated = (await updateChatSession(session.id, { title })).data
-  const target = sessions.value.find(item => item.id === session.id)
-  if (target) Object.assign(target, updated)
-}
-
-async function pinSession(session: { id: string, pinned?: boolean }) {
-  const updated = (await updateChatSession(session.id, { pinned: !session.pinned })).data
-  const target = sessions.value.find(item => item.id === session.id)
-  if (target) Object.assign(target, updated)
-}
-
-async function removeSession(session: { id: string }) {
-  if (!window.confirm('确定删除该会话？')) return
-  await deleteChatSession(session.id)
-  sessions.value = sessions.value.filter(item => item.id !== session.id)
-  if (activeId.value === session.id) {
-    activeId.value = ''
-    messages.value = []
-  }
-}
-
-async function onAttach(files: File[]) {
-  attachUploading.value = true
-  try {
-    for (const file of files) attachments.value.push(await uploadChatAttachment(file))
-  } finally {
-    attachUploading.value = false
-  }
-}
-
-function onRemoveAttachment(attachment: YdChatAttachment) { attachments.value = attachments.value.filter(item => item !== attachment) }
-
-async function onSend(text: string, currentAttachments: YdChatAttachment[]) {
-  await send(text, currentAttachments)
+watch(() => assistant.activeSession, (session) => {
+  scope.value = session?.scopeType || 'GENERAL'
+  selectedAgent.value = session?.scopeType === 'AGENT' ? session.agentCode || '' : ''
+  consoleProfile.value = session?.scopeType === 'CONSOLE' ? session.agentCode || 'general' : 'general'
+  wikiSlug.value = session?.spaceSlug || ''
   attachments.value = []
-  await Promise.all([loadQuota(), loadSessions()])
+}, { immediate: true })
+
+function sessionData() {
+  const model = assistant.models.find(item => item.id === assistant.modelId)
+  return {
+    scopeType: scope.value,
+    agentCode: scope.value === 'CONSOLE' ? consoleProfile.value : scope.value === 'AGENT' ? selectedAgent.value : undefined,
+    spaceSlug: wikiSlug.value || undefined,
+    providerCode: model?.providerCode,
+    modelCode: model?.modelCode,
+  }
 }
 
-function onCopy(message: YdChatMessage) { if (message.content) navigator.clipboard?.writeText(message.content) }
-function onRegenerate(message: YdChatMessage) {
-  const user = messages.value[messages.value.indexOf(message) - 1]
-  if (user?.role === 'user') void send(user.content, user.attachments)
+async function send(request: YdAgentSendRequest) {
+  if (uploading.value || !auth('platform:chat:use')) return
+  await assistant.send(request, undefined, {
+    ...sessionData(),
+    contextRefs: wikiSlug.value ? [{ type: 'wiki', target: wikiSlug.value === '__all__' ? 'all' : wikiSlug.value }] : [],
+  })
+  if (!assistant.error) attachments.value = []
+}
+
+async function attach(files: File[]) {
+  uploading.value = true
+  try {
+    const session = assistant.sessionId
+    for (const file of files) {
+      const attachment = await uploadChatAttachment(file)
+      if (session !== assistant.sessionId) return
+      attachments.value.push(attachment)
+    }
+  }
+  catch (error) { assistant.setError(error) }
+  finally { uploading.value = false }
+}
+
+function rename(session: YdAgentSession) {
+  targetSession.value = session
+  title.value = session.title
+  renameOpen.value = true
+}
+function remove(session: YdAgentSession) {
+  targetSession.value = session
+  removeOpen.value = true
 }
 
 function openSource(source: YdChatCitation | YdChatRetrievalHit) {
-  if (source.sourceUrl) {
-    if (source.sourceUrl.startsWith('/')) void router.push(source.sourceUrl)
-    else window.open(source.sourceUrl, '_blank', 'noopener')
-    return
+  if (source.sourceUrl?.startsWith('/') && !source.sourceUrl.startsWith('//')) {
+    void router.push(source.sourceUrl)
   }
-  if (source.spaceSlug && source.path) void router.push(`/wiki/${encodeURIComponent(source.spaceSlug)}/${encodeURI(source.path)}`)
+  else if (source.sourceUrl && /^https?:\/\//i.test(source.sourceUrl)) {
+    window.open(source.sourceUrl, '_blank', 'noopener,noreferrer')
+  }
+  else if (source.spaceSlug && source.path) {
+    void router.push(`/wiki/${encodeURIComponent(source.spaceSlug)}/${encodeURI(source.path)}`)
+  }
 }
 
-onMounted(async () => {
-  const queryScope = route.query.scopeType
-  const hasRouteContext = queryScope === 'WIKI' || queryScope === 'AGENT'
-  baseScopeType.value = queryScope === 'WIKI' ? 'WIKI' : 'GENERAL'
-  if (typeof route.query.spaceSlug === 'string' && route.query.spaceSlug) wikiContextSlug.value = normalizeWikiContext(route.query.spaceSlug)
-  if (typeof route.query.agentCode === 'string' && route.query.agentCode) agentCode.value = route.query.agentCode
-  await Promise.all([loadSessions(!hasRouteContext), loadQuota(), loadCatalog()])
-  if (hasRouteContext) await createSession()
-})
+onMounted(() => perform(async () => {
+  if (!account.isLogin || !account.userId) return
+  await assistant.initialize(String(account.userId))
+  const [catalogResult, agentResult] = await Promise.all([apiAgent.catalog(), apiAgent.available()])
+  catalog.value = catalogResult.data
+  agents.value = agentResult.data
+  if ((route.query.scopeType === 'AGENT' || route.query.scopeType === 'WIKI') && canEdit.value) {
+    await assistant.createSession({
+      scopeType: route.query.scopeType,
+      agentCode: typeof route.query.agentCode === 'string' ? route.query.agentCode : undefined,
+      spaceSlug: typeof route.query.spaceSlug === 'string' ? route.query.spaceSlug : undefined,
+    })
+  }
+}))
 </script>
 
 <template>
   <main class="chat-page">
-    <aside class="chat-page__sessions">
-      <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
-    </aside>
-    <YdDrawer v-model="sessionDrawerVisible" title="会话记录" :footer="false" content-class="chat-page__session-drawer sm:max-w-[320px]">
-      <div class="-m-4 h-full min-h-0">
-        <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
-      </div>
-    </YdDrawer>
-    <section class="chat-page__main">
-      <header class="chat-page__top">
-        <YdTooltip text="会话记录">
-          <YdAction type="button" class="chat-page__history" aria-label="会话记录" @click="sessionDrawerVisible = true"><YdIcon name="morph:menu" /></YdAction>
-        </YdTooltip>
-        <div v-if="quota" class="chat-page__quota" :title="`今日已用 ${quota.usedTokens.toLocaleString()} tokens`"><span class="chat-page__quota-ring" />剩余额度 {{ quota.remainingTokens.toLocaleString() }}</div>
-      </header>
-      <div v-if="isEmpty" class="chat-page__empty"><YdWelcome :title="welcomeTitle" :suggestions="suggestions" @select="send" /></div>
-      <YdChatMessageList v-else :messages="messages" :transform-content="rewriteApiFileUrls" :image-url-resolver="resolveApiFileUrl" @copy-message="onCopy" @regenerate-message="onRegenerate" @citation-click="openSource" @retrieval-click="openSource" />
-      <YdChatSender :constrained="true" :loading="streaming || attachUploading" :suggestions="[]" :attachments="attachments" :mention-items="wikiMentionItems" @send="onSend" @stop="stop" @attach="onAttach" @remove-attachment="onRemoveAttachment" @mention-select="onMentionSelect">
-        <template #actions>
-          <div class="chat-page__context-controls">
-            <div class="chat-context">
-              <YdTooltip text="引用知识库。也可输入 @wiki 选择并自动填充"><YdAction type="button" class="chat-control chat-control--icon" :class="{ 'is-active': wikiContextSlug }" aria-label="知识库上下文" @click="wikiMenuOpen = !wikiMenuOpen"><YdIcon name="morph:library" /><span>{{ wikiContextLabel || '知识库' }}</span></YdAction></YdTooltip>
-              <div v-if="wikiMenuOpen" class="chat-context__menu">
-                <YdAction type="button" :class="{ active: wikiContextSlug === '__all__' }" @click="selectWikiContext('__all__')"><YdIcon name="morph:globe" />检索全部知识库</YdAction>
-                <YdAction v-for="space in wikiSpaces" :key="space.slug" type="button" :class="{ active: wikiContextSlug === space.slug }" @click="selectWikiContext(space.slug)"><YdIcon name="morph:book" />{{ space.name }}</YdAction>
-                <YdAction v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><YdIcon name="morph:x" />关闭知识库</YdAction>
-              </div>
-            </div>
-            <div class="chat-context">
-              <YdTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><YdAction type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="consoleMenuOpen = !consoleMenuOpen"><YdIcon name="morph:terminal" /><span>{{ consoleProfileLabel }}</span></YdAction></YdTooltip>
-              <div v-if="consoleMenuOpen" class="chat-context__menu">
-                <YdAction type="button" @click="selectConsoleProfile(null)"><YdIcon name="morph:x" />关闭控制台</YdAction>
-                <YdAction type="button" :class="{ active: consoleProfile === 'general' }" @click="selectConsoleProfile('general')"><YdIcon name="morph:terminal" />通用助手（纯对话）</YdAction>
-                <YdAction type="button" :class="{ active: consoleProfile === 'cms-builder' }" @click="selectConsoleProfile('cms-builder')"><YdIcon name="morph:layout-template" />CMS 站点构建（可读写站点文件）</YdAction>
-              </div>
-            </div>
-            <div class="chat-control chat-control--select">
-              <YdIcon name="morph:bot" />
-              <YdSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
-            </div>
-            <div class="chat-control chat-control--select chat-control--model" :title="activeModel ? `${activeModel.providerName} · ${activeModel.modelName}` : '选择模型'">
-              <YdIcon name="morph:cpu" />
-              <YdSelect v-model="modelValue" placeholder="选择模型" :options="modelOptions" class="w-full" />
-            </div>
-          </div>
-        </template>
-      </YdChatSender>
-    </section>
+    <YdAlert v-if="assistant.error" variant="destructive" :title="assistant.error">
+      <YdButton v-if="assistant.activeRun" variant="outline" size="sm" @click="perform(assistant.reconnect)">恢复后端进度</YdButton>
+    </YdAlert>
+    <YdAgentWorkbench
+      :sessions="assistant.sessionItems"
+      :session-id="assistant.sessionId"
+      :models="assistant.models"
+      :model-id="assistant.modelId"
+      :available-modes="['ask']"
+      :messages="assistant.messages"
+      :harness="assistant.harness"
+      :activities="assistant.activities"
+      :attachments="attachments"
+      :attachments-enabled="true"
+      :disabled="assistant.loading || uploading || !auth('platform:chat:use')"
+      :suggestions="suggestions"
+      class="chat-page__workbench"
+      @send="request => perform(() => send(request))"
+      @stop="perform(assistant.stop)"
+      @attach="attach"
+      @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
+      @update:session-id="id => perform(() => assistant.selectSession(id))"
+      @update:model-id="assistant.modelId = $event"
+      @session-create="canEdit && perform(() => assistant.createSession(sessionData()))"
+      @session-rename="session => canEdit && rename(session)"
+      @session-pin="session => canEdit && perform(() => assistant.updateSession(session.id, { pinned: !session.pinned }))"
+      @session-remove="session => canEdit && remove(session)"
+      @citation-select="openSource"
+      @retrieval-select="openSource"
+    >
+      <template #sender-actions>
+        <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="[{ label: '通用助手', value: 'GENERAL' }, { label: 'Agent 应用', value: 'AGENT' }, { label: '知识库问答', value: 'WIKI' }, { label: '工作区控制台', value: 'CONSOLE' }]" />
+        <YdSelect v-if="scope === 'AGENT'" v-model="selectedAgent" :disabled="assistant.busy" aria-label="Agent 应用" :options="agents.map(item => ({ label: item.name, value: item.code }))" />
+        <YdSelect v-if="scope === 'CONSOLE'" v-model="consoleProfile" :disabled="assistant.busy" aria-label="工作区范围" :options="[{ label: '通用对话', value: 'general' }, { label: 'CMS 站点工作区', value: 'cms-builder' }]" />
+        <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
+      </template>
+      <template #header-actions>
+        <span v-if="assistant.quota" class="chat-page__quota">今日可用 {{ assistant.quota.remainingTokens.toLocaleString() }} tokens</span>
+        <YdButton variant="ghost" size="icon-sm" aria-label="打开全局助手设置" @click="assistant.open = true"><YdIcon name="morph:settings" /></YdButton>
+      </template>
+    </YdAgentWorkbench>
+    <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :confirm-button-disabled="!title.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: title.trim() }))">
+      <YdInput v-model="title" aria-label="会话标题" :maxlength="100" />
+    </YdModal>
+    <YdModal v-model="removeOpen" title="删除会话" show-cancel-button @confirm="targetSession && perform(() => assistant.removeSession(targetSession!.id))">
+      <p>确定删除“{{ targetSession?.title }}”及其消息记录？</p>
+    </YdModal>
   </main>
 </template>
 
@@ -321,50 +168,14 @@ onMounted(async () => {
 .chat-page {
   display: flex;
   height: calc(100dvh - var(--g-slots-layout-top-height) - var(--g-header-actual-height) - var(--g-topbar-actual-height) - var(--g-main-container-padding-top, 0px) - var(--g-slots-layout-bottom-height) - var(--g-main-container-padding-bottom, 0px));
+  min-width: 0;
   min-height: 0;
+  flex-direction: column;
   overflow: hidden;
-  background: var(--color-bg-1);
   color: var(--color-text-1);
+  background: var(--color-bg-1);
 }
-.chat-page__sessions { display: flex; flex-shrink: 0; min-height: 0; border-right: 1px solid var(--color-border-2); }
-.chat-page__main { display: grid; min-width: 0; min-height: 0; flex: 1; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
-.chat-page__top { display: flex; align-items: center; justify-content: space-between; min-height: 46px; padding: 8px 20px; border-bottom: 1px solid var(--color-border-2); }
-.chat-page__history { display: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-2); cursor: pointer; place-items: center; font-size: 18px; }
-.chat-page__history:hover { background: var(--color-fill-1); color: var(--color-text-1); }
-.chat-page__quota { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--color-border-2); border-radius: 999px; background: var(--color-bg-2); color: var(--color-text-3); font-size: 12px; }
-.chat-page__quota-ring { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-2); }
-.chat-page__empty { display: flex; min-height: 0; align-items: center; justify-content: center; overflow-y: auto; }
-.chat-page__empty :deep(.yd-welcome) { width: min(100%, 720px); padding: clamp(24px, 5vh, 56px) 24px 24px; }
-.chat-page__context-controls { display: inline-flex; min-width: 0; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-fill-1); }
-.chat-context { position: relative; flex-shrink: 0; }
-.chat-control { display: inline-flex; min-width: 0; height: 28px; align-items: center; border-radius: 6px; color: var(--color-text-3); font-size: 12px; }
-.chat-control--select { max-width: 156px; gap: 4px; padding-left: 7px; }
-.chat-control--select :deep([data-slot='select-trigger']) { height: 26px; min-height: 0; min-width: 0; flex: 1; padding: 0 5px; border: 0; background: transparent; box-shadow: none; color: var(--color-text-2); font-size: 12px; }
-.chat-control--select :deep([data-slot='select-value']) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-control--select:hover, .chat-control--select:focus-within { background: var(--color-bg-1); color: var(--color-text-1); }
-.chat-control--model { width: 260px; max-width: 260px; }
-.chat-control--icon { gap: 5px; max-width: 160px; padding: 0 8px; border: 0; background: transparent; cursor: pointer; font: inherit; text-overflow: ellipsis; white-space: nowrap; }
-.chat-control--icon:hover, .chat-control--icon.is-active { background: var(--color-bg-1); color: var(--color-text-1); }
-.chat-context__menu { position: absolute; z-index: 10; bottom: calc(100% + 8px); left: 0; display: grid; width: 250px; max-height: 260px; overflow-y: auto; padding: 5px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); box-shadow: 0 10px 28px rgb(0 0 0 / 12%); }
-.chat-context__menu button { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 0; border-radius: 5px; background: transparent; color: var(--color-text-2); cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
-.chat-context__menu button:hover, .chat-context__menu button.active { background: var(--color-fill-1); color: var(--color-text-1); }
-.chat-context__menu .chat-context__clear { margin-top: 4px; border-top: 1px solid var(--color-border-2); color: var(--color-text-3); }
-@media (max-width: 760px) {
-  /* 移动端：100dvh 链式计算会受地址栏/版权栏/固定区影响而超出可视区，改为由已 flex 撑满的父容器决定高度 */
-  .chat-page { width: 100%; max-width: 100%; height: 100%; }
-  .chat-page__sessions { display: none; }
-  .chat-page__history { display: grid; }
-  .chat-page__top { min-height: 42px; padding: 6px 12px; }
-  .chat-page__quota { font-size: 11px; }
-  .chat-page__empty :deep(.yd-welcome) { padding-inline: 12px; }
-  :global(.chat-page__session-drawer .yd-session-list) { width: 100%; min-width: 0; min-height: 100%; }
-}
-@media (max-width: 560px) {
-  .chat-page__context-controls { order: 2; width: 100%; justify-content: space-between; }
-  .chat-control--select { max-width: calc(50% - 18px); }
-  .chat-control--model { width: auto; max-width: calc(50% - 18px); }
-  .chat-control--icon { max-width: 42px; justify-content: center; padding: 0; }
-  .chat-control--icon span { display: none; }
-  .chat-context__menu { bottom: calc(100% + 8px); width: min(280px, calc(100vw - 24px)); }
-}
+.chat-page__workbench { min-height: 0; flex: 1; }
+.chat-page__quota { color: var(--color-text-3); font-size: 12px; }
+@media (width <= 768px) { .chat-page { width: 100%; height: 100%; } }
 </style>

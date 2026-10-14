@@ -8,6 +8,7 @@ const step = ref(1)
 const choice = ref<string | number>()
 const cascade = ref<string | number>()
 const tree = [{ key: 'platform', label: '余梦平台', children: [{ key: 'theme', label: '主题中心' }, { key: 'plugin', label: '插件生态' }, { key: 'wiki', label: '知识库' }] }]
+const checkedTreeKeys = ref<string[]>([])
 const locations = [{ value: 'design', label: '设计系统', children: [{ value: 'tokens', label: '主题令牌' }, { value: 'components', label: '共享组件' }] }, { value: 'build', label: '工程平台', children: [{ value: 'plugins', label: '插件开发' }] }]
 </script>
 
@@ -34,7 +35,10 @@ const locations = [{ value: 'design', label: '设计系统', children: [{ value:
     <DemoCard title="数据录入" description="搜索、级联和树结构">
       <div class="demo-row">
         <YdCombobox v-model="choice" :options="[{ label: '灵动', value: 'vibrant' }, { label: '雅致', value: 'calm' }, { label: '紧凑', value: 'compact' }]" clearable style="width: 220px;" /><YdCascader v-model="cascade" :options="locations" clearable style="width: 220px;" />
-      </div><YdTree :data="tree" checkable filterable default-expand-all />
+      </div><YdTree v-model:checked-keys="checkedTreeKeys" :data="tree" checkable filterable default-expand-all />
+      <p class="tree-selection-feedback" role="status">
+        已勾选 {{ checkedTreeKeys.length }} 个节点
+      </p>
     </DemoCard>
     <DemoCard title="进度与状态" description="清晰的过程、温和的反馈">
       <YdSteps v-model="step" :steps="[{ id: 'create', title: '创建项目', description: '让想法开始生长' }, { id: 'design', title: '设计界面', description: '找到舒服的节奏' }, { id: 'ship', title: '发布应用', description: '与大家见面' }]" clickable /><div class="demo-row">
@@ -86,6 +90,12 @@ p {
   flex-wrap: wrap;
   gap: var(--yd-content-gap);
   align-items: flex-start;
+}
+
+.tree-selection-feedback {
+  margin: -0.5rem 0 0;
+  font-size: 12px;
+  color: var(--color-text-3);
 }
 
 @media (width <= 768px) {

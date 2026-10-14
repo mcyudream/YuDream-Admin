@@ -40,19 +40,22 @@ export default antfu(
       'pnpm/yaml-enforce-settings': 'off',
     },
   },
-  // Fa 组件优先与品牌色令牌审查：仅告警不阻断，供 lint 与开发者工具面板消费
+  // Strict YD-only gate; the separate audit report remains visible in devtools.
   {
     files: [
-      'apps/**/*.vue',
-      'apps/**/*.ts',
-      'apps/**/*.tsx',
+      'apps/core-arco-design-vue/src/**/*.vue',
+      'apps/core-arco-design-vue/src/**/*.ts',
+      'apps/core-arco-design-vue/src/**/*.tsx',
+      'apps/component-showcase/src/**/*.vue',
+      'apps/component-showcase/src/**/*.ts',
+      'apps/component-showcase/src/**/*.tsx',
     ],
     plugins: {
       yudream,
     },
     rules: {
-      'yudream/prefer-fa-component': 'warn',
-      'yudream/no-brand-color-token': 'warn',
+      'yudream/prefer-fa-component': 'error',
+      'yudream/no-brand-color-token': 'error',
     },
   },
   // 本地规则用例使用 node:test 运行（根包无 vitest 依赖），禁止改写为 vitest 导入

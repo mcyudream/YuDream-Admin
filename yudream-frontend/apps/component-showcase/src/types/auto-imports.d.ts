@@ -7,6 +7,7 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
+  const clearYdPersistentChatOwner: typeof import('@yudream/components').clearYdPersistentChatOwner
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
   const customRef: typeof import('vue').customRef
@@ -70,11 +71,14 @@ declare global {
   const useYdChat: typeof import('@yudream/components').useYdChat
   const useYdChatConfig: typeof import('@yudream/components').useYdChatConfig
   const useYdChatStream: typeof import('@yudream/components').useYdChatStream
+  const useYdDomAction: typeof import('@yudream/components').useYdDomAction
   const useYdDrawer: typeof import('@yudream/components').useYdDrawer
+  const useYdFilePicker: typeof import('@yudream/components').useYdFilePicker
   const useYdImagePreview: typeof import('@yudream/components').useYdImagePreview
   const useYdLoading: typeof import('@yudream/components').useYdLoading
   const useYdModal: typeof import('@yudream/components').useYdModal
   const useYdMotion: typeof import('@yudream/components').useYdMotion
+  const useYdPersistentChatStream: typeof import('@yudream/components').useYdPersistentChatStream
   const useYdToast: typeof import('@yudream/components').useYdToast
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect

@@ -132,6 +132,14 @@ function handleCustomOptionClick(option: TOption) {
   updateOptionChecked(option, !isOptionChecked(option))
 }
 
+function handleOptionContainerClick(option: TOption) {
+  if (slots.option || isOptionDisabled(option)) {
+    return
+  }
+
+  updateOptionChecked(option, !isOptionChecked(option))
+}
+
 function handleCustomOptionKeydown(option: TOption) {
   if (!slots.option || isOptionDisabled(option)) {
     return
@@ -154,14 +162,17 @@ function handleCustomOptionKeydown(option: TOption) {
       :role="slots.option ? 'checkbox' : undefined"
       :aria-checked="slots.option ? `${isOptionChecked(option)}` : undefined"
       :aria-disabled="slots.option ? `${isOptionDisabled(option)}` : undefined"
+      :data-state="isOptionChecked(option) ? 'checked' : 'unchecked'"
+      :data-disabled="isOptionDisabled(option) ? '' : undefined"
       :class="
         cn(
-          'flex gap-2',
+          'flex min-w-0 gap-2 rounded-md border border-transparent px-2 py-1.5 transition-colors cursor-pointer hover:bg-accent/50 data-[state=checked]:border-border data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:cursor-not-allowed data-[disabled]:hover:bg-transparent',
           option.description ? 'items-start' : 'items-center',
           slots.option && 'outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded-xl',
           props.optionClass,
         )
       "
+      @click.self="handleOptionContainerClick(option)"
       @click="handleCustomOptionClick(option)"
       @keydown.enter.prevent="handleCustomOptionKeydown(option)"
       @keydown.space.prevent="handleCustomOptionKeydown(option)"

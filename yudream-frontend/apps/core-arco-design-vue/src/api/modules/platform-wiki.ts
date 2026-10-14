@@ -1,4 +1,5 @@
 import type { ApiResponse } from './system-client'
+import type { AiRunSnapshot } from './platform-ai-runs'
 import systemClient from './system-client'
 
 export interface WikiSpace {
@@ -122,6 +123,8 @@ export interface WikiIngestTask {
   id: string
   spaceId: string
   sourceId?: string
+  requestedByUserId?: string
+  aiRunId?: string
   taskType: string
   status: string
   attempts: number
@@ -207,7 +210,8 @@ export const importWikiUrls = (spaceId: string, data: { folderPath?: string; url
 export const createWikiTextSource = (spaceId: string, data: { folderPath?: string; title: string; content: string }) => systemClient.post<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/spaces/${spaceId}/sources/text`, data)
 export const updateWikiTextSource = (id: string, data: { title: string; content: string }) => systemClient.put<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/sources/${id}/text`, data)
 export const deleteWikiSource = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/wiki/sources/${id}`)
-export const captionWikiSourceImages = (id: string) => systemClient.post<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/sources/${id}/caption-images`)
+export const captionWikiSourceImages = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/wiki/sources/${id}/caption-images/runs`)
+export const startWikiChatRun = (spaceId: string, data: { question: string, sessionId: string }) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/wiki/spaces/${spaceId}/chat/runs`, data)
 
 // 摄入队列
 export const enqueueWikiIngest = (spaceId: string, sourceId: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/spaces/${spaceId}/sources/${sourceId}/ingest`)
@@ -219,13 +223,13 @@ export const clearWikiIngestTasks = (spaceId: string) => systemClient.delete<unk
 export const wikiIngestEventsEndpoint = (spaceId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/ingest-events`
 
 // Lint / 审核 / 深度研究 / 图谱 / 迁移
-export const lintWiki = (spaceId: string) => systemClient.post<unknown, ApiResponse<WikiLintReport>>(`api/platform/wiki/spaces/${spaceId}/lint`)
+export const lintWiki = (spaceId: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/wiki/spaces/${spaceId}/lint/runs`)
 export const fetchWikiReviews = (spaceId: string) => systemClient.get<unknown, ApiResponse<WikiReviewItem[]>>(`api/platform/wiki/spaces/${spaceId}/reviews`)
 export const fetchWikiPendingReviews = (spaceId: string) => systemClient.get<unknown, ApiResponse<WikiReviewItem[]>>(`api/platform/wiki/spaces/${spaceId}/reviews/pending`)
 export const resolveWikiReview = (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/reviews/${id}/resolve`)
 export const dismissWikiReview = (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/reviews/${id}/dismiss`)
 export const executeWikiReview = (id: string, action: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/reviews/${id}/execute`, { action })
-export const planWikiResearch = (spaceId: string, seed: string) => systemClient.post<unknown, ApiResponse<WikiResearchPlan>>(`api/platform/wiki/spaces/${spaceId}/research/plan`, { seed })
+export const planWikiResearch = (spaceId: string, seed: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/wiki/spaces/${spaceId}/research/plan/runs`, { seed })
 export const startWikiResearch = (spaceId: string, data: { topic: string; queries: string[] }) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/spaces/${spaceId}/research/start`, data)
 export const fetchWikiGraph = (spaceId: string) => systemClient.get<unknown, ApiResponse<WikiGraphSnapshot>>(`api/platform/wiki/spaces/${spaceId}/graph`)
 export const exportWikiArchive = (spaceId: string) => systemClient.get<unknown, ApiResponse<string>>(`api/platform/wiki/spaces/${spaceId}/export`)
@@ -246,6 +250,7 @@ export const wikiPublicationEventsEndpoint = (nodeId: string) => `${(import.meta
 // 公开端
 export const fetchPublicWikiTree = (slug: string) => systemClient.get<unknown, ApiResponse<WikiNode[]>>(`api/public/wiki/${slug}/tree`)
 export const fetchPublicWikiSpaces = () => systemClient.get<unknown, ApiResponse<WikiPublicSpace[]>>('api/public/wiki/spaces')
+export const startPublicWikiChatRun = (slug: string, question: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/public/wiki/${encodeURIComponent(slug)}/chat/user/runs`, { question })
 
 // 公开站点浮窗助手的 AG-UI 流式问答端点（无需登录）
 export const wikiPublicChatAguiEndpoint = (slug: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/public/wiki/${encodeURIComponent(slug)}/chat/agui`

@@ -494,7 +494,7 @@ const isSingleSelectionMode = computed(() => props.selectable && !props.multiple
 const singleSelectedRowId = computed(() => Object.keys(rowSelection.value).find(id => rowSelection.value[id]))
 const tableRootComponent = computed(() => isSingleSelectionMode.value ? RadioGroup : 'div')
 const tableRootModelValue = computed(() => isSingleSelectionMode.value ? singleSelectedRowId.value : undefined)
-const stripeInteractionClass = computed(() => props.stripe ? '[&:hover>td]:bg-muted/50 [&[data-state=selected]>td]:bg-muted' : undefined)
+const stripeInteractionClass = computed(() => props.stripe ? '[&:hover:not([data-state=selected])>td]:bg-muted/50' : undefined)
 const hasToolbar = computed(() => props.columnVisibility || Boolean(slots.toolbar))
 const columnVisibilityColumns = computed(() => {
   void resolvedColumns.value
@@ -863,7 +863,7 @@ function getCellBorderClass(cell: Cell<TData, unknown>) {
 function getRowClass(row: Row<TData>, rowIndex: number) {
   return cn(
     'bg-background',
-    '[&:hover>td[data-pinned]]:bg-muted [&[data-state=selected]>td[data-pinned]]:bg-muted',
+    '[&:hover:not([data-state=selected])>td[data-pinned]]:bg-muted [&[data-state=selected]>td]:bg-accent/70 [&[data-state=selected]>td[data-pinned]]:bg-accent/70',
     props.stripe && rowIndex % 2 === 1 && '[&>td]:bg-muted/50',
     props.stripe && rowIndex % 2 === 1 && '[&>td[data-pinned]]:bg-muted',
     stripeInteractionClass.value,

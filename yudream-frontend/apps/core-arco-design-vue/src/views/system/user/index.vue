@@ -8,6 +8,7 @@ import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
 import apiUser from '@/api/modules/system-user'
+import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -16,6 +17,8 @@ const { auth } = useAppAuth()
 const route = useRoute()
 const router = useRouter()
 const appAccountStore = useAppAccountStore()
+const assistantCreateUserRef = useAiAssistantAction('system:user:create', '新增用户', 'system:user:create')
+const assistantExportUsersRef = useAiAssistantAction('system:user:export', '导出用户', 'system:user:export')
 
 type EmailVerifiedFilter = 'true' | 'false'
 
@@ -504,7 +507,7 @@ function importUsers() {
 <template>
   <div>
     <YdPageHeader title="用户管理" class="mb-0">
-      <YdButton v-auth="'system:user:export'" variant="outline" @click="exportUsers">
+      <YdButton :ref="assistantExportUsersRef" v-auth="'system:user:export'" variant="outline" @click="exportUsers">
         <YdIcon name="morph:file-spreadsheet" />
         导出
       </YdButton>
@@ -516,7 +519,7 @@ function importUsers() {
         <YdIcon name="morph:upload" />
         导入
       </YdButton>
-      <YdButton v-auth="'system:user:create'" @click="openCreate">
+      <YdButton :ref="assistantCreateUserRef" v-auth="'system:user:create'" @click="openCreate">
         <YdIcon name="morph:user-plus" />
         新增用户
       </YdButton>

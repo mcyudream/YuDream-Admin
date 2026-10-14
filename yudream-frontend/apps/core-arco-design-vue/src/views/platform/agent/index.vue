@@ -1,14 +1,6 @@
 <script setup lang="ts">
-import type { AgentApplication, AgentApplicationStatus, AgentRunAttachment, AgentRunResult } from '@/api/modules/platform-agent'
+import type { AgentApplication, AgentApplicationStatus } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
-import { useYdFilePicker } from '@yudream/components'
-import { agentRunCapabilities, buildAgentRunInput } from './config/agent-run-input'
-
-interface RunnerAttachment extends AgentRunAttachment {
-  id: string
-  type: string
-  text?: string
-}
 
 const router = useRouter()
 const toast = useYdToast()
@@ -16,21 +8,8 @@ const modal = useYdModal()
 const loading = ref(false)
 const actionLoading = ref('')
 const rows = ref<AgentApplication[]>([])
-const runner = ref<AgentApplication | null>(null)
-const runnerVisible = ref(false)
-const runInput = ref('')
-const runResult = ref<AgentRunResult | null>(null)
-const runAttachments = ref<RunnerAttachment[]>([])
-const runnerError = ref('')
-const runnerFilePicker = useYdFilePicker({ multiple: true })
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const search = reactive<{ keyword: string, status: AgentApplicationStatus | '' }>({ keyword: '', status: '' })
-const runnerCapabilities = computed(() => agentRunCapabilities(runner.value?.workflowJson || ''))
-const runnerAccept = computed(() => [
-  runnerCapabilities.value.allowImage ? 'image/*' : '',
-  runnerCapabilities.value.allowFiles ? '.txt,.md,.markdown,.json,.csv,.xml,.html,.yaml,.yml,.pdf,.doc,.docx,.rtf,.odt' : '',
-].filter(Boolean).join(','))
-
 const statuses = [
   { label: '全部状态', value: '' },
   { label: '草稿', value: 'DRAFT' },
@@ -107,82 +86,10 @@ function openRunner(row: AgentApplication) {
     toast.error('Agent 应用发布后才能正式运行')
     return
   }
-  runner.value = row
-  runnerVisible.value = true
-  runInput.value = ''
-  runResult.value = null
-  runAttachments.value = []
-  runnerError.value = ''
-}
-async function run() {
-  if (!runner.value || (!runInput.value.trim() && !runAttachments.value.length)) {
-    return
-  }
-  actionLoading.value = 'run'
-  const image = runAttachments.value.find(item => item.type.startsWith('image/'))
-  try {
-    runResult.value = (await apiAgent.run(runner.value.id, {
-      input: buildAgentRunInput(runInput.value, runAttachments.value),
-      imageDataUrl: image?.dataUrl,
-      attachments: runAttachments.value
-        .filter(item => !item.type.startsWith('image/'))
-        .map(item => ({ name: item.name, contentType: item.type, size: item.size, dataUrl: item.dataUrl })),
-    })).data
-  }
-  finally {
-    actionLoading.value = ''
-  }
-}
-function pickRunnerFiles() {
-  void runnerFilePicker.open({ accept: runnerAccept.value }).then(onRunnerFiles)
-}
-async function onRunnerFiles(files: File[]) {
-  runnerError.value = ''
-  try {
-    for (const file of files) {
-      const image = file.type.startsWith('image/')
-      if (image && !runnerCapabilities.value.allowImage) {
-        throw new Error('当前工作流不支持图片输入')
-      }
-      if (!image && !runnerCapabilities.value.allowFiles) {
-        throw new Error('当前工作流不支持文档输入')
-      }
-      if (image && file.size > 5 * 1024 * 1024) {
-        throw new Error('单张图片不能超过 5MB')
-      }
-      if (!image && file.size > 10 * 1024 * 1024) {
-        throw new Error('单个文档不能超过 10MB')
-      }
-      if (image && runAttachments.value.some(item => item.type.startsWith('image/'))) {
-        throw new Error('一次运行只支持一张图片')
-      }
-      runAttachments.value.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        contentType: file.type || 'application/octet-stream',
-        size: file.size,
-        dataUrl: await readDataUrl(file),
-        text: !image && file.size <= 256 * 1024 && isTextFile(file) ? await file.text() : undefined,
-      })
-    }
-  }
-  catch (error) {
-    runnerError.value = error instanceof Error ? error.message : '附件读取失败'
-  }
-  finally {
-  }
-}
-function readDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('附件读取失败'))
-    reader.readAsDataURL(file)
+  void router.push({
+    path: '/platform/chat',
+    query: { scopeType: 'AGENT', agentCode: row.code },
   })
-}
-function isTextFile(file: File) {
-  return file.type.startsWith('text/') || /\.(?:txt|md|markdown|json|csv|xml|html|yaml|yml)$/i.test(file.name)
 }
 function statusText(status: AgentApplicationStatus) {
   return ({ DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '已停用' } as const)[status]
@@ -218,8 +125,7 @@ function statusVariant(status: AgentApplicationStatus) {
           </div>
         </div>
       </YdSearchBar>
-      <YdLoadingOverlay :loading="loading">
-        <div class="agent-grid">
+      <YdLoadingOverlay :loading="loading"><div  class="agent-grid">
         <article v-for="row in rows" :key="row.id" class="agent-card">
           <div class="agent-card__head">
             <span class="agent-icon"><YdIcon :name="row.icon || 'morph:bot'" /></span><YdTag :variant="statusVariant(row.status)">
@@ -231,7 +137,7 @@ function statusVariant(status: AgentApplicationStatus) {
             <code>{{ row.code }}</code><span>{{ row.toolCodes?.length || 0 }} 个工具</span>
           </div>
           <div class="agent-actions">
-            <YdButton v-if="!row.id.startsWith('-')" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
+            <YdButton v-auth="'platform:chat:use'" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
               运行
             </YdButton><YdButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" title="导入并编辑" :loading="actionLoading === `import-${row.id}`" @click="edit(row)">
               {{ row.id.startsWith('-') ? '导入并编辑' : '编排' }}
@@ -243,41 +149,14 @@ function statusVariant(status: AgentApplicationStatus) {
           </div>
         </article>
         <YdEmpty v-if="!loading && !rows.length" class="col-span-full" description="暂无 Agent 应用" />
-        </div>
-      </YdLoadingOverlay>
+      </div></YdLoadingOverlay>
       <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-4" @page-change="load" @size-change="load" />
     </YdPageMain>
-    <YdModal v-model="runnerVisible" :title="runner ? `运行 ${runner.name}` : '运行 Agent'" class="sm:max-w-3xl">
-      <div class="gap-4 grid">
-        <YdTextarea v-model="runInput" :autosize="{ minRows: 4, maxRows: 8 }" placeholder="输入任务或问题" />
-        <div v-if="runAttachments.length" class="runner-attachments">
-          <span v-for="item in runAttachments" :key="item.id"><img v-if="item.type.startsWith('image/')" :src="item.dataUrl" :alt="item.name"><YdIcon v-else name="morph:file-text" /><b>{{ item.name }}</b><YdAction type="button" title="移除附件" @click="runAttachments = runAttachments.filter(current => current.id !== item.id)"><YdIcon name="morph:x" /></YdAction></span>
-        </div>
-        <p v-if="runnerError" class="runner-error">
-          {{ runnerError }}
-        </p>
-        <div class="runner-actions">
-          <YdButton v-if="runnerAccept" variant="outline" @click="pickRunnerFiles">
-            <YdIcon name="morph:paperclip" /> 添加附件
-          </YdButton>
-
-          <YdButton :loading="actionLoading === 'run'" :disabled="!runInput.trim() && !runAttachments.length" @click="run">
-            <YdIcon name="morph:play" /> 运行应用
-          </YdButton>
-        </div>
-        <section v-if="runResult" class="run-result">
-          <strong>输出</strong><p>{{ runResult.content }}</p><div v-for="tool in runResult.toolResults" :key="`${tool.toolName}-${tool.action}`" class="tool-result">
-            {{ tool.toolName }}: {{ tool.message }}
-          </div>
-        </section>
-      </div>
-    </YdModal>
   </div>
 </template>
 
 <style scoped>
 .agent-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .agent-card { display: grid; gap: 12px; min-height: 210px; padding: 18px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }
-.agent-card__head, .agent-actions, .agent-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.agent-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 6px; background: var(--color-fill-2); color: rgb(var(--color-text-2)); }.agent-card h3 { margin: 0; font-size: 17px; }.agent-card p { min-height: 42px; margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }.agent-meta { color: var(--color-text-3); font-size: 12px; }.agent-actions { justify-content: flex-start; flex-wrap: wrap; }.run-result { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; white-space: pre-wrap; }.run-result p { margin: 0; line-height: 1.7; }.tool-result { padding: 8px; background: var(--color-fill-1); font-size: 12px; }
-.runner-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.runner-attachments { display: flex; gap: 8px; overflow-x: auto; }.runner-attachments span { display: flex; max-width: 220px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--color-border-2); border-radius: 5px; }.runner-attachments img { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; }.runner-attachments b { overflow: hidden; font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }.runner-attachments button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; color: var(--color-text-3); background: transparent; cursor: pointer; }.runner-error { margin: 0; color: rgb(var(--danger-6)); font-size: 12px; }
+.agent-card__head, .agent-actions, .agent-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.agent-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 6px; background: var(--color-fill-2); color: var(--color-text-1); }.agent-card h3 { margin: 0; font-size: 17px; }.agent-card p { min-height: 42px; margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }.agent-meta { color: var(--color-text-3); font-size: 12px; }.agent-actions { justify-content: flex-start; flex-wrap: wrap; }
 </style>

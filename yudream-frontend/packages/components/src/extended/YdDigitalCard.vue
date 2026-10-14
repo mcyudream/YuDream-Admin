@@ -51,7 +51,7 @@ header {
   inset: 0 auto 0 0;
   width: 3px;
   content: "";
-  background: oklch(var(--primary));
+  background: var(--yd-emphasis);
   opacity: 0.4;
 }
 </style>

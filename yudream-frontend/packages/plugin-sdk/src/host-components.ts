@@ -35,6 +35,8 @@ export const useYdChat = components.useYdChat
 export const ydRequest = components.ydRequest
 export const readYdStream = components.readYdStream
 export const useYdChatStream = components.useYdChatStream
+export const useYdPersistentChatStream = components.useYdPersistentChatStream
+export const clearYdPersistentChatOwner = components.clearYdPersistentChatOwner
 
 function shared(name: string) {
   const modules = (globalThis as any).__YUDREAM_PLUGIN_SHARED__

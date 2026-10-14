@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import type { YdChatCitation, YdChatGraphNode, YdChatRetrievalHit } from '@yudream/components'
-import { useYdChatStream, YdChatMessageList, YdChatSender, YdChatWindow } from '@yudream/components'
+import type { YdAgentRenderDocument, YdAgentSendRequest, YdChatCitation, YdChatGraphNode, YdChatRetrievalHit } from '@yudream/components'
+import { YdAgentWorkbench, YdAlert, YdChatWindow } from '@yudream/components'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { chatStreamOnceEndpoint } from '@/api/modules/platform-chat'
-import { wikilinksToMarkdown } from '../../platform/wiki/wiki-utils'
-import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
+import { startPublicWikiChatRun } from '@/api/modules/platform-wiki'
+import { useAiRunTask } from '@/composables/use-ai-run-task'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { useAppAccountStore } from '@/store/modules/app/account'
-
-// wikilink 转链接 + 站内文件地址补 dev 代理前缀
-const transformContent = (content: string) => rewriteApiFileUrls(wikilinksToMarkdown(content))
+import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 
 const props = defineProps<{
   slug: string
@@ -24,23 +22,46 @@ const router = useRouter()
 const appAccountStore = useAppAccountStore()
 const open = ref(false)
 const isLogin = computed(() => appAccountStore.isLogin)
-const { messages, streaming, send, stop } = useYdChatStream({
-  endpoint: chatStreamOnceEndpoint,
-  protocol: 'agui',
-  transport: 'sse',
-  historyLimit: 10,
-  buildBody: (question, history) => ({
-    scopeType: 'WIKI',
-    spaceSlug: props.slug,
-    question,
-    history,
-  }),
-})
+const { auth } = useAppAuth()
+const canOpenChat = computed(() => auth('platform:chat:session:view') && auth('platform:chat:use'))
+const runtime = useAiAssistantStore()
+const sessionKey = computed(() => isLogin.value && props.slug ? `public-wiki:${props.slug}` : undefined)
+const task = useAiRunTask(sessionKey)
+const messages = computed(() => sessionKey.value ? runtime.taskMessages(sessionKey.value) : [])
+const harness = computed(() => ({ name: 'AgentScope Harness', runId: task.run.value?.id, status: task.running.value ? task.run.value?.status === 'WAITING' ? 'waiting' as const : 'running' as const : task.run.value?.status === 'FAILED' ? 'error' as const : task.run.value?.status === 'CANCELLED' ? 'cancelled' as const : task.run.value ? 'completed' as const : 'idle' as const }))
+const renderDocuments = computed<Record<string, YdAgentRenderDocument>>(() => Object.fromEntries(messages.value.filter(message => message.id).map((message) => {
+  const references: YdAgentRenderDocument['blocks'] = []
+  const text = rewriteApiFileUrls(message.content).replace(/\[\[([^\][|]+)(?:\|([^\]]+))?\]\]/g, (original, rawTitle: string) => {
+    const citation = message.citations?.find(citation => citation.title === rawTitle.trim())
+    if (!citation) {
+      return original
+    }
+    const id = `citation:${citation.nodeId || citation.title}`
+    if (!references.some(block => block.type === 'reference' && block.reference.id === id)) {
+      references.push({ type: 'reference', reference: { id, title: citation.title, excerpt: citation.excerpt || '', path: citation.path } })
+    }
+    return `[[ref:${id}]]`
+  })
+  return [message.id!, { version: 1, blocks: [{ type: 'markdown', text }, ...references, ...(message.tools || []).map((tool, index) => ({ type: 'tool' as const, tool: { id: tool.toolCallId || `${message.id}:tool:${index}`, name: tool.toolName || '工具调用', status: tool.status === 'executing' ? 'running' as const : tool.status === 'error' ? 'error' as const : tool.status === 'cancelled' ? 'cancelled' as const : 'success' as const, description: tool.message, output: tool.payload ? JSON.stringify(tool.payload, null, 2) : undefined } }))] }]
+})))
+
+function send(request: YdAgentSendRequest) {
+  if (!sessionKey.value || task.running.value || !request.text.trim()) {
+    return
+  }
+  runtime.appendTaskInput(sessionKey.value, request.text)
+  void task.start(() => startPublicWikiChatRun(props.slug, request.text))
+}
 
 const suggestions = ['这个知识库主要讲什么？', '帮我梳理一下内容目录', '如何快速上手？']
 
 function onCitationClick(citation: YdChatCitation) {
   emits('citationSelect', citation)
+}
+
+function onReferenceSelect(reference: { title: string, path?: string }) {
+  const citation = messages.value.flatMap(message => message.citations || []).find(citation => citation.title === reference.title && citation.path === reference.path)
+  onCitationClick(citation || { title: reference.title, path: reference.path })
 }
 
 function onRetrievalClick(hit: YdChatRetrievalHit) {
@@ -57,6 +78,9 @@ function toggle() {
 
 /** 最大化/全屏：跳转到统一 AI 助手聊天页并带上知识库上下文 */
 function openInChatPage() {
+  if (!canOpenChat.value) {
+    return
+  }
   open.value = false
   router.push({ path: '/platform/chat', query: { scopeType: 'WIKI', spaceSlug: props.slug } })
 }
@@ -71,30 +95,40 @@ function goLogin() {
     <Transition name="wiki-assistant-panel">
       <YdChatWindow
         v-if="open"
-        :title="`文档助手${spaceName ? ' · ' + spaceName : ''}`"
+        :title="`文档助手${spaceName ? ` · ${spaceName}` : ''}`"
         :width="420"
         :height="620"
         :min-width="360"
         :min-height="420"
-        expand-only
+        :expand-only="canOpenChat"
         @close="toggle"
         @expand="openInChatPage"
       >
-        <YdChatMessageList
+        <YdAlert v-if="task.failure.value" variant="destructive" :title="task.failure.value" />
+        <YdAgentWorkbench
           :messages="messages"
-          :transform-content="transformContent"
+          :render-documents="renderDocuments"
+          :harness="harness"
           :image-url-resolver="resolveApiFileUrl"
-          compact
-          @citation-click="onCitationClick"
-          @retrieval-click="onRetrievalClick"
-          @graph-node-click="onGraphNodeClick"
+          :available-modes="['ask']"
+          :suggestions="isLogin ? suggestions : []"
+          :disabled="!isLogin"
+          class="wiki-assistant__workbench"
+          @send="send"
+          @stop="task.stop"
+          @citation-select="onCitationClick"
+          @retrieval-select="onRetrievalClick"
+          @graph-node-select="onGraphNodeClick"
+          @reference-select="onReferenceSelect"
         >
           <template #empty>
             <div v-if="!isLogin" class="wiki-assistant__empty">
               <YdIcon name="morph:log-in" />
               <strong>登录后即可提问</strong>
               <p>登录后可在知识库助手中进行流式问答。</p>
-              <YdAction type="button" class="wiki-assistant__login" @click="goLogin">去登录</YdAction>
+              <YdButton type="button" variant="outline" class="wiki-assistant__login" @click="goLogin">
+                去登录
+              </YdButton>
             </div>
             <div v-else class="wiki-assistant__empty">
               <YdIcon name="morph:message-circle-more" />
@@ -102,58 +136,54 @@ function goLogin() {
               <p>我会基于知识库内容回答，并附上可跳转的引用来源。</p>
             </div>
           </template>
-        </YdChatMessageList>
-
-        <YdChatSender
-          v-if="isLogin"
-          :loading="streaming"
-          :suggestions="messages.length ? [] : suggestions"
-          placeholder="输入问题，Enter 发送（Shift+Enter 换行）"
-          @send="send"
-          @stop="stop"
-          @suggestion-click="send"
-        />
+        </YdAgentWorkbench>
       </YdChatWindow>
     </Transition>
 
-    <YdAction type="button" class="wiki-assistant__fab" @click="toggle">
+    <YdButton type="button" variant="outline" class="wiki-assistant__fab" :aria-expanded="open" @click="toggle">
       <YdIcon :name="open ? 'morph:x' : 'morph:message-circle-more'" />
       <span v-if="!open">文档助手</span>
-    </YdAction>
+    </YdButton>
   </div>
 </template>
 
 <style scoped>
+.wiki-assistant__workbench {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+}
+
 .wiki-assistant {
   position: fixed;
   right: 24px;
   bottom: 24px;
   z-index: 1000;
   display: grid;
-  justify-items: end;
   gap: 12px;
+  justify-items: end;
 }
 
 .wiki-assistant__fab {
   display: inline-flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   padding: 11px 16px;
-  border: 1px solid var(--color-text-1);
-  border-radius: 999px;
-  background: var(--color-text-1);
-  color: var(--color-bg-1);
-  cursor: pointer;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
+  color: var(--color-bg-1);
+  cursor: pointer;
+  background: var(--color-text-1);
+  border: 1px solid var(--color-text-1);
+  border-radius: 999px;
   box-shadow: 0 10px 24px rgb(0 0 0 / 20%);
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .wiki-assistant__fab:hover {
-  transform: translateY(-2px);
   box-shadow: 0 14px 30px rgb(0 0 0 / 25%);
+  transform: translateY(-2px);
 }
 
 .wiki-assistant__fab :deep(svg) {
@@ -162,43 +192,43 @@ function goLogin() {
 
 .wiki-assistant__panel {
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
   width: min(420px, calc(100vw - 32px));
   height: min(620px, calc(100vh - 100px));
+  overflow: hidden;
+  background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: 16px;
-  background: var(--color-bg-2);
-  flex-direction: column;
   box-shadow: 0 24px 60px rgb(0 0 0 / 20%);
 }
 
 .wiki-assistant__head {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border-2);
   background: var(--color-fill-1);
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .wiki-assistant__head-main {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
   min-width: 0;
 }
 
 .wiki-assistant__mark {
   display: grid;
-  width: 34px;
-  height: 34px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 10px;
-  background: var(--color-fill-1);
-  color: var(--color-text-1);
+  width: 34px;
+  height: 34px;
   font-size: 18px;
+  color: var(--color-text-1);
+  background: var(--color-fill-1);
+  border-radius: 10px;
 }
 
 .wiki-assistant__head-text {
@@ -208,50 +238,50 @@ function goLogin() {
 }
 
 .wiki-assistant__head-text strong {
-  color: var(--color-text-1);
   font-size: 14px;
+  color: var(--color-text-1);
 }
 
 .wiki-assistant__head-text span {
   overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 12px;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
 .wiki-assistant__head-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
   flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
 }
 
 .wiki-assistant__hint {
   max-width: 150px;
   overflow: hidden;
-  color: var(--color-text-1);
-  font-size: 12px;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-1);
   white-space: nowrap;
 }
 
 .wiki-assistant__icon {
   display: grid;
+  place-items: center;
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
   color: var(--color-text-3);
   cursor: pointer;
-  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
 }
 
 .wiki-assistant__icon:hover:not(:disabled) {
-  background: var(--color-fill-3);
   color: var(--color-text-1);
+  background: var(--color-fill-3);
 }
 
 .wiki-assistant__icon:disabled {
@@ -261,21 +291,21 @@ function goLogin() {
 
 .wiki-assistant__empty {
   display: grid;
-  justify-items: center;
   gap: 8px;
+  justify-items: center;
   padding: 44px 24px;
   color: var(--color-text-3);
   text-align: center;
 }
 
 .wiki-assistant__empty :deep(svg) {
-  color: var(--color-text-1);
   font-size: 28px;
+  color: var(--color-text-1);
 }
 
 .wiki-assistant__empty strong {
-  color: var(--color-text-1);
   font-size: 15px;
+  color: var(--color-text-1);
 }
 
 .wiki-assistant__empty p {
@@ -285,15 +315,15 @@ function goLogin() {
 }
 
 .wiki-assistant__login {
-  margin-top: 8px;
   padding: 7px 16px;
-  border: 1px solid var(--color-text-1);
-  border-radius: 999px;
-  background: var(--color-text-1);
-  color: var(--color-bg-1);
-  cursor: pointer;
+  margin-top: 8px;
   font: inherit;
   font-size: 13px;
+  color: var(--color-bg-1);
+  cursor: pointer;
+  background: var(--color-text-1);
+  border: 1px solid var(--color-text-1);
+  border-radius: 999px;
 }
 
 .wiki-assistant-panel-enter-active,
@@ -307,7 +337,7 @@ function goLogin() {
   transform: translateY(10px) scale(0.98);
 }
 
-@media (max-width: 560px) {
+@media (width <= 560px) {
   .wiki-assistant {
     right: 14px;
     bottom: 14px;

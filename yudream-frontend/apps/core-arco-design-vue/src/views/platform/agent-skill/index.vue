@@ -200,7 +200,7 @@ function formatTime(value?: string) {
     <YdPageMain>
       <section class="skill-section">
         <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-
+          
           row-key="id"
           :data="rows"
           :columns="columns"

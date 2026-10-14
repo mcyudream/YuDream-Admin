@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<{
   models?: YdAgentModel[]
   modelId?: string
   mode?: YdAgentMode
+  availableModes?: YdAgentMode[]
   messages?: YdChatMessage[]
   harness: YdAgentHarnessState
   activities?: YdAgentActivity[]
@@ -37,12 +38,17 @@ const props = withDefaults(defineProps<{
   suggestions?: string[]
   disabled?: boolean
   attachmentsEnabled?: boolean
+  attachments?: YdChatAttachment[]
+  attachmentAccept?: string
+  placeholder?: string
+  imageUrlResolver?: (url: string) => string
   demo?: boolean
 }>(), {
   sessions: () => [],
   workspaces: () => [],
   models: () => [],
   mode: 'ask',
+  availableModes: () => ['ask', 'plan', 'code'],
   messages: () => [],
   activities: () => [],
   skills: () => [],
@@ -53,6 +59,8 @@ const props = withDefaults(defineProps<{
   renderDocuments: () => ({}),
   suggestions: () => [],
   attachmentsEnabled: false,
+  attachments: () => [],
+  placeholder: '描述任务或输入问题…',
 })
 const emit = defineEmits<{
   'update:sessionId': [id: string]
@@ -62,6 +70,7 @@ const emit = defineEmits<{
   'send': [request: YdAgentSendRequest]
   'stop': []
   'attach': [files: File[]]
+  'removeAttachment': [attachment: YdChatAttachment]
   'sessionCreate': []
   'sessionRename': [session: YdAgentSession]
   'sessionPin': [session: YdAgentSession]
@@ -102,7 +111,7 @@ const modeOptions = computed(() => [
   { label: '问答', value: 'ask' },
   { label: '规划', value: 'plan' },
   { label: '编码', value: 'code', disabled: workspace.value?.access !== 'write' },
-])
+].filter(option => props.availableModes.includes(option.value as YdAgentMode)))
 const runState = computed(() => ({
   idle: { label: '就绪', icon: 'morph:circle-dot' },
   running: { label: '执行中', icon: 'morph:loader-circle' },
@@ -172,7 +181,7 @@ function messageDocument(message: YdChatMessage): YdAgentRenderDocument {
   }
 }
 function changeMode(value: unknown) {
-  if (value === 'ask' || value === 'plan' || (value === 'code' && workspace.value?.access === 'write')) {
+  if (props.availableModes.includes(value as YdAgentMode) && (value === 'ask' || value === 'plan' || (value === 'code' && workspace.value?.access === 'write'))) {
     emit('update:mode', value)
   }
 }
@@ -260,9 +269,9 @@ defineExpose({ scrollToBottom })
             <slot name="empty" />
           </div>
           <div v-for="(message, index) in messages" :key="message.id || index" class="yd-agent-message">
-            <YdBubble :message="displayMessage(message)" thinking-text="正在准备下一步…" @citation-click="emit('citationSelect', $event)">
+            <YdBubble :message="displayMessage(message)" :image-url-resolver="imageUrlResolver" thinking-text="正在准备下一步…" @citation-click="emit('citationSelect', $event)">
               <template #process>
-                <YdChatProcess v-if="message.activities?.length && !(message.id && renderDocuments[message.id])" :activities="message.activities" @retrieval-select="emit('retrievalSelect', $event)" @graph-node-select="emit('graphNodeSelect', $event)" />
+                <YdChatProcess v-if="message.activities?.length" :activities="message.activities" @retrieval-select="emit('retrievalSelect', $event)" @graph-node-select="emit('graphNodeSelect', $event)" />
               </template>
               <template #content>
                 <YdAgentAnswer :document="messageDocument(message)" :retry-disabled="busy || disabled" @reference-select="emit('referenceSelect', $event)" @tool-select="emit('toolSelect', $event)" @tool-retry="emit('toolRetry', $event)" />
@@ -276,6 +285,7 @@ defineExpose({ scrollToBottom })
                 </div>
               </template>
             </YdBubble>
+            <slot name="message-extra" :message="message" :index="index" />
           </div>
         </div>
         <div v-if="activities.length" class="yd-agent-trace">
@@ -294,7 +304,8 @@ defineExpose({ scrollToBottom })
             </div>
           </section>
         </div>
-        <YdChatSender v-model="draft" :loading="busy" :disabled="inputDisabled" :attachments-enabled="attachmentsEnabled" placeholder="描述任务，用 @ 引用工作区文件…" :mention-items="files.map(file => ({ key: file.path, label: file.path, value: file.path, icon: 'morph:file-code' }))" :large="false" :disclaimer="demo ? '本地演示 · Enter 发送，Shift + Enter 换行' : 'Enter 发送，Shift + Enter 换行'" @send="send" @stop="emit('stop')" @attach="emit('attach', $event)" @mention-select="emit('fileToggle', String($event.key), true)">
+        <slot name="composer-before" />
+        <YdChatSender v-model="draft" :loading="busy" :disabled="inputDisabled" :attachments-enabled="attachmentsEnabled" :attachments="attachments" :accept="attachmentAccept" :placeholder="placeholder" :mention-items="files.map(file => ({ key: file.path, label: file.path, value: file.path, icon: 'morph:file-code' }))" :large="false" :disclaimer="demo ? '本地演示 · Enter 发送，Shift + Enter 换行' : 'Enter 发送，Shift + Enter 换行'" @send="send" @stop="emit('stop')" @attach="emit('attach', $event)" @remove-attachment="emit('removeAttachment', $event)" @mention-select="emit('fileToggle', String($event.key), true)">
           <template #context>
             <div v-if="files.some(file => file.included)" class="yd-agent-context-chips">
               <YdButton v-for="file in files.filter(file => file.included)" :key="file.path" variant="ghost" size="sm" :disabled="busy || disabled" :title="file.path" @click="emit('fileToggle', file.path, false)">
@@ -303,7 +314,8 @@ defineExpose({ scrollToBottom })
             </div>
           </template>
           <template #actions>
-            <YdSelect :model-value="mode" :options="modeOptions" :disabled="busy || disabled" aria-label="执行模式" @update:model-value="changeMode" /><YdSelect v-if="models.length" :model-value="modelId" :options="modelOptions" :disabled="busy || disabled" aria-label="选择模型" @update:model-value="typeof $event === 'string' && emit('update:modelId', $event)" />
+            <YdSelect v-if="modeOptions.length > 1" :model-value="mode" :options="modeOptions" :disabled="busy || disabled" aria-label="执行模式" @update:model-value="changeMode" /><YdSelect v-if="models.length" :model-value="modelId" :options="modelOptions" :disabled="busy || disabled" aria-label="选择模型" @update:model-value="typeof $event === 'string' && emit('update:modelId', $event)" />
+            <slot name="sender-actions" />
           </template>
         </YdChatSender>
         <p v-if="inputDisabled && !disabled" class="yd-agent-input-hint">
@@ -428,6 +440,7 @@ defineExpose({ scrollToBottom })
 }
 
 .yd-agent-title {
+  flex: 1;
   min-width: 0;
 }
 
@@ -448,8 +461,10 @@ defineExpose({ scrollToBottom })
 .yd-agent-heading-actions {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   gap: 5px;
   align-items: center;
+  max-width: 100%;
 }
 
 .yd-agent-toolbar {
@@ -517,9 +532,11 @@ defineExpose({ scrollToBottom })
 
 .yd-agent-welcome {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-content: center;
   justify-items: start;
+  min-width: 0;
   max-width: 600px;
   min-height: 100%;
   margin-inline: auto;
@@ -564,7 +581,10 @@ defineExpose({ scrollToBottom })
 
 .yd-agent-starters :deep(.yd-button) {
   justify-content: flex-start;
+  max-width: 100%;
   font-size: 12px;
+  text-align: left;
+  white-space: normal;
 }
 
 .yd-agent-inspector {
@@ -732,8 +752,14 @@ defineExpose({ scrollToBottom })
 
 @media (width <= 768px) {
   .yd-agent-heading {
+    flex-wrap: wrap;
     gap: 6px;
     padding: 14px 12px 10px;
+  }
+
+  .yd-agent-heading-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
 
   .yd-agent-title h2 {

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  UseYdChatStreamOptions,
+  YdAgentSendRequest,
   YdChatAttachment,
   YdChatHistoryTurn,
   YdChatMessage,
@@ -9,16 +11,18 @@ import type {
   YdChatToolEvent,
   YdChatTransport,
 } from '@yudream/components'
+import type { YdAgentChatSession, YdAgentChatSessionMeta, YdAgentChatSessionStore } from './types'
 import {
   provideYdChatConfig,
-  useYdChatStream,
-  YdChatMessageList,
-  YdChatSender,
+  useYdPersistentChatStream,
+  YdAgentWorkbench,
   YdChatSessionList,
   YdWelcome,
 } from '@yudream/components'
 import apiAi from '@/api/modules/platform-ai'
-import type { YdAgentChatSession, YdAgentChatSessionMeta, YdAgentChatSessionStore } from './types'
+import { cancelAiRun, getAiRun, listAiRuns, replyAiFrontendTool } from '@/api/modules/platform-ai-runs'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { resolveApiFileUrl } from '@/utils/api-file-url'
 
 const props = withDefaults(defineProps<{
@@ -56,6 +60,8 @@ const props = withDefaults(defineProps<{
   accept?: string
   /** v2 客户端工具请求处理器（仅 websocket 传输；如 CMS 画布工具在本端真实执行并回传结果） */
   onToolCallRequest?: (request: YdChatToolCallRequest) => Promise<YdChatToolCallReply>
+  durableContextKey: string
+  toolsReady?: boolean
 }>(), {
   protocol: 'agui',
   transport: 'sse',
@@ -71,6 +77,7 @@ const props = withDefaults(defineProps<{
   thinkingText: '正在思考…',
   disclaimer: '内容由 AI 生成，请核对重要信息',
   accept: 'image/*',
+  toolsReady: true,
 })
 
 const emits = defineEmits<{
@@ -95,8 +102,15 @@ const sessionsLoading = ref(false)
 const sessionDrawerOpen = ref(false)
 const activeSession = ref<YdAgentChatSession | null>(null)
 const attachments = ref<YdChatAttachment[]>([])
+const renameOpen = ref(false)
+const renameTitle = ref('')
+const renameTarget = ref<{ id: string, title: string }>()
+const removeOpen = ref(false)
+const removeTarget = ref<{ id: string }>()
+const account = useAppAccountStore()
+const aiRuntime = useAiAssistantStore()
 
-const { messages, streaming, send, stop } = useYdChatStream({
+const streamOptions: UseYdChatStreamOptions = {
   endpoint: () => typeof props.endpoint === 'function' ? props.endpoint() : props.endpoint,
   protocol: props.protocol,
   transport: props.transport,
@@ -112,18 +126,61 @@ const { messages, streaming, send, stop } = useYdChatStream({
       return localStorage.getItem('token') || undefined
     }
     // AG-UI 端点改用一次性握手票据，避免长效会话令牌出现在 URL 中
-    try {
-      const res = await apiAi.issueAguiWsTicket()
-      return res.data?.ticket
-    } catch {
-      return localStorage.getItem('token') || undefined
+    const res = await apiAi.issueAguiWsTicket()
+    if (!res.data?.ticket) {
+      throw new Error('AI 连接没有返回握手票据')
     }
+    return res.data.ticket
   },
   onDone: message => emits('done', message),
   onError: (message, error) => emits('error', message, error),
+}
+function normalizeRun(run: Awaited<ReturnType<typeof getAiRun>>['data']) {
+  return { ...run, tools: (run.tools || []).flatMap((tool) => {
+    const projected = projectAiRunTool(tool)
+    return projected ? [projected] : []
+  }), activities: (run.activities || []).flatMap((activity) => {
+    const projected = projectAiRunActivity(activity, run.id)
+    return projected ? [projected] : []
+  }) }
+}
+const chatStream = useYdPersistentChatStream({
+  ...streamOptions,
+  ownerKey: () => account.isLogin ? String(account.userId) : '',
+  contextKey: () => props.durableContextKey,
+  toolsReady: () => props.toolsReady,
+  persistence: {
+    latest: async (context) => {
+      const runs = (await listAiRuns(`cms-canvas:${context}`)).data.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+      return runs[0] ? normalizeRun(runs[0]) : undefined
+    },
+    snapshot: async id => normalizeRun((await getAiRun(id)).data),
+    cancel: async id => normalizeRun((await cancelAiRun(id)).data),
+    toolResult: async (id, request, reply) => {
+      await replyAiFrontendTool(id, request.toolCallId, reply)
+    },
+    track: (id) => {
+      const epoch = aiRuntime.lifecycleVersion()
+      void getAiRun(id).then(response => aiRuntime.attachRun(response.data, epoch)).catch((error) => {
+        if (epoch === aiRuntime.lifecycleVersion()) {
+          aiRuntime.setError(error)
+        }
+      })
+    },
+  },
 })
+const { messages, streaming, send, stop: stopStream } = chatStream
+async function stop() {
+  try {
+    await stopStream()
+  }
+  catch (error) {
+    useYdToast().warning(error instanceof Error ? error.message : '停止任务失败')
+  }
+}
+const harness = computed(() => ({ name: 'AgentScope Harness', runId: chatStream.runId.value || undefined, status: streaming.value ? chatStream.runStatus.value === 'WAITING' ? 'waiting' as const : 'running' as const : chatStream.runStatus.value === 'FAILED' ? 'error' as const : chatStream.runStatus.value === 'CANCELLED' ? 'cancelled' as const : chatStream.runStatus.value === 'COMPLETED' ? 'completed' as const : 'idle' as const }))
+const restoreRun = 'restore' in chatStream ? chatStream.restore : undefined
 
-const isEmpty = computed(() => messages.value.length === 0)
 const activeTitle = computed(() => activeSession.value?.title || '新的对话')
 const sessionItems = computed(() => sessions.value.map(item => ({
   id: item.id,
@@ -157,6 +214,9 @@ function sortSessions(list: YdAgentChatSessionMeta[]) {
 
 /** 新建会话：立即持久化一个空会话，保证列表与选中状态一致 */
 async function createSession() {
+  if (props.durableContextKey && streaming.value) {
+    return
+  }
   // 切换/新建前先保存当前会话，避免正在生成或刚完成的消息因清空引用而丢失。
   await persistActiveSession()
   stop()
@@ -188,7 +248,9 @@ async function selectSession(id: string) {
     return
   }
   await persistActiveSession()
-  stop()
+  if (!props.durableContextKey) {
+    stop()
+  }
   sessionDrawerOpen.value = false
   try {
     const session = await props.sessionStore.load(id)
@@ -197,7 +259,14 @@ async function selectSession(id: string) {
       return
     }
     activeSession.value = session
-    messages.value = session.messages
+    if (props.durableContextKey && streaming.value) {
+      const live = messages.value
+      const liveIds = new Set(live.map(message => message.id))
+      messages.value = [...session.messages.filter(message => !message.pending && !liveIds.has(message.id)), ...live]
+    }
+    else {
+      messages.value = session.messages
+    }
     emits('sessionChange', session)
   }
   catch {
@@ -205,11 +274,21 @@ async function selectSession(id: string) {
   }
 }
 
-async function renameSession(item: { id: string, title: string }) {
+function renameSession(item: { id: string, title: string }) {
+  renameTarget.value = item
+  renameTitle.value = item.title
+  renameOpen.value = true
+}
+
+async function saveRename() {
+  const item = renameTarget.value
+  if (!item) {
+    return
+  }
   if (!props.sessionStore) {
     return
   }
-  const title = window.prompt('请输入会话标题', item.title)?.trim()
+  const title = renameTitle.value.trim()
   if (!title) {
     return
   }
@@ -240,8 +319,18 @@ async function pinSession(item: { id: string, pinned?: boolean }) {
   await loadSessions()
 }
 
-async function removeSession(item: { id: string }) {
-  if (!props.sessionStore || !window.confirm('确定删除该会话？')) {
+function removeSession(item: { id: string }) {
+  if (props.durableContextKey && streaming.value && item.id === activeSession.value?.id) {
+    useYdToast().warning('请先停止当前运行，再删除会话记录')
+    return
+  }
+  removeTarget.value = item
+  removeOpen.value = true
+}
+
+async function confirmRemove() {
+  const item = removeTarget.value
+  if (!props.sessionStore || !item) {
     return
   }
   await props.sessionStore.remove(item.id)
@@ -288,7 +377,15 @@ async function onSend(text: string, currentAttachments: YdChatAttachment[]) {
   if (props.sessionStore && !activeSession.value) {
     await createSession()
   }
-  await send(text, currentAttachments)
+  const owner = String(account.userId)
+  const pending = send(text, currentAttachments)
+  if (props.durableContextKey) {
+    await persistActiveSession()
+  }
+  await pending
+  if (!account.isLogin || owner !== String(account.userId)) {
+    return
+  }
   attachments.value = []
   await persistActiveSession()
 }
@@ -299,6 +396,22 @@ async function sendPrompt(text: string) {
   if (content) {
     await onSend(content, [])
   }
+}
+
+async function respondToPendingAsk(title: string) {
+  if (!('runId' in chatStream) || !chatStream.runId.value) {
+    return false
+  }
+  const snapshot = (await getAiRun(chatStream.runId.value)).data
+  const request = snapshot.pendingFrontendTools?.find(tool => tool.name === 'cms.ask.user')
+  if (!request) {
+    return false
+  }
+  await replyAiFrontendTool(snapshot.id, request.toolCallId, { ok: true, result: { selectedOption: title, message: `用户选择了：${title}` } })
+  if ('acknowledgeTool' in chatStream) {
+    chatStream.acknowledgeTool(request.toolCallId, { ok: true, result: { selectedOption: title, message: `用户选择了：${title}` } })
+  }
+  return true
 }
 
 function onAttach(files: File[]) {
@@ -332,62 +445,77 @@ function onRemoveAttachment(attachment: YdChatAttachment) {
   attachments.value = attachments.value.filter(item => item !== attachment)
 }
 
-function onCopy(message: YdChatMessage) {
-  if (message.content) {
-    navigator.clipboard?.writeText(message.content)
-  }
+function onAgentSend(request: YdAgentSendRequest) {
+  void onSend(request.text, request.attachments)
 }
 
-function onRegenerate(message: YdChatMessage) {
-  const user = messages.value[messages.value.indexOf(message) - 1]
-  if (user?.role === 'user') {
-    void onSend(user.content, user.attachments ?? [])
-  }
-}
-
-defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSession, reloadSessions: loadSessions })
+defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSession, reloadSessions: loadSessions, restoreRun, respondToPendingAsk })
 </script>
 
 <template>
   <div class="yd-agent-chat">
+    <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :confirm-button-disabled="!renameTitle.trim()" @confirm="saveRename">
+      <YdInput v-model="renameTitle" aria-label="会话标题" :maxlength="100" />
+    </YdModal>
+    <YdModal v-model="removeOpen" title="删除会话记录" show-cancel-button @confirm="confirmRemove">
+      <p>确定删除这份会话记录？</p>
+    </YdModal>
     <header v-if="sessionStore" class="yd-agent-chat__head">
       <YdTooltip text="会话记录">
-        <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="会话记录" @click="sessionDrawerOpen = !sessionDrawerOpen">
+        <YdButton type="button" variant="ghost" size="icon-sm" class="yd-agent-chat__head-btn" aria-label="会话记录" :aria-expanded="sessionDrawerOpen" @click="sessionDrawerOpen = !sessionDrawerOpen">
           <YdIcon name="morph:menu" />
-        </YdAction>
+        </YdButton>
       </YdTooltip>
       <span class="yd-agent-chat__title" :title="activeTitle">{{ activeTitle }}</span>
       <YdTooltip text="新建会话">
-        <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="新建会话" @click="createSession">
+        <YdButton type="button" variant="ghost" size="icon-sm" class="yd-agent-chat__head-btn" aria-label="新建会话" @click="createSession">
           <YdIcon name="morph:plus" />
-        </YdAction>
+        </YdButton>
       </YdTooltip>
     </header>
 
     <div class="yd-agent-chat__body">
-      <div v-if="isEmpty" class="yd-agent-chat__welcome">
-        <YdWelcome :title="welcomeTitle" :description="welcomeDescription" :suggestions="suggestions" @select="sendPrompt" />
-      </div>
-      <YdChatMessageList
-        v-else
+      <YdAgentWorkbench
         :messages="messages"
+        :harness="harness"
+        :available-modes="['ask']"
         :image-url-resolver="resolveApiFileUrl"
-        compact
-        @copy-message="onCopy"
-        @regenerate-message="onRegenerate"
+        :suggestions="suggestions"
+        :attachments="attachments"
+        :attachment-accept="accept"
+        :placeholder="placeholder"
+        attachments-enabled
+        class="yd-agent-chat__workbench"
+        @send="onAgentSend"
+        @stop="stop"
+        @attach="onAttach"
+        @remove-attachment="onRemoveAttachment"
       >
+        <template #empty>
+          <YdWelcome :title="welcomeTitle" :description="welcomeDescription" :suggestions="[]" />
+        </template>
         <template #message-extra="slotProps">
           <slot name="message-extra" v-bind="slotProps" />
         </template>
-      </YdChatMessageList>
+        <template #composer-before>
+          <YdAlert v-if="chatStream.runStatus.value === 'WAITING'" title="Harness 正在等待本次工具交互，离开页面不会取消任务" />
+          <YdButton v-if="chatStream.connectionState.value === 'disconnected' && streaming" variant="outline" size="sm" @click="restoreRun">
+            恢复原任务进度
+          </YdButton>
+          <slot name="footer" />
+        </template>
+        <template #sender-actions>
+          <slot name="actions" />
+        </template>
+      </YdAgentWorkbench>
 
       <transition name="yd-agent-chat-fade">
         <div v-if="sessionStore && sessionDrawerOpen" class="yd-agent-chat__drawer">
           <div class="yd-agent-chat__drawer-head">
             <strong>会话记录</strong>
-            <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="关闭" @click="sessionDrawerOpen = false">
+            <YdButton type="button" variant="ghost" size="icon-sm" class="yd-agent-chat__head-btn" aria-label="关闭" @click="sessionDrawerOpen = false">
               <YdIcon name="morph:x" />
-            </YdAction>
+            </YdButton>
           </div>
           <YdChatSessionList
             :sessions="sessionItems"
@@ -402,40 +530,27 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
         </div>
       </transition>
     </div>
-
-    <div class="yd-agent-chat__footer">
-      <slot name="footer" />
-      <div v-if="$slots.actions" class="yd-agent-chat__controls">
-        <slot name="actions" />
-      </div>
-      <YdChatSender
-        :loading="streaming"
-        :suggestions="[]"
-        :attachments="attachments"
-        :accept="accept"
-        @send="onSend"
-        @stop="stop"
-        @attach="onAttach"
-        @remove-attachment="onRemoveAttachment"
-      />
-    </div>
   </div>
 </template>
 
 <style scoped>
+.yd-agent-chat__workbench {
+  height: 100%;
+}
+
 .yd-agent-chat {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
-  max-width: 100%;
   min-width: 0;
-  min-height: 0;
+  max-width: 100%;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
-  background: var(--color-bg-1);
   color: var(--color-text-1);
+  background: var(--color-bg-1);
 }
 
 .yd-agent-chat__head {
@@ -450,56 +565,56 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
 
 .yd-agent-chat__head-btn {
   display: grid;
+  flex-shrink: 0;
+  place-items: center;
   width: 28px;
   height: 28px;
-  flex-shrink: 0;
   padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  font-size: 16px;
   color: var(--color-text-2);
   cursor: pointer;
-  place-items: center;
-  font-size: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
 }
 
 .yd-agent-chat__head-btn:hover {
-  background: var(--color-fill-1);
   color: var(--color-text-1);
+  background: var(--color-fill-1);
 }
 
 .yd-agent-chat__title {
-  overflow: hidden;
-  min-width: 0;
   flex: 1;
-  color: var(--color-text-2);
-  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--color-text-2);
   white-space: nowrap;
 }
 
 .yd-agent-chat__body {
   position: relative;
   display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  flex-direction: column;
   overflow: hidden;
 }
 
 .yd-agent-chat__body :deep(.yd-chat-list) {
-  min-height: 0;
   flex: 1;
+  min-height: 0;
   padding: 12px 12px 16px;
 }
 
 .yd-agent-chat__welcome {
   display: flex;
-  min-width: 0;
-  min-height: 0;
   flex: 1;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -519,12 +634,12 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
 
 .yd-agent-chat__drawer {
   position: absolute;
+  inset: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-1);
   box-shadow: 6px 0 24px rgb(0 0 0 / 8%);
-  inset: 0;
 }
 
 .yd-agent-chat__drawer-head {
@@ -534,33 +649,33 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
   justify-content: space-between;
   min-height: 40px;
   padding: 6px 12px;
-  border-bottom: 1px solid var(--color-border-2);
-  color: var(--color-text-1);
   font-size: 13px;
+  color: var(--color-text-1);
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .yd-agent-chat__drawer :deep(.yd-session-list) {
+  flex: 1;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  flex: 1;
   background: transparent;
 }
 
 .yd-agent-chat__footer {
   display: grid;
-  min-width: 0;
   flex-shrink: 0;
   gap: 8px;
+  min-width: 0;
   padding: 0 10px 10px;
 }
 
 /* 上下文控件（Agent / 模型 / 开关等）独立一行，避免挤占输入框工具条 */
 .yd-agent-chat__controls {
   display: flex;
-  min-width: 0;
-  align-items: center;
   gap: 8px;
+  align-items: center;
+  min-width: 0;
 }
 
 /* 嵌入式面板：去掉 YdChatSender 页面级的 clamp 大内边距，允许工具条收缩换行 */
@@ -583,8 +698,8 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
 
 .yd-agent-chat__footer :deep(.yd-sender__bar) {
   flex-wrap: wrap;
-  min-width: 0;
   gap: 6px;
+  min-width: 0;
   padding: 4px 10px 10px;
 }
 
