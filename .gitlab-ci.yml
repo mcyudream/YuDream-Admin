@@ -391,6 +391,8 @@ deploy:docs-ftp:
     FTP_SSL_VERIFY: "true"
     FTP_DELETE: "true"
   before_script:
+    # apt 官方源在国内 runner 上极慢：切阿里云镜像后再装工具
+    - sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list 2>/dev/null || true
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends lftp ca-certificates
     - npm config set registry "$NPM_CONFIG_REGISTRY"
     - corepack enable && corepack prepare pnpm@11.9.0 --activate
