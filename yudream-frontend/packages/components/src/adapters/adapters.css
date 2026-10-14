@@ -80,6 +80,36 @@
   box-shadow: var(--yd-surface-shadow);
 }
 
+/* Status colours stay coupled to the FA theme runtime, including dark mode and
+ * custom themes. Components use these classes instead of fixed utility colours. */
+.yd-status-info,
+.yd-modal-icon--info,
+.toast[data-type="info"] .yd-toast-icon {
+  color: var(--yd-status-info);
+}
+
+.yd-status-success,
+.yd-modal-icon--success,
+.toast[data-type="success"] .yd-toast-icon {
+  color: var(--yd-status-success);
+}
+
+.yd-status-warning,
+.yd-modal-icon--warning,
+.toast[data-type="warning"] .yd-toast-icon {
+  color: var(--yd-status-warning);
+}
+
+.yd-status-danger,
+.yd-modal-icon--error,
+.toast[data-type="error"] .yd-toast-icon {
+  color: var(--yd-status-danger);
+}
+
+.yd-toast-icon {
+  scale: 1.2;
+}
+
 :root[data-admin-style="vibrant"] .yd-button:not(:disabled):hover {
   translate: 0 var(--yd-motion-lift);
 }

@@ -4,7 +4,7 @@
 
 YD Agent 工作台把会话、任务对话、执行轨迹、工作区上下文和变更审阅组合成可复用的 Coding Agent 界面。组件通过属性接收运行状态，通过事件向宿主提交操作意图；它不负责启动模型、连接 MCP、执行命令或写入仓库。
 
-本次实现范围为组件库和 `component-showcase` 的实时预览，没有改造生产 AI 助手 API。预览中的任务、文件片段、MCP 状态、工具结果和审批均为明确标记的本地演示数据。真实 MCP、通用 Git 操作、审批恢复与文件读写，需要宿主提供适配器，组件没有默认接通这些能力。
+生产聊天页和全局助手复用此工作台，由根级 Pinia store 消费后端持久运行快照与增量事件。AgentScope 原生 AgentSession 管理后台执行与持久上下文，关闭窗口或切换页面只改变观察界面。`component-showcase` 中的任务、文件片段、MCP 状态、工具结果和审批仍为明确标记的本地演示数据；MCP、Git 与文件操作只展示宿主实际提供的能力。
 
 ## 公开入口与源码
 
@@ -50,6 +50,7 @@ import {
 | `workspaces`、`workspaceId` | `YdAgentWorkspace[]`、`string?` | 可选工作区与当前工作区 |
 | `models`、`modelId` | `YdAgentModel[]`、`string?` | 供应商与模型选择；请求包含所选模型的 `providerCode` / `modelCode` |
 | `mode` | `'ask' \| 'plan' \| 'code'`，默认 `ask` | 问答、规划、编码 |
+| `availableModes` | `YdAgentMode[]`，默认三种模式 | 宿主明确可用模式；普通聊天传 `['ask']`，不会凭 UI 取得编码权限 |
 | `messages` | `YdChatMessage[]` | 消息与兼容的既有聊天内容 |
 | `renderDocuments` | `Record<string, YdAgentRenderDocument>` | 以消息 `id` 关联回答渲染文档 |
 | `harness` | `YdAgentHarnessState` | 真实运行状态、上下文用量、阶段和检查点 |
@@ -62,6 +63,7 @@ import {
 | `suggestions` | `string[]` | 空会话的起始提示，点击后填入草稿 |
 | `disabled` | `boolean`，默认 `false` | 禁止发送及变更上下文等操作 |
 | `attachmentsEnabled` | `boolean`，默认 `false` | 启用附件选择入口；上传仍交给宿主 |
+| `attachments` | `YdChatAttachment[]`，默认空 | 已上传附件的受控列表；发送携带此列表，移除仍由宿主处理 |
 | `demo` | `boolean`，默认 `false` | 显示本地演示标识，不会自动产生示例状态 |
 
 ### 事件
@@ -75,6 +77,7 @@ import {
 | `send` | `request: YdAgentSendRequest` | 校验权限后提交任务 |
 | `stop` | 无 | 取消当前运行并更新状态 |
 | `attach` | `files: File[]` | 执行上传或解析流程 |
+| `removeAttachment` | `attachment: YdChatAttachment` | 更新宿主附件列表，不自行删除服务端文件 |
 | `sessionCreate` | 无 | 创建会话并提供新 ID |
 | `sessionRename`、`sessionPin`、`sessionRemove` | `session: YdAgentSession` | 变更会话元数据或删除会话 |
 | `fileSelect` | `file: YdAgentContextFile` | 打开或定位文件，按宿主权限读取内容 |
@@ -199,6 +202,24 @@ const answer: YdAgentRenderDocument = {
 需要新回答协议时，为消息提供稳定的字符串 `id`，并在 `renderDocuments[message.id]` 放入 `version: 1` 文档。该文档替换消息的正文展示，消息的其他兼容信息仍由既有气泡承载。建议同时在 `message.content` 保留可复制和存储的纯文本或 Markdown 回答；工作台的“复制回答”使用这个字段。
 
 工作台运行状态与工具状态是不同层级：`YdAgentRunStatus` 为 `idle`、`running`、`waiting`、`completed`、`error`、`cancelled`；`YdAgentActivity.status` 为 `pending`、`running`、`complete`、`error`、`waiting`。宿主应按自己的权威事件映射，不能仅因一个工具成功就将整项任务标记完成。
+
+## 生产会话与全局助手
+
+`/platform/chat` 和根级全局助手共享 `useAiAssistantStore`，使用统一 `/api/platform/ai/runs` 快照与 SSE 游标。刷新先读取服务端快照再续读，关闭浮层与路由卸载均不调用取消；停止按钮发送明确的服务端取消请求。正文、真实 reasoning、工具卡片和生命周期活动分别投影，缺少真流式实现时明确失败，禁止计时打字或阻塞后整段回放。
+
+全局助手仅在登录且具备助手使用与会话查看权限时挂载，默认 `Ctrl/⌘+Shift+Y` 唤起，可选择 `Alt+Shift+A` 或关闭快捷键。路由、页面元数据、导航工具与高亮各自可关闭，默认关闭；偏好按账号保存在当前浏览器。开启对应工具后，宿主按可见菜单和路由权限校验导航，按页面显式注册的稳定操作标识聚焦和高亮，再回传真实结果。不能读取任意 DOM、表单、查询参数或令牌，不能接受任意脚本、选择器或代用户点击操作。
+
+共享输入区提供 `sender-actions` 插槽以承载宿主的业务范围选择。附件上传与解析交给宿主，完成后通过 `attachments` 回显，通过 `removeAttachment` 更新；组件不另建文件 API。普通会话显式只开放 `availableModes=['ask']`。审批、MCP 和 Git 操作由真实宿主协议提供；组件示例不会被解释为已经接通生产服务。
+
+`message-extra` 插槽接收 `{ message, index }`，承载宿主特定的工具结果与澄清问题；`composer-before` 位于输入区之前，承载真实等待、断线恢复和业务提示。`placeholder`、`attachmentAccept`、`imageUrlResolver` 分别控制输入提示、上传候选类型和引用图片地址；处理权限和上传解析仍属于宿主。过程活动即使存在 `renderDocuments` 也继续显示，检索与关系图不会被自定义回答块遮掉。
+
+CMS 画布通过公开 `useYdPersistentChatStream` 与宿主的 `persistence` 端口接入根级浏览器运行注册表。`ownerKey` 必须是登录用户字符串标识，`contextKey` 必须稳定；`latest(contextKey)` / `snapshot(runId)` 返回权威运行快照，`cancel(runId)` 是显式取消，`toolResult(runId, request, reply)` 回传真实工具结果，`toolsReady` 防止编辑器未就绪时执行画布工具。首帧 `RUN_STARTED.runId` 与字符串 `cursor` 保存后，断线仅发送 `{ resumeRunId, after }`，不会再次提交问题。重复请求复用待回执 Promise 和已核销结果；卸载只移除页面工具绑定，重新进入页面后恢复原生挂起请求。
+
+后端 `WAITING` 不是结束状态。普通导航与高亮在用户开启开关后自动执行，危险工具的原生 `confirmation` 显示本次批准/拒绝；外部执行只由对应业务页面处理，再以真实回执接续原 turn。退出登录调用 `clearYdPersistentChatOwner` 断开旧用户的浏览器观察，后台记录保留。公开 Wiki 浮窗仍仅登录后可提问，使用独立 `public-wiki:{slug}` 的用户运行记录；私有 Wiki、研究、Lint、摄入及图片描述都观察同一运行日志。
+
+内部模型阶段的 `ai.generation` 根据 `callId` 分别展示真实正文与推理，不混入主回答。结构化 JSON 仅以已收到的完整字段或完整条目更新业务草稿，原始增量可折叠查看。额度将实际用量、运行预留与待核对用量分开展示；有额度配置权限者管理用户/系统每日预算，有查看/编辑权限者依据供应商真实 usage 核对扣留额度，前端不估算或伪造用量。
+
+`/platform/ai/system-runs` 是独立的系统任务观察页面，只使用 `/api/platform/ai/system-runs` 端口和专有状态仓库；系统 owner `0` 不进入个人助手列表。`platform:ai:system:view` 控制查看，`edit` 控制取消，`accept` 控制本次原生批准/拒绝。页面卸载不取消，退出登录或失去查看权限时断开浏览器观察。
 
 ## 宿主接入边界
 

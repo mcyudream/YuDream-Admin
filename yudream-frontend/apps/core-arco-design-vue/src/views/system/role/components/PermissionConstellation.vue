@@ -378,7 +378,7 @@ watch([() => props.userKeyword, () => props.userUnassignedOnly], ([serverKeyword
 </script>
 
 <template>
-  <section class="permission-constellation" :class="{ 'is-paused': paused, 'is-mobile': mobile }" :aria-busy="loading" aria-label="权限关系星图" @keydown.esc="selectedId = null">
+  <section class="permission-constellation" :class="{ 'is-paused': paused, 'is-mobile': mobile }" :aria-busy="loading" aria-label="权限关系星图" @keydown.esc.stop="selectedId = null">
     <div class="constellation-toolbar flex flex-wrap gap-3 items-start justify-between">
       <div>
         <span class="constellation-eyebrow"><YdIcon name="morph:orbit" /> 权限全景</span>

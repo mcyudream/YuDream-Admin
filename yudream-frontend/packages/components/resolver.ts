@@ -202,6 +202,8 @@ const COMPONENT_NAMES = [
 const AUTO_IMPORT_NAMES = [
   'useYdChat',
   'useYdChatStream',
+  'useYdPersistentChatStream',
+  'clearYdPersistentChatOwner',
   'provideYdChatConfig',
   'useYdChatConfig',
   'useYdDrawer',

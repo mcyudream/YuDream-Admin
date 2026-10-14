@@ -10,6 +10,21 @@ const month = shallowRef<YdCalendarValue>()
 const year = shallowRef<YdCalendarValue>()
 const datetime = shallowRef<YdCalendarValue>()
 const shortcuts = [{ text: '体验周', value: { start: new CalendarDate(2026, 10, 14), end: new CalendarDate(2026, 10, 20) } }]
+
+function calendarLabel(value: YdCalendarValue): string {
+  if (!value) {
+    return '未选择'
+  }
+  if (Array.isArray(value)) {
+    return value.length ? value.map(item => item.toString()).join('、') : '未选择'
+  }
+  if ('start' in value) {
+    const start = value.start?.toString() ?? '…'
+    const end = value.end?.toString() ?? '…'
+    return value.start || value.end ? `${start} 至 ${end}` : '未选择'
+  }
+  return value.toString()
+}
 </script>
 
 <template>
@@ -19,7 +34,7 @@ const shortcuts = [{ text: '体验周', value: { start: new CalendarDate(2026, 1
         <YdCalendarDate v-model="date" /><YdCalendarDateRange v-model="range" :shortcuts="shortcuts" :maximum-days="14" />
       </div>
       <p class="demo-label">
-        日期：{{ date || '未选择' }} · 范围：{{ range || '未选择' }}
+        日期：{{ calendarLabel(date) }} · 范围：{{ calendarLabel(range) }}
       </p>
     </DemoCard>
     <DemoCard title="月份与年份" description="独立面板适合统计周期、预算年度等场景">
@@ -32,7 +47,7 @@ const shortcuts = [{ text: '体验周', value: { start: new CalendarDate(2026, 1
         <YdCalendarDate v-model="date" picker /><YdDate v-model="datetime" picker with-time picker-placeholder="选择日期和时间" /><YdCalendarYear picker picker-placeholder="选择年份" />
       </div>
       <p class="demo-label">
-        日期时间：{{ datetime || '未选择' }}
+        日期时间：{{ calendarLabel(datetime) }}
       </p>
     </DemoCard>
   </div>
@@ -50,5 +65,25 @@ const shortcuts = [{ text: '体验周', value: { start: new CalendarDate(2026, 1
   gap: var(--yd-content-gap);
   align-items: flex-start;
   min-width: 0;
+}
+
+/* The range calendar is wider than a single month. Compact cells keep both
+ * panels visible on desktop while the existing wrap behavior still handles
+ * narrow screens. */
+.calendar-row:first-child {
+  gap: 12px;
+}
+
+.calendar-row:first-child :deep(.yd-calendar-cell) {
+  min-width: 34px;
+  height: 34px;
+  padding-inline: 4px;
+}
+
+@media (width <= 920px) {
+  .calendar-row:first-child :deep(.yd-calendar-cell) {
+    min-width: 32px;
+    height: 32px;
+  }
 }
 </style>

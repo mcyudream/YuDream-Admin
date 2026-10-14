@@ -1,6 +1,7 @@
 import type { PluginFrontendAssetLease } from './frontend-assets'
 import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
 import apiPlugin from '@/api/modules/platform-plugin'
+import { disposePluginAiActions } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { acquirePluginFrontendAssets, pluginFrontendAssetUrl } from './frontend-assets'
 // 副作用导入：remoteEntry 求值前必须就绪插件共享运行时（主题运行时在启动阶段即加载远程模块）
@@ -66,6 +67,9 @@ export async function acquirePluginRemoteModule(manifest: RemoteManifest, option
         }
         finally {
           record!.assets?.release()
+          if (![...remoteRegistry.keys()].some(item => item.startsWith(`${pluginCode}\u0000`))) {
+            disposePluginAiActions(pluginCode)
+          }
         }
       },
     }

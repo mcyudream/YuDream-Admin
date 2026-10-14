@@ -8,6 +8,8 @@ export type { YdRequestOptions, YdStreamEvent } from './request'
 export { useYdChat } from './useYdChat'
 export type { UseYdChatOptions } from './useYdChat'
 export { useYdChatStream } from './useYdChatStream'
+export { clearYdPersistentChatOwner, useYdPersistentChatStream } from './useYdPersistentChatStream'
+export type { UseYdPersistentChatStreamOptions, YdPersistentChatPort } from './useYdPersistentChatStream'
 export type {
   UseYdChatStreamOptions,
   YdChatAction,
@@ -20,6 +22,7 @@ export type {
   YdChatHistoryTurn,
   YdChatMessage,
   YdChatProtocol,
+  YdChatRunSnapshot,
   YdChatRetrievalHit,
   YdChatToolCallReply,
   YdChatToolCallRequest,

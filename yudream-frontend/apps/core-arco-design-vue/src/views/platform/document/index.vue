@@ -474,8 +474,8 @@ function generationVariant(status: GenerationStatus) {
       </section>
 
       <YdLoadingOverlay v-if="activeTab === 'templates'" :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1320px]"
@@ -591,8 +591,8 @@ function generationVariant(status: GenerationStatus) {
       </YdResponsiveTable></YdLoadingOverlay>
 
       <YdLoadingOverlay v-else :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1160px]"

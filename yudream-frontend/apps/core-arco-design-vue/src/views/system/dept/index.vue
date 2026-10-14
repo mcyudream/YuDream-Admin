@@ -208,7 +208,7 @@ function importDepts() {
 
     <YdPageMain>
       <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1120px]"

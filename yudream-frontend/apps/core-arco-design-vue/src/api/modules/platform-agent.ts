@@ -1,3 +1,4 @@
+import type { AiRunSnapshot } from './platform-ai-runs'
 import type { ApiResponse, PageResult } from './system-client'
 import { prepareApiEncryption } from '@/utils/api-encryption'
 import systemClient from './system-client'
@@ -118,6 +119,7 @@ export interface AgentDebugStreamEvent {
 }
 
 export default {
+  startDebugRun: (id: string, data: { input: string, providerCode?: string, modelCode?: string, imageDataUrl?: string, attachments?: AgentRunAttachment[] }) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/agents/${id}/debug/runs`, data),
   available: () => systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/agents/available'),
   runtimeDetail: (code: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}`),
   importRuntime: (code: string) => systemClient.post<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}/import`),
@@ -127,7 +129,6 @@ export default {
   update: (id: string, data: AgentApplicationPayload) => systemClient.put<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/${id}`, data),
   publish: (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/agents/${id}/publish`),
   delete: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/agents/${id}`),
-  run: (id: string, data: { input: string, providerCode?: string, modelCode?: string, imageDataUrl?: string, attachments?: AgentRunAttachment[] }) => systemClient.post<unknown, ApiResponse<AgentRunResult>>(`api/platform/agents/${id}/run`, data),
   debugStreamEndpoint: (id: string) => streamEndpoint(`/api/platform/agents/${id}/debug/stream`),
   debugStreamRequest: async (id: string, data: { input: string, providerCode?: string, modelCode?: string, imageDataUrl?: string, attachments?: AgentRunAttachment[] }): Promise<RequestInit> => {
     const headers: Record<string, string> = {

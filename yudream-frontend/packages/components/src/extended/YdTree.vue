@@ -15,6 +15,7 @@ export interface YdTreeNode {
 const props = withDefaults(defineProps<{
   data: YdTreeNode[]
   checkable?: boolean
+  selectable?: boolean
   filterable?: boolean
   virtualList?: boolean
   defaultExpandAll?: boolean
@@ -29,12 +30,32 @@ const selection = defineModel<string[]>('selectedKeys', { default: () => [] })
 const checked = defineModel<string[]>('checkedKeys', { default: () => [] })
 const expanded = defineModel<string[]>('expandedKeys', { default: () => [] })
 const keyword = ref('')
+const treeRef = ref<InstanceType<typeof ATree>>()
 function flatten(items: YdTreeNode[]): YdTreeNode[] {
   return items.flatMap(node => [node, ...flatten(node.children || [])])
 }
 const nodes = computed(() => flatten(props.data))
 const nodeMap = computed(() => new Map(nodes.value.map(node => [node.key, node])))
 const branchKeys = computed(() => nodes.value.filter(node => node.children?.length).map(node => node.key))
+const selectable = computed(() => props.selectable ?? !props.checkable)
+const checkStates = computed(() => {
+  const checkedKeys = new Set(checked.value)
+  const states = new Map<string, 'checked' | 'indeterminate' | 'unchecked'>()
+
+  function visit(node: YdTreeNode): 'checked' | 'indeterminate' | 'unchecked' {
+    const childStates = (node.children || []).map(visit)
+    const state = checkedKeys.has(node.key)
+      ? 'checked'
+      : childStates.some(childState => childState !== 'unchecked')
+        ? 'indeterminate'
+        : 'unchecked'
+    states.set(node.key, state)
+    return state
+  }
+
+  props.data.forEach(visit)
+  return states
+})
 let initializedExpansion = false
 watch(() => props.data, (items) => {
   if (!initializedExpansion && items.length) {
@@ -82,12 +103,34 @@ function check(keys: (string | number)[]) {
   checked.value = enabledKeys(keys)
   emit('checkChange', checked.value.map(key => nodeMap.value.get(key)!))
 }
+function nodeCheckState(key: string): 'checked' | 'indeterminate' | 'unchecked' {
+  return checkStates.value.get(key) || 'unchecked'
+}
+function toggleNodeCheck(key: string) {
+  if (!props.checkable || unavailableKeys.value.has(key)) {
+    return
+  }
+
+  treeRef.value?.checkNode(key, nodeCheckState(key) !== 'checked')
+}
+function handleNodeTitleClick(key: string, event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('button, a, input, textarea, select, [role="button"], [role="checkbox"], [role="link"], [contenteditable="true"]')) {
+    return
+  }
+  if (props.checkable) {
+    toggleNodeCheck(key)
+  }
+
+  if (selectable.value && !unavailableKeys.value.has(key)) {
+    treeRef.value?.selectNode(key, !selection.value.includes(key))
+  }
+}
 defineExpose({
   expand: (keys?: string[]) => { expanded.value = keys?.filter(key => branchKeys.value.includes(key)) || branchKeys.value },
   collapse: (keys?: string[]) => { expanded.value = keys ? expanded.value.filter(key => !keys.includes(key)) : [] },
   checkAll: (on: boolean) => check(on ? nodes.value.map(node => node.key) : []),
   setSelection: (key: string) => {
-    if (nodeMap.value.has(key) && !unavailableKeys.value.has(key)) {
+    if (selectable.value && nodeMap.value.has(key) && !unavailableKeys.value.has(key)) {
       select([key])
     }
   },
@@ -96,11 +139,25 @@ defineExpose({
 </script>
 
 <template>
-  <div class="yd-stack yd-tree">
+  <div class="yd-stack yd-tree" :class="{ 'yd-tree--checkable': checkable }">
     <YdInput v-if="filterable" v-model="keyword" :placeholder="filterPlaceholder" clearable aria-label="搜索树节点" />
-    <ATree :data="treeData" :checkable="checkable" :selected-keys="selection" :checked-keys="checked" :expanded-keys="expandedView" :virtual-list-props="virtualList ? { height: 320 } : undefined" block-node @select="select" @check="check" @update:expanded-keys="expanded = $event.map(String)">
+    <ATree ref="treeRef" :data="treeData" :checkable="checkable" :selectable="selectable" :selected-keys="selectable ? selection : []" :checked-keys="checked" :expanded-keys="expandedView" :virtual-list-props="virtualList ? { height: 320 } : undefined" block-node @select="select" @check="check" @update:expanded-keys="expanded = $event.map(String)">
       <template #title="node">
-        <slot :node="nodeMap.get(String(node.key))" :expanded="expandedView.includes(String(node.key))">
+        <span
+          v-if="checkable"
+          class="yd-tree-check-title"
+          :data-state="nodeCheckState(String(node.key))"
+          @click.stop="handleNodeTitleClick(String(node.key), $event)"
+        >
+          <slot :node="nodeMap.get(String(node.key))" :expanded="expandedView.includes(String(node.key))">
+            {{ node.title }}
+          </slot>
+        </span>
+        <slot
+          v-else
+          :node="nodeMap.get(String(node.key))"
+          :expanded="expandedView.includes(String(node.key))"
+        >
           {{ node.title }}
         </slot>
       </template>

@@ -12,6 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AiRunProgress: typeof import('./../components/AiRunProgress/index.vue')['default']
     AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
     AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
     AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
@@ -66,6 +67,7 @@ declare module 'vue' {
     FaToast: typeof import('@yudream/components')['FaToast']
     FaTooltip: typeof import('@yudream/components')['FaTooltip']
     FaTrend: typeof import('@yudream/components')['FaTrend']
+    GlobalAiAssistant: typeof import('./../components/GlobalAiAssistant/index.vue')['default']
     YdAction: typeof import('@yudream/components')['YdAction']
     YdAgentAnswer: typeof import('@yudream/components')['YdAgentAnswer']
     YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
@@ -208,6 +210,7 @@ declare module 'vue' {
 
 // For TSX support
 declare global {
+  const AiRunProgress: typeof import('./../components/AiRunProgress/index.vue')['default']
   const AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
   const AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
   const AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
@@ -262,6 +265,7 @@ declare global {
   const FaToast: typeof import('@yudream/components')['FaToast']
   const FaTooltip: typeof import('@yudream/components')['FaTooltip']
   const FaTrend: typeof import('@yudream/components')['FaTrend']
+  const GlobalAiAssistant: typeof import('./../components/GlobalAiAssistant/index.vue')['default']
   const YdAction: typeof import('@yudream/components')['YdAction']
   const YdAgentAnswer: typeof import('@yudream/components')['YdAgentAnswer']
   const YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']

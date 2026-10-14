@@ -9,11 +9,23 @@ import {
   retryWikiIngestTask,
   wikiIngestEventsEndpoint,
 } from '@/api/modules/platform-wiki'
+import AiRunProgress from '@/components/AiRunProgress/index.vue'
 import { ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
 const modal = useYdModal()
+const account = useAppAccountStore()
+const runProgressOpen = ref(false)
+const selectedRunId = ref('')
+
+function viewAiRun(task: WikiIngestTask) {
+  if (!task.aiRunId || !account.isLogin || String(task.requestedByUserId || '') !== String(account.userId)) {
+    return
+  }
+  selectedRunId.value = task.aiRunId
+  runProgressOpen.value = true
+}
 
 const tasks = ref<WikiIngestTask[]>([])
 const loading = ref(false)
@@ -230,6 +242,9 @@ watch(() => store.spaceId.value, () => {
               <strong class="ing-card__type">{{ taskTypeLabel(task.taskType) }}</strong>
               <span class="ing-card__phase">{{ task.phase }}</span>
               <div class="ing-card__actions">
+                <YdButton v-if="task.aiRunId && String(task.requestedByUserId || '') === String(account.userId)" size="sm" variant="outline" @click="viewAiRun(task)">
+                  <YdIcon name="morph:bot" /> AI 实际进度
+                </YdButton>
                 <YdButton
                   v-if="['QUEUED', 'RUNNING'].includes(task.status)"
                   size="sm"
@@ -281,6 +296,9 @@ watch(() => store.spaceId.value, () => {
         />
       </div>
     </YdScrollArea>
+    <YdDrawer v-model="runProgressOpen" title="摄入任务的 AI 运行" :footer="false" content-class="w-[760px] max-w-full">
+      <AiRunProgress v-if="selectedRunId" :run-id="selectedRunId" />
+    </YdDrawer>
   </div>
 </template>
 
@@ -329,8 +347,8 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-live--on {
-  background: var(--color-text-2);
-  box-shadow: 0 0 0 3px var(--color-text-2)33;
+  background: #10b981;
+  box-shadow: 0 0 0 3px #10b98133;
 }
 
 .ing-empty {
@@ -342,7 +360,7 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-empty :deep(svg) {
-  color: rgb(var(--color-text-2));
+  color: var(--color-text-2);
   font-size: 36px;
 }
 
@@ -394,7 +412,7 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-danger {
-  color: var(--color-text-2);
+  color: #dc2626;
 }
 
 .ing-card__progress {
@@ -433,8 +451,8 @@ watch(() => store.spaceId.value, () => {
   margin: 10px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--color-text-2)12;
-  color: var(--color-text-2);
+  background: #ef444412;
+  color: #dc2626;
   font-size: 12px;
 }
 </style>

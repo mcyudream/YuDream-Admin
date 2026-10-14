@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { YdAgentContextFile, YdAgentReference, YdAgentSession, YdAgentToolCall, YdChatMessage, YdPromptItem, YdThoughtChainItem } from '@yudream/components'
+import type { YdAgentContextFile, YdAgentReference, YdAgentSendRequest, YdAgentSession, YdAgentToolCall, YdChatAttachment, YdChatMessage, YdPromptItem, YdThoughtChainItem } from '@yudream/components'
 import { YdAgentWorkbench, YdBubble, YdButton, YdChatLoading, YdCheckbox, YdCode, YdIcon, YdInput, YdModal, YdPrompts, YdThoughtChain } from '@yudream/components'
 import { computed, ref } from 'vue'
 import { useAgentWorkbenchDemo } from './useAgentWorkbenchDemo'
@@ -7,6 +7,24 @@ import { useAgentWorkbenchDemo } from './useAgentWorkbenchDemo'
 const demo = useAgentWorkbenchDemo()
 const { sessionId, workspaceId, modelId, mode } = demo
 const galleryOpen = ref(false)
+const protocolOpen = ref(false)
+const persistentContract = `const stream = useYdPersistentChatStream({
+  ownerKey: () => account.userId,
+  contextKey: () => 'page:' + page.id,
+  toolsReady: () => editor.ready,
+  endpoint: '/api/platform/cms/generate/agui/ws',
+  persistence: { latest, snapshot, cancel, toolResult },
+  onToolCallRequest: executeRegisteredCanvasTool,
+})
+
+// 首次提交创建后端 run；重連只订阅原 run
+// WebSocket: { resumeRunId: stream.runId, after: stream.cursor }
+// WAITING 保存原生 pendingInteractions，真实回执续原 turn
+// 卸载视图不取消；显式停止才调用 persistence.cancel
+// message-extra: 宿主业务工具结果
+// composer-before: 等待输入、恢复连接与业务提示
+// sender-actions: 业务模型或范围选择`
+const attachments = ref<YdChatAttachment[]>([])
 const renameOpen = ref(false)
 const renameId = ref('')
 const renameTitle = ref('')
@@ -31,6 +49,14 @@ const sourceText = computed(() => {
   }
   return '# YD 组件接入（演示片段）\n\n统一通过 YD 组件公开属性、插槽与事件组合页面。\n工作台只接收状态投影，真实运行、权限与持久化由宿主 Harness 管理。'
 })
+
+async function send(request: YdAgentSendRequest) {
+  await demo.send(request)
+  attachments.value = []
+}
+function attach(files: File[]) {
+  attachments.value.push(...files.map(file => ({ fileName: file.name, contentType: file.type, size: file.size, kind: 'FILE' })))
+}
 
 function openRename(session: YdAgentSession) {
   renameId.value = session.id
@@ -88,8 +114,12 @@ const prompts: YdPromptItem[] = [
       :changes="demo.current.value.changes"
       :approvals="demo.current.value.approvals"
       :suggestions="suggestions"
+      :attachments="attachments"
+      attachments-enabled
       demo
-      @send="demo.send"
+      @send="send"
+      @attach="attach"
+      @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
       @stop="demo.stop"
       @session-create="demo.createSession"
       @session-rename="openRename"
@@ -104,6 +134,9 @@ const prompts: YdPromptItem[] = [
       @tool-retry="demo.toolRetry"
     >
       <template #header-actions>
+        <YdButton variant="ghost" size="sm" @click="protocolOpen = true">
+          持久会话接入
+        </YdButton>
         <YdCheckbox v-model="demo.failCheck.value" class="failure-toggle" :disabled="mode !== 'code'" title="影响下一轮代码模式的本地演示">
           模拟验证失败
         </YdCheckbox>
@@ -129,6 +162,9 @@ const prompts: YdPromptItem[] = [
 
     <YdModal v-model="renameOpen" title="重命名会话" description="名称仅保存在当前页面的本地演示状态。" show-cancel-button :confirm-button-disabled="!renameTitle.trim()" @confirm="saveRename">
       <YdInput v-model="renameTitle" aria-label="会话名称" placeholder="输入会话名称" :maxlength="60" @keydown.enter.prevent="renameTitle.trim() && (saveRename(), renameOpen = false)" />
+    </YdModal>
+    <YdModal v-model="protocolOpen" title="持久会话与宿主插槽" description="接入契约示例；此预览没有连接 CMS 后端或执行工具。" confirm-button-text="关闭" class="source-modal">
+      <YdCode :code="persistentContract" language="typescript" :line-numbers="false" />
     </YdModal>
     <YdModal v-model="sourceOpen" :title="sourceFile?.path || '上下文文件'" description="本地示例片段，不会读取宿主文件。" confirm-button-text="关闭" class="source-modal">
       <YdCode :code="sourceText" :language="sourceFile?.path.endsWith('.vue') ? 'xml' : sourceFile?.path.endsWith('.css') ? 'css' : 'markdown'" line-numbers />

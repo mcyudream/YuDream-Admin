@@ -71,6 +71,7 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 - 插件主题可按 `@PluginTheme` 唯一 scope 在其声明的 `style.css` 中声明 `--primary-N`：SITE 需 SITE 锚点，ADMIN 仅 `:root`/`.dark`；消费仍禁止，未证明隔离的双 scope 资产 fail-closed，详见同步规范。
 - 权限管理使用 `apps/core-arco-design-vue/src/utils/permission-catalog.ts` 的集中分类，按业务域 → 稳定资源码 → 动作分类 → 权限展示，列表/权限树/矩阵/溯源不得各自维护动作词表。整理分组保留历史权限码与搜索隐藏、暂失效插件授权，`assign-*` 覆盖完整规范动作家族；细则见 `../docs/system/permission-management.md`。
 - Agent 页面复用 `YdAgentWorkbench` / `YdAgentAnswer` 的受控状态与 version 1 渲染协议；引用原文、工具卡片、运行轨迹与真实推理分开呈现。协议先校验，Markdown HTML 局部清理，外链仅 HTTP(S)，工作区/审批/Skills/MCP 的执行与授权仍由宿主 Harness 负责。参见 `../docs/yd-agent-workbench.md`。
+- 生产 AI 不使用阻塞结果或整段回放模拟流式。统一根级会话 store 与后端运行快照/cursor；关闭窗口或切页只解除观察，取消走显式 API。工作台按后端能力配置 availableModes，上传附件通过 attachments 受控回显。全局助手仅登录且具权限可用，路由/页面感知和导航/高亮分别可关闭，不抓 DOM/表单/query/token，不允许任意脚本/选择器或自动点击。
 - 后台预制外观由宿主 `settings.appearance` 管理（灵动/雅致/紧凑），统一消费 `--yd-*` 表面与动效变量。默认值只在共享 `@yudream/components/appearance.css` 的 `yudream-base` 层根节点声明，宿主 `admin-appearance.css` 仅导入；允许 ADMIN 主题插件覆盖，禁止内联写入这些变量或在子布局重新定义默认值。三套外观均保留已启用的功能动画；灵动完整，雅致与紧凑的减少动态效果设置仅柔化动作、速度与装饰密度，禁止统一冻结动画。详见 `../docs/frontend-appearance.md` 与 `../docs/yd-components.md`。
 - 用户已授权的组件封装与修复在工作范围内执行；保持 Fa/YD 契约兼容，禁止顺手改动无关组件或破坏行为。
 - 移动端断点统一 768px。`YdPageMain` 手机端已全出血，页面不重复加外边距；后台列表用 `YdResponsiveTable` + `#card`，不使用裸 `YdTable` 承载需要双端管理的列表，不另造分页/选中状态。

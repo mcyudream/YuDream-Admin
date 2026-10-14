@@ -9,6 +9,7 @@ export interface CmsChatHistoryMessage {
 }
 
 export interface CmsPageGeneratePayload {
+  contextKey?: string
   target?: 'page' | 'home' | 'header' | 'footer'
   agentCode?: string
   title?: string
@@ -66,9 +67,6 @@ export default {
   /** CMS/AI 场景的可用模型清单（provider-first，platform:ai:generate 权限） */
   availableModels: () => {
     return systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/ai/models/available')
-  },
-  generateCmsPage: (data: CmsPageGeneratePayload) => {
-    return systemClient.post<unknown, ApiResponse<CmsPageGenerateResult>>('api/platform/ai/cms/pages/generate', data)
   },
   generateCmsPageStreamEndpoint: () => {
     return streamEndpoint('/api/platform/ai/cms/pages/generate/stream')

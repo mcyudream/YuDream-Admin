@@ -483,6 +483,56 @@
   background: oklch(var(--primary) / 10%);
 }
 
+.yd-tree--checkable .arco-tree-node-disabled-selectable:not(.arco-tree-node-disabled) .arco-tree-node-title {
+  color: oklch(var(--foreground));
+  cursor: pointer;
+}
+
+.yd-tree--checkable .arco-tree-node-title-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.yd-tree--checkable .yd-tree-check-title {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--yd-control-height);
+  margin: -0.35rem -0.65rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--yd-control-radius);
+  cursor: pointer;
+  transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast);
+}
+
+.yd-tree--checkable .yd-tree-check-title[data-state='checked'] {
+  color: var(--yd-emphasis);
+  font-weight: 600;
+  background: oklch(var(--primary) / 10%);
+}
+
+.yd-tree--checkable .yd-tree-check-title[data-state='indeterminate'] {
+  background: oklch(var(--accent));
+}
+
+.yd-tree--checkable .arco-checkbox-icon {
+  width: 18px;
+  height: 18px;
+  border-color: oklch(var(--muted-foreground) / 65%);
+}
+
+.yd-tree--checkable .arco-checkbox-icon-check {
+  width: 10px;
+}
+
+.yd-tree--checkable .arco-tree-node-disabled .yd-tree-check-title {
+  color: oklch(var(--muted-foreground));
+  cursor: not-allowed;
+  background: transparent;
+}
+
 .yd-tree .arco-checkbox-checked:hover .arco-checkbox-icon,
 .yd-tree .arco-checkbox-indeterminate:hover .arco-checkbox-icon {
   background: oklch(var(--primary));

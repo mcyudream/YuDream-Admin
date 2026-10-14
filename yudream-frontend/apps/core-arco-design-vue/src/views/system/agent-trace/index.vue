@@ -316,7 +316,7 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
       </div>
 
       <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-
+        
         row-key="traceId"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1500px]"

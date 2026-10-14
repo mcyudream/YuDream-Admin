@@ -114,11 +114,11 @@ const permissionSelectOptions = computed(() => Object.entries(permissionGroups.v
     value: item.code,
   })),
 })))
+
 const permissionMultiSelectOptions = computed(() => permissionSelectOptions.value.flatMap(group => group.options.map(option => ({
   label: `${group.label} · ${option.label}`,
   value: option.value,
 }))))
-
 
 const permissionNameMap = computed(() => new Map(availablePermissions.value.map(item => [item.code, item.name])))
 

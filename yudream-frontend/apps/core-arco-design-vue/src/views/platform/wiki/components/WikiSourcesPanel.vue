@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { WikiSource } from '@/api/modules/platform-wiki'
-import { useYdFilePicker } from '@yudream/components'
+import type { YdFilePickerInstance } from '@yudream/components'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
   captionWikiSourceImages,
@@ -13,6 +13,8 @@ import {
   uploadWikiSource,
 } from '@/api/modules/platform-wiki'
 import CmsMarkdownEditor from '../../theme-center/components/CmsMarkdownEditor.vue'
+import AiRunProgress from '@/components/AiRunProgress/index.vue'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { extractionStatusLabel, ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
@@ -20,6 +22,9 @@ const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
 const modal = useYdModal()
 const imagePreview = useYdImagePreview()
+const aiRuntime = useAiAssistantStore()
+const captionRunId = ref('')
+const captionProgressOpen = ref(false)
 
 const sources = ref<WikiSource[]>([])
 const loading = ref(false)
@@ -27,7 +32,7 @@ const folderPath = ref('/')
 const urlsText = ref('')
 const importing = ref(false)
 const uploading = ref(false)
-const filePicker = useYdFilePicker()
+const fileInput = ref<YdFilePickerInstance | null>(null)
 const expandedSource = ref('')
 
 const sortedSources = computed(() => [...sources.value].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)))
@@ -57,11 +62,12 @@ async function load() {
 }
 
 function pickFile() {
-  void filePicker.open().then(onFileChange)
+  fileInput.value?.open()
 }
 
 async function onFileChange(files: File[]) {
   const file = files[0]
+  fileInput.value?.reset()
   if (!file || !store.spaceId.value) {
     return
   }
@@ -112,10 +118,16 @@ async function caption(source: WikiSource) {
     toast.warning('该资料没有图片')
     return
   }
-  await captionWikiSourceImages(source.id)
-  toast.success('图片描述已重新生成')
-  await load()
+  const response = await captionWikiSourceImages(source.id)
+  aiRuntime.attachRun(response.data)
+  captionRunId.value = response.data.id
+  captionProgressOpen.value = true
+  toast.success('图片描述任务已启动，关闭面板后继续执行')
 }
+
+watch(() => aiRuntime.runs[captionRunId.value]?.status, (status) => {
+  if (status === 'COMPLETED') void load()
+})
 
 async function ingest(source: WikiSource) {
   if (!store.spaceId.value) {
@@ -203,7 +215,7 @@ watch(() => store.spaceId.value, load)
                 <YdButton variant="outline" :loading="uploading" @click="pickFile">
                   <YdIcon name="morph:upload" /> 选择文件上传
                 </YdButton>
-
+                <YdFilePicker ref="fileInput" label="选择资料文件" @select="onFileChange"><template #default /></YdFilePicker>
               </div>
             </div>
             <div class="src-field">
@@ -258,26 +270,30 @@ watch(() => store.spaceId.value, load)
             </p>
 
             <div v-if="(source.images || []).length" class="src-card__images">
-              <YdAction
+              <YdButton
                 v-for="(img, index) in source.images.slice(0, expandedSource === source.id ? source.images.length : 6)"
                 :key="img.fileObjectId"
+                variant="ghost"
                 type="button"
                 class="src-thumb"
                 :title="img.caption || `第 ${img.pageNumber} 页图片`"
+                :aria-label="img.caption || `预览第 ${img.pageNumber} 页图片`"
                 @click="previewImage(source, index)"
               >
                 <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
                 <span v-else class="src-thumb__placeholder"><YdIcon name="morph:image" /></span>
                 <span v-if="img.caption" class="src-thumb__caption">{{ img.caption }}</span>
-              </YdAction>
-              <YdAction
+              </YdButton>
+              <YdButton
                 v-if="source.images.length > 6"
+                variant="ghost"
                 type="button"
                 class="src-thumb src-thumb--more"
+                :aria-expanded="expandedSource === source.id"
                 @click="expandedSource = expandedSource === source.id ? '' : source.id"
               >
                 {{ expandedSource === source.id ? '收起' : `+${source.images.length - 6}` }}
-              </YdAction>
+              </YdButton>
             </div>
 
             <div class="src-card__footer">
@@ -327,6 +343,9 @@ watch(() => store.spaceId.value, load)
         </p>
       </div>
     </YdModal>
+    <YdDrawer v-model="captionProgressOpen" title="图片描述的实际 AI 进度" :footer="false" content-class="w-[760px] max-w-full">
+      <AiRunProgress v-if="captionRunId" :run-id="captionRunId" />
+    </YdDrawer>
   </div>
 </template>
 
@@ -398,7 +417,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-empty :deep(svg) {
-  color: rgb(var(--color-text-2));
+  color: var(--color-text-3);
   font-size: 36px;
 }
 
@@ -433,7 +452,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-card__kind-icon {
-  color: rgb(var(--color-text-2));
+  color: var(--color-text-3);
   font-size: 17px;
 }
 
@@ -467,8 +486,8 @@ watch(() => store.spaceId.value, load)
   margin: 10px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--color-text-2)12;
-  color: var(--color-text-2);
+  background: #ef444412;
+  color: #dc2626;
   font-size: 12px;
 }
 
@@ -512,7 +531,7 @@ watch(() => store.spaceId.value, load)
   overflow: hidden;
   padding: 2px 5px;
   background: rgb(0 0 0 / 55%);
-  color: var(--color-bg-1);
+  color: #fff;
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -558,7 +577,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-danger {
-  color: var(--color-text-2);
+  color: #dc2626;
 }
 
 .src-pagination {

@@ -1,0 +1,30 @@
+name: UI Conformance
+
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/components/**'
+      - 'packages/plugin-sdk/**'
+      - 'eslint-rules/**'
+      - 'scripts/audit-ui.mjs'
+      - 'eslint.config.js'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  workflow_dispatch:
+
+jobs:
+  yd-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:eslint-rules
+      - run: pnpm audit:ui -- --baseline=eslint-rules/yd-only-baseline.json

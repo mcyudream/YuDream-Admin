@@ -14,10 +14,10 @@ let paletteAction: YdDomActionInstance | undefined
 let soundAction: YdDomActionInstance | undefined
 let favoriteAction: YdDomActionInstance | undefined
 const palette = [
-  { id: 'green', color: '#3c8527' },
-  { id: 'red', color: '#b02e26' },
-  { id: 'blue', color: '#3c44aa' },
-  { id: 'gold', color: '#c8a03a' },
+  { id: 'strong', color: 'color-mix(in oklab, oklch(var(--primary)) 82%, oklch(var(--background)))' },
+  { id: 'soft', color: 'color-mix(in oklab, oklch(var(--primary)) 62%, oklch(var(--background)))' },
+  { id: 'muted', color: 'color-mix(in oklab, oklch(var(--primary)) 42%, oklch(var(--background)))' },
+  { id: 'quiet', color: 'color-mix(in oklab, oklch(var(--primary)) 24%, oklch(var(--background)))' },
 ]
 
 function recordAction(label: string, event: MouseEvent) {
@@ -96,34 +96,45 @@ onBeforeUnmount(() => {
 <template>
   <DemoCard title="非 Vue DOM 动作" description="在外部引擎/主题运行时节点中由 YD 负责真实 button、无障碍属性、点击事件与 Vue 生命周期。图形插槽仅承载非交互内容。">
     <div class="yd-dom-action-demo-grid">
-      <div>
-        <p>主题强调色</p>
+      <div class="yd-dom-action-demo-item">
+        <div class="action-label"><strong>主题强调色</strong><span>外部节点挂载</span></div>
         <div ref="paletteHost" />
       </div>
-      <div>
-        <p>音效开关</p>
+      <div class="yd-dom-action-demo-item">
+        <div class="action-label"><strong>音效开关</strong><span>{{ soundEnabled ? '已开启' : '已静音' }}</span></div>
         <div ref="soundHost" />
       </div>
-      <div>
-        <p>收藏状态</p>
+      <div class="yd-dom-action-demo-item">
+        <div class="action-label"><strong>收藏状态</strong><span>{{ favorite ? '已收藏' : '未收藏' }}</span></div>
         <div ref="favoriteHost" />
       </div>
     </div>
-    <p class="yd-dom-action-demo__status" role="status">
-      {{ lastAction }}
-    </p>
+    <div class="yd-dom-action-demo-status" role="status" aria-live="polite">
+      <div>
+        <span class="status-label">最近动作</span>
+        <strong>{{ lastAction }}</strong>
+      </div>
+      <p>动作由 YD 生成真实 button，并在组件卸载时自动销毁。</p>
+    </div>
   </DemoCard>
 </template>
 
 <style>
-.yd-dom-action-demo-grid { display: flex; flex-wrap: wrap; gap: 20px; }
-.yd-dom-action-demo-grid > div { display: flex; align-items: center; gap: 10px; }
-.yd-dom-action-demo-grid p, .yd-dom-action-demo__status { color: var(--color-text-2); font-size: 13px; }
+.yd-dom-action-demo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--yd-content-gap); }
+.yd-dom-action-demo-item { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; background: var(--color-fill-1); border: 1px solid var(--color-border-2); border-radius: var(--yd-control-radius); }
+.action-label { display: grid; gap: 4px; min-width: 0; }
+.action-label strong { font-size: 13px; color: var(--color-text-1); }
+.action-label span { color: var(--color-text-3); font-size: 11px; }
 .yd-dom-action-demo { display: inline-flex; min-width: 38px; min-height: 38px; align-items: center; justify-content: center; border: 1px solid var(--color-border-2); border-radius: var(--yd-control-radius); background: var(--color-bg-2); color: var(--color-text-1); cursor: pointer; }
 .yd-dom-action-demo:disabled { cursor: not-allowed; opacity: 0.55; }
 .yd-dom-action-demo--sound, .yd-dom-action-demo--favorite { font-size: 18px; }
 .yd-dom-action-demo--sound[aria-pressed="false"], .yd-dom-action-demo--favorite[aria-pressed="true"] { border-color: var(--color-border-3); background: var(--color-fill-2); }
 .yd-dom-action-demo__swatches { display: inline-flex; gap: 3px; }
 .yd-dom-action-demo__swatch { width: 7px; height: 13px; border-radius: 2px; }
-.yd-dom-action-demo__status { margin-top: 12px; }
+.yd-dom-action-demo-status { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding: 12px 14px; margin-top: var(--yd-content-gap); background: var(--color-bg-2); border: 1px solid var(--color-border-2); border-radius: var(--yd-control-radius); }
+.yd-dom-action-demo-status > div { display: grid; gap: 3px; }
+.status-label { color: var(--color-text-3); font-size: 11px; }
+.yd-dom-action-demo-status strong { color: var(--color-text-1); font-size: 13px; }
+.yd-dom-action-demo-status p { margin: 0; color: var(--color-text-3); font-size: 12px; }
+@media (width <= 760px) { .yd-dom-action-demo-grid { grid-template-columns: 1fr; } }
 </style>

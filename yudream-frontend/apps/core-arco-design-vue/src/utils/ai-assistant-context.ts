@@ -1,0 +1,106 @@
+import type { AiFrontendContext, AiFrontendRoute, AiFrontendToolRequest } from '@/api/modules/platform-ai-runs'
+
+export interface AiAssistantPreferences {
+  routeAwareness: boolean
+  pageAwareness: boolean
+  navigationTools: boolean
+  highlightTools: boolean
+  shortcut: 'mod-shift-y' | 'alt-shift-a' | 'disabled'
+}
+
+export const defaultAiAssistantPreferences: AiAssistantPreferences = {
+  routeAwareness: false,
+  pageAwareness: false,
+  navigationTools: false,
+  highlightTools: false,
+  shortcut: 'mod-shift-y',
+}
+
+export function parseAiAssistantPreferences(value: unknown): AiAssistantPreferences {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    routeAwareness: raw.routeAwareness === true,
+    pageAwareness: raw.pageAwareness === true,
+    navigationTools: raw.navigationTools === true,
+    highlightTools: raw.highlightTools === true,
+    shortcut: raw.shortcut === 'alt-shift-a' || raw.shortcut === 'disabled' ? raw.shortcut : 'mod-shift-y',
+  }
+}
+
+/** Catalog contains only static, permission-filtered menu pages. URL queries/IDs never become model context. */
+export function isSafeAiRoute(route: AiFrontendRoute): boolean {
+  return !!route.name && route.name.length <= 180 && !!route.title && route.title.length <= 100
+    && /^\/(?!\/)[^:?#\\*]*$/.test(route.path)
+    && !['/login', '/setup', '/oauth/authorize', '/verify-email'].includes(route.path)
+}
+
+/** Includes the host-added plugin namespace, which is longer than a plugin's local action code. */
+export function isSafeAiActionCode(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-z][a-z0-9:._-]{1,179}$/.test(value)
+}
+
+export function parseAiFrontendToolRequest(value: unknown): AiFrontendToolRequest | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  const raw = value as Record<string, unknown>
+  if (typeof raw.toolCallId !== 'string' || !raw.toolCallId || raw.toolCallId.length > 200) {
+    return undefined
+  }
+  if (raw.name !== 'ui.navigate' && raw.name !== 'ui.highlight') {
+    return undefined
+  }
+  if (!raw.arguments || typeof raw.arguments !== 'object' || Array.isArray(raw.arguments)) {
+    return undefined
+  }
+  const args = raw.arguments as Record<string, unknown>
+  // Reject arbitrary selectors, scripts, URL params and additional action payloads.
+  if (Object.keys(args).some(key => key !== 'routeName' && key !== 'actionCode')) {
+    return undefined
+  }
+  const routeName = typeof args.routeName === 'string' ? args.routeName : undefined
+  const actionCode = typeof args.actionCode === 'string' ? args.actionCode : undefined
+  if (raw.name === 'ui.navigate' && (!routeName || routeName.length > 180)) {
+    return undefined
+  }
+  if (raw.name === 'ui.highlight' && !isSafeAiActionCode(actionCode)) {
+    return undefined
+  }
+  return {
+    toolCallId: raw.toolCallId,
+    name: raw.name,
+    arguments: { ...(routeName ? { routeName } : {}), ...(actionCode ? { actionCode } : {}) },
+    expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : typeof raw.expiresAt === 'string' && Number.isFinite(Date.parse(raw.expiresAt)) ? Date.parse(raw.expiresAt) : undefined,
+  }
+}
+
+export function frontendContextForPreferences(context: AiFrontendContext, preferences: AiAssistantPreferences): AiFrontendContext | undefined {
+  const result: AiFrontendContext = {}
+  if (preferences.routeAwareness && context.route?.name && context.route.name.length <= 180 && context.route.title && context.route.title.length <= 100) {
+    result.route = context.route
+  }
+  if (preferences.navigationTools) {
+    result.routes = context.routes?.filter(isSafeAiRoute) ?? []
+  }
+  if (preferences.pageAwareness || preferences.highlightTools) {
+    result.actions = context.actions ?? []
+  }
+  return Object.keys(result).length ? {
+    ...result,
+    navigationToolsEnabled: preferences.navigationTools,
+    highlightToolsEnabled: preferences.highlightTools,
+  } : undefined
+}
+
+export function matchesAiAssistantShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey' | 'isComposing' | 'repeat'>, shortcut: AiAssistantPreferences['shortcut']): boolean {
+  if (event.isComposing || event.repeat || !event.shiftKey) {
+    return false
+  }
+  if (shortcut === 'mod-shift-y') {
+    return event.key.toLowerCase() === 'y' && (event.ctrlKey || event.metaKey) && !event.altKey
+  }
+  if (shortcut === 'alt-shift-a') {
+    return event.key.toLowerCase() === 'a' && event.altKey && !event.ctrlKey && !event.metaKey
+  }
+  return false
+}

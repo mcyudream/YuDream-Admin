@@ -399,6 +399,10 @@ function displayValue(value?: string | number | boolean | null) {
   return value ?? '-'
 }
 
+function menuForTreeNode(node?: YdTreeNode) {
+  return node ? findMenu(rows.value, node.key) : undefined
+}
+
 function menuIcon(menu?: MenuManageItem) {
   return menu?.icon || treeIcon(menu?.type || 'CATEGORY')
 }
@@ -462,10 +466,6 @@ function importMenus() {
     await loadTree()
   })
 }
-function menuForTreeNode(node?: YdTreeNode) {
-  return node ? findMenu(rows.value, node.key) : undefined
-}
-
 </script>
 
 <template>
@@ -685,7 +685,7 @@ function menuForTreeNode(node?: YdTreeNode) {
           </div>
 
           <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-
+            
             row-key="code"
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[720px]"
@@ -782,7 +782,7 @@ function menuForTreeNode(node?: YdTreeNode) {
 
     <YdModal v-model="formVisible" :title="editing ? '编辑菜单' : '新增菜单'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="grid grid-cols-2 gap-x-4">
           <div>
             <YdFormItem label="菜单编码" required>
               <YdInput

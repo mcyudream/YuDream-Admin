@@ -641,6 +641,7 @@ function aiSessionMeta() {
 }
 
 function onAiSessionChange(session: YdAgentChatSession | null) {
+  if (pendingAskResolver && aiChatPanelRef.value?.streaming) return
   if (pendingAskResolver) {
     pendingAskResolver({ ok: false, error: '会话已切换，已取消等待中的澄清问题' })
     pendingAskResolver = null
@@ -1445,6 +1446,7 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
   }
   return {
     target: props.historyTargetType,
+    contextKey: `${chatHistoryTargetType.value}:${chatHistoryTargetId.value}`,
     title: props.title || '',
     siteName: appSettingsStore.siteName || '',
     prompt: prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
@@ -1849,7 +1851,7 @@ function getLatestAssistantMessage(): YdChatMessage | null {
   return [...messages].reverse().find(item => item.role === 'assistant') || null
 }
 
-function chooseAskOption(title: string) {
+async function chooseAskOption(title: string) {
   const message = getLatestAssistantMessage()
   if (message?.context?.askUser && typeof message.context.askUser === 'object') {
     message.context = {
@@ -1866,7 +1868,10 @@ function chooseAskOption(title: string) {
     resolver({ ok: true, result: { selectedOption: title, message: `用户选择了：${title}` } })
     return
   }
-  // 恢复历史会话后原 WebSocket 已不存在，点击旧问题时退化为普通追问。
+  if (await aiChatPanelRef.value?.respondToPendingAsk(title)) {
+    return
+  }
+  // 已完成的历史问题可作为新的追问；持久等待交互始终核销原始 requestId。
   void sendAiPrompt(title)
 }
 

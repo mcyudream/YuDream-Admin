@@ -263,12 +263,7 @@ function handleAnimationEnd() {
                 success: 'morph:circle-check',
                 warning: 'morph:triangle-alert',
                 error: 'morph:circle-x',
-              }[props.icon]" class="size-6" :class="{
-                'text-blue-600 dark:text-blue-400': props.icon === 'info',
-                'text-green-600 dark:text-green-400': props.icon === 'success',
-                'text-yellow-600 dark:text-yellow-400': props.icon === 'warning',
-                'text-red-600 dark:text-red-400': props.icon === 'error',
-              }"
+              }[props.icon]" class="size-6" :class="props.icon ? `yd-modal-icon--${props.icon}` : undefined"
             />
             {{ typeof title === 'function' ? title() : title }}
           </DialogTitle>

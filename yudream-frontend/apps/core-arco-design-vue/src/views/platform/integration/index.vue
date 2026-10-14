@@ -469,8 +469,8 @@ function executionVariant(status: ExecutionStatus) {
       </div>
 
       <YdLoadingOverlay v-if="activeTab === 'connectors'" :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -565,8 +565,8 @@ function executionVariant(status: ExecutionStatus) {
       </YdResponsiveTable></YdLoadingOverlay>
 
       <YdLoadingOverlay v-else-if="activeTab === 'httpLogs'" :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1320px]"
@@ -641,8 +641,8 @@ function executionVariant(status: ExecutionStatus) {
       </YdResponsiveTable></YdLoadingOverlay>
 
       <YdLoadingOverlay v-else-if="activeTab === 'scripts'" :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1080px]"
@@ -736,8 +736,8 @@ function executionVariant(status: ExecutionStatus) {
       </YdResponsiveTable></YdLoadingOverlay>
 
       <YdLoadingOverlay v-else :loading="loading"><YdResponsiveTable
-
-
+        
+        
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"

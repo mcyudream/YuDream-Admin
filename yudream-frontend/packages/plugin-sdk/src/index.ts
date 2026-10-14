@@ -1,5 +1,8 @@
 import type { Component } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import type { YuDreamAiPageAction, YuDreamPluginAiRunsClient } from './ai-runs'
+
+export type { YuDreamAiPageAction, YuDreamAiRunEvent, YuDreamAiRunSnapshot, YuDreamPluginAiRunsClient } from './ai-runs'
 
 export interface YuDreamPluginHttpClient {
   request: <T = unknown>(path: string, options?: { method?: string, data?: unknown }) => Promise<T>
@@ -42,6 +45,11 @@ export interface YuDreamPluginThumbOptions {
   maxEdge?: number
 }
 
+const imageSlotState = {
+  inflight: 0,
+  waiters: [] as Array<() => void>,
+}
+
 /** Firefox 每域名约 6 条并发连接；列表封面必须排队，避免占满后把 API 请求挤掉。 */
 export function acquireImageSlot(maxInflight = 2): Promise<() => void> {
   const limit = Math.max(1, maxInflight)
@@ -65,11 +73,6 @@ export function acquireImageSlot(maxInflight = 2): Promise<() => void> {
     }
     grant()
   })
-}
-
-const imageSlotState = {
-  inflight: 0,
-  waiters: [] as Array<() => void>,
 }
 
 export interface YuDreamPluginAssetsClient {
@@ -149,6 +152,10 @@ export interface YuDreamPluginAiProviderOption {
 export interface YuDreamPluginAiClient {
   agents: () => Promise<YuDreamPluginAiAgentOption[]>
   providers: () => Promise<YuDreamPluginAiProviderOption[]>
+  /** SDK 1.11 起提供；仅可读当前本站账号所属运行，系统后台任务有独立管理边界。 */
+  runs: YuDreamPluginAiRunsClient
+  /** 只登记真实元素以便聚焦/高亮，不提供选择器、脚本、点击或权限授权。 */
+  registerAction: (action: YuDreamAiPageAction, element: HTMLElement) => () => void
 }
 
 export interface YuDreamPluginBackupTargetOption {
