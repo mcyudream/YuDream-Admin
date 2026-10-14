@@ -82,6 +82,10 @@ onMounted(async () => {
   if (!nodes.value.length) {
     seedWorkflow()
   }
+  await nextTick()
+  if (nodes.value.length) {
+    fitCanvas()
+  }
 })
 
 onBeforeUnmount(() => {

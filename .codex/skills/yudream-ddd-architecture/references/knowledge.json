@@ -334,7 +334,7 @@
     },
     {
       "key": "yd-ui-only-design-contract",
-      "text": "宿主与插件Vue Web业务只用公开Yd/useYd，Fa/Reka/Arco等仅组件内部与明确provider装配；缺少能力先封装再同步导出/resolver/SDK/预览/文档/严格审查。视觉与动效、流程/树/选择弹层选型以docs/yd-ui-guidelines.md为权威，AGENTS与插件规则副本在同一工作项实时维护，发布验签后才能同步下游，禁止行级disable和未发布版本掩盖缺口。 主题资产豁免须核对插件元数据、单一scope及声明style.css：SITE只在SITE锚点、ADMIN只在:root/.dark声明变量；消费和未隔离的双scope资产不豁免。严格门禁使用完整SFC/TS/JSX语法树、真实公开入口及逐文件逐规则历史基线，禁止工作区基线掩盖新增。"
+      "text": "宿主与插件Vue Web业务只用公开Yd/useYd，Fa/Reka/Arco等仅组件内部与明确provider装配；缺少能力先封装再同步导出/resolver/SDK/预览/文档/严格审查。视觉与动效、流程/树/选择弹层选型以docs/yd-ui-guidelines.md为权威，AGENTS与插件规则副本在同一工作项实时维护，发布验签后才能同步下游，禁止行级disable和未发布版本掩盖缺口。 主题资产豁免须核对插件元数据、单一scope及声明style.css：SITE只在SITE锚点、ADMIN只在:root/.dark声明变量；消费和未隔离的双scope资产不豁免。严格门禁使用完整SFC/TS/JSX语法树、真实公开入口及逐文件逐规则历史基线，禁止工作区基线掩盖新增。 历史违规清零后保留 findings={} 与验收提交 SHA，CI 按零违规阻断；只能从明确已提交版本生成基线，不能从工作区或扩大历史例外。"
     }
   ],
   "utilities": [

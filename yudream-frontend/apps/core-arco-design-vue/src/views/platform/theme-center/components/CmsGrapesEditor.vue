@@ -821,6 +821,9 @@ async function onBuilderReady(facade: YdPageBuilderEditorFacade) {
     }
   })
   await loadMedia()
+  if (editor !== instance) {
+    return
+  }
   aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], aiModelValue.value)
   registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
