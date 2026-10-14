@@ -379,6 +379,11 @@ async function executeFrontendTool(request: AiFrontendToolRequest): Promise<Reco
   z-index: 1500;
 }
 
+/* 全屏接管页（放映大屏等）让位 */
+html[data-fullscreen-stage="true"] .yd-global-ai-trigger {
+  display: none;
+}
+
 .yd-global-ai-modal {
   width: min(1240px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);

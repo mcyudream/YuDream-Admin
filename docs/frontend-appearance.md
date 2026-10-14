@@ -56,6 +56,7 @@ ADMIN 插件仍通过插件管理启停，停用后恢复已选内置预设；SI
 - 页面使用 Vue Transition；工作台卡片使用 CSS 入场，最多八个错峰节奏步。流光、粒子、跑马灯等装饰动效由共享 YD 组件显式提供，消费主题变量与同一减少动效政策，不给所有业务页面自动添加循环动画或额外动画库。
 - GridStack 的拖拽定位由其自身管理，只对内部卡片做入场动画；编辑模式取消入场，动画终态不保留 transform。按钮手柄内的图标须 `pointer-events: none`，避免拖动图标时被 GridStack 的交互元素过滤忽略。
 - 悬停反馈仅在支持精确指针与 hover 的设备启用；普通信息卡不抬升，以免误示可点击。
+- 全屏接管页（放映大屏、演示模式等）在 `html` 上置 `data-fullscreen-stage="true"`，离开时移除；全局悬浮件（AI 助手、宠物挂件、主题开关等）以该属性让位隐藏，页面自身内容不受影响。
 - 新页面可显式给合适的操作入口添加 `yd-interactive`，不全局扫描 DOM 或给所有按钮/表格强加动画。
 
 交互节奏参考 [scaffold-master 的动效实现](https://github.com/wbr664393425-lgtm/scaffold-master/blob/577079e9a347555fadddd3865fc0bbcdb00d9fb4/scaffold-vue/src/composables/motion.ts)，使用现有 Vue/CSS 能力独立实现。
