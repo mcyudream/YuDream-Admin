@@ -47,6 +47,7 @@ import online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -81,8 +82,9 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
     private AiUsageQuotaGateway usageQuotaGateway;
 
+    // 额度网关在运行期才调用；@Lazy 代理避免经 ChatQuotaAppService→CapabilityAppService→providers 形成构造期循环。
     @Autowired(required = false)
-    void setUsageQuotaGateway(AiUsageQuotaGateway usageQuotaGateway) {
+    void setUsageQuotaGateway(@Lazy AiUsageQuotaGateway usageQuotaGateway) {
         this.usageQuotaGateway = usageQuotaGateway;
     }
 
