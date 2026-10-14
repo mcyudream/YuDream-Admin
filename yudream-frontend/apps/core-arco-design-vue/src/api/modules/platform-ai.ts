@@ -1,5 +1,5 @@
-import type { ApiResponse } from './system-client'
 import type { AgentApplication, AgentModelOption } from './platform-agent'
+import type { ApiResponse } from './system-client'
 import { prepareApiEncryption } from '@/utils/api-encryption'
 import systemClient from './system-client'
 

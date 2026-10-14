@@ -120,8 +120,8 @@ const week = computed(() => {
 
 .dashboard-profile__week .is-today {
   color: var(--yd-dashboard-feature-text);
-  background: color-mix(in srgb, rgb(var(--primary-6)) 52%, transparent);
-  box-shadow: 0 4px 14px color-mix(in srgb, rgb(var(--primary-6)) 36%, transparent);
+  background: color-mix(in srgb, var(--yd-dashboard-feature-accent) 52%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--yd-dashboard-feature-accent) 36%, transparent);
 }
 
 .dashboard-profile__week i {

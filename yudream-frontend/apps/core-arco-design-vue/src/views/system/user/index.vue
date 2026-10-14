@@ -526,179 +526,180 @@ function importUsers() {
     </YdPageHeader>
 
     <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+      <YdLoadingOverlay :loading="loading">
+        <YdResponsiveTable
 
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1280px]"
-        column-visibility
-        border
-        stripe
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <YdInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
-              <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-              <YdSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
-              <YdSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
-              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-              <div class="flex gap-2 col-end--1 justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  重置
-                </YdButton>
-                <YdButton @click="loadUsers">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-identities="{ row }">
-          <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="flex flex-col gap-1 text-sm">
-            <div v-if="row.original.qq" class="flex gap-2">
-              <span class="shrink-0 text-secondary-foreground/60">QQ 号</span>
-              <span class="break-all">{{ row.original.qq }}</span>
-            </div>
-            <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
-              <span class="shrink-0 text-secondary-foreground/60">{{ protocolLabel(item.protocol) }}</span>
-              <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
-            </div>
-          </div>
-          <span v-else>-</span>
-        </template>
-        <template #cell-fields="{ row }">
-          <div v-if="personnelFields(row.original).length" class="flex flex-col gap-1 text-sm">
-            <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
-              <span class="shrink-0 text-secondary-foreground/60">{{ field.label }}</span>
-              <span class="break-all">{{ field.value }}</span>
-            </div>
-          </div>
-          <span v-else>-</span>
-        </template>
-        <template #cell-tags="{ row }">
-          <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
-            <YdTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
-              {{ tag.label }}
-            </YdTag>
-          </div>
-          <span v-else>-</span>
-        </template>
-        <template #cell-deptNames="{ row }">
-          <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
-            <YdTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
-              {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
-            </YdTag>
-          </div>
-          <span v-else>-</span>
-        </template>
-        <template #cell-roleNames="{ row }">
-          {{ row.original.roleNames?.join('、') || '-' }}
-        </template>
-        <template #cell-emailVerified="{ row }">
-          <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
-            {{ row.original.emailVerified ? '已验证' : '未验证' }}
-          </YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
-            {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </YdTag>
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="flex-center gap-2">
-            <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
-              编辑
-            </YdButton>
-            <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
-              改密
-            </YdButton>
-            <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
-              部门角色
-            </YdButton>
-            <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
-              伪装
-            </YdButton>
-            <YdButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
-              启用
-            </YdButton>
-            <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row.original)">
-              停用
-            </YdButton>
-          </div>
-        </template>
+          row-key="id"
+          table-root-class="rounded-lg overflow-hidden"
+          table-class="min-w-[1280px]"
 
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.username }}</span>
-                <div class="flex gap-1">
-                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
-                    {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </YdTag>
-                  <YdTag :variant="row.emailVerified ? 'default' : 'secondary'">
-                    {{ row.emailVerified ? '已验证' : '未验证' }}
-                  </YdTag>
+          column-visibility stripe border
+          :columns="tableColumns"
+          :data="rows"
+        >
+          <template #toolbar>
+            <YdSearchBar class="w-full">
+              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+                <YdInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
+                <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+                <YdSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
+                <YdSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
+                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+                <div class="flex gap-2 col-end--1 justify-end">
+                  <YdButton variant="outline" @click="resetSearch">
+                    重置
+                  </YdButton>
+                  <YdButton @click="loadUsers">
+                    <YdIcon name="morph:search" />
+                    筛选
+                  </YdButton>
                 </div>
               </div>
-              <div v-if="row.nickname" class="text-sm text-secondary-foreground/70">
-                {{ row.nickname }}
+            </YdSearchBar>
+          </template>
+          <template #cell-identities="{ row }">
+            <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1">
+              <div v-if="row.original.qq" class="flex gap-2">
+                <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
+                <span class="break-all">{{ row.original.qq }}</span>
               </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div v-if="row.email" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">邮箱</span>
-                  <span class="break-all">{{ row.email }}</span>
-                </div>
-                <div v-if="row.qq" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">QQ 号</span>
-                  <span>{{ row.qq }}</span>
-                </div>
-                <div v-for="(item, index) in row.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">协议</span>
-                  <span class="break-all">{{ identitySummary(item) }}</span>
-                </div>
-              </div>
-              <div v-if="row.tags?.length" class="flex flex-wrap gap-1">
-                <YdTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
-                  {{ tag.label }}
-                </YdTag>
-              </div>
-              <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
-                <YdTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
-                  {{ row.deptNames?.[index] || deptId }}{{ sameId(deptId, row.defaultDeptId) ? '（默认）' : '' }}
-                </YdTag>
-              </div>
-              <div v-if="row.roleNames?.length" class="text-sm text-secondary-foreground/80">
-                角色：{{ row.roleNames.join('、') }}
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
-                  编辑
-                </YdButton>
-                <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
-                  改密
-                </YdButton>
-                <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
-                  部门角色
-                </YdButton>
-                <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
-                  伪装
-                </YdButton>
-                <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
-                  启用
-                </YdButton>
-                <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
-                  停用
-                </YdButton>
+              <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+                <span class="text-secondary-foreground/60 shrink-0">{{ protocolLabel(item.protocol) }}</span>
+                <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
               </div>
             </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+            <span v-else>-</span>
+          </template>
+          <template #cell-fields="{ row }">
+            <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1">
+              <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
+                <span class="text-secondary-foreground/60 shrink-0">{{ field.label }}</span>
+                <span class="break-all">{{ field.value }}</span>
+              </div>
+            </div>
+            <span v-else>-</span>
+          </template>
+          <template #cell-tags="{ row }">
+            <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
+              <YdTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+                {{ tag.label }}
+              </YdTag>
+            </div>
+            <span v-else>-</span>
+          </template>
+          <template #cell-deptNames="{ row }">
+            <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
+              <YdTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
+                {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
+              </YdTag>
+            </div>
+            <span v-else>-</span>
+          </template>
+          <template #cell-roleNames="{ row }">
+            {{ row.original.roleNames?.join('、') || '-' }}
+          </template>
+          <template #cell-emailVerified="{ row }">
+            <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
+              {{ row.original.emailVerified ? '已验证' : '未验证' }}
+            </YdTag>
+          </template>
+          <template #cell-status="{ row }">
+            <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
+              {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
+            </YdTag>
+          </template>
+          <template #cell-operation="{ row }">
+            <div class="flex-center gap-2">
+              <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
+                编辑
+              </YdButton>
+              <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
+                改密
+              </YdButton>
+              <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
+                部门角色
+              </YdButton>
+              <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
+                伪装
+              </YdButton>
+              <YdButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
+                启用
+              </YdButton>
+              <YdButton v-else v-auth="'system:user:delete'" variant="outline" size="sm" class="text-destructive hover:text-destructive hover:bg-destructive/10" @click="confirmDisable(row.original)">
+                停用
+              </YdButton>
+            </div>
+          </template>
+
+          <template #card="{ row }">
+            <YdCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex gap-2 items-center justify-between">
+                  <span class="text-base font-semibold min-w-0 break-words">{{ row.username }}</span>
+                  <div class="flex gap-1">
+                    <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                      {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
+                    </YdTag>
+                    <YdTag :variant="row.emailVerified ? 'default' : 'secondary'">
+                      {{ row.emailVerified ? '已验证' : '未验证' }}
+                    </YdTag>
+                  </div>
+                </div>
+                <div v-if="row.nickname" class="text-sm text-secondary-foreground/70">
+                  {{ row.nickname }}
+                </div>
+                <div class="text-sm flex flex-col gap-1">
+                  <div v-if="row.email" class="flex gap-2">
+                    <span class="text-secondary-foreground/60 shrink-0">邮箱</span>
+                    <span class="break-all">{{ row.email }}</span>
+                  </div>
+                  <div v-if="row.qq" class="flex gap-2">
+                    <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
+                    <span>{{ row.qq }}</span>
+                  </div>
+                  <div v-for="(item, index) in row.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+                    <span class="text-secondary-foreground/60 shrink-0">协议</span>
+                    <span class="break-all">{{ identitySummary(item) }}</span>
+                  </div>
+                </div>
+                <div v-if="row.tags?.length" class="flex flex-wrap gap-1">
+                  <YdTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+                    {{ tag.label }}
+                  </YdTag>
+                </div>
+                <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
+                  <YdTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
+                    {{ row.deptNames?.[index] || deptId }}{{ sameId(deptId, row.defaultDeptId) ? '（默认）' : '' }}
+                  </YdTag>
+                </div>
+                <div v-if="row.roleNames?.length" class="text-sm text-secondary-foreground/80">
+                  角色：{{ row.roleNames.join('、') }}
+                </div>
+                <div class="pt-3 border-t flex flex-wrap gap-2">
+                  <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                    编辑
+                  </YdButton>
+                  <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
+                    改密
+                  </YdButton>
+                  <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
+                    部门角色
+                  </YdButton>
+                  <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
+                    伪装
+                  </YdButton>
+                  <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                    启用
+                  </YdButton>
+                  <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
+                    停用
+                  </YdButton>
+                </div>
+              </div>
+            </YdCard>
+          </template>
+        </YdResponsiveTable>
+      </YdLoadingOverlay>
 
       <YdPagination
         v-model:page="pagination.page"
@@ -712,7 +713,7 @@ function importUsers() {
 
     <YdModal v-model="formVisible" :title="editing ? '编辑用户' : '新增用户'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="gap-4 grid grid-cols-1 sm:grid-cols-2">
           <div>
             <YdFormItem label="用户名" required>
               <YdInput v-model="form.username" class="w-full" />
@@ -745,7 +746,7 @@ function importUsers() {
           </div>
           <div>
             <YdFormItem label="邮箱状态">
-              <div class="h-9 flex items-center gap-3">
+              <div class="flex gap-3 h-9 items-center">
                 <YdSwitch v-model="form.emailVerified" />
                 <span class="text-sm text-muted-foreground">{{ form.emailVerified ? '已验证' : '未验证' }}</span>
               </div>
@@ -759,9 +760,9 @@ function importUsers() {
           <YdSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
         </YdFormItem>
         <YdFormItem v-auth="'system:user:assign-role'" label="部门角色">
-          <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
-            <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
-              <div class="mb-2 flex items-center gap-2 text-sm font-medium">
+          <div v-if="selectedDeptRoleSections.length" class="w-full space-y-3">
+            <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="p-3 border rounded-md">
+              <div class="text-sm font-medium mb-2 flex gap-2 items-center">
                 <YdIcon name="morph:network" />
                 {{ section.deptName }}
               </div>
@@ -808,9 +809,9 @@ function importUsers() {
           <YdSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
         </YdFormItem>
         <YdFormItem v-auth="'system:user:assign-role'" label="部门角色">
-          <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
-            <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
-              <div class="mb-2 flex items-center gap-2 text-sm font-medium">
+          <div v-if="selectedDeptRoleSections.length" class="w-full space-y-3">
+            <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="p-3 border rounded-md">
+              <div class="text-sm font-medium mb-2 flex gap-2 items-center">
                 <YdIcon name="morph:network" />
                 {{ section.deptName }}
               </div>

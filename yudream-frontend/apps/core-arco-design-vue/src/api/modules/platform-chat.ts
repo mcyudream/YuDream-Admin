@@ -1,6 +1,6 @@
 import type { ApiResponse } from './system-client'
-import systemClient from './system-client'
 import { normalizeAiQuota, normalizeAiQuotaConfig, normalizeAiQuotaReservations, parseAiTokenCount } from '@/utils/ai-quota'
+import systemClient from './system-client'
 
 export type ChatScopeType = 'GENERAL' | 'AGENT' | 'WIKI' | 'CONSOLE'
 
@@ -143,7 +143,9 @@ export function reconcileChatQuota(data: Pick<ChatQuotaReservation, 'reservation
   const promptTokens = parseAiTokenCount(data.promptTokens, 'promptTokens')
   const completionTokens = parseAiTokenCount(data.completionTokens, 'completionTokens')
   const totalTokens = parseAiTokenCount(data.totalTokens, 'totalTokens')
-  if (!Number.isSafeInteger(promptTokens + completionTokens) || totalTokens !== promptTokens + completionTokens) throw new Error('核对总用量必须等于输入与输出 token 用量之和')
+  if (!Number.isSafeInteger(promptTokens + completionTokens) || totalTokens !== promptTokens + completionTokens) {
+    throw new Error('核对总用量必须等于输入与输出 token 用量之和')
+  }
   return systemClient.post<unknown, ApiResponse<void>>('api/platform/chat/quota/reconcile', { ...data, promptTokens, completionTokens, totalTokens })
 }
 
