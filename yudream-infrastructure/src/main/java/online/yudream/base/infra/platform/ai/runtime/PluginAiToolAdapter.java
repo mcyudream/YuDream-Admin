@@ -27,11 +27,18 @@ public class PluginAiToolAdapter extends ToolBase {
     private final PluginAiTool delegate;
     private final PluginAiToolDescriptor descriptor;
     private final online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context;
+    private final online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard guard;
 
     public PluginAiToolAdapter(
             PluginAiTool delegate,
             online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context
     ) {
+        this(delegate, context, online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard.ALLOW_ALL);
+    }
+
+    public PluginAiToolAdapter(PluginAiTool delegate,
+            online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context,
+            online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard guard) {
         super(ToolBase.builder()
                 .name(ToolSchemas.safeName(delegate.descriptor().name()))
                 .description(delegate.descriptor().description())
@@ -41,11 +48,14 @@ public class PluginAiToolAdapter extends ToolBase {
         this.delegate = delegate;
         this.descriptor = delegate.descriptor();
         this.context = context;
+        this.guard = guard == null ? online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard.ALLOW_ALL : guard.capture();
     }
 
     public String platformToolName() {
         return descriptor.name();
     }
+
+    boolean requiresPersistentInteractions() { return descriptor.requiresConfirmation() || descriptor.risk() == PluginAiToolRisk.DESTRUCTIVE; }
 
     /**
      * 装配期过滤条件与旧网关一致：READ 默认可用，WRITE/DESTRUCTIVE 需显式点名授权；
@@ -62,34 +72,59 @@ public class PluginAiToolAdapter extends ToolBase {
     @Override
     public Mono<PermissionDecision> checkPermissions(Map<String, Object> toolInput, PermissionContextState state) {
         if (descriptor.risk() == PluginAiToolRisk.DESTRUCTIVE || descriptor.requiresConfirmation()) {
-            return Mono.just(PermissionDecision.ask("高风险插件工具需要用户确认：" + descriptor.title()));
+            return Mono.just(PermissionDecision.builder()
+                    .behavior(io.agentscope.core.permission.PermissionBehavior.ASK)
+                    .message("高风险插件工具需要用户确认：" + descriptor.title())
+                    .decisionReason("safety: plugin tool requires user confirmation").build());
         }
         return Mono.just(PermissionDecision.passthrough("grants checked at assembly and execution"));
     }
 
     @Override
     public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
-        if (!granted()) {
+        var catalog = param.getRuntimeContext() == null ? null : param.getRuntimeContext().get(AgentToolCatalog.class);
+        if (!granted() || catalog != null && (!catalog.enabled()
+                || !catalog.allowed().isEmpty() && !catalog.allowed().contains(getName()))) {
             log.info("[YuDreamAdmin] plugin AI tool denied: tool={}, risk={}, trigger={}",
                     descriptor.name(), descriptor.risk(), context.trigger());
-            return Mono.just(result(param, ToolResultState.DENIED, "当前用户无权调用 AI 工具：" + descriptor.title()));
+            return Mono.just(failure(param, ToolResultState.DENIED, "当前用户无权调用 AI 工具：" + descriptor.title()));
         }
         try {
-            var value = delegate.execute(context, new PluginAiToolCall(descriptor.name(), inputOf(param)));
+            var value = guard.execute(descriptor.name(), descriptor.risk() == PluginAiToolRisk.READ
+                    ? online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk.READ
+                    : online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk.WRITE,
+                    descriptor.permissionCode(), () -> delegate.execute(context, new PluginAiToolCall(descriptor.name(), inputOf(param))));
             var result = new online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult(
-                    descriptor.name(), value.action(), context.traceId(), value.message(), value.payload());
+                    descriptor.name(), value.action(), descriptor.permissionCode(), value.message(), value.payload());
             io.agentscope.core.agent.RuntimeContext runtimeContext = param.getRuntimeContext();
             if (runtimeContext != null) {
                 HarnessToolCollector collector = runtimeContext.get(HarnessToolCollector.class);
                 if (collector != null) {
-                    collector.record(result);
+                    collector.record(identified(param, result, ToolResultState.SUCCESS));
                 }
             }
             return Mono.just(result(param, ToolResultState.SUCCESS, ToolSchemas.resultJson(result)));
         } catch (Exception e) {
             log.debug("plugin AI tool execution failed: tool={}", descriptor.name(), e);
-            return Mono.just(result(param, ToolResultState.ERROR, "工具执行失败：" + e.getMessage()));
+            return Mono.just(failure(param, ToolResultState.ERROR, "工具执行失败：" + e.getMessage()));
         }
+    }
+
+    private ToolResultBlock failure(ToolCallParam param, ToolResultState state, String message) {
+        var failure = new online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult(descriptor.name(),
+                state == ToolResultState.DENIED ? "denied" : "error", descriptor.permissionCode(), message, Map.of());
+        var context = param.getRuntimeContext();
+        if (context != null && context.get(HarnessToolCollector.class) != null) {
+            context.get(HarnessToolCollector.class).record(identified(param, failure, state));
+        }
+        return result(param, state, message);
+    }
+
+    private online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult identified(ToolCallParam param,
+            online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult result, ToolResultState state) {
+        var payload = new java.util.LinkedHashMap<String, Object>(result.payload() == null ? Map.of() : result.payload());
+        payload.put("_toolCallId", param.getToolUseBlock().getId()); payload.put("_nativeToolState", state.name());
+        return new online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult(result.toolName(), result.action(), result.permissionCode(), result.message(), payload);
     }
 
     private static Map<String, Object> inputOf(ToolCallParam param) {

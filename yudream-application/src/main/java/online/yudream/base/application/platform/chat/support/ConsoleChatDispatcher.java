@@ -25,10 +25,8 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class ConsoleChatDispatcher implements ChatDispatcher {
-
-    private static final Map<String, String> PROFILE_TOOL_PERMISSION = Map.of(
-            "cms-builder", "platform:ai:tool:cms-chrome-style");
 
     private final HarnessAgentGateway harnessAgents;
     private final CapabilityModuleRepo capabilityModuleRepo;
@@ -43,11 +41,7 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
         String agentCode = resolveAgentCode(context.agentCode());
         boolean stateful = StringUtils.hasText(context.sessionId());
         List<String> allowed = allowedTools(agentCode);
-        List<String> permissionCodes = new ArrayList<>(context.permissionCodes());
-        String toolPermission = profileToolPermission(agentCode);
-        if (toolPermission != null && !permissionCodes.contains(toolPermission)) {
-            permissionCodes.add(toolPermission);
-        }
+        List<String> permissionCodes = context.permissionCodes() == null ? List.of() : List.copyOf(context.permissionCodes());
         HarnessRunRequest request = new HarnessRunRequest(
                 context.userId(),
                 stateful ? "console-" + context.sessionId() : null,
@@ -67,7 +61,9 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
                 request,
                 context.onDelta(),
                 context.onReasoningDelta(),
-                context.onTool());
+                context.onTool(),
+                progress -> context.onActivity().accept(new online.yudream.base.domain.platform.chat.valobj.ChatActivity(
+                        "harness", progress.action(), "running", progress.action(), progress.content(), null, null, null)));
         return ChatDispatchResult.of(result.content(), result.usage());
     }
 
@@ -79,10 +75,6 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
                     "cms_chrome_style");
             default -> List.of();
         };
-    }
-
-    private String profileToolPermission(String agentCode) {
-        return PROFILE_TOOL_PERMISSION.get(agentCode);
     }
 
     private String resolveAgentCode(String agentCode) {

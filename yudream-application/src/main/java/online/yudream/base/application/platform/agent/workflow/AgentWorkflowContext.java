@@ -21,6 +21,14 @@ public final class AgentWorkflowContext {
         variables.put("input", this.input);
     }
 
+    static AgentWorkflowContext restore(online.yudream.base.domain.platform.agent.valobj.AgentWorkflowFrame frame) {
+        AgentWorkflowContext context = new AgentWorkflowContext(frame.input());
+        context.nodeOutputs.putAll(frame.nodeOutputs());
+        context.variables.clear();
+        context.variables.putAll(frame.variables());
+        return context;
+    }
+
     public Object input() {
         return input;
     }

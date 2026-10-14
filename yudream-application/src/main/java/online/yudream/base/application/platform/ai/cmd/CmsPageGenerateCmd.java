@@ -7,6 +7,8 @@ import java.util.List;
 
 @Data
 public class CmsPageGenerateCmd {
+    private Long userId;
+    private String sessionId;
     private String agentCode;
     private String title;
     private String prompt;

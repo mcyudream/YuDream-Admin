@@ -345,6 +345,23 @@ public enum PlatformMenuModule {
             parentName = "THEME_CENTER", permission = "platform:ai:generate")
     AI_GENERATE,
 
+    @MenuNode(code = "platform:ai:system", name = "AI 系统任务", type = MenuNodeType.MENU,
+            parentName = "APP_HUB", path = "/platform/ai/system-runs", component = "platform/ai/system-runs.vue",
+            icon = "i-ri:task-line", sort = 54, permission = "platform:ai:system:view")
+    AI_SYSTEM_RUNS,
+
+    @MenuNode(code = "platform:ai:system:view", name = "查看 AI 系统任务", type = MenuNodeType.BUTTON,
+            parentName = "AI_SYSTEM_RUNS", permission = "platform:ai:system:view")
+    AI_SYSTEM_RUNS_VIEW,
+
+    @MenuNode(code = "platform:ai:system:edit", name = "停止 AI 系统任务", type = MenuNodeType.BUTTON,
+            parentName = "AI_SYSTEM_RUNS", permission = "platform:ai:system:edit")
+    AI_SYSTEM_RUNS_EDIT,
+
+    @MenuNode(code = "platform:ai:system:accept", name = "确认 AI 系统任务", type = MenuNodeType.BUTTON,
+            parentName = "AI_SYSTEM_RUNS", permission = "platform:ai:system:accept")
+    AI_SYSTEM_RUNS_ACCEPT,
+
     @MenuNode(code = "platform:agent", name = "Agent 应用", type = MenuNodeType.MENU,
             parentName = "APP_HUB", path = "/platform/agent", component = "platform/agent/index.vue",
             icon = "i-ri:robot-2-line", sort = 59)

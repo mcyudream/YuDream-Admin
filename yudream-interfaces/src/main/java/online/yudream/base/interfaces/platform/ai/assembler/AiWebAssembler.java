@@ -32,6 +32,7 @@ public class AiWebAssembler {
 
     public static CmsPageGenerateCmd toCmd(CmsPageGenerateRequest request, SecurityPrincipal principal) {
         CmsPageGenerateCmd cmd = new CmsPageGenerateCmd();
+        if (StringUtils.hasText(request.getContextKey())) cmd.setSessionId("cms-canvas:" + request.getContextKey());
         cmd.setAgentCode(request.getAgentCode());
         cmd.setTitle(request.getTitle());
         cmd.setPrompt(request.getPrompt());
@@ -53,6 +54,7 @@ public class AiWebAssembler {
         cmd.setMode(request.getMode());
         cmd.setHistory(toHistory(request.getHistory()));
         if (principal != null) {
+            cmd.setUserId(principal.userId());
             cmd.setPermissionCodes(principal.permissions() == null ? List.of() : List.copyOf(principal.permissions()));
             cmd.setPermissionContextExplicit(true);
         }

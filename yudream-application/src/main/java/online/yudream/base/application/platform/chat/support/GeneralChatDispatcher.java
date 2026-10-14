@@ -21,6 +21,7 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class GeneralChatDispatcher implements ChatDispatcher {
 
     public static final String GENERAL_SYSTEM_PROMPT =
@@ -59,14 +60,16 @@ public class GeneralChatDispatcher implements ChatDispatcher {
                 providerCode,
                 modelCode,
                 config,
-                false,
+                online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.currentTools() != null,
                 context.permissionCodes(),
                 stateful ? List.of() : context.history());
         HarnessRunResult result = harnessAgents.run(
                 request,
                 context.onDelta(),
                 context.onReasoningDelta(),
-                context.onTool());
+                context.onTool(),
+                progress -> context.onActivity().accept(new online.yudream.base.domain.platform.chat.valobj.ChatActivity(
+                        "harness", progress.action(), "running", progress.action(), progress.content(), null, null, null)));
         return ChatDispatchResult.of(result.content(), result.usage());
     }
 

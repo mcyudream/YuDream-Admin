@@ -17,6 +17,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class AgentChatDispatcher implements ChatDispatcher {
 
     private final AgentAppService agentAppService;
@@ -33,6 +34,7 @@ public class AgentChatDispatcher implements ChatDispatcher {
         }
         AgentRunCmd command = new AgentRunCmd();
         command.setUserId(context.userId());
+        command.setSessionId(context.sessionId() == null ? null : "chat-" + context.sessionId());
         command.setInput(context.question());
         command.setProviderCode(context.providerCode());
         command.setModelCode(context.modelCode());

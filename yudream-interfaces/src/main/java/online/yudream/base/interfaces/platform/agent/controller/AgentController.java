@@ -99,58 +99,6 @@ private final AgentAppService agentAppService;
     @DeleteMapping("/{id}")
     @PermissionRegister(code = "platform:agent:delete", name = "删除 Agent 应用", module = "平台能力", desc = "删除 Agent 应用")
     public Result<Void> delete(@PathVariable Long id) { agentAppService.deleteApplication(id); return Result.ok(); }
-    @PostMapping("/{id}/run")
-    @PermissionRegister(code = "platform:agent:run", name = "运行 Agent 应用", module = "平台能力", desc = "运行 Agent 应用")
-    public Result<AgentRunRes> run(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.run(AgentWebAssembler.toRunCmd(id, request, SecurityPrincipalSupport.current())))); }
-
-    @PostMapping(value = "/{id}/debug/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PermissionRegister(code = "platform:agent:edit", name = "调试 Agent 应用", module = "平台能力", desc = "流式调试 Agent 工作流")
-    public SseEmitter debug(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) {
-        SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
-        String runId = UUID.randomUUID().toString();
-        var command = AgentWebAssembler.toRunCmd(id, request, SecurityPrincipalSupport.current());
-        CompletableFuture.runAsync(() -> {
-            var thinkingStarted = new java.util.concurrent.atomic.AtomicBoolean(false);
-            try {
-                send(emitter, AgentWebAssembler.toDebugRunStarted(runId));
-                var result = agentAppService.debug(
-                        command,
-                        event -> send(emitter, AgentWebAssembler.toDebugNodeEvent(runId, event)),
-                        delta -> send(emitter, AgentWebAssembler.toDebugTextChunk(runId, delta)),
-                        reasoning -> {
-                            if (thinkingStarted.compareAndSet(false, true)) {
-                                send(emitter, AgentWebAssembler.toDebugThinkingStart(runId));
-                            }
-                            send(emitter, AgentWebAssembler.toDebugThinkingContent(runId, reasoning));
-                        },
-                        tool -> send(emitter, AgentWebAssembler.toDebugToolResult(runId, tool))
-                );
-                if (thinkingStarted.compareAndSet(true, false)) {
-                    send(emitter, AgentWebAssembler.toDebugThinkingEnd(runId));
-                }
-                send(emitter, AgentWebAssembler.toDebugRunFinished(runId, result));
-                emitter.complete();
-            } catch (Exception e) {
-                if (thinkingStarted.compareAndSet(true, false)) {
-                    send(emitter, AgentWebAssembler.toDebugThinkingEnd(runId));
-                }
-                send(emitter, AgentWebAssembler.toDebugRunError(runId, e.getMessage()));
-                emitter.complete();
-            }
-        });
-        return emitter;
-    }
-
-    private void send(SseEmitter emitter, AgentDebugEventRes event) {
-        try {
-            synchronized (emitter) {
-                emitter.send(SseEmitter.event().name(event.getType()).data(event));
-            }
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-        }
-    }
-
     @GetMapping("/tools")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看 Agent 工具", module = "平台能力", desc = "查看自定义 Agent 工具")
     public Result<PageResult<AgentToolRes>> tools(AgentToolPageQuery query) { return Result.ok(AgentWebAssembler.toToolPage(agentAppService.pageTools(query))); }

@@ -18,6 +18,7 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class WikiChatDispatcher implements ChatDispatcher {
 
     private final WikiChatAppService wikiChatAppService;

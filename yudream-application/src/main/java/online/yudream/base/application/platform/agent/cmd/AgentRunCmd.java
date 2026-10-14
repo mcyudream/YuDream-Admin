@@ -10,6 +10,8 @@ public class AgentRunCmd {
     private Long applicationId;
     /** 发起运行的用户（有状态工作区会话按它隔离）；系统/匿名触发可为空。 */
     private Long userId;
+    /** 可信应用层提供的会话命名空间，HTTP 不能直接认领其他用户的会话。 */
+    private String sessionId;
     private String input;
     private String providerCode;
     private String modelCode;

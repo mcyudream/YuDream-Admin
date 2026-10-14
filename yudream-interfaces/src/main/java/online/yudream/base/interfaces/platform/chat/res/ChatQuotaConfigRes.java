@@ -4,6 +4,7 @@ import lombok.Builder;
 
 @Builder
 public record ChatQuotaConfigRes(
-        long dailyTokenLimit
+        long dailyTokenLimit,
+        long systemDailyTokenLimit
 ) {
 }

@@ -114,6 +114,8 @@ public final class ChatInfraMapper {
                 .usageDate(dataObj.getUsageDate())
                 .usedTokens(dataObj.getUsedTokens())
                 .limitTokens(dataObj.getLimitTokens())
+                .reservedTokens(dataObj.getReservedTokens())
+                .uncertainTokens(dataObj.getUncertainTokens())
                 .build();
     }
 
@@ -127,6 +129,8 @@ public final class ChatInfraMapper {
         dataObj.setUsageDate(domain.getUsageDate());
         dataObj.setUsedTokens(domain.getUsedTokens());
         dataObj.setLimitTokens(domain.getLimitTokens());
+        dataObj.setReservedTokens(domain.getReservedTokens());
+        dataObj.setUncertainTokens(domain.getUncertainTokens());
         return dataObj;
     }
 

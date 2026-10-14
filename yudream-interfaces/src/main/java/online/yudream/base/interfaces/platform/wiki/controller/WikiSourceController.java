@@ -3,9 +3,11 @@ package online.yudream.base.interfaces.platform.wiki.controller;
 import jakarta.validation.Valid;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiSourceAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.interfaces.platform.wiki.assembler.WikiKnowledgeWebAssembler;
 import online.yudream.base.interfaces.platform.wiki.request.WikiTextSourceRequest;
 import online.yudream.base.interfaces.platform.wiki.request.WikiUrlImportRequest;
@@ -40,33 +42,41 @@ public class WikiSourceController {
     public Result<WikiSourceRes> upload(@PathVariable Long spaceId,
                                         @RequestParam(defaultValue = "/") String folderPath,
                                         @RequestPart("file") MultipartFile file) throws IOException {
-        return Result.ok(WikiKnowledgeWebAssembler.toRes(service.importFile(spaceId, folderPath, file.getInputStream(),
-                file.getOriginalFilename(), file.getContentType(), file.getSize())));
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            return Result.ok(WikiKnowledgeWebAssembler.toRes(service.importFile(spaceId, folderPath, file.getInputStream(),
+                    file.getOriginalFilename(), file.getContentType(), file.getSize())));
+        }
     }
 
     @PostMapping("/spaces/{spaceId}/sources/import-urls")
     @PermissionRegister(code = "platform:wiki:manage", name = "批量导入 URL", module = "平台能力", desc = "抓取网页并作为原始资料摄入知识库")
     public Result<List<WikiSourceRes>> importUrls(@PathVariable Long spaceId,
                                                   @Valid @RequestBody WikiUrlImportRequest request) {
-        return Result.ok(WikiKnowledgeWebAssembler.toSourceResList(
-                service.importUrls(spaceId, request.getFolderPath(), request.getUrls())));
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            return Result.ok(WikiKnowledgeWebAssembler.toSourceResList(
+                    service.importUrls(spaceId, request.getFolderPath(), request.getUrls())));
+        }
     }
 
     @PostMapping("/spaces/{spaceId}/sources/text")
     @PermissionRegister(code = "platform:wiki:manage", name = "新建在线文档资料", module = "平台能力", desc = "在线编写 Markdown 文本并作为原始资料摄入知识库")
     public Result<WikiSourceRes> createText(@PathVariable Long spaceId,
                                             @Valid @RequestBody WikiTextSourceRequest request) {
-        return Result.ok(WikiKnowledgeWebAssembler.toRes(
-                service.createText(spaceId, request.getFolderPath(), request.getTitle(), request.getContent(),
-                        StpUtil.getLoginIdAsLong())));
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            return Result.ok(WikiKnowledgeWebAssembler.toRes(
+                    service.createText(spaceId, request.getFolderPath(), request.getTitle(), request.getContent(),
+                            StpUtil.getLoginIdAsLong())));
+        }
     }
 
     @PutMapping("/sources/{id}/text")
     @PermissionRegister(code = "platform:wiki:edit", name = "编辑在线文档资料", module = "平台能力", desc = "编辑在线 Markdown 文本资料并触发重新摄入")
     public Result<WikiSourceRes> updateText(@PathVariable Long id,
                                             @Valid @RequestBody WikiTextSourceRequest request) {
-        return Result.ok(WikiKnowledgeWebAssembler.toRes(
-                service.updateText(id, request.getTitle(), request.getContent(), StpUtil.getLoginIdAsLong())));
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            return Result.ok(WikiKnowledgeWebAssembler.toRes(
+                    service.updateText(id, request.getTitle(), request.getContent(), StpUtil.getLoginIdAsLong())));
+        }
     }
 
     @GetMapping("/spaces/{spaceId}/sources")
@@ -78,13 +88,10 @@ public class WikiSourceController {
     @DeleteMapping("/sources/{id}")
     @PermissionRegister(code = "platform:wiki:delete", name = "删除 Wiki 资料", module = "平台能力", desc = "删除原始资料并级联清理其 Wiki 页面")
     public Result<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return Result.ok();
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            service.delete(id);
+            return Result.ok();
+        }
     }
 
-    @PostMapping("/sources/{id}/caption-images")
-    @PermissionRegister(code = "platform:wiki:edit", name = "重新生成图片描述", module = "平台能力", desc = "为资料中未成功生成 caption 的图片重新调用视觉模型")
-    public Result<WikiSourceRes> captionImages(@PathVariable Long id) {
-        return Result.ok(WikiKnowledgeWebAssembler.toRes(service.captionImages(id, StpUtil.getLoginIdAsLong())));
-    }
 }

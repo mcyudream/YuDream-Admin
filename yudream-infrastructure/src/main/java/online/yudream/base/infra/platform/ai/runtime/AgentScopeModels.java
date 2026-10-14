@@ -56,7 +56,7 @@ public class AgentScopeModels {
         }
     }
 
-    /** 模型配置身份键：agent 实例按 (agentCode, 该键) 缓存，构建期绑定模型。 */
+    /** 模型连接的缓存身份；Agent 在每次执行时绑定所选模型。 */
     public static String identityOf(AiProviderEndpoint provider, AiModelEndpoint model) {
         return String.join("|",
                 String.valueOf(provider.type()),

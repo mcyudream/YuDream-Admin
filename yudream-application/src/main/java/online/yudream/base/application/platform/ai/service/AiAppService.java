@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class AiAppService {
 
     private static final String CAPABILITY_CODE = "ai";
@@ -38,10 +39,11 @@ public class AiAppService {
     /**
      * CMS 静态站点工作区 builder：Harness 文件工具直执行（无需浏览器桥），会话按
      * (cms-builder, 编辑者, targetKey) 隔离，工作区跨轮次持久；发布由用户在界面触发。
-     * providerCode/modelCode 决定本次会话绑定的模型（agent 实例按 (profile, 模型身份) 缓存）。
+     * providerCode/modelCode 决定本次模型选择；Agent 实例按运行隔离，Session 由框架恢复。
      */
     public CmsPageGenerateDTO streamCmsWorkspace(
             Long userId,
+            List<String> permissionCodes,
             String targetKey,
             String question,
             List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
@@ -65,10 +67,10 @@ public class AiAppService {
                 modelCode,
                 aiConfig(),
                 true,
-                List.of("platform:ai:tool:cms-chrome-style"),
+                permissionCodes == null ? List.of() : permissionCodes,
                 history == null ? List.of() : history,
-                List.of("cms_chrome_style"));
-        var result = harnessAgents.run(request, onDelta, onReasoningDelta, onTool);
+                List.of("read_file", "write_file", "edit_file", "list_files", "grep_files", "glob_files", "cms_chrome_style"));
+        var result = harnessAgents.run(request, onDelta, onReasoningDelta, onTool, onProgress);
         return CmsPageGenerateDTO.builder()
                 .title(target)
                 .summary(result.content())
@@ -116,24 +118,27 @@ public class AiAppService {
         systemTools.stream()
                 .filter(tool -> "web.fetch".equals(tool.descriptor().name()))
                 .forEach(tools::add);
-        online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest request =
-                new online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest(
+        online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest request =
+                new online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest(
+                        cmd.getUserId(), cmd.getSessionId(), "cms-canvas",
                         agentSystemPrompt(cmd),
                         agentUserPrompt(cmd),
-                        cmd.getImageDataUrl(),
+                        StringUtils.hasText(cmd.getImageDataUrl()) ? List.of(cmd.getImageDataUrl()) : List.of(),
                         StringUtils.hasText(cmd.getProviderCode()) ? cmd.getProviderCode() : null,
                         StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : null,
                         aiConfig(),
-                        cmd.getHistory(),
                         true,
-                        online.yudream.base.domain.platform.ai.enumerate.AiToolMode.AUTO
+                        cmd.getPermissionCodes(),
+                        List.of(),
+                        tools.stream().map(tool -> tool.descriptor().name()).toList()
                 );
-        online.yudream.base.domain.platform.ai.valobj.AiGenerationResult result;
+        online.yudream.base.domain.platform.ai.valobj.HarnessRunResult result;
         try (online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope ignored =
-                     online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools)) {
-            result = generationGateway.generateStream(request, onDelta, onReasoningDelta, onTool, onProgress);
+                     online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools);
+             var usageScope = online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope.open(cmd.getUserId())) {
+            result = harnessAgents.run(request, onDelta, onReasoningDelta, onTool, onProgress);
         }
-        CmsPageGenerateDTO dto = CmsPageGenerateDTO.builder().summary(result.summary()).build();
+        CmsPageGenerateDTO dto = CmsPageGenerateDTO.builder().summary(result.content()).build();
         return AiAssembler.withTools(dto, result.toolResults());
     }
 
@@ -281,6 +286,8 @@ public class AiAppService {
         boolean aguiCard = BuiltinAgentCodes.AGUI_CARD.equals(cmd.getAgentCode());
         progress(onProgress, "analysis", aguiCard ? "正在生成 AG-UI 卡片。" : "正在分析当前画布、用户需求和可用工具。");
         AgentRunCmd agentCmd = new AgentRunCmd();
+        agentCmd.setUserId(cmd.getUserId());
+        agentCmd.setSessionId(cmd.getSessionId());
         agentCmd.setInput(aguiCard ? defaultText(cmd.getPrompt(), "生成一张摘要卡片") : userPrompt(cmd));
         agentCmd.setRuntimeSystemPrompt(aguiCard ? "" : systemPrompt(cmd));
         agentCmd.setImageDataUrl(cmd.getImageDataUrl());

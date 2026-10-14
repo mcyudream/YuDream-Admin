@@ -4,13 +4,16 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 
 /**
- * RuntimeContext 中的按次调用模型选择（携带模型配置身份键）。
- * 模型绑定已前移到 agent 实例缓存键（(profile, modelKey) 多实例），
- * 本记录保留用于会话寻址与兼容。
+ * 按次构建 Agent 的模型绑定；连接身份用于模型缓存，规范化的代码用于私有恢复配置。
  */
-public record AgentModelSelection(Model model, GenerateOptions options, String modelKey) {
+public record AgentModelSelection(Model model, GenerateOptions options, String modelKey,
+                                   String providerCode, String modelCode) {
+
+    public AgentModelSelection(Model model, GenerateOptions options, String modelKey) {
+        this(model, options, modelKey, null, null);
+    }
 
     public AgentModelSelection(Model model, GenerateOptions options) {
-        this(model, options, null);
+        this(model, options, null, null, null);
     }
 }

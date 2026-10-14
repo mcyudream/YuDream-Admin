@@ -73,7 +73,7 @@ public class CmsWorkspaceService implements online.yudream.base.application.plat
         List<WorkspaceEntry> entries = new ArrayList<>();
         int offset = 0;
         while (true) {
-            List<StoreItem> page = store.search(ns(userId, PREFIX_SEGMENT), offset, 200);
+            List<StoreItem> page = store.search(ns(userId, PREFIX_SEGMENT), 200, offset);
             if (page.isEmpty()) {
                 break;
             }

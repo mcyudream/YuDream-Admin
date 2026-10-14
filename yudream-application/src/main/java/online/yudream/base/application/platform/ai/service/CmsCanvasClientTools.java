@@ -14,7 +14,7 @@ import java.util.Map;
  */
 public final class CmsCanvasClientTools {
 
-    public static final String PERMISSION_CODE = "platform:ai:tool:cms-canvas-client";
+    public static final String PERMISSION_CODE = "platform:ai:generate";
 
     private CmsCanvasClientTools() {
     }
@@ -71,6 +71,16 @@ public final class CmsCanvasClientTools {
         AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
                 name, title, description, PERMISSION_CODE, title, "平台能力", description,
                 new java.util.LinkedHashMap<>(inputs));
+        if (bridge.externalExecution()) {
+            return new online.yudream.base.domain.platform.ai.service.AiExternalAgentTool() {
+                public AiAgentToolDescriptor descriptor() { return descriptor; }
+                public AiAgentToolResult prepare(String requestId, AiAgentToolCall call) {
+                    bridge.prepare(requestId, name, call.arguments());
+                    return new AiAgentToolResult(name, "pending", PERMISSION_CODE, "等待画布真实执行结果",
+                            Map.of("_toolCallId", requestId, "arguments", call.arguments() == null ? Map.of() : call.arguments()));
+                }
+            };
+        }
         return new AiAgentTool() {
             @Override
             public AiAgentToolDescriptor descriptor() {

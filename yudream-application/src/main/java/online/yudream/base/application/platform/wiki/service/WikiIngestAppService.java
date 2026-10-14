@@ -3,6 +3,8 @@ package online.yudream.base.application.platform.wiki.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.ai.service.AiRunAppService;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.assembler.WikiKnowledgeAssembler;
@@ -42,6 +44,7 @@ import online.yudream.base.domain.platform.wiki.valobj.WikiSlug;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebSearchConfig;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebSearchResult;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -68,7 +71,8 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final AiGenerationGateway aiGeneration;
+    private final ObjectProvider<AiGenerationGateway> aiGeneration;
+    private final ObjectProvider<AiRunAppService> runs;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
     private final WikiPageVersionRepo versionRepo;
@@ -76,6 +80,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
     private final WikiIngestTaskRepo taskRepo;
     private final WikiReviewItemRepo reviewItemRepo;
     private final WikiSourceExtractionService extractionService;
+    private final WikiImageCaptionService imageCaptions;
     private final WikiPublicationAppService publicationAppService;
     private final WikiWebSearchGateway webSearchGateway;
     private final WikiIngestCancellationRegistry cancellationRegistry;
@@ -87,14 +92,14 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         enabled();
         spaceRepo.findById(spaceId).orElseThrow(() -> new BizException("知识库不存在"));
         sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
-        taskRepo.save(WikiIngestTask.create(spaceId, sourceId, WikiIngestTaskType.INGEST, null, System.currentTimeMillis()));
+        enqueue(WikiIngestTask.create(spaceId, sourceId, WikiIngestTaskType.INGEST, null, System.currentTimeMillis()));
     }
 
     public void enqueueCleanup(Long spaceId, Long sourceId, String title, String path) {
         enabled();
         try {
             String payload = objectMapper.writeValueAsString(Map.of("title", title == null ? "" : title, "path", path == null ? "" : path));
-            taskRepo.save(WikiIngestTask.create(spaceId, sourceId, WikiIngestTaskType.DELETE_CLEANUP, payload, System.currentTimeMillis()));
+            enqueue(WikiIngestTask.create(spaceId, sourceId, WikiIngestTaskType.DELETE_CLEANUP, payload, System.currentTimeMillis()));
         }
         catch (Exception exception) {
             throw new BizException("创建清理任务失败");
@@ -106,7 +111,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         try {
             String payload = objectMapper.writeValueAsString(Map.of("topic", topic == null ? "" : topic,
                     "queries", queries == null ? List.of() : queries));
-            taskRepo.save(WikiIngestTask.create(spaceId, null, WikiIngestTaskType.DEEP_RESEARCH, payload, System.currentTimeMillis()));
+            enqueue(WikiIngestTask.create(spaceId, null, WikiIngestTaskType.DEEP_RESEARCH, payload, System.currentTimeMillis()));
         }
         catch (Exception exception) {
             throw new BizException("创建研究任务失败");
@@ -115,7 +120,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     public void enqueueReindex(Long spaceId) {
         enabled();
-        taskRepo.save(WikiIngestTask.create(spaceId, null, WikiIngestTaskType.REINDEX, null, System.currentTimeMillis()));
+        enqueue(WikiIngestTask.create(spaceId, null, WikiIngestTaskType.REINDEX, null, System.currentTimeMillis()));
     }
 
     public List<WikiIngestTaskDTO> tasks(Long spaceId) {
@@ -131,6 +136,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
             }
             else if (task.getStatus() == WikiIngestTaskStatus.RUNNING) {
                 cancellationRegistry.markCancelled(taskId);
+                if (task.getAiRunId() != null) {
+                    var runService = runs.getIfAvailable();
+                    if (runService != null) runService.cancel(task.getRequestedByUserId() == null ? 0L : task.getRequestedByUserId(), task.getAiRunId());
+                }
             }
         });
     }
@@ -175,14 +184,31 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     @Override
     public void run(WikiIngestTask task, Consumer<WikiIngestProgress> progress, BooleanSupplier isCancelled) {
-        this.currentProgress = progress;
-        switch (task.getTaskType()) {
-            case INGEST -> doIngest(task, progress, isCancelled);
-            case DELETE_CLEANUP -> doCleanup(task, progress);
-            case DEEP_RESEARCH -> doResearch(task, progress, isCancelled);
-            case REINDEX -> doReindex(task, progress);
-            default -> throw new BizException("未知的摄入任务类型：" + task.getTaskType());
-        }
+        Long owner = task.getRequestedByUserId() == null ? 0L : task.getRequestedByUserId();
+        runs.getObject().execute(owner, "wiki-ingest", "wiki-ingest:" + task.getId(), emitter -> {
+            task.setAiRunId(emitter.id());
+            taskRepo.save(task);
+            currentRun.set(emitter);
+            currentProgress.set(progress);
+            try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(owner)) {
+                switch (task.getTaskType()) {
+                    case INGEST -> doIngest(task, progress, isCancelled);
+                    case DELETE_CLEANUP -> doCleanup(task, progress);
+                    case DEEP_RESEARCH -> doResearch(task, progress, isCancelled);
+                    case REINDEX -> doReindex(task, progress);
+                    default -> throw new BizException("未知的摄入任务类型：" + task.getTaskType());
+                }
+                return Map.of("taskId", String.valueOf(task.getId()), "spaceId", String.valueOf(task.getSpaceId()));
+            } finally {
+                currentRun.remove();
+                currentProgress.remove();
+            }
+        }, () -> cancellationRegistry.markCancelled(task.getId()));
+    }
+
+    private void enqueue(WikiIngestTask task) {
+        task.setRequestedByUserId(AiUsageExecutionScope.currentUserId());
+        taskRepo.save(task);
     }
 
     private void doIngest(WikiIngestTask task, Consumer<WikiIngestProgress> progress, BooleanSupplier isCancelled) {
@@ -199,6 +225,9 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         if (source.getExtractionStatus() == WikiExtractionStatus.FAILED) {
             throw new BizException(source.getExtractionError());
         }
+        progress(task, source, "caption", "生成资料图片描述", 12);
+        imageCaptions.caption(source, space, task.getRequestedByUserId(), aiConfig());
+        sourceRepo.save(source);
         if (source.isUnchangedSinceIngest(source.getContentHash())) {
             progress(task, source, "skip", "资料未变更，跳过摄入", 100);
             return;
@@ -407,7 +436,12 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
     private JsonNode generateJson(String system, String user, String provider, String model) {
         AiGenerationRequest request = new AiGenerationRequest(system, user, null, provider, model, aiConfig())
                 .withStructuredOutput(AiStructuredOutput.jsonObject());
-        AiGenerationResult result = aiGeneration.generate(request);
+        AiRunAppService.RunEmitter emitter = currentRun.get();
+        AiGenerationResult result = aiGeneration.getObject().generateStream(request,
+                delta -> { if (emitter != null) emitter.event("ai.structured", "delta", Map.of("content", delta)); },
+                delta -> { if (emitter != null) emitter.reasoning(delta); },
+                tool -> { if (emitter != null) emitter.tool(tool); },
+                activity -> { if (emitter != null) emitter.progress(activity.action(), activity); });
         String text = result == null ? null : result.summary();
         if (text == null || text.isBlank()) {
             throw new BizException("LLM 未返回结构化结果");
@@ -585,7 +619,12 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 + "请综合以上资料，产出一篇有交叉引用、带小标题的中文研究页面，并在关键结论处标注来源编号 [n]。";
         AiGenerationRequest request = new AiGenerationRequest(system, user, null,
                 space.getIngestProviderCode(), space.getIngestModelCode(), aiConfig());
-        AiGenerationResult result = aiGeneration.generate(request);
+        AiRunAppService.RunEmitter emitter = currentRun.get();
+        AiGenerationResult result = aiGeneration.getObject().generateStream(request,
+                delta -> { if (emitter != null) emitter.content(delta); },
+                delta -> { if (emitter != null) emitter.reasoning(delta); },
+                tool -> { if (emitter != null) emitter.tool(tool); },
+                activity -> { if (emitter != null) emitter.progress(activity.action(), activity); });
         return result == null || result.summary() == null ? "研究主题：" + topic : result.summary();
     }
 
@@ -614,11 +653,15 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 .collect(Collectors.joining("\n"));
     }
 
-    private Consumer<WikiIngestProgress> currentProgress;
+    private final ThreadLocal<Consumer<WikiIngestProgress>> currentProgress = new ThreadLocal<>();
+    private final ThreadLocal<AiRunAppService.RunEmitter> currentRun = new ThreadLocal<>();
+
 
     private void progress(WikiIngestTask task, WikiSource source, String phase, String message, int percent) {
-        if (currentProgress != null) {
-            currentProgress.accept(new WikiIngestProgress(task.getId(), task.getSpaceId(),
+        if (currentRun.get() != null) currentRun.get().progress(phase,
+                Map.of("title", message, "content", message, "percent", percent, "status", percent == 100 ? "complete" : "running"));
+        if (currentProgress.get() != null) {
+            currentProgress.get().accept(new WikiIngestProgress(task.getId(), task.getSpaceId(),
                     source == null ? null : source.getId(), phase, message, percent, false));
         }
     }

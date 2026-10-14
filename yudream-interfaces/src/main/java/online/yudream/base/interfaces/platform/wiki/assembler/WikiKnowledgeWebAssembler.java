@@ -79,6 +79,8 @@ public final class WikiKnowledgeWebAssembler {
                 .finishedAt(dto.finishedAt())
                 .sortOrder(dto.sortOrder())
                 .payloadJson(dto.payloadJson())
+                .requestedByUserId(dto.requestedByUserId())
+                .aiRunId(dto.aiRunId())
                 .build();
     }
 

@@ -11,7 +11,11 @@ public record HarnessRunResult(
         String reasoning,
         AiUsage usage,
         List<AiAgentToolResult> toolResults,
-        List<PendingToolConfirmation> pendingConfirmations
+        List<PendingToolConfirmation> pendingConfirmations,
+        String nativeTurnId,
+        String nativeRunId,
+        String status,
+        List<HarnessPendingInteraction> pendingInteractions
 ) {
     public HarnessRunResult {
         content = content == null ? "" : content;
@@ -19,9 +23,22 @@ public record HarnessRunResult(
         usage = usage == null ? AiUsage.empty() : usage;
         toolResults = toolResults == null ? List.of() : List.copyOf(toolResults);
         pendingConfirmations = pendingConfirmations == null ? List.of() : List.copyOf(pendingConfirmations);
+        status = status == null ? "completed" : status;
+        pendingInteractions = pendingInteractions == null ? List.of() : List.copyOf(pendingInteractions);
     }
 
     public HarnessRunResult(String content, String reasoning, AiUsage usage, List<AiAgentToolResult> toolResults) {
         this(content, reasoning, usage, toolResults, List.of());
+    }
+
+    public HarnessRunResult(String content, String reasoning, AiUsage usage, List<AiAgentToolResult> toolResults,
+                            List<PendingToolConfirmation> pendingConfirmations) {
+        this(content, reasoning, usage, toolResults, pendingConfirmations, null, null);
+    }
+
+    public HarnessRunResult(String content, String reasoning, AiUsage usage, List<AiAgentToolResult> toolResults,
+                            List<PendingToolConfirmation> pendingConfirmations, String nativeTurnId, String nativeRunId) {
+        this(content, reasoning, usage, toolResults, pendingConfirmations, nativeTurnId, nativeRunId,
+                "completed", List.of());
     }
 }

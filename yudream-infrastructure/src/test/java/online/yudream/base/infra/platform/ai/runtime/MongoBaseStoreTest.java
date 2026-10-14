@@ -60,18 +60,50 @@ class MongoBaseStoreTest extends MongoStoreTestBase {
     }
 
     @Test
+    void nativeSessionObjectCreationIsAtomicAcrossWriters() throws Exception {
+        assertTrue(store.supportsAtomicSessionStorage());
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(8);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            List<java.util.concurrent.Future<Boolean>> writes = new java.util.ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                int writer = i;
+                writes.add(executor.submit(() -> {
+                    start.await();
+                    return store.putIfVersion(List.of("logs"), "head.json", Map.of("writer", writer), 0);
+                }));
+            }
+            start.countDown();
+            int accepted = 0;
+            for (var write : writes) if (write.get()) accepted++;
+            assertEquals(1, accepted);
+            assertEquals(1, store.get(List.of("logs"), "head.json").version());
+            assertFalse(store.putIfVersion(List.of("logs"), "head.json", Map.of(), 0));
+            assertTrue(store.putIfVersion(List.of("logs"), "head.json", Map.of("next", true), 1));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void zeroLimitDoesNotExpandIntoAnUnboundedQuery() {
+        store.put(List.of("ns"), "a", Map.of());
+        assertTrue(store.search(List.of("ns"), 0, 0).isEmpty());
+    }
+
+    @Test
     void searchReturnsNamespacePrefixInKeyOrderWithPaging() {
         store.put(List.of("agents", "a1"), "memory/b.md", Map.of("i", 2));
         store.put(List.of("agents", "a1"), "memory/a.md", Map.of("i", 1));
         store.put(List.of("agents", "a1"), "MEMORY.md", Map.of("i", 0));
         store.put(List.of("agents", "other"), "memory/z.md", Map.of("i", 9));
 
-        List<StoreItem> page = store.search(List.of("agents", "a1"), 0, 2);
+        List<StoreItem> page = store.search(List.of("agents", "a1"), 2, 0);
         assertEquals(2, page.size());
         assertEquals("MEMORY.md", page.get(0).key());
         assertEquals("memory/a.md", page.get(1).key());
 
-        List<StoreItem> secondPage = store.search(List.of("agents", "a1"), 2, 10);
+        List<StoreItem> secondPage = store.search(List.of("agents", "a1"), 10, 2);
         assertEquals(1, secondPage.size());
         assertEquals("memory/b.md", secondPage.get(0).key());
     }

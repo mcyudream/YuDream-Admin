@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class ChatQuotaAppServiceTest {
 
@@ -25,15 +26,16 @@ class ChatQuotaAppServiceTest {
         ChatQuotaRepo quotas = mock(ChatQuotaRepo.class);
         CapabilityModule module = new CapabilityModule();
         module.setConfig(Map.of("dailyTokenLimit", "500"));
-        when(modules.findByCode("chat")).thenReturn(Optional.of(module));
-        when(quotas.findByUserAndDate(1L, LocalDate.now())).thenReturn(Optional.of(
-                UserChatQuota.of(1L, LocalDate.now(), 500)));
-        when(quotas.addUsage(1L, LocalDate.now(), 30)).thenReturn(
-                Optional.of(UserChatQuota.of(1L, LocalDate.now(), 500)));
-        ChatQuotaAppService service = new ChatQuotaAppService(capabilities, modules, quotas);
+        LocalDate day = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        when(modules.findByCode("ai")).thenReturn(Optional.of(module));
+        when(quotas.addUsage(1L, day, 30)).thenReturn(
+                Optional.of(UserChatQuota.of(1L, day, 500)));
+        ChatQuotaAppService service = new ChatQuotaAppService(capabilities, modules, quotas,
+                mock(online.yudream.base.domain.platform.ai.repo.AiRunRepo.class));
 
         UserChatQuota quota = service.recordUsage(1L, 30);
 
         assertThat(quota.getLimitTokens()).isEqualTo(500);
+        verify(quotas).addUsage(1L, day, 30);
     }
 }

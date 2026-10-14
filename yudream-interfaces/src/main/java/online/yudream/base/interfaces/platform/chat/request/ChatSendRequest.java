@@ -10,6 +10,10 @@ import java.util.List;
 
 @Data
 public class ChatSendRequest {
+    private boolean contextEnabled;
+    private boolean frontendToolsEnabled;
+    @Valid
+    private ChatFrontendContextRequest frontendContext;
     private Long sessionId;
     private ChatScopeType scopeType;
     private String agentCode;
@@ -28,4 +32,7 @@ public class ChatSendRequest {
     @Valid
     @Size(max = 20, message = "历史消息不能超过 20 条")
     private List<ChatTurnRequest> history = List.of();
+    @Valid
+    @Size(max = 20)
+    private List<online.yudream.base.domain.platform.ai.valobj.ToolConfirmationDecision> confirmDecisions = List.of();
 }

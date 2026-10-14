@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard;
 import online.yudream.base.domain.platform.agent.valobj.AgentToolPermissions;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
+import online.yudream.base.domain.platform.ai.service.AiExternalAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
@@ -68,7 +69,7 @@ public class AgentToolAdapter extends ToolBase {
         this.delegate = delegate;
         this.descriptor = delegate.descriptor();
         this.permissionGateway = permissionGateway;
-        this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard;
+        this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard.capture();
     }
 
     public String platformToolName() {
@@ -83,10 +84,18 @@ public class AgentToolAdapter extends ToolBase {
         return delegate.risk();
     }
 
+    boolean requiresPersistentInteractions() { return delegate.requiresConfirmation() || delegate instanceof AiExternalAgentTool; }
+
     @Override
     public Mono<PermissionDecision> checkPermissions(Map<String, Object> toolInput, PermissionContextState context) {
-        // RBAC 与沙箱守卫在执行层按真实入参复核；此处只暴露静态风险语义。
-        return Mono.just(PermissionDecision.passthrough("rbac enforced at execution"));
+        if (!delegate.requiresConfirmation() && delegate.risk() == AgentToolRisk.READ) {
+            // Schema 和执行阶段仍以可信快照复核；普通只读动作无需每次人工批准。
+            return Mono.just(PermissionDecision.allow("只读工具将在执行前复核用户权限"));
+        }
+        return Mono.just(PermissionDecision.builder()
+                .behavior(io.agentscope.core.permission.PermissionBehavior.ASK)
+                .message("工具需要用户确认：" + descriptor.title())
+                .decisionReason("safety: platform write tool requires user confirmation").build());
     }
 
     @Override
@@ -94,24 +103,49 @@ public class AgentToolAdapter extends ToolBase {
         if (!hasPermission(param.getRuntimeContext())) {
             log.info("[YuDreamAdmin] AI tool denied by permission snapshot: tool={}, permissionCode={}",
                     descriptor.name(), descriptor.permissionCode());
-            return Mono.just(result(param, ToolResultState.DENIED,
+            return Mono.just(failure(param, ToolResultState.DENIED,
                     "当前用户无权调用 AI 工具：" + descriptor.title()));
         }
         try {
-            executionGuard.check(descriptor.name(), delegate.risk(), descriptor.permissionCode());
+            return Mono.just(executionGuard.execute(descriptor.name(), delegate.risk(), descriptor.permissionCode(),
+                    () -> executeDelegate(param)));
         } catch (BizException e) {
-            return Mono.just(result(param, ToolResultState.DENIED, e.getMessage()));
+            return Mono.just(failure(param, ToolResultState.DENIED, e.getMessage()));
         }
+    }
+
+    private ToolResultBlock executeDelegate(ToolCallParam param) {
         try {
+            if (delegate instanceof AiExternalAgentTool external) {
+                AiAgentToolResult request = external.prepare(param.getToolUseBlock().getId(),
+                        new AiAgentToolCall(descriptor.name(), inputOf(param)));
+                recordIfPresent(param, identified(param, request, ToolResultState.RUNNING));
+                return ToolResultBlock.suspended(param.getToolUseBlock(),
+                        new io.agentscope.core.tool.ToolSuspendException("等待真实外部执行结果"));
+            }
             AiAgentToolResult result = delegate.execute(new AiAgentToolCall(descriptor.name(), inputOf(param)));
-            recordIfPresent(param, result);
-            return Mono.just(result(param, ToolResultState.SUCCESS, ToolSchemas.resultJson(result)));
+            recordIfPresent(param, identified(param, result, ToolResultState.SUCCESS));
+            return result(param, ToolResultState.SUCCESS, ToolSchemas.resultJson(result));
         } catch (BizException e) {
-            return Mono.just(result(param, ToolResultState.ERROR, e.getMessage()));
+            return failure(param, ToolResultState.ERROR, e.getMessage());
         } catch (Exception e) {
             log.debug("AI tool execution failed: tool={}", descriptor.name(), e);
-            return Mono.just(result(param, ToolResultState.ERROR, "工具执行失败：" + e.getMessage()));
+            return failure(param, ToolResultState.ERROR, "工具执行失败：" + e.getMessage());
         }
+    }
+
+    private ToolResultBlock failure(ToolCallParam param, ToolResultState state, String message) {
+        AiAgentToolResult failure = new AiAgentToolResult(descriptor.name(), state == ToolResultState.DENIED ? "denied" : "error",
+                descriptor.permissionCode(), message, Map.of());
+        recordIfPresent(param, identified(param, failure, state));
+        return result(param, state, message);
+    }
+
+    private AiAgentToolResult identified(ToolCallParam param, AiAgentToolResult result, ToolResultState state) {
+        var payload = new java.util.LinkedHashMap<String, Object>(result.payload() == null ? Map.of() : result.payload());
+        payload.put("_toolCallId", param.getToolUseBlock().getId());
+        payload.put("_nativeToolState", state.name());
+        return new AiAgentToolResult(result.toolName(), result.action(), result.permissionCode(), result.message(), payload);
     }
 
     private void recordIfPresent(ToolCallParam param, AiAgentToolResult result) {
@@ -126,6 +160,8 @@ public class AgentToolAdapter extends ToolBase {
     }
 
     private boolean hasPermission(RuntimeContext runtimeContext) {
+        AgentToolCatalog catalog = runtimeContext == null ? null : runtimeContext.get(AgentToolCatalog.class);
+        if (catalog != null && (!catalog.enabled() || !catalog.allowed().isEmpty() && !catalog.allowed().contains(getName()))) return false;
         AgentToolPermissions permissions = runtimeContext == null
                 ? null
                 : runtimeContext.get(AgentToolPermissions.class);

@@ -2,9 +2,11 @@ package online.yudream.base.interfaces.platform.wiki.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiReviewAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.interfaces.platform.wiki.assembler.WikiKnowledgeWebAssembler;
 import online.yudream.base.interfaces.platform.wiki.request.WikiReviewExecuteRequest;
 import online.yudream.base.interfaces.platform.wiki.res.WikiReviewItemRes;
@@ -56,7 +58,9 @@ public class WikiReviewController {
     @PostMapping("/reviews/{id}/execute")
     @PermissionRegister(code = "platform:wiki:edit", name = "执行 Wiki 审阅动作", module = "平台能力", desc = "执行完成/忽略/触发深度研究等预定义动作")
     public Result<Void> execute(@PathVariable Long id, @Valid @RequestBody WikiReviewExecuteRequest request) {
-        service.execute(id, request.getAction());
-        return Result.ok();
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            service.execute(id, request.getAction());
+            return Result.ok();
+        }
     }
 }

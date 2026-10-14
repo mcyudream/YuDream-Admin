@@ -12,7 +12,6 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiCaptionStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSourceKind;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSourceFormat;
 import online.yudream.base.domain.platform.wiki.service.WikiDocumentImageExtractor;
-import online.yudream.base.domain.platform.wiki.service.WikiVisionCaptionGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiExtractedImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import org.springframework.stereotype.Service;
@@ -40,7 +39,6 @@ public class WikiSourceExtractionService {
     private final FileAppService fileAppService;
     private final DocumentTextExtractor documentTextExtractor;
     private final WikiDocumentImageExtractor imageExtractor;
-    private final WikiVisionCaptionGateway visionCaptionGateway;
 
     public void extract(WikiSource source, WikiSpace space, Map<String, String> aiConfig) {
         if (source.getKind() != WikiSourceKind.FILE) {
@@ -109,19 +107,8 @@ public class WikiSourceExtractionService {
             return new WikiSourceImage(fileObjectId, image.pageNumber(), sequence, null, WikiCaptionStatus.SKIPPED,
                     space.getVisionProviderCode(), space.getVisionModelCode(), image.width(), image.height(), image.contentType());
         }
-        try {
-            String dataUrl = "data:" + image.contentType() + ";base64,"
-                    + Base64.getEncoder().encodeToString(image.content());
-            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
-                    aiConfig, dataUrl);
-            return new WikiSourceImage(fileObjectId, image.pageNumber(), sequence, caption, WikiCaptionStatus.CAPTIONED,
-                    space.getVisionProviderCode(), space.getVisionModelCode(), image.width(), image.height(), image.contentType());
-        }
-        catch (Exception exception) {
-            log.warn("图片 caption 失败：{}", exception.getMessage());
-            return new WikiSourceImage(fileObjectId, image.pageNumber(), sequence, null, WikiCaptionStatus.FAILED,
-                    space.getVisionProviderCode(), space.getVisionModelCode(), image.width(), image.height(), image.contentType());
-        }
+        return new WikiSourceImage(fileObjectId, image.pageNumber(), sequence, null, WikiCaptionStatus.PENDING,
+                space.getVisionProviderCode(), space.getVisionModelCode(), image.width(), image.height(), image.contentType());
     }
 
     private byte[] readFile(Long fileObjectId) throws IOException {

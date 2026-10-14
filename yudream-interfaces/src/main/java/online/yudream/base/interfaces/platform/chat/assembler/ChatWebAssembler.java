@@ -48,6 +48,10 @@ public final class ChatWebAssembler {
     public static ChatSendCmd send(ChatSendRequest request, SecurityPrincipal principal) {
         ChatSendCmd cmd = new ChatSendCmd();
         cmd.setSessionId(request.getSessionId());
+        cmd.setContextEnabled(request.isContextEnabled());
+        cmd.setFrontendToolsEnabled(request.isFrontendToolsEnabled());
+        cmd.setFrontendContext(frontendContext(request.getFrontendContext()));
+        cmd.setConfirmDecisions(request.getConfirmDecisions());
         cmd.setScopeType(request.getScopeType());
         cmd.setAgentCode(request.getAgentCode());
         cmd.setSpaceSlug(request.getSpaceSlug());
@@ -72,10 +76,35 @@ public final class ChatWebAssembler {
         return cmd;
     }
 
+    private static online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO frontendContext(
+            online.yudream.base.interfaces.platform.chat.request.ChatFrontendContextRequest request) {
+        if (request == null) return null;
+        return new online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO(frontendRoute(request.route()),
+                request.routes() == null ? List.of() : request.routes().stream().map(ChatWebAssembler::frontendRoute).toList(),
+                request.actions() == null ? List.of() : request.actions().stream().map(action ->
+                        new online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO.Action(action.code(), action.label(), action.routeName())).toList(),
+                request.navigationToolsEnabled(), request.highlightToolsEnabled());
+    }
+    private static online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO.Route frontendRoute(
+            online.yudream.base.interfaces.platform.chat.request.ChatFrontendContextRequest.Route route) {
+        return route == null ? null : new online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO.Route(route.name(), route.title(), route.path());
+    }
+
     public static ChatQuotaConfigCmd quotaConfig(ChatQuotaConfigRequest request) {
         ChatQuotaConfigCmd cmd = new ChatQuotaConfigCmd();
         cmd.setDailyTokenLimit(request.getDailyTokenLimit());
+        cmd.setSystemDailyTokenLimit(request.getSystemDailyTokenLimit());
         return cmd;
+    }
+    public static online.yudream.base.application.platform.chat.cmd.ChatQuotaReconcileCmd reconcile(
+            online.yudream.base.interfaces.platform.chat.request.ChatQuotaReconcileRequest request) {
+        return new online.yudream.base.application.platform.chat.cmd.ChatQuotaReconcileCmd(request.userId(), request.usageDate(), request.reservationId(),
+                new online.yudream.base.domain.platform.ai.valobj.AiUsage(request.promptTokens(), request.completionTokens(), request.totalTokens()));
+    }
+    public static java.util.List<online.yudream.base.interfaces.platform.chat.res.ChatQuotaUncertainRes> uncertainQuotas(
+            java.util.List<online.yudream.base.application.platform.chat.dto.ChatQuotaUncertainDTO> records) {
+        return records.stream().map(record -> new online.yudream.base.interfaces.platform.chat.res.ChatQuotaUncertainRes(
+                record.reservationId(), record.userId(), record.usageDate(), record.heldTokens(), record.runId(), record.knownTokens())).toList();
     }
 
     public static ChatSessionRes session(ChatSessionDTO dto) {
@@ -130,11 +159,16 @@ public final class ChatWebAssembler {
                 .usedTokens(dto.usedTokens())
                 .limitTokens(dto.limitTokens())
                 .remainingTokens(dto.remainingTokens())
+                .reservedTokens(dto.reservedTokens())
+                .uncertainTokens(dto.uncertainTokens())
                 .build();
     }
 
     public static ChatQuotaConfigRes quotaConfig(long dailyTokenLimit) {
         return ChatQuotaConfigRes.builder().dailyTokenLimit(dailyTokenLimit).build();
+    }
+    public static ChatQuotaConfigRes quotaConfig(long dailyTokenLimit, long systemDailyTokenLimit) {
+        return ChatQuotaConfigRes.builder().dailyTokenLimit(dailyTokenLimit).systemDailyTokenLimit(systemDailyTokenLimit).build();
     }
 
     public static ChatSendResultRes sendResult(ChatSendResultDTO dto) {

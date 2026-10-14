@@ -63,7 +63,9 @@ public final class WikiKnowledgeAssembler {
                 task.getStartedAt(),
                 task.getFinishedAt(),
                 task.getSortOrder(),
-                task.getPayloadJson()
+                task.getPayloadJson(),
+                id(task.getRequestedByUserId()),
+                task.getAiRunId()
         );
     }
 

@@ -67,6 +67,7 @@ public class ChatMessage extends BaseDomain {
         this.reasoning = reasoning == null ? "" : reasoning;
         this.usage = usage == null ? AiUsage.empty() : usage;
         this.status = ChatMessageStatus.COMPLETED;
+        this.errorMessage = null;
     }
 
     public void complete(String content, AiUsage usage) {
@@ -77,9 +78,10 @@ public class ChatMessage extends BaseDomain {
         this.status = ChatMessageStatus.FAILED;
         this.errorMessage = message == null ? "问答失败，请稍后重试" : message;
     }
+    public void suspend() { this.status = ChatMessageStatus.WAITING; }
 
     public void cancel() {
-        if (this.status == ChatMessageStatus.STREAMING || this.status == ChatMessageStatus.PENDING) {
+        if (this.status == ChatMessageStatus.STREAMING || this.status == ChatMessageStatus.PENDING || this.status == ChatMessageStatus.WAITING) {
             this.status = ChatMessageStatus.CANCELLED;
         }
     }

@@ -1,12 +1,12 @@
 package online.yudream.base.interfaces.platform.chat.support;
 
+import online.yudream.base.application.platform.ai.dto.AiRunDTO;
+import online.yudream.base.application.platform.ai.service.AiRunAppService;
 import online.yudream.base.application.platform.chat.cmd.ChatSendCmd;
-import online.yudream.base.application.platform.chat.dto.ChatQuotaDTO;
-import online.yudream.base.application.platform.chat.service.ChatAppService;
-import online.yudream.base.application.platform.chat.service.ChatQuotaAppService;
-import online.yudream.base.application.platform.chat.support.ChatDispatchResult;
-import online.yudream.base.domain.platform.ai.valobj.AiUsage;
+import online.yudream.base.application.platform.chat.service.ChatRunAppService;
+import online.yudream.base.domain.platform.ai.valobj.AiRunEvent;
 import online.yudream.base.interfaces.platform.ai.res.AguiStreamEventRes;
+import online.yudream.base.interfaces.platform.ai.support.AiRunStreamSupport;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -14,169 +14,123 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
+/** 连接仅订阅后端日志，浏览器关闭不得终止持久任务。 */
 class ChatStreamSupportTest {
-
     @Test
-    void stopsCallbacksAndDoesNotSendFinishedAfterSendIOException() throws Exception {
-        ChatAppService chatAppService = mock(ChatAppService.class);
-        ChatQuotaAppService quotaService = mock(ChatQuotaAppService.class);
-        List<String> eventTypes = new CopyOnWriteArrayList<>();
-        CountDownLatch returned = new CountDownLatch(1);
-        when(chatAppService.streamOnce(any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
-            Consumer<String> onDelta = invocation.getArgument(2);
-            try {
-                onDelta.accept("first");
-                onDelta.accept("second");
-                return ChatDispatchResult.of("finished", AiUsage.empty());
-            }
-            finally {
-                returned.countDown();
-            }
-        });
+    void legacyAddressStartsOneDurableRunAndSubscribesToItsJournal() {
+        ChatRunAppService chat = mock(ChatRunAppService.class);
+        AiRunStreamSupport streams = mock(AiRunStreamSupport.class);
+        AiRunDTO receipt = mock(AiRunDTO.class);
+        ChatSendCmd command = new ChatSendCmd();
+        SseEmitter emitter = new SseEmitter();
+        when(receipt.id()).thenReturn("run-1");
+        when(chat.startOnce(7L, command)).thenReturn(receipt);
+        when(streams.subscribe(7L, "run-1", 0, true)).thenReturn(emitter);
 
-        try (MockedConstruction<SseEmitter> construction = emitterConstruction(eventTypes, "TEXT_MESSAGE_CHUNK")) {
-            support(chatAppService, quotaService).streamOnce(7L, command());
-
-            assertThat(returned.await(2, TimeUnit.SECONDS)).isTrue();
-            assertThat(eventTypes).containsExactly("RUN_STARTED", "TEXT_MESSAGE_CHUNK");
-            assertThat(construction.constructed()).hasSize(1);
-        }
+        assertThat(new ChatStreamSupport(chat, streams).streamOnce(7L, command)).isSameAs(emitter);
+        verify(chat, times(1)).startOnce(7L, command);
+        verify(streams).subscribe(7L, "run-1", 0, true);
     }
 
     @Test
-    void completionCancelsRunningApplicationTask() throws Exception {
-        ChatAppService chatAppService = mock(ChatAppService.class);
-        ChatQuotaAppService quotaService = mock(ChatQuotaAppService.class);
-        CountDownLatch started = new CountDownLatch(1);
-        CountDownLatch interrupted = new CountDownLatch(1);
-        AtomicReference<Runnable> completion = new AtomicReference<>();
-        when(chatAppService.streamOnce(any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
-            started.countDown();
-            try {
-                Thread.sleep(30_000L);
-                return ChatDispatchResult.of("unexpected", AiUsage.empty());
-            }
-            catch (InterruptedException error) {
-                Thread.currentThread().interrupt();
-                interrupted.countDown();
-                throw new IllegalStateException(error);
-            }
-        });
-
+    void sendFailureClosesObservationAndNeverCancelsBackendRun() throws Exception {
+        AiRunAppService runs = mock(AiRunAppService.class);
+        when(runs.events(7L, "run-1", 0)).thenReturn(List.of(event(1, "ai.message", "delta", Map.of("content", "first")),
+                event(2, "ai.message", "delta", Map.of("content", "second"))));
+        List<String> types = new CopyOnWriteArrayList<>();
+        CountDownLatch closed = new CountDownLatch(1);
         try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) -> {
-            doAnswer(invocation -> {
-                completion.set(invocation.getArgument(0));
-                return null;
-            }).when(emitter).onCompletion(any());
+            doAnswer(call -> {
+                types.add(agui(call.getArgument(0)).getType());
+                throw new IOException("client disconnected");
+            }).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+            doAnswer(call -> { closed.countDown(); return null; }).when(emitter).complete();
         })) {
-            support(chatAppService, quotaService).streamOnce(7L, command());
+            streams(runs).subscribe(7L, "run-1", 0, true);
+            assertThat(closed.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(types).containsExactly("TEXT_MESSAGE_CHUNK");
+            verify(runs, never()).cancel(anyLong(), anyString());
+        }
+    }
 
-            assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
-            assertThat(completion.get()).isNotNull();
+    @Test
+    void completionOnlyReleasesSubscription() throws Exception {
+        AiRunAppService runs = mock(AiRunAppService.class);
+        AtomicReference<Runnable> completion = new AtomicReference<>();
+        CountDownLatch polled = new CountDownLatch(1);
+        when(runs.events(7L, "run-1", 0)).thenAnswer(call -> { polled.countDown(); return List.of(); });
+        try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) ->
+                doAnswer(call -> { completion.set(call.getArgument(0)); return null; }).when(emitter).onCompletion(any()))) {
+            streams(runs).subscribe(7L, "run-1", 0, true);
+            assertThat(polled.await(2, TimeUnit.SECONDS)).isTrue();
             completion.get().run();
-            assertThat(interrupted.await(2, TimeUnit.SECONDS)).isTrue();
+            verify(runs, never()).cancel(anyLong(), anyString());
         }
     }
 
     @Test
-    void sendFailureWhileFinishingDoesNotProduceSecondTerminalEvent() throws Exception {
-        ChatAppService chatAppService = mock(ChatAppService.class);
-        ChatQuotaAppService quotaService = mock(ChatQuotaAppService.class);
-        List<String> eventTypes = new CopyOnWriteArrayList<>();
-        CountDownLatch terminalAttempted = new CountDownLatch(1);
-        when(chatAppService.streamOnce(any(), any(), any(), any(), any(), any()))
-                .thenReturn(ChatDispatchResult.of("answer", AiUsage.empty()));
-        when(quotaService.me(7L)).thenReturn(new ChatQuotaDTO("7", LocalDate.now(), 0, 100, 100));
-
-        try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) ->
-                doAnswer(invocation -> {
-                    AguiStreamEventRes event = event(invocation.getArgument(0));
-                    eventTypes.add(event.getType());
-                    if ("RUN_FINISHED".equals(event.getType())) {
-                        terminalAttempted.countDown();
-                        throw new IOException("client disconnected");
-                    }
-                    return null;
-                }).when(emitter).send(any(SseEmitter.SseEventBuilder.class)))) {
-            support(chatAppService, quotaService).streamOnce(7L, command());
-
-            assertThat(terminalAttempted.await(2, TimeUnit.SECONDS)).isTrue();
-            Thread.sleep(100L);
-            assertThat(eventTypes.stream().filter(type -> type.startsWith("RUN_") && !"RUN_STARTED".equals(type)))
-                    .containsExactly("RUN_FINISHED");
-        }
-    }
-
-    @Test
-    void streamOnceFinishedPayloadContainsAuthoritativeReasoning() throws Exception {
-        ChatAppService chatAppService = mock(ChatAppService.class);
-        ChatQuotaAppService quotaService = mock(ChatQuotaAppService.class);
+    void reconnectUsesCommittedCursorAndPreservesAuthoritativeReasoning() throws Exception {
+        AiRunAppService runs = mock(AiRunAppService.class);
+        when(runs.events(7L, "run-1", 17)).thenReturn(List.of(event(18, "ai.result", "completed",
+                Map.of("result", Map.of("content", "answer", "reasoning", "authoritative reasoning")))));
+        when(runs.finished(7L, "run-1", 18)).thenReturn(true);
         List<AguiStreamEventRes> events = new CopyOnWriteArrayList<>();
-        CountDownLatch finished = new CountDownLatch(1);
-        when(chatAppService.streamOnce(any(), any(), any(), any(), any(), any()))
-                .thenReturn(ChatDispatchResult.of("answer", "authoritative reasoning", AiUsage.empty(), List.of()));
-        when(quotaService.me(7L)).thenReturn(new ChatQuotaDTO("7", LocalDate.now(), 0, 100, 100));
-
-        try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) ->
-                doAnswer(invocation -> {
-                    AguiStreamEventRes event = event(invocation.getArgument(0));
-                    events.add(event);
-                    if ("RUN_FINISHED".equals(event.getType())) finished.countDown();
-                    return null;
-                }).when(emitter).send(any(SseEmitter.SseEventBuilder.class)))) {
-            support(chatAppService, quotaService).streamOnce(7L, command());
-
-            assertThat(finished.await(2, TimeUnit.SECONDS)).isTrue();
-            AguiStreamEventRes terminal = events.stream()
-                    .filter(event -> "RUN_FINISHED".equals(event.getType()))
-                    .findFirst().orElseThrow();
-            assertThat(((Map<?, ?>) terminal.getResult()).get("reasoning")).isEqualTo("authoritative reasoning");
+        CountDownLatch closed = new CountDownLatch(1);
+        try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) -> {
+            doAnswer(call -> { events.add(agui(call.getArgument(0))); return null; }).when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+            doAnswer(call -> { closed.countDown(); return null; }).when(emitter).complete();
+        })) {
+            streams(runs).subscribe(7L, "run-1", 17, true);
+            assertThat(closed.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(events).hasSize(1);
+            assertThat(events.getFirst().getType()).isEqualTo("RUN_FINISHED");
+            assertThat(((Map<?, ?>) events.getFirst().getResult()).get("reasoning")).isEqualTo("authoritative reasoning");
+            verify(runs).events(7L, "run-1", 17);
         }
     }
 
-    private static MockedConstruction<SseEmitter> emitterConstruction(List<String> eventTypes, String failingType) {
-        return mockConstruction(SseEmitter.class, (emitter, context) ->
-                doAnswer(invocation -> {
-                    AguiStreamEventRes event = event(invocation.getArgument(0));
-                    eventTypes.add(event.getType());
-                    if (failingType.equals(event.getType())) throw new IOException("client disconnected");
-                    return null;
-                }).when(emitter).send(any(SseEmitter.SseEventBuilder.class)));
+    @Test
+    void terminalSendFailureDoesNotProduceSecondTerminalEvent() throws Exception {
+        AiRunAppService runs = mock(AiRunAppService.class);
+        when(runs.events(7L, "run-1", 0)).thenReturn(List.of(event(1, "ai.error", "failed", Map.of("message", "provider failure"))));
+        List<String> types = new CopyOnWriteArrayList<>();
+        CountDownLatch closed = new CountDownLatch(1);
+        try (MockedConstruction<SseEmitter> ignored = mockConstruction(SseEmitter.class, (emitter, context) -> {
+            doAnswer(call -> { types.add(agui(call.getArgument(0)).getType()); throw new IOException("client disconnected"); })
+                    .when(emitter).send(any(SseEmitter.SseEventBuilder.class));
+            doAnswer(call -> { closed.countDown(); return null; }).when(emitter).complete();
+        })) {
+            streams(runs).subscribe(7L, "run-1", 0, true);
+            assertThat(closed.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(types).containsExactly("RUN_ERROR");
+            verify(runs, never()).cancel(anyLong(), anyString());
+        }
     }
 
-    private static AguiStreamEventRes event(SseEmitter.SseEventBuilder builder) {
-        return builder.build().stream()
-                .map(item -> item.getData())
-                .filter(AguiStreamEventRes.class::isInstance)
-                .map(AguiStreamEventRes.class::cast)
-                .findFirst().orElseThrow();
-    }
-
-    private static ChatStreamSupport support(ChatAppService appService, ChatQuotaAppService quotaService) {
-        ChatStreamSupport support = new ChatStreamSupport(appService, quotaService);
+    private static AiRunStreamSupport streams(AiRunAppService runs) {
+        AiRunStreamSupport support = new AiRunStreamSupport(runs);
         ReflectionTestUtils.setField(support, "timeout", Duration.ofSeconds(30));
         return support;
     }
-
-    private static ChatSendCmd command() {
-        ChatSendCmd command = new ChatSendCmd();
-        command.setQuestion("question");
-        return command;
+    private static AiRunEvent event(long cursor, String type, String action, Map<String, Object> payload) {
+        return new AiRunEvent("run-1", cursor, type, action, "chat", "run-1", Instant.now(), payload);
+    }
+    private static AguiStreamEventRes agui(SseEmitter.SseEventBuilder builder) {
+        return builder.build().stream().map(item -> item.getData()).filter(AguiStreamEventRes.class::isInstance)
+                .map(AguiStreamEventRes.class::cast).findFirst().orElseThrow();
     }
 }

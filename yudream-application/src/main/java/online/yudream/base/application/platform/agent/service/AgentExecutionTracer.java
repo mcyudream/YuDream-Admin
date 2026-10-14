@@ -59,6 +59,13 @@ public class AgentExecutionTracer {
         return new RecordingSession(trace);
     }
 
+    public AgentTraceSession resume(String traceId) {
+        if (!properties.isEnabled() || traceId == null) return AgentTraceSession.NOOP;
+        return traceRepo.findByTraceId(traceId)
+                .filter(trace -> trace.getStatus() == online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus.RUNNING)
+                .<AgentTraceSession>map(RecordingSession::new).orElse(AgentTraceSession.NOOP);
+    }
+
     private String ownerPluginCode(AgentApplication application) {
         if (application == null) {
             return null;
@@ -148,6 +155,13 @@ public class AgentExecutionTracer {
 
         private RecordingSession(AgentExecutionTrace trace) {
             this.trace = trace;
+            for (AgentTraceStep step : trace.getSteps()) {
+                sequence.accumulateAndGet(step.seq(), Math::max);
+                if (step.status() == AgentTraceStepStatus.RUNNING && step.nodeId() != null) {
+                    openSteps.put(step.nodeId(), new OpenStep(step.seq(), step.nodeId(), step.nodeKind(), step.nodeTitle(),
+                            step.inputSummary(), new StringBuilder(step.reasoning() == null ? "" : step.reasoning()), step.startTime()));
+                }
+            }
         }
 
         @Override
@@ -260,6 +274,14 @@ public class AgentExecutionTracer {
             trace.fail(error == null || error.getMessage() == null ? "Agent 执行失败" : error.getMessage());
             persist(trace);
             publish(AgentTraceEvent.failed(trace));
+        }
+
+        @Override public void suspend() {
+            for (OpenStep open : openSteps.values()) {
+                var step = open.toStep(AgentTraceStepStatus.RUNNING, null, "等待原生工具交互", properties.getMaxReasoningLength());
+                if (step.seq() <= trace.getSteps().size()) trace.getSteps().set(step.seq() - 1, step);
+            }
+            persist(trace);
         }
     }
 }

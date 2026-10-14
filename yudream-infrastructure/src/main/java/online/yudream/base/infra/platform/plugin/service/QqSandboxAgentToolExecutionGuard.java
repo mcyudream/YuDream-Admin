@@ -11,6 +11,24 @@ import java.util.Map;
 @Component
 public class QqSandboxAgentToolExecutionGuard implements AgentToolExecutionGuard {
     @Override
+    public AgentToolExecutionGuard capture() {
+        QqSandboxSession captured = QqSandboxExecutionScope.requireActive();
+        if (captured == null) return AgentToolExecutionGuard.ALLOW_ALL;
+        return new AgentToolExecutionGuard() {
+            @Override public void check(String name, AgentToolRisk risk, String permission) {
+                try (var ignored = QqSandboxExecutionScope.open(captured)) {
+                    QqSandboxAgentToolExecutionGuard.this.check(name, risk, permission);
+                }
+            }
+            @Override public <T> T execute(String name, AgentToolRisk risk, String permission, java.util.function.Supplier<T> action) {
+                try (var ignored = QqSandboxExecutionScope.open(captured)) {
+                    QqSandboxAgentToolExecutionGuard.this.check(name, risk, permission);
+                    return action.get();
+                }
+            }
+        };
+    }
+    @Override
     public void check(String toolName, AgentToolRisk risk, String permissionCode) {
         QqSandboxSession session = QqSandboxExecutionScope.requireActive();
         if (session == null) return;

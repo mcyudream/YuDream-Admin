@@ -3,6 +3,10 @@ package online.yudream.base.application.platform.wiki.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.ai.service.AiRunAppService;
+import online.yudream.base.application.platform.ai.dto.AiRunDTO;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
+import java.util.function.Consumer;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.dto.WikiResearchPlanDTO;
 import online.yudream.base.domain.common.exception.BizException;
@@ -17,6 +21,7 @@ import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -32,14 +37,31 @@ public class WikiDeepResearchAppService {
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final AiGenerationGateway aiGeneration;
+    private final ObjectProvider<AiGenerationGateway> aiGeneration;
+    private final ObjectProvider<AiRunAppService> runs;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
     private final WikiIngestAppService ingestAppService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public AiRunDTO startPlan(Long userId, Long spaceId, String seed) {
+        enabled();
+        return runs.getObject().start(userId, "wiki-research", "wiki-research:" + spaceId, emitter -> {
+            emitter.input(seed);
+            try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(userId)) {
+                return planStream(spaceId, seed,
+                        delta -> emitter.event("ai.structured", "delta", Map.of("content", delta)),
+                        emitter::reasoning);
+            }
+        }, null);
+    }
+
     @Transactional(readOnly = true)
     public WikiResearchPlanDTO plan(Long spaceId, String seed) {
+        return planStream(spaceId, seed, null, null);
+    }
+
+    private WikiResearchPlanDTO planStream(Long spaceId, String seed, Consumer<String> onDelta, Consumer<String> onReasoning) {
         enabled();
         WikiSpace space = spaceRepo.findById(spaceId).orElseThrow(() -> new BizException("知识库不存在"));
         String overview = nodeRepo.findBySlug(spaceId, "overview").map(WikiNode::bodyMarkdown).orElse("");
@@ -52,19 +74,25 @@ public class WikiDeepResearchAppService {
         AiGenerationRequest request = new AiGenerationRequest(system, user, null,
                 space.getIngestProviderCode(), space.getIngestModelCode(), aiConfig())
                 .withStructuredOutput(AiStructuredOutput.jsonObject());
-        AiGenerationResult result = aiGeneration.generate(request);
+        AiGenerationResult result = aiGeneration.getObject().generateStream(request, onDelta, onReasoning, null, null);
         String text = result == null ? null : result.summary();
         if (text == null || text.isBlank()) {
-            return new WikiResearchPlanDTO(seed == null ? "未命名研究" : seed, "", List.of(seed == null ? "" : seed));
+            throw new BizException("AI 未返回研究计划，请重新生成");
         }
         try {
-            JsonNode root = objectMapper.readTree(stripFence(text));
-            return new WikiResearchPlanDTO(root.path("topic").asText(seed),
-                    root.path("rationale").asText(""), stringList(root, "queries"));
+            JsonNode root = objectMapper.readTree(text);
+            if (root == null || !root.isObject() || !root.path("topic").isTextual() || root.path("topic").asText().isBlank()
+                    || !root.path("queries").isArray() || root.path("queries").isEmpty() || root.path("queries").size() > 20) {
+                throw new BizException("AI 返回的研究计划缺少有效主题或查询，请重新生成");
+            }
+            for (JsonNode query : root.path("queries")) {
+                if (!query.isTextual() || query.asText().isBlank()) throw new BizException("AI 返回的研究查询格式无效，请重新生成");
+            }
+            return new WikiResearchPlanDTO(root.path("topic").asText().trim(), root.path("rationale").asText(""), stringList(root, "queries"));
         }
+        catch (BizException exception) { throw exception; }
         catch (Exception exception) {
-            return new WikiResearchPlanDTO(seed == null ? "未命名研究" : seed, "",
-                    List.of(seed == null ? "" : seed));
+            throw new BizException("AI 返回的研究计划无法解析，请重新生成");
         }
     }
 
@@ -89,20 +117,6 @@ public class WikiDeepResearchAppService {
             });
         }
         return list;
-    }
-
-    private String stripFence(String text) {
-        String trimmed = text.trim();
-        if (trimmed.startsWith("```")) {
-            int firstNewline = trimmed.indexOf('\n');
-            String withoutOpen = firstNewline >= 0 ? trimmed.substring(firstNewline + 1) : "";
-            int close = withoutOpen.lastIndexOf("```");
-            if (close >= 0) {
-                withoutOpen = withoutOpen.substring(0, close);
-            }
-            return withoutOpen.trim();
-        }
-        return trimmed;
     }
 
     private Map<String, String> aiConfig() {

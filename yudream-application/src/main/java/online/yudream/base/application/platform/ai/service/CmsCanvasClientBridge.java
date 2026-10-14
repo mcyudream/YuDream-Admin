@@ -29,16 +29,48 @@ public final class CmsCanvasClientBridge {
     }
 
     private final Outbound outbound;
+    private final java.util.function.BiFunction<String, Map<String, Object>, Map<String, Object>> persistentExecution;
+    private final boolean externalExecution;
     private final AtomicInteger sequence = new AtomicInteger();
     private final ConcurrentMap<String, CompletableFuture<Map<String, Object>>> pending = new ConcurrentHashMap<>();
     private final AtomicBoolean failed = new AtomicBoolean(false);
 
     public CmsCanvasClientBridge(Outbound outbound) {
         this.outbound = outbound;
+        this.persistentExecution = null;
+        this.externalExecution = false;
+    }
+
+    private CmsCanvasClientBridge(java.util.function.BiFunction<String, Map<String, Object>, Map<String, Object>> execution) {
+        this.outbound = null;
+        this.persistentExecution = execution;
+        this.externalExecution = false;
+    }
+    public static CmsCanvasClientBridge persistent(java.util.function.BiFunction<String, Map<String, Object>, Map<String, Object>> execution) {
+        return new CmsCanvasClientBridge(execution);
+    }
+    private CmsCanvasClientBridge(Outbound outbound, boolean external) {
+        this.outbound = outbound; this.persistentExecution = null; this.externalExecution = external;
+    }
+    public static CmsCanvasClientBridge external(Outbound outbound) { return new CmsCanvasClientBridge(outbound, true); }
+    public boolean externalExecution() { return externalExecution; }
+    public void prepare(String requestId, String toolName, Map<String, Object> arguments) {
+        if (!externalExecution) throw new IllegalStateException("当前画布桥不支持原生挂起");
+        outbound.send(requestId, toolName, arguments == null ? Map.of() : arguments);
     }
 
     /** 由模型工具循环调用：向浏览器发出工具请求并等待真实执行结果。 */
     public Map<String, Object> execute(String toolName, Map<String, Object> args) {
+        if (externalExecution) throw new IllegalStateException("外部画布执行必须走原生挂起与真实回执");
+        if (persistentExecution != null) {
+            Map<String, Object> response = persistentExecution.apply(toolName, args == null ? Map.of() : args);
+            if (Boolean.TRUE.equals(response.get("ok")) && response.get("result") instanceof Map<?, ?> result) {
+                Map<String, Object> output = new java.util.LinkedHashMap<>();
+                result.forEach((key, value) -> output.put(String.valueOf(key), value));
+                return output;
+            }
+            return response;
+        }
         if (failed.get()) {
             throw new BizException("画布连接已断开，无法执行工具：" + toolName);
         }
