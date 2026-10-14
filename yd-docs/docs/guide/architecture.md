@@ -123,7 +123,7 @@ sequenceDiagram
 
 ### 分层硬规则（禁止项）
 
-完整规范见 `.codex/skills/yudream-ddd-architecture/SKILL.md`，这里列出最容易踩的红线：
+完整规范见主仓 `AGENTS.md`、[`docs/dev/backend-architecture.md`](../../../docs/dev/backend-architecture.md) 与 [`docs/dev/plugin-system.md`](../../../docs/dev/plugin-system.md)，这里列出最容易踩的红线：
 
 | 层 | 禁止项 |
 | --- | --- |

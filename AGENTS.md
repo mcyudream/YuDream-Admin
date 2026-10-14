@@ -1,144 +1,70 @@
-# YuDream Admin — 工程规则
+# YuDream Admin
 
-本文件适用于 `D:/code/yudream-admim` 下的全部工作。它是项目规范的索引；修改后端代码前必须完整阅读 `.codex/skills/yudream-ddd-architecture/SKILL.md`，契约发布前必须完整阅读 `.codex/skills/yudream-contract-release/SKILL.md` 及其 `references/`。本文件与 skill 内容冲突时，以 skill 的最新内容为准，并在同一工作项内同步更新两边。
+> **适用范围**：`D:/code/yudream-admim` 主仓全部工作。
+> **目标**：提供唯一工程规则入口、最短必读路径与双仓同步纪律。
 
-- 后端 DDD 分层、平台能力、插件架构、Excel、中文文本、Git 工作流：`.codex/skills/yudream-ddd-architecture/SKILL.md` 与 `references/knowledge.json`
-- SPI/SDK/components 契约发布与下游同步：`.codex/skills/yudream-contract-release/SKILL.md`、`references/file-map.md`、`references/release-workflow.md`
-- 前端框架与 monorepo 规范：`yudream-frontend/AGENTS.md`
-- YD 视觉语言、组件选型与持续维护：`docs/yd-ui-guidelines.md`（宿主权威规范，插件仓保留同步副本）
+## 1. 项目卡
 
-## 1. 工作范围与模块布局
+| 项 | 内容 |
+|---|---|
+| 类型 | Java 21 / Spring Boot 后端 + Vue 3 / TypeScript 前端，插件化后台平台 |
+| 主仓 | `yudream-admim` |
+| 插件仓 | `D:/code/yudream-admin-plugins`，官方业务插件前后端源码唯一归属 |
+| 契约 | `yudream-plugin-spi`、`@yudream/plugin-sdk`、`@yudream/components` |
+| 前端 | `yudream-frontend/`，宿主 app + 共享包；组件权威 `docs/yd-ui-guidelines.md` |
 
-- `yudream-domain`：聚合、值对象、枚举、仓储接口、领域服务；禁止框架/Web 依赖。
-- `yudream-application`：cmd/query/dto、应用 assembler、应用 service（编排仓储、领域服务、事务、校验）。
-- `yudream-infrastructure`：dataobj、mapper、仓储实现、外部技术网关。
-- `yudream-interfaces`：controller、request/res、接口 assembler、Excel row。
-- `yudream-bootstrap`：启动与装配。
-- `yudream-plugins/yudream-plugin-spi`：第三方插件唯一允许依赖的编译期契约模块。
-- `yudream-frontend`：宿主前端与共享包；官方业务插件的前后端源码一律在独立的 `yudream-admin-plugins` 仓，不再回流本仓。
+## 2. 开始工作前必读
 
-修改插件架构前先确定受影响边界，先参考行为最接近的既有模块；分层改造以 `system/user` 包为基线。保留用户已有的未提交修改，禁止覆盖或顺手重构无关文件。
+- 全部任务：本文件 + `docs/dev/conventions.md`。
+- Java 后端：`docs/dev/backend-architecture.md`；插件运行时再读 `docs/dev/plugin-system.md`。
+- 前端 UI：`yudream-frontend/AGENTS.md`、`docs/dev/frontend.md`、`docs/yd-ui-guidelines.md`。
+- 权限变更：`docs/dev/permission-codes.md`、`docs/system/permission-management.md`。
+- 契约版本/发布/下游同步：`docs/dev/contract-release.md`。
+- 跨仓规范变更或写入约束性记忆：先查 `docs/dev/repo-sync.md`。
+- 处理已知故障：查 `docs/exp/README.md` 的分类索引；AI 运行另读 `docs/platform/ai-foundation.md`。
+- **AGENTS.md 是硬规则唯一入口；`docs/dev/` 是规范正文；`docs/exp/` 是经验库。不得再建立 skill 作为项目规范权威。**
 
-## 2. DDD 分层硬规则
+## 3. 硬规则
 
-- 应用 service 不得接收接口 `request`、不得返回接口 `res`；非琐碎的 `domain <-> DTO` 转换放应用 assembler。
-- dataobj 不外泄到应用/接口层；`domain <-> dataobj` 只在 infra mapper。
-- Controller 硬规则：禁止 `new XxxCmd/Res/ExcelRow`、响应 `builder()`、私有 `toXxx/parseXxx`、Excel 模板构造和业务不变量；只做边界校验、调用应用 service、经 assembler 返回 `Result`。
-- 分层归属：接口 assembler 负责 `request -> cmd`、`DTO -> res`、Excel 行映射；应用 assembler 负责领域到应用 DTO；infra mapper 负责领域到 dataobj。
-- 领域异常与错误文案使用正常 UTF-8 中文；禁止 `\uXXXX` 转义和乱码。PowerShell 打印乱码不构成修改文件的理由，只修复源文件中真实存在的乱码。
+1. **双仓同步**：修改任一仓的 `AGENTS.md`、`docs/dev/**`，或写入约束性记忆前，必须对照主仓 `docs/dev/repo-sync.md`。命中映射的同一工作项内同步对方仓对应文件，提交注明同步面；暂不能同步则提交标 `[sync-pending]` 并登记待同步。规范冲突以主仓 `docs/dev/` 为准。两仓 AGENTS.md 本条规则保持同文并互检。
+2. **保留用户改动**：不覆盖既有未提交修改；不顺手重构无关文件；提交只暂存本模块文件。
+3. **分层**：应用 service 不接收接口 request、不返回 res；dataobj 不越出 infra；Controller 不构造 Cmd/Res/ExcelRow、不写 mapping helper/业务不变量。完整边界见 `docs/dev/backend-architecture.md`。
+4. **平台能力双闸门**：项目配置闸门 + 每用例应用闸门；未通过不得注册端点/恢复/连接外部资源；能力依赖声明并按级联语义启停。
+5. **插件隔离**：插件唯一 compile-time 宿主依赖是 SPI；不得依赖宿主内部层。JAR 根 `plugin.yml` 权威；依赖图无环；贡献经 PluginContext 并可完整回收。详见 `docs/dev/plugin-system.md` 与 `docs/plugin-system/specification.md`。
+6. **ID 精度**：Java Long/Snowflake 跨 JSON、插件、TypeScript、表单与 URL 一律字符串，禁止 `Number(id)`。
+7. **权限动作**：末段动作必须使用既定词表；按资源拆分查看/操作/危险权限。详见 `docs/dev/permission-codes.md`。
+8. **中文与编码**：正常 UTF-8 中文；禁止 `\uXXXX` 文案和真实乱码。PowerShell 显示乱码不作为改文件依据。
+9. **前端组件**：宿主与插件业务只用 `@yudream/components` 公开 YD 入口；缺能力先封装 YD 并同步公开面/文档/门禁，禁止 Fa/Arco 等业务直用。详见 `docs/dev/frontend.md`。
+10. **提交与外部动作**：模块完成后先验证、再按模块创建中文提交；未经明确要求不 push/tag/publish。契约只发布至 Nexus，按 `docs/dev/contract-release.md` 执行。
+11. **机密**：凭据、本机路径、token 只存被忽略的 `docs/local.md` 或系统凭据管理器；严禁提交或复制到规范、经验、issue、日志。计划放在被忽略的 `docs/plan/`；`docs/plans/` 为冻结历史归档。
 
-## 3. 平台能力（platform vs system）
+## 4. 沟通与推进
 
-- 安全与身份等基线能力（接口加密、双 token、API Key、Passkey、OAuth）属于 `system`；SSE、WebSocket、MQ、Neo4j、Python Runtime、HTTP 集成、文档生成、CMS、AI/Agent 等可动态加载能力属于 `platform`。
-- 平台能力运行必须过两道闸门：项目闸门（配置/`@ConditionalOnProperty` 决定是否允许加载 provider）与应用闸门（应用层每次用例前 `ensureEnabled(...)` 检查持久化状态）。项目闸门不允许的能力不得注册端点、不得启动恢复。
-- Infra provider 只是工具包装：构造与 `enable(config)` 不得建立外部连接、声明队列或启动长驻资源；连接只在两道闸门通过且真实业务/连接/健康检查动作需要时创建，disable 时关闭清理。
-- 能力间运行时依赖必须声明在 `CapabilityDescriptor.dependencies`；依赖不可用时拒绝启用，禁用依赖必须级联禁用依赖方。
-- 插件市场源（`plugin-market-source`，类型 DISTRIBUTION）**只提供本机源**：项目闸门关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2 端点；应用闸门关闭时 LOCAL 不进入目录、公开 `/market` 不可用。**远程源订阅与安装不依赖本能力**（后台「插件市场」点「添加市场源」进入独立页 `/platform/plugin-marketplace/add-source`，系统路由不进菜单；「市场源管理」始终可用，可添加 `V2_API`/`STATIC_INDEX`）。**不回落 Nexus/`store-root-url`**；未订阅远程源且能力关闭时目录为空，插件管理/上传/回滚不受影响。开启后默认内置源 `default` 为 `LOCAL`（本机发布物进程内直读）。市场读各启用源快照合并展示（LOCAL 无快照、列表零外呼），安装/更新记录 `marketSourceCode` 并跟随安装来源、跨源取最高版本。市场源 token 经主密钥加密存储。
-- 自托管服务端：正式协议为 v2 裸 JSON REST（`/api/public/plugin-market/api/v2`，分类/标签/作者/时间检索）；静态 `schemaVersion=1` index.json 仅 legacy。后台系统商店目录同样支持分类/标签筛选（LOCAL/V2 结构化版本携带 `category/tags`，静态索引源视为未分类），安装走「安装计划 + 批量安装」：`install-plan` 列出硬/软前置依赖与市场候选版本（硬依赖必装锁定、软依赖可选），`install-batch` 按依赖顺序逐项安装、任一项失败整体回滚；启用可携带 `includeSoftDependencies` 一并启用软依赖（硬依赖始终自动先启用）。后台「插件发布 / 发布审核」映射本能力（能力关则隐藏）；「市场源管理」不映射，用于订阅远程源。发布走界面/API Key 双通道（`upload` 权限，API Key 绑定用户可审计），元数据从 JAR 内 plugin.yml 自动解析，分类/标签为社区元数据，`{code}@{pluginVersion}` 不可覆盖；审核开关 `reviewRequired`（能力配置键，读取处默认回落 true），公开社区开关 `publicEnabled`（能力配置键，读取处默认回落 true；关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布/审核/订阅不受影响），持有 `platform:plugin-market-source:publish` 可跳过审核直接发布；状态机 PENDING→PUBLISHED/REJECTED、PUBLISHED→REVOKED；作者只能改自己的发布物（无 accept 且无源管理 edit/delete 时），编辑不重审，硬删除移除记录与 JAR。发布物 JAR 存 `market-source.directory`（必须独立于插件扫描目录）。细则见 `yd-docs/docs/plugin/market-source.md`。
+- 用户明确要求实现/修复时，按规范自主推进到实现、验证与结果汇报；不得把常规实施选择反复交回用户。
+- 用户在提问、评估或头脑风暴时，先给判断，不擅自改代码。
+- 破坏性、不可逆或对外动作先确认；读取、分析、可逆本地改动及按明确要求的工作自主完成。
+- 发现验证失败如实报告，不将单测描述成运行环境启动验收。
 
-## 4. 插件架构要点
+## 5. 当前工程基线（2026-10-14）
 
-- `yudream-plugin-spi` 是插件唯一可依赖的宿主模块；插件代码禁止依赖 domain/application/infrastructure/interfaces/bootstrap。
-- 数据备份是 `system/backup` 四层的基线能力（无双闸门）：全量导出/合并导入用 YDBA 归档（ZIP：manifest.json + `mongo/*.ndjson` EJSON EXTENDED + 对象存储索引 + 插件范围文件），合并导入是无损并集、同标识冲突开始前一次询问策略（本地为准只补缺 / 备份为准覆盖）；异地备份目标支持 FTP/FTPS/WebDAV（密码主密钥加密，AAD `system-backup:target:{code}`），本地归档目录默认 `config/backup`；计划 cron 为 Spring 6 位表达式，监听 `BackupPlansChangedEvent` 重排；插件经 SPI `system.backup` 扩展点 `context.registerExtension(PluginBackupProvider.class, impl)` 贡装备份范围（scopeCode 归属插件码，恢复缺失提供方时跳过并告警）。细则见 `docs/system/backup.md` 与 skill `rules.system-backup-capability`。
-- JAR 根必须有权威 `plugin.yml`（`name`/`main`/`version`）；`name` 是唯一稳定 code，`displayName` 仅展示；可选 `git` 声明 http(s) 源码仓库地址（宿主持久化并随市场目录下发展示链接）；`depend` 为硬依赖、`softdepend` 为可选依赖。禁止打包 `META-INF/services/...YuDreamPlugin`。
-- 插件按职责分包（domain/application/infrastructure/interfaces/migration/frontend/bootstrap）；入口类只做装配与生命周期，所有注册走 `PluginContext.registerXxx(...)`，保证 disable/unload 可完整回收。
-- 插件调用宿主能力只能走 SPI 端口；需要新能力时先发布稳定 SPI 端口/DTO，再在宿主实现适配。插件间业务 API 放 provider JAR 的稳定最小 `*.api` 包，consumer 以 `provided` 编译并通过 `context.service(...)` 调用；禁止复制 provider API。
-- 硬依赖必须先于 consumer 加载启用；软依赖缺失不阻塞 consumer，相关菜单/路由/端点必须条件注册并显式降级。provider 存在已加载的硬/软依赖方时禁止直接卸载，须走级联（`cascade=true`）：按叶子依赖方先停的顺序停机，仅软依赖目标的插件自动降级恢复，沿硬依赖链依赖目标的插件保持禁用；级联语义同样适用于删除与回滚（回滚级联会先停机再交换 JAR 并恢复可恢复的依赖方）。`depend`/`softdepend` 图必须无环：平台适配器不得 softdepend 已经 softdepend 自己的业务插件（`launcher-adapter` 不得声明 `minecraft-server`；服务器列表页与 YMCL scope 由 `minecraft-server` 以 `LauncherProvider` 贡献）。
-- 插件 HTTP 端点统一挂载 `/api/plugins/{pluginCode}/**`；插件自有 Thymeleaf 模板放插件 JAR 的 `src/main/resources/templates`，经插件作用域渲染器按逻辑名渲染。
-- 菜单默认按最主要的业务大类注册（如 MC、待办、社交），一级大图标只承载共享 `CATEGORY` 分类，插件模块和功能放在分类下，禁止每注册一个功能就新增一级入口。新插件在 `plugin.yml` 声明 `menu.category`（`mc`/`todo`/`social`/`other` 或自定义 `{code,name,icon,sort}`），`menu.mode` 默认 `CATEGORY`；同类共用 `plugin-category:{code}`，不归属单个插件。明确要求或个例可声明 `INDEPENDENT`、显式 `parentCode`；旧插件缺 `menu` 块或声明 `LEGACY` 保留旧模式，已持久化及管理员调整过的菜单不自动搬移。菜单管理新建根节点默认分类，类型仍可显式选择。详见 `docs/plugin-system/specification.md` 第 10 节。
-- Java `Long`/Snowflake ID 在 JSON、插件 DTO、TS 模型、表单与 URL 参数中一律使用 `string`，禁止 `Number(id)`。
-- 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。
-- 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。级联隔离：SDK 1.6.0 起插件产物全部降入 `@layer yudream-plugin`，宿主层序固定 `yudream-base`（宿主 preflight）< `yudream-plugin` < 宿主未分层工具类——插件可覆写宿主 preflight 与原生元素样式，但永远不能覆盖宿主同名工具类/响应式变体；插件必须随 SDK ≥1.6.0 重建 style.css，旧未分层产物仍会顶掉宿主工具类。
-- 插件主题经 `@PluginTheme` 注册（一个插件一个主题，`scopes` 声明 SITE/ADMIN）：同 scope 同时只激活一个，启用新主题插件自动顶替旧插件并持久化激活位（`sys_setting` category `plugin-theme`），禁用/卸载即释放回落内置主题。主题样式资产放插件 frontend 目录并经 `/api/platform/plugins/{code}/assets/**` 下发；CSS 约定 SITE 只写 `.site-page`/`.site-chrome` 与 `--yb-site-*` 变量、ADMIN 只写 `:root`/`.dark` 宿主变量，两 scope 不得互相污染。启动页皮肤也属主题：宿主 `loading.html` 只保留默认动画，禁止把主题 GIF/字体放进宿主 `public/`；SITE 主题用自己的 style.css 覆盖 `[data-app-loading]`；`index.html` 在公开路径（含无 token 的 `/`）立刻注入上次缓存的 SITE CSS 并并行拉取 `/themes/active`，theme-runtime 在 router 就绪前打开 SITE media（已登录的 `/` 仍是后台）。细则见 `docs/plugin-system/specification.md` 9.1。
-- **主题即整套独立模板，不只是样式覆盖**：首页布局（`HomePageLayout`）、首页方案（`HomePagePreset`）、页面（`CmsPage`）均以 `themeCode`（`"default"` 或插件 code）归属主题，各主题的首页设计/页面集/方案/导航完全独立、绝不混杂；SITE 激活指针是 Setting 键 `pluginTheme.active.site`，切换/停用主题只拨指针，不做还原或下线——内容天然归属主题，指针离开即对外不可见，再启用原样恢复。SITE 主题可用 `homePreset` 声明 JAR 内首页方案 JSON：激活时纯量 upsert `plugin:{pluginCode}` 方案，该主题无布局则克隆 default 主题当前布局作起点、布局未被管理员改动或尚未写入 homeHtml（仍走 FEATURE 卡片回退）则自动应用新方案、管理员已手写 homeHtml 则只更新方案；方案按主题隔离列表与快照计数（每主题上限 10）。方案可再带 `pages[]` 整套页面——导入到该主题自己的页面集（标记 `sourcePluginCode`），slug 唯一性按 `(themeCode, slug)`（不同主题可复用同 slug），管理员占用的 slug 跳过不覆盖，声明清单之外的该插件旧页面转草稿。主题页面与 `settings.homeHtml` 一律用 `data-yb-*` 模板指令注入系统数据，禁止声明 `navigationJson`。后台「平台 → 内容站点 → 主题中心」（已合并 CMS 页面/首页定制/导航/媒体库/首页方案）统一管理与一键切换，工作台「编辑主题」选择器可离线预编辑任意主题（默认当前激活主题）；既有部署的种子菜单需手工清理旧「内容站点」节点。启动迁移 `CmsThemeBindingInitializer` 回填存量数据 themeCode、按主题去重布局、把历史 `plugin-backup:*` 预设转换为对应主题布局后删除。公开页换肤正途是插件适配主题：插件自带 `--xx-*` 桥接变量回退消费 `--yb-site-*`，主题按插件专属类名写样式仅作兼容层。
-- **SITE 主题版式页推荐 Vue 原生承载（homeComponent + chromeComponent，SPI 2.26.0 起）**：`@PluginTheme(homeComponent = "theme/Home", chromeComponent = "theme/Chrome")` 声明远程模块 routes 键（格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`，注册期校验）。`homeComponent` 接管公开站首页；`chromeComponent` 接管公开站页头/页脚（导航数据由宿主注入且必须含首页 `/site`，主题自己画导航，切页不再换 chrome）。公开知识库 `/wiki` 与外链嵌入页 `/embed` 也走同一套 chrome（默认主题同样），禁止独立顶栏。主题中心导航 http(s) 外链可勾选站内 iframe 嵌入。其余版式页走 `@PluginRoute(publicAccess=true, siteNav=true)` 公开路由；主题页面用 `sdk.site.context(blocks/limit/cmsLatest)` 取公开主题上下文（`GET /api/public/theme/context`，匿名）。未声明 chromeComponent 时仍由宿主 SiteChrome 承载，并可继续用 chrome 变量契约覆盖外观。主题对业务插件一律 `softdepend`（禁止 `depend`），数据走块契约，不 import 其他插件代码，缺失即回落 config 静态清单。细则见 `docs/plugin-system/specification.md` 9.1。
-- **主题配置走声明式 schema**：主题经 `@PluginTheme(configSchema="...")` 声明 JAR 内 `theme-config.json`（分节+字段：text/textarea/number/switch/select/color/image/list，字段可标 `secret` 加密存储、管理端脱敏），宿主按 schema 渲染独立配置页 `/platform/theme-center/config/{theme}`，值按主题隔离持久化 Setting（key `pluginTheme.config.{themeCode}`、category `plugin-theme`、type JSON），模板以 `theme.config.*` 消费（公开输出剔除 secret）；内置 default 主题无配置页。细则见 `docs/plugin-system/specification.md` 9.1。
-- **插件数据进主题模板走块提供者**：系统能力（CMS/Wiki/导航/站点设置）已在模板上下文直接可用；插件私有数据经 SPI `PluginThemeBlockProvider`（`code/name/supportedThemes/data(ctx)`）以 `context.registerExtension(...)` 注册，模板经 `blocks.{code}` 懒加载消费，块缺失时优雅降级；提供者只暴露公开安全字段，宿主不做字段级过滤。
+- 后端 AI 底座使用 AgentScope Java Harness，AI 持久运行/工具/额度规则见 `docs/platform/ai-foundation.md`。
+- 插件持久 AI 运行契约见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；该版本在对应工作项中只完成本仓提交，未获发布授权前不得推 Nexus 或让插件仓消费。
+- 宿主前端 YD 零违规门禁以已提交基线为准；禁止从工作区生成基线或恢复历史例外。
+- 双仓同步地图：`docs/dev/repo-sync.md`；待同步事项以该文件为准。
 
-- 外部认证自动开户绑定使用 SPI 2.29.0 的 `PluginExternalLoginIdentity.authenticatedUserId`（字符串 ID），只能声明本次新建或已验证本站凭据的用户；禁止用邮箱匹配或浏览器提供的 ID 自动认领已有账号。宿主必须核销 state 并检查停用、绑定冲突；缺省字段保留 `BIND_REQUIRED`。开户前用 `PluginUserService.findByExternalIdentity` 检查已有绑定。详见 `docs/plugin-system/spi-2.29.0-external-login.md`。
+## 6. 现状与敏感信息
 
-## 5. AI/Agent 与 CMS 要点
+- 当前工作分支通常为 `master`；工作前核对 `git status`，尤其保留用户的未提交内容。
+- 不在本文件记录账号、密码、token、私有 URL 或个人绝对目录之外的敏感信息；本机凭据位置见被忽略的 `docs/local.md`。
 
-- AI 底层由 AgentScope Java（`io.agentscope:agentscope-harness`）承载，禁止在框架中手搓 AI 底层逻辑：模型实例构建/连接复用（`AgentScopeModels`）、流式拆包、工具调用循环、结构化输出与降级、重试一律交给框架。供应商差异经 `AiProviderAdapter` 产出 AgentScope `GenerateOptions`（`additionalBodyParams` 注入 thinking、`toolChoice`、`reasoningEffort` 等）。
-- AI 配置必须 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`。Kimi/DeepSeek 等兼容供应商走 AgentScope 官方 compat formatter，并禁用「结构化输出与工具共存」的原生路径。
-- 有状态会话（通用聊天、Wiki 问答等）走 `HarnessAgentRuntime`：按用户、Agent、会话构建隔离的 `HarnessAgent`，任务通过原生 `AgentSession` 提交与恢复，后台运行结束后关闭实例；MongoDB `AgentStateStore` / `BaseStore` / 原子 Session Log 持久化上下文与检查点，禁止复用跨用户可变 Agent 单例。上下文、压缩、记忆、队列与工具循环由框架管理，平台消息表和 `AiRun` 仅作 UI 投影。聊天型 Agent 禁用宿主文件系统与 shell 工具；工作区工具只在授权的隔离 profile 开启。无状态调用走 `AgentScopeGenerationGateway`。依赖版本必须从 `pom.xml` 读取并核实其真实 API，不以网页描述代替已发布制品。
-- Session Log 必须显式绑定共享 Mongo `RemoteFilesystem`，不能因配置了远程工作区就假定默认日志已远程保存。已认证用户长期记忆按 USER 隔离；匿名调用按 SESSION 隔离，禁止共用匿名用户长期记忆。插件声明的通配权限不替代本站账号实时权限，未绑定账号只能使用不要求本站权限的工具。
-- Agent 工具权限四层控制：① schema 层按权限快照过滤模型可见工具（`PerCallToolFilterMiddleware`）；② 规则/模式层（`PermissionContextState`）；③ 执行层以 RuntimeContext 权限快照复核、fail-closed（`AgentToolAdapter`）；④ 沙箱守卫最后把关。插件 DESTRUCTIVE/需确认工具必须走权限系统 ASK（HITL）。工具描述符到模型 schema 的归一化与安全名转换走 `ToolSchemas`。
-- 技能框架级统一管理：`platformAgentSkill`（`MongoAgentSkillRepository implements AgentSkillRepository`）是所有 Harness Agent 的技能源，启用技能随每轮推理进入 `<available_skills>`；管理端 `/api/platform/agent-skills`（view/create/edit/delete 按动作词表拆分）。
-- Agent 路径（ReActAgent/HarnessAgent）的 system prompt 必须经 `sysPrompt`/`onSystemPrompt` 注入，输入消息列表禁止携带 SYSTEM 消息；模型可见工具名一律 `ToolSchemas.safeName`。
-- SSE 必须端到端真流式；事件使用可扩展信封（`ai.message`/`ai.tool`/`ai.result`/`ai.error` 等，含 `event/action/module/traceId/timestamp/payload`）。发送结构化 `ai.error` 后正常 complete，不得再 `completeWithError`。
-- 所有面向用户的 AI 通过统一持久运行出口；正文与真实推理增量分开，工具与生命周期进度独立。禁止阻塞响应后整段回放、计时打字或断线后重新提交输入。刷新先恢复快照及对应游标，再续读事件；浏览器关闭/切页只解除观察，取消需显式请求。额度在统一网关原子预占、实际用量结算并幂等释放，插件与系统后台调用同样计入预算。
-- 全局 AI 助手要求登录及对应权限，状态由根级 store 持有。页面/路由感知、导航、高亮分别可关闭；上下文只提交经过权限过滤的元数据与显式注册功能，不抓取 DOM、表单、query 或 token。前端工具必须按稳定路由/操作标识校验和回传真实结果，禁止任意 selector、脚本或自动点击。
-- 原生审批与外部工具等待保留 `WAITING` 任务，回复沿原 turn 接续；业务工作流保存原图及节点检查点，禁止重跑已执行业务副作用。恢复权限属于原调用者，管理员确认不能借出自己的 `*` 权限。插件/QQ 调用只存原触发寻址与工具名单，沙箱失效必须拒绝恢复，禁止回落真实连接。插件持久接口与最终业务响应见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；完整运行、工作区与额度规则见 `docs/platform/ai-foundation.md`。
-- YD Agent 工作台只呈现 Harness 的运行与权限状态；回答按 version 1 的 markdown/reference/tool 块校验、渲染，引用原文与工具卡片独立于推理。Markdown HTML 局部清理，外链仅 HTTP(S)，文件引用与工具重试交宿主事件；Skills、MCP、工作区和审批的演示不得冒充真实连接。组件契约见 `docs/yd-agent-workbench.md`。
-- CMS 改动必须是完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面/模板元数据，以及 GrapesJS 可视化构建兼容存储（`htmlContent`/`cssContent`/`builderProjectJson`）。
+## 7. 规则分层
 
-## 6. Excel / 导入导出
-
-- 使用 EasyExcel；HTTP 文件读写放 `ExcelHttpSupport` 等支撑类，行映射与模板行创建放接口 assembler。
-- 前端导出用 blob，并使用 `src/utils/excel.ts` 的既有工具；新增 `v-auth` 按钮时同步菜单种子枚举权限。
-
-## 7. 前端组件与主题
-
-- 宿主和插件业务 UI **只使用 `@yudream/components` 的公开 `Yd*` / `useYd*` 入口**。禁止业务直接使用 `Fa*` / `useFa*`、Arco/TDesign/Reka 等通用 UI 原生入口，禁止自行制作通用按钮、输入、选择器、弹层、表格、加载与通知。允许原生语义内容与布局元素；技术编辑器/图形引擎必须经有类型的 YD 适配组件承载。Fa 与第三方仅是共享组件内部实现及明确的框架启动装配边界，不能作为页面例外。
-- 宿主与插件已迁移的 Vue Web 规范门禁保持零违规；保留 findings={} 与验收 Git SHA，不得重新放回历史例外。基线只能从明确已提交版本生成。
-- 缺少组件时先在共享组件库封装为 YD，补齐属性、模型、事件、插槽、ref 方法、键盘/焦点、主题与弹出层，再使用；不得只改标签或把不兼容的 Arco API 硬套到 YD。新增公开入口同步根导出、resolver、SDK host-components、实时预览和组件文档。插件仅从契约包公开入口显式导入，不复制宿主实现。
-- YD 外观默认值统一在共享 `@yudream/components/appearance.css` 的 `yudream-base` 根节点层声明；宿主与预览共用 FA 主题运行时。ADMIN 插件通过根变量覆盖；三套外观均保留已启用的功能动画，灵动完整，雅致与紧凑的减少动态效果偏好仅柔化动作、速度与装饰密度，禁止统一冻结动画。
-- 不在业务页面自行指定主色、品牌色或固定色板；主题、主色、深浅模式由后台主题配置与组件体系统一控制。业务样式仅使用中性语义变量（如 `--color-bg-*`、`--color-text-*`、`--color-border-*`、`--color-fill-*`），不直接模拟主题组件的激活/强调态。
-- 插件主题声明的 `style.css` 资产可按其唯一 scope 声明 `--primary-N`：SITE 使用明确 SITE 锚点，ADMIN 限 `:root`/`.dark`；变量消费仍禁止。未能证明 SITE/ADMIN 双 scope 的资产隔离时扫描器 fail-closed，详见 `docs/yd-ui-guidelines.md`。
-- 选型：普通业务优先基础 YD；阶段用 `YdSteps`、异步进度用 `YdMultiStepLoader`/`YdProgress`、履历用 `YdTimeline`；层级用 `YdTree`；少量选项用 `YdSelect`、搜索单选用 `YdCombobox`、级联用 `YdCascader`、远程分页资源选择用 `YdTablePicker`。短任务用 `YdModal`，上下文详情用 `YdDrawer`，轻量锚点信息用 `YdPopover`，独立长流程用路由页。装饰动效仅用于迎宾、重点提示或可视化，不遮挡表单、表格、错误和危险确认。
-- 完整分类、能力边界、视觉状态与决策表遵循 `docs/yd-ui-guidelines.md`。后台管理列表使用 `YdResponsiveTable` 与 `#card` 窄屏视图，不另造双端分页/选中逻辑，不以装饰卡片替代管理表格；系统可查询的内部 ID 使用带标签选择器，长 ID 保持字符串。
-- 规范是持续维护的契约：每次组件新增/变更/废弃，同一工作项更新选型文档、预览、导出/resolver/SDK桥、检查映射、受影响的 AGENTS/skill/知识条目与插件副本；完成前运行严格 UI 检查和目标 typecheck/build，验收三套外观×浅/深模式及窄屏。不得通过禁用规则、全局忽略或未发布依赖掩盖缺口。
-
-## 8. 构建与验证
-
-- 环境：JDK 21、Maven 3.9+、Node.js 22.22+/24.15+、pnpm 11.9+；Windows 下跑 Maven 需显式设置 JDK 21 环境，否则会误用 JDK 17 报 `invalid target release: 21`。
-- 后端改动至少执行受影响模块的定向测试或编译：
-  `mvn -pl <模块> -am -Dtest=<定向测试> -Dsurefire.failIfNoSpecifiedTests=false test`
-- 前端改动执行目标 app 的 typecheck/build：
-  `pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run test:typecheck`
-- 完成后端工作前按 skill 的 Review Checklist 执行 Controller 与乱码定向扫描。
-
-## 9. Git 工作流
-
-- 每个可独立使用的模块完成后，先运行对应验证，只暂存该模块文件并创建中文提交（如 `feat: 完成用户管理模块`），再进入下一模块。
-- 改动或修正架构规则时，必须在同一提交同步更新对应 skill/`knowledge.json`，禁止代码与项目规则脱节。
-- 未经用户明确要求不执行 push/tag 等外部动作；不纳入 IDE 元数据、临时文件等与任务无关的改动。
-
-## 10. 契约发布（SPI / SDK / components）
-
-- 只发布到 `nexus.yudream.online`；版本号永远从源文件读取，不凭记忆。
-- 顺序：先在本仓升级并验证契约版本 → 提交推送 → tag 流水线发布并等待 verify 通过 → 再到 `yudream-admin-plugins` 同步依赖、刷新 lockfile、运行下游校验并单独提交。
-- SPI 版本在 `yudream-plugins/yudream-plugin-spi/pom.xml` 与本仓根 `pom.xml` 的 `yudream.plugin.spi.version` 同步维护；下游只改其根属性。SDK/components 版本在 `yudream-frontend/packages/*/package.json`，下游经 `pnpm-workspace.yaml` catalog 消费并刷新 `pnpm-lock.yaml`。
-- 发布/验签 CI：`publish:maven-plugin-spi`、`publish:npm-plugin-sdk`、`publish:npm-components`、`verify:maven-plugin-spi`、`verify:npm-contracts`；发布前跑 `validate:contract-packages`、`validate:contract-package-tarballs`、`validate:contract-publish-pipeline`。
-- 契约包可分开发布：`v*`/裸 `p*` tag 发布并验签全部三个契约包；`pspi-*` 只发 SPI、`psdk-*` 只发 plugin-sdk、`pcomp-*` 只发 components（`verify:npm-contracts` 按 `VERIFY_NPM_PACKAGES` 收窄验签范围）。只发布版本实际变动的包。
-- 未验证已发布的版本不得用于下游；未明确要求时不做发布后 snapshot 升版。
-
-## 11. 权限码业务分类
-
-- 权限码结构：`{域}:{资源}:{动作}`（必要时 `{域}:{子域}:{资源}:{动作}`）；插件统一 `plugin:{pluginCode}:{动作}`；`@PermissionRegister` 的 `module` 使用中文模块名。
-- 末段动作词决定角色权限树的业务分组与色彩，必须从既定词表选择，禁止自造同义词：
-  - 查看：`view`、`export`、`download`
-  - 操作：`create`、`edit`、`import`、`upload`、`use`、`generate`、`publish`、`connect`、`send`、`test`、`run`、`invoke`、`execute`、`enable`、`disable`、`assign-*`、`dataset`、`report`、`accept`
-  - 管理：`manage`、`config`
-  - 危险：`delete`、`kickout`、`revoke`、`impersonate`
-  - 词表外动作归入"其他"分组；确需新动作词时，在同一提交同步本表、集中词表 `src/utils/permission-catalog.ts` 的 `permissionCategoryMeta` 与 skill `knowledge.json`。
-- 查看/操作/管理/危险的分级语义靠动作词区分：新权限按资源拆分为独立的 `view`/`edit`/`delete` 等权限码，不得只注册一个 `manage` 再在代码内二次判断。
-- 权限管理统一按「业务域 → 稳定资源码 → 动作分类 → 权限」展示，权限树/矩阵/溯源共享 `permission-catalog.ts`；`assign-*` 匹配完整动作家族。整理分组不重命名历史权限码，不丢失搜索隐藏或暂失效的插件授权。全景用户/菜单分别受 `system:user:view`/`system:menu:view` 控制，统计由仓储聚合全量数据，不能依据当前分页；只有本人使用当前 tokenSession，其他用户明确显示默认部门/角色上下文。完整规则见 `docs/system/permission-management.md`。
-- 矩阵默认只读，明确开启编辑后提交差量；快捷授权与用户角色分配以原完整数组 CAS，保留未点名撤销的历史码，冲突不得自动覆盖。系统超管与历史 `*` 角色锁定单项操作。权限树按叶子分页叠加虚拟窗口，目录/搜索索引缓存，勾选只合并当前页可见叶，保留其他页及未知授权；全选全部与本页操作明确区分。权限目录按 ANNOTATION → 实际注册 MANUAL → MENU 补缺，同码元数据稳定归一，菜单不得覆盖端点登记；CATEGORY/LAYOUT 不生成独立权限。重建仅操作 `sysPermission`，先备份并核对角色、用户与菜单指纹，不重启插件、不重新播种授权；历史入口与接口动作按真实菜单绑定映射到同资源展示，但保留不同权限码。
-
-## 12. 完成前自检
-
-- 分层归属是否正确？Controller/assembler 是否触碰了禁项？
-- dataobj、Spring Bean、宿主内部类是否泄漏给了插件或接口层？
-- 平台能力是否遵守双闸门与依赖级联？长 ID 是否全程字符串？
-- 新权限码末段动作词是否落入第 11 节词表，并拆分了查看/写/删除级别？
-- 插件 JAR 的 `plugin.yml`、前端 remote 产物是否完整？软依赖路径是否条件注册？
-- 是否完成目标构建/测试与定向扫描，中文文案无乱码，并同步了受影响的 skill/文档？
-
-## 13. 安装向导与引导配置
-
-- 新部署无数据库配置时自动进入安装器切片（`InstallerApplication`，只扫 installer 包并排除 Mongo/Redis/邮件/SaToken DAO 自动配置）；引导配置落 `config/yudream-bootstrap.properties`（卷挂载持久化，`YUDREAM_BOOTSTRAP_CONFIG` 可覆盖），经 EnvironmentPostProcessor 以最高优先级属性源装载，压过环境变量；env 仅作存量部署兜底。
-- 运行期业务配置（邮件、对象存储、站点地址等）归管理后台系统配置；`.env` 只保留部署拓扑（镜像/端口/能力闸门）。三层职责不得互相写穿。
-- 全套编排 `docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d` 内置 MongoDB/Redis 并向 backend 注入 `YUDREAM_DISCOVERY_*` 发现提示，安装向导据此自动发现并预填中间件连接。
-- 细则见 `.codex/skills/yudream-ddd-architecture/SKILL.md`「Setup Installer and Bootstrap Configuration」。
+- 工程总纲与提交/验证：`docs/dev/conventions.md`
+- 后端 DDD 与平台能力：`docs/dev/backend-architecture.md`
+- SPI、插件生命周期、菜单、主题与 DevTools：`docs/dev/plugin-system.md`
+- 权限码：`docs/dev/permission-codes.md`
+- 契约发布：`docs/dev/contract-release.md`
+- 前端与 YD 组件：`docs/dev/frontend.md` + `docs/yd-ui-guidelines.md`
+- 双仓同步：`docs/dev/repo-sync.md`
+- 已知坑：`docs/exp/README.md`
+- AI 运行细则：`docs/platform/ai-foundation.md`

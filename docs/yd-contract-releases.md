@@ -1,6 +1,6 @@
 # YD 契约发布记录
 
-此文档与组件/API/视觉规范同步维护，区分工作区能力、已发布能力和插件依赖，不能以源码版本代替远程验签结果。发布只使用 Nexus `npm-public`，GitLab 负责 tag 流水线，具体流程见 `.codex/skills/yudream-contract-release/`。
+此文档与组件/API/视觉规范同步维护，区分工作区能力、已发布能力和插件依赖，不能以源码版本代替远程验签结果。发布只使用 Nexus `npm-public`，GitLab 负责 tag 流水线，发布顺序与门禁见 [`docs/dev/contract-release.md`](dev/contract-release.md)。
 
 ## 本次 YD 组件与 Agent 能力
 

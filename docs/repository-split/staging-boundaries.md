@@ -57,8 +57,7 @@ git add yudream-frontend/packages/components/package.json
 下面这些路径如果不是这次拆仓必需，建议单独处理：
 
 - `.idea/`
-- `.codex/skills/`
-- `skills/`
+- `docs/dev/`、`docs/exp/`（工程规范与经验库，拆仓工作需人工判断归属）
 - `docs/plans/`
 - 与拆仓无关的业务页面样式或交互调整
 
