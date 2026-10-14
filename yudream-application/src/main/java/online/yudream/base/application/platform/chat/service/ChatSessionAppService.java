@@ -22,6 +22,7 @@ public class ChatSessionAppService {
     private final CapabilityAppService capabilities;
     private final ChatSessionRepo sessionRepo;
     private final ChatMessageRepo messageRepo;
+    private final online.yudream.base.domain.platform.ai.repo.AiRunRepo runRepo;
 
     @Transactional(readOnly = true)
     public List<ChatSessionDTO> list(Long userId) {
@@ -61,6 +62,7 @@ public class ChatSessionAppService {
         requireUser(userId);
         ChatSession session = session(sessionId);
         session.belongsTo(userId);
+        if (!runRepo.list(userId, String.valueOf(sessionId), true).isEmpty()) throw new BizException("请先取消当前会话运行，再删除会话");
         messageRepo.deleteBySessionId(sessionId);
         sessionRepo.deleteById(sessionId);
     }
@@ -77,10 +79,10 @@ public class ChatSessionAppService {
         if (cmd.getScopeType() != null) {
             session.setScopeType(cmd.getScopeType());
         }
-        session.setAgentCode(cmd.getAgentCode());
-        session.setSpaceSlug(cmd.getSpaceSlug());
-        session.setProviderCode(cmd.getProviderCode());
-        session.setModelCode(cmd.getModelCode());
+        if (cmd.getAgentCode() != null || cmd.getScopeType() != null) session.setAgentCode(cmd.getAgentCode());
+        if (cmd.getSpaceSlug() != null || cmd.getScopeType() != null) session.setSpaceSlug(cmd.getSpaceSlug());
+        if (cmd.getProviderCode() != null) session.setProviderCode(cmd.getProviderCode());
+        if (cmd.getModelCode() != null || cmd.getProviderCode() != null) session.setModelCode(cmd.getModelCode());
     }
 
     private ChatSession session(Long id) {

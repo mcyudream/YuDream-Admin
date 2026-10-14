@@ -11,6 +11,12 @@ import java.util.List;
 
 @Data
 public class ChatSendCmd {
+    private boolean contextEnabled;
+    private boolean frontendToolsEnabled;
+    private online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO frontendContext;
+    /** 服务端每轮构造；不从 HTTP 接收工具实现。 */
+    private List<online.yudream.base.domain.platform.ai.service.AiAgentTool> scopedTools;
+    private String frontendContextPrompt = "";
     private Long sessionId;
     private ChatScopeType scopeType;
     private String agentCode;

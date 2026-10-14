@@ -329,12 +329,36 @@
       "text": "权限树/矩阵/溯源共享 src/utils/permission-catalog.ts，按业务域→稳定资源码→动作分类→权限展示，assign-*匹配完整规范后缀；历史入口与接口动作按SystemMenuModule真实绑定归同资源独立叶子，resourceAliases不得按中文同名猜测，插件嵌套码归稳定owner，中文标签按完整目录稳定归一。历史未知码兼容保留，搜索勾选只更新可见叶子，全选合并而不删除暂失效插件码。权限树按叶子分页叠加YdTree虚拟窗口，目录/搜索索引缓存、搜索防抖，勾选只merge本页可见叶、保留跨页与未知授权，明确区分本页与全目录操作；矩阵默认只读，可明确开启差量编辑；角色权限/用户角色以原完整数组CAS，冲突保留意图拒绝覆盖，用户新增角色校验已有部门并在CAS中复核，SUPER_ADMIN和历史*锁定单项操作。overview用户/菜单分别校验system:user:view与system:menu:view，全量统计由轻量仓储聚合不按分页，菜单关系复用真实可见码算法。SaTokenUserContextStore只能读取本人tokenSession；他人展示contextSource=DEFAULT默认部门/角色，不冒充真实在线会话。目录同码元数据稳定归一，真实ANNOTATION优先实际注册MANUAL、MENU只补缺，CATEGORY/LAYOUT不登记；重建sysPermission先可回读备份、完整计划验证、写失败恢复，并验证角色/用户/菜单指纹不变，不重新播种或启停插件。规范见docs/system/permission-management.md。"
     },
     {
+      "key": "yd-ui-only-design-contract",
+      "text": "宿主与插件Vue Web业务只用公开Yd/useYd，Fa/Reka/Arco等仅组件内部与明确provider装配；缺少能力先封装再同步导出/resolver/SDK/预览/文档/严格审查。视觉与动效、流程/树/选择弹层选型以docs/yd-ui-guidelines.md为权威，AGENTS与插件规则副本在同一工作项实时维护，发布验签后才能同步下游，禁止行级disable和未发布版本掩盖缺口。 主题资产豁免须核对插件元数据、单一scope及声明style.css：SITE只在SITE锚点、ADMIN只在:root/.dark声明变量；消费和未隔离的双scope资产不豁免。严格门禁使用完整SFC/TS/JSX语法树、真实公开入口及逐文件逐规则历史基线，禁止工作区基线掩盖新增。 历史违规清零后保留 findings={} 与验收提交 SHA，CI 按零违规阻断；只能从明确已提交版本生成基线，不能从工作区或扩大历史例外。"
+    },
+    {
       "key": "plugin-menu-business-categories",
       "text": "新插件必须在plugin.yml声明menu块，menu.mode缺省CATEGORY、menu.category以主要业务大类mc/todo/social/other或自定义code/name/icon/sort归组；共享一级CATEGORY代码plugin-category:{code}由宿主拥有，无路由/权限，不随单插件停用。模块和功能放分类下，parentCode显式优先；INDEPENDENT仅明确个例，缺整个menu或LEGACY保留旧插件结构，持久化菜单不自动搬移或覆盖。菜单管理新建根默认分类，前端分类生成必须兼容有path的旧根MENU/LINK。详见docs/plugin-system/specification.md第10节。"
     },
     {
-      "key": "yd-ui-only-design-contract",
-      "text": "宿主与插件Vue Web业务只用公开Yd/useYd，Fa/Reka/Arco等仅组件内部与明确provider装配；缺少能力先封装再同步导出/resolver/SDK/预览/文档/严格审查。视觉与动效、流程/树/选择弹层选型以docs/yd-ui-guidelines.md为权威，AGENTS与插件规则副本在同一工作项实时维护，发布验签后才能同步下游，禁止行级disable和未发布版本掩盖缺口。 主题资产豁免须核对插件元数据、单一scope及声明style.css：SITE只在SITE锚点、ADMIN只在:root/.dark声明变量；消费和未隔离的双scope资产不豁免。严格门禁使用完整SFC/TS/JSX语法树、真实公开入口及逐文件逐规则历史基线，禁止工作区基线掩盖新增。 历史违规清零后保留 findings={} 与验收提交 SHA，CI 按零违规阻断；只能从明确已提交版本生成基线，不能从工作区或扩大历史例外。"
+      "key": "ai-persistent-run-outlet",
+      "text": "AI 的 UI 进度统一走持久 AiRun 事件信封与 cursor，正文、真实 reasoning、工具、生命周期独立；浏览器断开只停止观察，刷新先还原快照，再从一致游标补齐，不重新提交。原生 AgentSession 管理执行与恢复，Mongo Session Log 必须原子追加和租约隔离，平台投影不得冒充原生检查点。"
+    },
+    {
+      "key": "ai-streaming-no-fallback",
+      "text": "AiGenerationGateway 与 PluginAiService 缺真流式实现时必须明确失败，禁止阻塞 generate/chat/runAgent 后整段 onDelta 回放；共享模型网关统一进行额度预占与实际结算，异步身份来自可信入口捕获，后台未绑定用户使用独立系统预算。"
+    },
+    {
+      "key": "ai-native-session-storage",
+      "text": "AgentScope原生AgentSession按用户/Agent/会话隔离构建且运行后关闭，Session Log显式绑定共享Mongo RemoteFilesystem；USER长期记忆仅已认证账号，匿名用SESSION隔离。工具暂停持久化原生pending，恢复只回答原request不重复submit；插件通配权限不能替代本站实时角色权限。"
+    },
+    {
+      "key": "ai-restored-actor-permissions",
+      "text": "原生任务恢复以原调用者当前角色权限为准；管理员accept仅核销确认，不能把自己的*权限注入匿名SYSTEM或其他用户工具。原外部actor/connection/channel/trace、有效点名工具与沙箱引用私有持久，失效沙箱拒绝恢复，不回落真实连接。"
+    },
+    {
+      "key": "ai-workflow-waiting-checkpoint",
+      "text": "业务DAG遇到原生ASK/外部执行时保存原图与节点frame后停在WAITING，后续输出校验与业务节点等待真实答复；回复接续原图，不重跑已提交副作用，无法验证的中断明确失败保留日志。插件跨进程作业保存runId并消费getRun.response最终业务值，不把UI多节点累计正文当结构化最终结果。"
+    },
+    {
+      "key": "ai-unknown-usage-ledger",
+      "text": "每次实际模型调用统一原子预占、续租与结算；启动后缺可靠usage保留待核对预算，已知部分计实际消费，其余保留，不伪造零用量；管理核对幂等仅补差额，额度上限更新不得覆盖并发账本。用户与SYSTEM0按上海日期分账。"
     }
   ],
   "utilities": [

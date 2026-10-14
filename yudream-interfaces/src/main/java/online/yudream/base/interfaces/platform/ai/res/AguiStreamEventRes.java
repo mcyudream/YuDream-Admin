@@ -23,4 +23,6 @@ public class AguiStreamEventRes {
     private Object patch;
     private Object result;
     private String message;
+    private String action;
+    private String code;
 }

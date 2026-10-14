@@ -24,6 +24,9 @@ import online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.service.AiGenerationObserverScope;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
+import online.yudream.base.domain.platform.ai.service.AiUsageQuotaGateway;
 import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
@@ -32,6 +35,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.ai.valobj.AiUsage;
+import online.yudream.base.domain.platform.ai.valobj.AiUsageReservation;
 import online.yudream.base.infra.platform.ai.service.AiClientProperties;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
@@ -75,6 +79,12 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
     private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
     private final PluginAiToolRegistry pluginAiToolRegistry;
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
+    private AiUsageQuotaGateway usageQuotaGateway;
+
+    @Autowired(required = false)
+    void setUsageQuotaGateway(AiUsageQuotaGateway usageQuotaGateway) {
+        this.usageQuotaGateway = usageQuotaGateway;
+    }
 
     @Autowired(required = false)
     void setToolExecutionGuard(AgentToolExecutionGuard toolExecutionGuard) {
@@ -99,28 +109,7 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
-        Generation generation = prepare(request, null, null);
-        try {
-            if (generation.structuredSchema() != null) {
-                Msg reply = generation.agent()
-                        .call(generation.messages(), generation.structuredSchema(), RuntimeContext.empty())
-                        .block(generation.timeout());
-                return finish(reply, generation, true);
-            }
-            if (generation.agent() != null) {
-                Msg reply = generation.agent()
-                        .call(generation.messages(), RuntimeContext.empty())
-                        .block(generation.timeout());
-                return finish(reply, generation, false);
-            }
-            DirectRun run = new DirectRun();
-            run.subscribe(generation);
-            return toResult(run.content(), generation.toolResults(), run.usage());
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw translate("AI 调用异常", e);
-        }
+        return generateStream(request, null, null, null, null);
     }
 
     @Override
@@ -141,12 +130,22 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        Generation generation = prepare(request, onTool, onProgress);
+        var observation = AiGenerationObserverScope.capture(request);
+        if (observation != null) {
+            if (onDelta == null) onDelta = observation::content;
+            if (onReasoningDelta == null) onReasoningDelta = observation::reasoning;
+            if (onTool == null) onTool = observation::tool;
+            if (onProgress == null) onProgress = observation::progress;
+        }
+        Generation generation = prepare(request, onTool, onProgress,
+                new HarnessRunEvents(onDelta, onReasoningDelta, onProgress));
+        AiUsageReservation reservation = reserve(request);
+        if (reservation != null) generation.events().onModelStarted(() -> usageQuotaGateway.markStarted(reservation));
         progress(onProgress, "request", "正在准备模型请求。");
         try {
             if (generation.structuredSchema() != null) {
                 Msg reply = generation.agent()
-                        .call(generation.messages(), generation.structuredSchema(), RuntimeContext.empty())
+                        .call(generation.messages(), generation.structuredSchema(), generation.context())
                         .block(generation.timeout());
                 progress(onProgress, "complete", "AI 处理完成。");
                 return finish(reply, generation, true);
@@ -165,6 +164,27 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
             throw e;
         } catch (Exception e) {
             throw translate("AI 流式调用异常", e);
+        } finally {
+            settle(generation, reservation);
+        }
+    }
+
+    private AiUsageReservation reserve(AiGenerationRequest request) {
+        return usageQuotaGateway == null ? null : usageQuotaGateway.reserve(
+                AiUsageExecutionScope.currentUserId(), HarnessAgentRuntime.quotaBudget(
+                        request.config() == null ? Map.of() : request.config()));
+    }
+
+    private void settle(Generation generation, AiUsageReservation reservation) {
+        try {
+            if (generation.agent() != null) {
+                generation.agent().close();
+            }
+        } finally {
+            if (usageQuotaGateway != null && reservation != null) {
+                if (generation.events().hasUnknownUsage()) usageQuotaGateway.uncertain(reservation, generation.events().usage());
+                else usageQuotaGateway.settle(reservation, generation.events().usage());
+            }
         }
     }
 
@@ -184,7 +204,7 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
     // ------------------------------------------------------------------
 
     private Generation prepare(AiGenerationRequest request, Consumer<AiAgentToolResult> onTool,
-                               Consumer<AiGenerationProgress> onProgress) {
+                               Consumer<AiGenerationProgress> onProgress, HarnessRunEvents events) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
         ResolvedAiModel resolved = providerConfigParser.resolve(config, request.providerCode(), request.modelCode(), providerAdapters);
         validate(resolved);
@@ -194,13 +214,16 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
         }
         GenerateOptions options = resolved.adapter()
                 .generateOptions(resolved.provider(), resolved.model(), request);
-        Model model = models.resolve(resolved);
+        Model model = new MeteredAgentScopeModel(models.resolve(resolved), events);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         List<ToolSchema> registered = List.of();
         Toolkit toolkit = null;
         boolean wantsTools = request.toolCallingEnabled() && request.toolMode() != AiToolMode.NONE;
         if (wantsTools) {
             List<Object> tools = scopedTools(toolResults, onTool, onProgress);
+            boolean interactive = tools.stream().anyMatch(tool -> tool instanceof AgentToolAdapter adapter && adapter.requiresPersistentInteractions()
+                    || tool instanceof PluginAiToolAdapter pluginAdapter && pluginAdapter.requiresPersistentInteractions());
+            if (interactive) throw new BizException("审批或外部执行工具需要持久 Agent 会话，请使用 Agent 工作流或会话入口");
             if (!tools.isEmpty()) {
                 Toolkit callToolkit = new Toolkit();
                 tools.forEach(tool -> callToolkit.registerAgentTool((io.agentscope.core.tool.AgentTool) tool));
@@ -208,9 +231,10 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
             }
         }
         JsonNode structuredSchema = structuredSchema(request);
+        events.structuredToolDeltas(structuredSchema != null);
         // 结构化输出必须走 Agent 结构化路径（框架负责原生/合成工具降级），因此即便无工具也装配 Agent。
         ReActAgent agent = toolkit != null || structuredSchema != null
-                ? buildAgent(resolved, options, model, toolkit, request.systemPrompt())
+                ? buildAgent(resolved, options, model, toolkit, request.systemPrompt(), events)
                 : null;
         List<Msg> messages = agent == null ? messages(request) : conversationMessages(request);
         log.debug("AI call start, provider={}, endpoint={}, model={}, promptLength={}, images={}, tools={}, structured={}",
@@ -221,17 +245,23 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
                 request.imageDataUrls().size(),
                 toolkit == null ? 0 : toolkit.getToolSchemas().size(),
                 request.structuredOutput().mode());
-        return new Generation(resolved, options, model, toolResults, agent, messages, structuredSchema, timeout(), onProgress);
+        var collector = new HarnessToolCollector(result -> {
+            toolResults.add(result);
+            if (onTool != null) onTool.accept(result);
+        });
+        RuntimeContext context = RuntimeContext.builder().put(HarnessToolCollector.class, collector).build();
+        return new Generation(resolved, options, model, toolResults, agent, messages, structuredSchema, timeout(), onProgress, events, context);
     }
 
     private ReActAgent buildAgent(ResolvedAiModel resolved, GenerateOptions options, Model model, Toolkit toolkit,
-                                  String systemPrompt) {
+                                  String systemPrompt, HarnessRunEvents events) {
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name(AGENT_NAME)
                 .sysPrompt(systemPrompt == null ? "" : systemPrompt.trim())
                 .model(model)
                 .maxIters(16)
                 .maxRetries(2)
+                .middleware(events)
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.BYPASS)
                         .build());
@@ -357,55 +387,12 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
 
     private AgentToolAdapter adapter(AiAgentTool tool, List<AiAgentToolResult> toolResults,
                                      Consumer<AiAgentToolResult> onTool) {
-        return new AgentToolAdapter(recording(tool, toolResults, onTool), permissionGateway(), toolExecutionGuard);
+        return new AgentToolAdapter(tool, permissionGateway(), toolExecutionGuard);
     }
 
     private PluginAiToolAdapter pluginAdapter(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext scope,
                                               List<AiAgentToolResult> toolResults, Consumer<AiAgentToolResult> onTool) {
-        return new PluginAiToolAdapter(new PluginAiTool() {
-            @Override
-            public online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor descriptor() {
-                return tool.descriptor();
-            }
-
-            @Override
-            public online.yudream.base.plugin.spi.system.ai.PluginAiToolResult execute(
-                    online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context,
-                    online.yudream.base.plugin.spi.system.ai.PluginAiToolCall call) {
-                var value = tool.execute(context, call);
-                AiAgentToolResult result = new AiAgentToolResult(
-                        tool.descriptor().name(), value.action(), context.traceId(), value.message(), value.payload());
-                toolResults.add(result);
-                if (onTool != null) {
-                    onTool.accept(result);
-                }
-                return value;
-            }
-        }, scope);
-    }
-
-    private AiAgentTool recording(AiAgentTool tool, List<AiAgentToolResult> toolResults, Consumer<AiAgentToolResult> onTool) {
-        return new AiAgentTool() {
-            @Override
-            public online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor descriptor() {
-                return tool.descriptor();
-            }
-
-            @Override
-            public online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk risk() {
-                return tool.risk();
-            }
-
-            @Override
-            public AiAgentToolResult execute(AiAgentToolCall call) {
-                AiAgentToolResult result = tool.execute(call);
-                toolResults.add(result);
-                if (onTool != null) {
-                    onTool.accept(result);
-                }
-                return result;
-            }
-        };
+        return new PluginAiToolAdapter(tool, scope, toolExecutionGuard);
     }
 
     private boolean pluginGranted(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context) {
@@ -436,7 +423,9 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
         if (structured && reply.hasStructuredData()) {
             content = ToolSchemas.resultJson(reply.getStructuredData(false));
         }
-        return toResult(content, generation.toolResults(), usageOf(reply.getUsage()));
+        AiUsage usage = generation.events().usage();
+        return toResult(content, generation.toolResults(), usage.totalTokens() > 0
+                ? usage : usageOf(reply.getUsage()));
     }
 
     private static AiUsage usageOf(ChatUsage usage) {
@@ -508,52 +497,22 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
      */
     private final class AgentRun {
         private final Generation generation;
-        private final Consumer<String> onDelta;
-        private final Consumer<String> onReasoningDelta;
-        private final StringBuilder content = new StringBuilder();
-        private volatile AiUsage usage = AiUsage.empty();
 
         AgentRun(Generation generation, Consumer<String> onDelta, Consumer<String> onReasoningDelta) {
             this.generation = generation;
-            this.onDelta = onDelta;
-            this.onReasoningDelta = onReasoningDelta;
         }
 
         void run() {
-            StringBuilder reasoning = new StringBuilder();
-            generation.agent().streamEvents(generation.messages(), RuntimeContext.empty())
-                    .doOnNext(event -> {
-                        if (event instanceof io.agentscope.core.event.TextBlockDeltaEvent delta) {
-                            if (content.isEmpty() && generation.onProgress != null) {
-                                progress(generation.onProgress, "first-delta", "模型已开始输出内容。");
-                            }
-                            content.append(delta.getDelta());
-                            if (onDelta != null) {
-                                onDelta.accept(delta.getDelta());
-                            }
-                        } else if (event instanceof io.agentscope.core.event.ThinkingBlockDeltaEvent thinking) {
-                            reasoning.append(thinking.getDelta());
-                            if (onReasoningDelta != null) {
-                                onReasoningDelta.accept(thinking.getDelta());
-                            }
-                        } else if (event instanceof io.agentscope.core.event.ModelCallEndEvent modelEnd
-                                && modelEnd.getUsage() != null) {
-                            usage = usageOf(modelEnd.getUsage());
-                        } else if (event instanceof io.agentscope.core.event.ToolResultEndEvent toolEnd
-                                && generation.onProgress != null) {
-                            progress(generation.onProgress, "tool-complete",
-                                    "工具调用完成：" + toolEnd.getToolCallName());
-                        }
-                    })
+            generation.agent().streamEvents(generation.messages(), generation.context())
                     .blockLast(generation.timeout());
         }
 
         String content() {
-            return content.toString();
+            return generation.events().content();
         }
 
         AiUsage usage() {
-            return usage;
+            return generation.events().usage();
         }
     }
 
@@ -584,16 +543,17 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
             if (onProgress != null) {
                 flux = flux.doFirst(() -> progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。"));
             }
-            flux.doOnNext(chunk -> {
+            try {
+                flux.doOnNext(chunk -> {
                         if (chunk.getUsage() != null && chunk.getUsage().getTotalTokens() > 0) {
                             usage.set(chunk.getUsage());
                         }
                         for (ContentBlock block : chunk.getContent()) {
-                            if (block instanceof ThinkingBlock thinking && StringUtils.hasText(thinking.getThinking())) {
+                            if (block instanceof ThinkingBlock thinking && thinking.getThinking() != null && !thinking.getThinking().isEmpty()) {
                                 if (onReasoningDelta != null) {
                                     onReasoningDelta.accept(thinking.getThinking());
                                 }
-                            } else if (block instanceof TextBlock text && StringUtils.hasText(text.getText())) {
+                            } else if (block instanceof TextBlock text && text.getText() != null && !text.getText().isEmpty()) {
                                 if (content.isEmpty() && onProgress != null) {
                                     progress(onProgress, "first-delta", "模型已开始输出内容。");
                                 }
@@ -605,6 +565,9 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
                         }
                     })
                     .blockLast(generation.timeout());
+            } finally {
+                generation.events().recordUsage(usage.get());
+            }
         }
 
         String content() {
@@ -631,7 +594,9 @@ public class AgentScopeGenerationGateway implements AiGenerationGateway {
             List<Msg> messages,
             JsonNode structuredSchema,
             Duration timeout,
-            Consumer<AiGenerationProgress> onProgress
+            Consumer<AiGenerationProgress> onProgress,
+            HarnessRunEvents events,
+            RuntimeContext context
     ) {
     }
 }

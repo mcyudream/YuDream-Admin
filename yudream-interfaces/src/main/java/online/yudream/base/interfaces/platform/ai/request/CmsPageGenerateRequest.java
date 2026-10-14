@@ -6,6 +6,8 @@ import java.util.List;
 
 @Data
 public class CmsPageGenerateRequest {
+    @jakarta.validation.constraints.Size(max = 200)
+    private String contextKey;
     private String agentCode;
     private String title;
     private String prompt;

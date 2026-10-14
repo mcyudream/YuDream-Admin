@@ -19,6 +19,8 @@ public record WikiIngestTaskRes(
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
         long sortOrder,
-        String payloadJson
+        String payloadJson,
+        String requestedByUserId,
+        String aiRunId
 ) {
 }

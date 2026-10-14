@@ -43,4 +43,7 @@ public interface AgentTraceSession {
 
     default void fail(RuntimeException error) {
     }
+
+    /** 暂停只保存进行中的追踪，不把等待审批误记为成功或失败。 */
+    default void suspend() { }
 }

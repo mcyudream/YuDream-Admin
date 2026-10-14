@@ -10,6 +10,8 @@ public record ChatQuotaRes(
         LocalDate usageDate,
         long usedTokens,
         long limitTokens,
-        long remainingTokens
+        long remainingTokens,
+        long reservedTokens,
+        long uncertainTokens
 ) {
 }

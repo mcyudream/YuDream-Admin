@@ -33,4 +33,7 @@ public class HarnessRuntimeProperties {
 
     /** 是否启用双层长期记忆（日流水账 + MEMORY.md 每轮注入）；关闭可省去每轮后的提炼调用 */
     private boolean memoryHooksEnabled = true;
+
+    /** 允许工作区 profile 委派子 Agent；默认关闭，需先配置真实执行边界。 */
+    private boolean subagentsEnabled = false;
 }

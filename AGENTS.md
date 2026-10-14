@@ -61,11 +61,15 @@
 
 - AI 底层由 AgentScope Java（`io.agentscope:agentscope-harness`）承载，禁止在框架中手搓 AI 底层逻辑：模型实例构建/连接复用（`AgentScopeModels`）、流式拆包、工具调用循环、结构化输出与降级、重试一律交给框架。供应商差异经 `AiProviderAdapter` 产出 AgentScope `GenerateOptions`（`additionalBodyParams` 注入 thinking、`toolChoice`、`reasoningEffort` 等）。
 - AI 配置必须 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`。Kimi/DeepSeek 等兼容供应商走 AgentScope 官方 compat formatter，并禁用「结构化输出与工具共存」的原生路径。
-- 有状态会话（通用聊天、Wiki 问答等）走 `HarnessAgentRuntime`（`HarnessAgent` 单例 per agentCode + MongoDB `AgentStateStore`/`BaseStore`，`IsolationScope.USER` 多副本隔离）：上下文、压缩、双层长期记忆由框架 `AgentState` 管理，平台消息表仅作 UI 投影，禁止再手工裁剪历史；聊天型 Agent 必须禁用宿主文件系统与 shell 工具。无状态/一次性调用走 `AgentScopeGenerationGateway`（domain `AiGenerationGateway` 端口）。
+- 有状态会话（通用聊天、Wiki 问答等）走 `HarnessAgentRuntime`：按用户、Agent、会话构建隔离的 `HarnessAgent`，任务通过原生 `AgentSession` 提交与恢复，后台运行结束后关闭实例；MongoDB `AgentStateStore` / `BaseStore` / 原子 Session Log 持久化上下文与检查点，禁止复用跨用户可变 Agent 单例。上下文、压缩、记忆、队列与工具循环由框架管理，平台消息表和 `AiRun` 仅作 UI 投影。聊天型 Agent 禁用宿主文件系统与 shell 工具；工作区工具只在授权的隔离 profile 开启。无状态调用走 `AgentScopeGenerationGateway`。依赖版本必须从 `pom.xml` 读取并核实其真实 API，不以网页描述代替已发布制品。
+- Session Log 必须显式绑定共享 Mongo `RemoteFilesystem`，不能因配置了远程工作区就假定默认日志已远程保存。已认证用户长期记忆按 USER 隔离；匿名调用按 SESSION 隔离，禁止共用匿名用户长期记忆。插件声明的通配权限不替代本站账号实时权限，未绑定账号只能使用不要求本站权限的工具。
 - Agent 工具权限四层控制：① schema 层按权限快照过滤模型可见工具（`PerCallToolFilterMiddleware`）；② 规则/模式层（`PermissionContextState`）；③ 执行层以 RuntimeContext 权限快照复核、fail-closed（`AgentToolAdapter`）；④ 沙箱守卫最后把关。插件 DESTRUCTIVE/需确认工具必须走权限系统 ASK（HITL）。工具描述符到模型 schema 的归一化与安全名转换走 `ToolSchemas`。
 - 技能框架级统一管理：`platformAgentSkill`（`MongoAgentSkillRepository implements AgentSkillRepository`）是所有 Harness Agent 的技能源，启用技能随每轮推理进入 `<available_skills>`；管理端 `/api/platform/agent-skills`（view/create/edit/delete 按动作词表拆分）。
 - Agent 路径（ReActAgent/HarnessAgent）的 system prompt 必须经 `sysPrompt`/`onSystemPrompt` 注入，输入消息列表禁止携带 SYSTEM 消息；模型可见工具名一律 `ToolSchemas.safeName`。
 - SSE 必须端到端真流式；事件使用可扩展信封（`ai.message`/`ai.tool`/`ai.result`/`ai.error` 等，含 `event/action/module/traceId/timestamp/payload`）。发送结构化 `ai.error` 后正常 complete，不得再 `completeWithError`。
+- 所有面向用户的 AI 通过统一持久运行出口；正文与真实推理增量分开，工具与生命周期进度独立。禁止阻塞响应后整段回放、计时打字或断线后重新提交输入。刷新先恢复快照及对应游标，再续读事件；浏览器关闭/切页只解除观察，取消需显式请求。额度在统一网关原子预占、实际用量结算并幂等释放，插件与系统后台调用同样计入预算。
+- 全局 AI 助手要求登录及对应权限，状态由根级 store 持有。页面/路由感知、导航、高亮分别可关闭；上下文只提交经过权限过滤的元数据与显式注册功能，不抓取 DOM、表单、query 或 token。前端工具必须按稳定路由/操作标识校验和回传真实结果，禁止任意 selector、脚本或自动点击。
+- 原生审批与外部工具等待保留 `WAITING` 任务，回复沿原 turn 接续；业务工作流保存原图及节点检查点，禁止重跑已执行业务副作用。恢复权限属于原调用者，管理员确认不能借出自己的 `*` 权限。插件/QQ 调用只存原触发寻址与工具名单，沙箱失效必须拒绝恢复，禁止回落真实连接。插件持久接口与最终业务响应见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；完整运行、工作区与额度规则见 `docs/platform/ai-foundation.md`。
 - YD Agent 工作台只呈现 Harness 的运行与权限状态；回答按 version 1 的 markdown/reference/tool 块校验、渲染，引用原文与工具卡片独立于推理。Markdown HTML 局部清理，外链仅 HTTP(S)，文件引用与工具重试交宿主事件；Skills、MCP、工作区和审批的演示不得冒充真实连接。组件契约见 `docs/yd-agent-workbench.md`。
 - CMS 改动必须是完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面/模板元数据，以及 GrapesJS 可视化构建兼容存储（`htmlContent`/`cssContent`/`builderProjectJson`）。
 

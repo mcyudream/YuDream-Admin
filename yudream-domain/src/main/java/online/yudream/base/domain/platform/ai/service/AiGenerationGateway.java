@@ -21,14 +21,7 @@ public interface AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        AiGenerationResult result = generate(request);
-        if (onDelta != null && result.summary() != null && !result.summary().isBlank()) {
-            onDelta.accept(result.summary());
-        }
-        if (onTool != null && result.toolResults() != null) {
-            result.toolResults().forEach(onTool);
-        }
-        return result;
+        throw new UnsupportedOperationException("当前 AI 网关未实现真实流式生成");
     }
 
     /**

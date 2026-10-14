@@ -27,6 +27,7 @@ public final class AgentWorkflowRunState {
     private final List<AiAgentToolResult> toolResults = new ArrayList<>();
     private final StringBuilder reasoning = new StringBuilder();
     private AiUsage usage = AiUsage.empty();
+    private final Map<String, Integer> modelInvocations = new java.util.LinkedHashMap<>();
 
     public AgentWorkflowRunState(
             AgentApplication application,
@@ -92,6 +93,22 @@ public final class AgentWorkflowRunState {
     /** 一次工作流运行的稳定标识：工作区会话按它隔离。 */
     public String runKey() {
         return runKey;
+    }
+
+    /** 循环再次执行同一模型节点时仍提交新一轮输入，重放同一节点调用保持同一幂等键。 */
+    public String nextModelInvocation(String nodeId) {
+        int sequence = modelInvocations.merge(nodeId, 1, Integer::sum);
+        return nodeId + ":" + sequence;
+    }
+
+    public Map<String, Integer> modelInvocations() { return Map.copyOf(modelInvocations); }
+
+    /** 恢复累计账本，历史内容不作为新的增量回放。 */
+    public void restore(Map<String, Integer> invocations, String priorReasoning, List<AiAgentToolResult> priorTools, AiUsage priorUsage) {
+        modelInvocations.clear(); modelInvocations.putAll(invocations);
+        reasoning.setLength(0); reasoning.append(priorReasoning == null ? "" : priorReasoning);
+        toolResults.clear(); toolResults.addAll(priorTools == null ? List.of() : priorTools);
+        usage = priorUsage == null ? AiUsage.empty() : priorUsage;
     }
 
     public AgentApplication application() {

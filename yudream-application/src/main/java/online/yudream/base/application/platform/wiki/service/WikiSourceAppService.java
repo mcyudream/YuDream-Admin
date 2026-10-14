@@ -17,12 +17,15 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiSourceFormat;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiRemoteImageFetcher;
-import online.yudream.base.domain.platform.wiki.service.WikiVisionCaptionGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiWebPageFetcher;
 import online.yudream.base.domain.platform.wiki.valobj.WikiRemoteImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebPage;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
+import online.yudream.base.application.platform.ai.service.AiRunAppService;
+import online.yudream.base.application.platform.ai.dto.AiRunDTO;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -30,7 +33,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,10 +59,10 @@ public class WikiSourceAppService {
     private final WikiSpaceRepo spaceRepo;
     private final WikiSourceRepo sourceRepo;
     private final FileAppService fileAppService;
-    private final WikiSourceExtractionService extractionService;
     private final WikiWebPageFetcher webPageFetcher;
     private final WikiRemoteImageFetcher remoteImageFetcher;
-    private final WikiVisionCaptionGateway visionCaptionGateway;
+    private final WikiImageCaptionService imageCaptions;
+    private final ObjectProvider<AiRunAppService> runs;
     private final WikiIngestAppService ingestAppService;
 
     @Transactional
@@ -80,7 +82,6 @@ public class WikiSourceAppService {
             Long fileObjectId = fileAppService.upload(new java.io.ByteArrayInputStream(bytes), fileName, contentType,
                     size, "wiki-source", null, false).getId();
             WikiSource source = WikiSource.file(spaceId, folderPath, fileName, fileName, contentType, fileObjectId, hash);
-            extractionService.extract(source, space, aiConfig());
             WikiSource saved = sourceRepo.save(source);
             ingestAppService.enqueueIngest(spaceId, saved.getId());
             return WikiKnowledgeAssembler.source(saved);
@@ -188,39 +189,21 @@ public class WikiSourceAppService {
         if (!StringUtils.hasText(space.getVisionProviderCode()) || !StringUtils.hasText(space.getVisionModelCode())) {
             throw new BizException("该知识库未配置视觉模型");
         }
-        List<WikiSourceImage> images = new ArrayList<>();
-        for (WikiSourceImage image : source.getImages()) {
-            if (image.captionStatus() == WikiCaptionStatus.CAPTIONED) {
-                images.add(image);
-                continue;
-            }
-            images.add(caption(space, image, callerId));
-        }
-        source.setImages(images);
+        imageCaptions.caption(source, space, callerId, aiConfig());
         return WikiKnowledgeAssembler.source(sourceRepo.save(source));
     }
 
-    private WikiSourceImage caption(WikiSpace space, WikiSourceImage image, Long callerId) {
-        try {
-            // 仅允许公开文件或调用方本人文件进入视觉模型，防止站内 id 枚举读取私有文件。
-            FileContentDTO content = fileAppService.content(image.fileObjectId(), callerId, false);
-            byte[] bytes;
-            try (InputStream inputStream = content.getInputStream()) {
-                bytes = inputStream.readAllBytes();
+    public AiRunDTO startCaptionImages(Long sourceId, Long callerId) {
+        enabled();
+        var runner = runs.getIfAvailable();
+        if (runner == null) throw new BizException("项目未开放 AI 能力");
+        sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
+        return runner.start(callerId, "wiki-caption", "wiki-caption:" + sourceId, emitter -> {
+            emitter.input("重新生成资料图片描述");
+            try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(callerId)) {
+                return captionImages(sourceId, callerId);
             }
-            String dataUrl = "data:" + image.contentType() + ";base64," + Base64.getEncoder().encodeToString(bytes);
-            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
-                    aiConfig(), dataUrl);
-            return new WikiSourceImage(image.fileObjectId(), image.pageNumber(), image.sequence(), caption,
-                    WikiCaptionStatus.CAPTIONED, space.getVisionProviderCode(), space.getVisionModelCode(),
-                    image.width(), image.height(), image.contentType());
-        }
-        catch (Exception exception) {
-            log.warn("图片 caption 失败：{}", exception.getMessage());
-            return new WikiSourceImage(image.fileObjectId(), image.pageNumber(), image.sequence(), image.caption(),
-                    WikiCaptionStatus.FAILED, image.captionProviderCode(), image.captionModelCode(),
-                    image.width(), image.height(), image.contentType());
-        }
+        }, null);
     }
 
     /**
@@ -236,7 +219,7 @@ public class WikiSourceAppService {
         List<WikiSourceImage> images = new ArrayList<>();
         boolean captionEnabled = StringUtils.hasText(space.getVisionProviderCode())
                 && StringUtils.hasText(space.getVisionModelCode());
-        Map<String, String> aiConfig = captionEnabled ? aiConfig() : Map.of();
+        Map<String, String> aiConfig = Map.of();
         while (matcher.find()) {
             if (images.size() >= MAX_MARKDOWN_IMAGES) {
                 break;
@@ -275,7 +258,7 @@ public class WikiSourceAppService {
         return new MarkdownImageIngest(rewritten, images);
     }
 
-    /** 站内已存储图片：登记为资料图片，配置了视觉模型时读取字节生成 caption。 */
+    /** 校验站内文件访问权并登记图片，视觉描述留给持久摄入运行。 */
     private WikiSourceImage captionStored(Long fileObjectId, int sequence, WikiSpace space,
                                           Map<String, String> aiConfig, boolean captionEnabled, Long callerId) {
         try {
@@ -287,14 +270,8 @@ public class WikiSourceAppService {
                 return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.SKIPPED,
                         space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, contentType);
             }
-            byte[] bytes;
-            try (InputStream inputStream = content.getInputStream()) {
-                bytes = inputStream.readAllBytes();
-            }
-            String dataUrl = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
-            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
-                    aiConfig, dataUrl);
-            return new WikiSourceImage(fileObjectId, 0, sequence, caption, WikiCaptionStatus.CAPTIONED,
+            closeQuietly(content);
+            return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.PENDING,
                     space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, contentType);
         }
         catch (Exception exception) {
@@ -321,18 +298,8 @@ public class WikiSourceAppService {
             return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.SKIPPED,
                     space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
         }
-        try {
-            String dataUrl = "data:" + remote.contentType() + ";base64," + Base64.getEncoder().encodeToString(remote.content());
-            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
-                    aiConfig, dataUrl);
-            return new WikiSourceImage(fileObjectId, 0, sequence, caption, WikiCaptionStatus.CAPTIONED,
-                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
-        }
-        catch (Exception exception) {
-            log.warn("图片 caption 失败：{}", exception.getMessage());
-            return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.FAILED,
-                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
-        }
+        return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.PENDING,
+                space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
     }
 
     private record MarkdownImageIngest(String markdown, List<WikiSourceImage> images) {

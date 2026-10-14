@@ -36,6 +36,8 @@ public class WikiIngestTask extends BaseDomain {
     private LocalDateTime finishedAt;
     private long sortOrder;
     private String payloadJson;
+    private Long requestedByUserId;
+    private String aiRunId;
 
     public static WikiIngestTask create(Long spaceId, Long sourceId, WikiIngestTaskType taskType,
                                         String payloadJson, long sortOrder) {

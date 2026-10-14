@@ -48,6 +48,16 @@ abstract class MongoStoreTestBase {
         }
 
         @Override
+        public <T> T insert(T objectToSave) {
+            Document document = new Document();
+            getConverter().write(objectToSave, document);
+            if (rows.putIfAbsent(String.valueOf(document.get("_id")), document) != null) {
+                throw new org.springframework.dao.DuplicateKeyException("duplicate id");
+            }
+            return objectToSave;
+        }
+
+        @Override
         public <T> T findById(Object id, Class<T> entityClass) {
             Document document = rows.get(String.valueOf(id));
             return document == null ? null : getConverter().read(entityClass, document);
@@ -80,19 +90,33 @@ abstract class MongoStoreTestBase {
         }
 
         @Override
-        public <T> T findAndModify(Query query, org.springframework.data.mongodb.core.query.UpdateDefinition update,
+        public synchronized <T> T findAndModify(Query query, org.springframework.data.mongodb.core.query.UpdateDefinition update,
                                    FindAndModifyOptions options, Class<T> entityClass) {
             for (Document document : rows.values()) {
                 if (!matches(query.getQueryObject(), document)) {
                     continue;
                 }
-                Document set = ((Update) update).getUpdateObject().get("$set", Document.class);
-                if (set != null) {
-                    set.forEach(document::put);
-                }
-                return getConverter().read(entityClass, document);
+                Document previous = new Document(document);
+                applyUpdate(document, ((Update) update).getUpdateObject(), false);
+                return getConverter().read(entityClass, options.isReturnNew() ? document : previous);
+            }
+            if (options.isUpsert()) {
+                Document created = new Document("_id", query.getQueryObject().get("_id"));
+                applyUpdate(created, ((Update) update).getUpdateObject(), true);
+                rows.put(String.valueOf(created.get("_id")), created);
+                return options.isReturnNew() ? getConverter().read(entityClass, created) : null;
             }
             return null;
+        }
+
+        private void applyUpdate(Document document, Document update, boolean inserted) {
+            Document set = update.get("$set", Document.class);
+            if (set != null) set.forEach(document::put);
+            Document inc = update.get("$inc", Document.class);
+            if (inc != null) inc.forEach((key, value) -> document.put(key,
+                    ((Number) document.getOrDefault(key, 0L)).longValue() + ((Number) value).longValue()));
+            Document seed = update.get("$setOnInsert", Document.class);
+            if (inserted && seed != null) seed.forEach(document::put);
         }
 
         @Override
@@ -115,6 +139,14 @@ abstract class MongoStoreTestBase {
 
         private boolean matches(Document criteria, Document document) {
             for (Map.Entry<String, Object> entry : criteria.entrySet()) {
+                if (entry.getKey().equals("$and")) {
+                    if (!((List<Document>) entry.getValue()).stream().allMatch(item -> matches(item, document))) return false;
+                    continue;
+                }
+                if (entry.getKey().equals("$or")) {
+                    if (!((List<Document>) entry.getValue()).stream().anyMatch(item -> matches(item, document))) return false;
+                    continue;
+                }
                 if (!matchesValue(document.get(entry.getKey()), entry.getValue())) {
                     return false;
                 }
@@ -128,7 +160,11 @@ abstract class MongoStoreTestBase {
                 if (regex != null) {
                     return actual != null && Pattern.compile(String.valueOf(regex)).matcher(String.valueOf(actual)).find();
                 }
+                if (operator.containsKey("$exists")) return (actual != null) == Boolean.TRUE.equals(operator.get("$exists"));
                 return false;
+            }
+            if (actual instanceof Number left && expected instanceof Number right) {
+                return left.longValue() == right.longValue();
             }
             return actual != null && actual.equals(expected);
         }

@@ -67,6 +67,12 @@ public class AgentWorkflowRuntimeService {
     private final CapabilityAppService capabilityAppService;
     private final AgentExecutionTracer executionTracer;
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
+    private online.yudream.base.domain.platform.agent.repo.AgentWorkflowCheckpointRepo checkpoints;
+
+    @Autowired(required = false)
+    void setCheckpoints(online.yudream.base.domain.platform.agent.repo.AgentWorkflowCheckpointRepo checkpoints) {
+        this.checkpoints = checkpoints;
+    }
 
     @Autowired(required = false)
     void setToolExecutionGuard(AgentToolExecutionGuard toolExecutionGuard) {
@@ -160,12 +166,22 @@ public class AgentWorkflowRuntimeService {
         AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
                 graphParser, handlers(values, application, state, toolExecutor)
         );
-        try {
+        String checkpointId = online.yudream.base.domain.platform.ai.service.HarnessExecutionScope.currentIdempotencyKey();
+        try (var usageScope = online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope.open(
+                command.getUserId() == null ? online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope.currentUserId() : command.getUserId())) {
             AgentWorkflowExecution execution = executor.execute(
                     application.getWorkflowJson(),
                     initialInput(command),
-                    listener(onNode, values, trace)
+                    checkpointListener(listener(onNode, values, trace), checkpointId, application, command, state, trace)
             );
+            if (execution.waiting()) {
+                if (checkpointId == null || checkpoints == null) {
+                    throw new online.yudream.base.domain.common.exception.BizException("工作流工具交互需要持久 AI 运行入口");
+                }
+                trace.suspend();
+                return new AgentWorkflowRuntimeResult(execution.checkpoint().suspendedNative().content(),
+                        state.reasoning(), state.toolResults(), state.usage());
+            }
             Object output = graph.topologicalOrder().stream()
                     .filter(node -> "end".equals(node.kind()))
                     .filter(node -> execution.executedNodeIds().contains(node.id()))
@@ -173,12 +189,113 @@ public class AgentWorkflowRuntimeService {
                     .reduce((left, right) -> right)
                     .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("工作流未执行结束节点"));
             AgentWorkflowRuntimeResult result = new AgentWorkflowRuntimeResult(content(output), state.reasoning(), state.toolResults(), state.usage());
+            if (checkpoints != null && checkpointId != null) checkpoints.complete(checkpointId);
             trace.succeed(result);
             return result;
         } catch (RuntimeException e) {
             trace.fail(e);
             throw e;
         }
+    }
+
+    /** 只补入原生已完成节点的业务输出，原模型消息与已执行宿主节点都不重跑。 */
+    public AgentWorkflowRuntimeResult continueAfterNative(
+            online.yudream.base.domain.platform.agent.aggregate.AgentWorkflowCheckpoint checkpoint,
+            AgentApplication application, AgentRunCmd command, Map<String, String> aiConfig,
+            online.yudream.base.domain.platform.ai.valobj.HarnessRunResult nativeResult,
+            Consumer<AgentDebugEventDTO> onNode, Consumer<String> onDelta, Consumer<String> onReasoning,
+            Consumer<AiAgentToolResult> onTool, Consumer<AiGenerationProgress> onProgress) {
+        var pending = checkpoint.frame().suspendedNative();
+        if (pending == null || !"completed".equals(nativeResult.status())
+                || !java.util.Objects.equals(pending.nativeTurnId(), nativeResult.nativeTurnId())) {
+            throw new online.yudream.base.domain.common.exception.BizException("原生结果与暂停的工作流节点不匹配");
+        }
+        var systemTools = systemToolProvider.stream().toList();
+        Set<String> systemCodes = systemTools.stream().map(tool -> tool.descriptor().name())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        var toolExecutor = new AgentToolExecutor(objectMapper, runtimeExecutor, toolRepo, systemTools,
+                permissionGateway, pluginToolGateways, toolExecutionGuard);
+        var state = new AgentWorkflowRunState(application, command, aiConfig, systemCodes, onDelta, onReasoning,
+                onTool, onProgress, new AgentModelToolResolver(toolExecutor), checkpoint.runKey());
+        var tools = new ArrayList<>(checkpoint.toolResults()); tools.addAll(nativeResult.toolResults());
+        state.restore(checkpoint.modelInvocations(), checkpoint.reasoning() + nativeResult.reasoning(),
+                tools, checkpoint.usage().plus(nativeResult.usage()));
+        var values = new AgentWorkflowValueResolver(objectMapper);
+        var parser = new AgentWorkflowGraphParser(objectMapper);
+        var graph = parser.parse(checkpoint.workflowJson());
+        ensurePythonRuntime(graph, systemCodes);
+        var nodeHandlers = handlers(values, application, state, toolExecutor);
+        var pendingNode = graph.node(checkpoint.frame().pausedNodeId());
+        var handler = nodeHandlers.stream().filter(candidate -> candidate.kind().equals(pendingNode.kind()))
+                .filter(AgentLlmNodeHandler.class::isInstance).map(AgentLlmNodeHandler.class::cast)
+                .findFirst().orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("暂停节点不再是可恢复的模型节点"));
+        var completed = new online.yudream.base.domain.platform.ai.valobj.HarnessRunResult(
+                pending.content() + nativeResult.content(), nativeResult.reasoning(), nativeResult.usage(), nativeResult.toolResults(),
+                nativeResult.pendingConfirmations(), nativeResult.nativeTurnId(), nativeResult.nativeRunId(),
+                nativeResult.status(), nativeResult.pendingInteractions());
+        var trace = executionTracer.resume(checkpoint.runKey());
+        try (var usageScope = online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope.open(command.getUserId())) {
+            var execution = new AgentWorkflowExecutor(parser, nodeHandlers).resume(checkpoint.workflowJson(), checkpoint.frame(),
+                    handler.completeNative(pendingNode, completed), checkpointListener(listener(onNode, values, trace),
+                            checkpoint.runId(), application, command, state, trace));
+            if (execution.waiting()) {
+                trace.suspend();
+                return new AgentWorkflowRuntimeResult(execution.checkpoint().suspendedNative().content(),
+                        state.reasoning(), state.toolResults(), state.usage());
+            }
+            Object output = graph.topologicalOrder().stream().filter(node -> "end".equals(node.kind()))
+                    .filter(node -> execution.executedNodeIds().contains(node.id()))
+                    .map(node -> execution.context().nodeOutput(node.id())).reduce((left, right) -> right)
+                    .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("工作流未执行结束节点"));
+            var result = new AgentWorkflowRuntimeResult(content(output), state.reasoning(), state.toolResults(), state.usage());
+            checkpoints.complete(checkpoint.runId()); trace.succeed(result); return result;
+        } catch (RuntimeException failure) { trace.fail(failure); throw failure; }
+    }
+
+    public List<AiAgentTool> restoreCheckpointTools(
+            online.yudream.base.domain.platform.agent.aggregate.AgentWorkflowCheckpoint checkpoint,
+            AgentApplication application, AgentRunCmd command) {
+        var node = new AgentWorkflowGraphParser(objectMapper).parse(checkpoint.workflowJson()).node(checkpoint.frame().pausedNodeId());
+        if ("NONE".equalsIgnoreCase(node.data().path("toolMode").asText())) return List.of();
+        var systemTools = systemToolProvider.stream().toList();
+        var executor = new AgentToolExecutor(objectMapper, runtimeExecutor, toolRepo, systemTools,
+                permissionGateway, pluginToolGateways, toolExecutionGuard);
+        List<String> codes = new ArrayList<>();
+        if (node.data().path("toolCodes").isArray()) node.data().path("toolCodes").forEach(code -> codes.add(code.asText()));
+        ensurePythonRuntime(new AgentWorkflowGraphParser(objectMapper).parse(checkpoint.workflowJson()),
+                systemTools.stream().map(tool -> tool.descriptor().name()).collect(java.util.stream.Collectors.toSet()));
+        return new AgentModelToolResolver(executor).resolve(codes, application, command);
+    }
+
+    private AgentWorkflowEventListener checkpointListener(AgentWorkflowEventListener delegate, String id,
+            AgentApplication application, AgentRunCmd command, AgentWorkflowRunState state, AgentTraceSession trace) {
+        return new AgentWorkflowEventListener() {
+            @Override public void onNodeStarted(AgentWorkflowNode node, online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
+                delegate.onNodeStarted(node, context);
+            }
+            @Override public void onNodeCompleted(AgentWorkflowNode node, AgentWorkflowNodeResult result,
+                    online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
+                delegate.onNodeCompleted(node, result, context);
+            }
+            @Override public void onNodeFailed(AgentWorkflowNode node, RuntimeException failure,
+                    online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
+                delegate.onNodeFailed(node, failure, context);
+            }
+            @Override public void onNodeSkipped(AgentWorkflowNode node,
+                    online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
+                delegate.onNodeSkipped(node, context);
+            }
+            @Override public void onNodeSuspended(AgentWorkflowNode node,
+                    online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
+                if (state != null) state.emitProgress(new AiGenerationProgress("waiting", "工作流正在等待工具交互：" + node.title()));
+            }
+            @Override public void onCheckpoint(online.yudream.base.domain.platform.agent.valobj.AgentWorkflowFrame frame) {
+                if (id == null || checkpoints == null) return;
+                checkpoints.save(online.yudream.base.application.platform.agent.assembler.AgentWorkflowCheckpointAssembler.capture(
+                        id, application, command, state, frame, objectMapper));
+                trace.suspend();
+            }
+        };
     }
 
     private List<AgentWorkflowNodeHandler> handlers(

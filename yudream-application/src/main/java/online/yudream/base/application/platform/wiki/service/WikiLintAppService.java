@@ -3,6 +3,10 @@ package online.yudream.base.application.platform.wiki.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.ai.service.AiRunAppService;
+import online.yudream.base.application.platform.ai.dto.AiRunDTO;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
+import java.util.function.Consumer;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.assembler.WikiKnowledgeAssembler;
 import online.yudream.base.application.platform.wiki.dto.WikiLintReportDTO;
@@ -21,6 +25,7 @@ import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.valobj.WikiLintIssue;
 import online.yudream.base.domain.platform.wiki.valobj.WikiLintReport;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -44,20 +49,37 @@ public class WikiLintAppService {
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final AiGenerationGateway aiGeneration;
+    private final ObjectProvider<AiGenerationGateway> aiGeneration;
+    private final ObjectProvider<AiRunAppService> runs;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public AiRunDTO startLint(Long userId, Long spaceId) {
+        enabled();
+        return runs.getObject().start(userId, "wiki-lint", "wiki-lint:" + spaceId, emitter -> {
+            try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(userId)) {
+                emitter.progress("analysis", Map.of("title", "正在检查页面关系与内容", "status", "running"));
+                return lintStream(spaceId,
+                        delta -> emitter.event("ai.structured", "delta", Map.of("content", delta)),
+                        emitter::reasoning);
+            }
+        }, null);
+    }
+
     @Transactional(readOnly = true)
     public WikiLintReportDTO lint(Long spaceId) {
+        return lintStream(spaceId, null, null);
+    }
+
+    private WikiLintReportDTO lintStream(Long spaceId, Consumer<String> onDelta, Consumer<String> onReasoning) {
         enabled();
         WikiSpace space = spaceRepo.findById(spaceId).orElseThrow(() -> new BizException("知识库不存在"));
         List<WikiNode> pages = nodeRepo.findBySpaceId(spaceId).stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE).toList();
         List<WikiLintIssue> issues = new ArrayList<>(detectOrphans(pages));
         try {
-            issues.addAll(llmLint(space, pages));
+            issues.addAll(llmLint(space, pages, onDelta, onReasoning));
         }
         catch (Exception exception) {
             issues.add(new WikiLintIssue(WikiLintIssue.CATEGORY_DATA_GAP, "info", "LLM 深度检查未完成",
@@ -88,7 +110,7 @@ public class WikiLintAppService {
         return issues;
     }
 
-    private List<WikiLintIssue> llmLint(WikiSpace space, List<WikiNode> pages) {
+    private List<WikiLintIssue> llmLint(WikiSpace space, List<WikiNode> pages, Consumer<String> onDelta, Consumer<String> onReasoning) {
         String pageList = pages.stream().limit(200)
                 .map(node -> "- " + node.getTitle() + "（" + node.getPageType() + "）: " + blankToEmpty(node.getSummary()))
                 .collect(Collectors.joining("\n"));
@@ -102,7 +124,7 @@ public class WikiLintAppService {
         AiGenerationRequest request = new AiGenerationRequest(system, user, null,
                 space.getIngestProviderCode(), space.getIngestModelCode(), aiConfig())
                 .withStructuredOutput(AiStructuredOutput.jsonObject());
-        AiGenerationResult result = aiGeneration.generate(request);
+        AiGenerationResult result = aiGeneration.getObject().generateStream(request, onDelta, onReasoning, null, null);
         String text = result == null ? null : result.summary();
         if (text == null || text.isBlank()) {
             return List.of();

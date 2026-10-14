@@ -46,7 +46,8 @@ import java.util.Base64;
 public class CmsWorkspaceController {
 
     private final CmsWorkspaceStore workspaceStore;
-    private final AiAppService aiAppService;
+    private final online.yudream.base.application.platform.ai.service.AiBusinessRunAppService businessRuns;
+    private final online.yudream.base.interfaces.platform.ai.support.AiRunStreamSupport runStreams;
     private final online.yudream.base.application.platform.cms.service.CmsWorkspacePublishService publishService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
@@ -104,52 +105,20 @@ public class CmsWorkspaceController {
     public record PublishRequest(String themeCode, Boolean published) {
     }
 
-    /** builder 对话：Harness 文件工具服务端直执行，AG-UI 事件流与 v1 生成端点同构。 */
+    @PostMapping("/{targetKey}/chat/runs")
+    @PermissionRegister(code = "platform:ai:generate", name = "提交 CMS 工作区构建", module = "平台能力", desc = "创建后台可恢复工作区构建运行")
+    public Result<online.yudream.base.interfaces.platform.ai.res.AiRunRes> startChat(@PathVariable String targetKey, @Valid @RequestBody WorkspaceChatRequest request) {
+        var principal = SecurityPrincipalSupport.current();
+        return Result.ok(online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler.run(
+                businessRuns.workspace(principal.userId(), principal.permissions(), targetKey, request.question(), request.history(), request.providerCode(), request.modelCode())));
+    }
+
     @PostMapping(value = "/{targetKey}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区 AI 构建", module = "平台能力", desc = "与静态站点构建代理流式对话")
+    @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区 AI 构建", module = "平台能力", desc = "订阅后台工作区构建运行")
     public SseEmitter chatStream(@PathVariable String targetKey, @Valid @RequestBody WorkspaceChatRequest request) {
-        Long userId = SecurityPrincipalSupport.current().userId();
-        SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
-        String traceId = UUID.randomUUID().toString();
-        AtomicInteger toolSequence = new AtomicInteger();
-        CompletableFuture.runAsync(() -> {
-            AtomicBoolean running = new AtomicBoolean(true);
-            AtomicBoolean activityStarted = new AtomicBoolean(false);
-            CompletableFuture<Void> heartbeat = null;
-            try {
-                send(emitter, AiWebAssembler.toAguiRunStarted(traceId));
-                heartbeat = startHeartbeat(emitter, traceId, running, activityStarted);
-                var result = aiAppService.streamCmsWorkspace(
-                        userId,
-                        targetKey,
-                        request.question(),
-                        request.history() == null ? List.of() : request.history(),
-                        request.providerCode(),
-                        request.modelCode(),
-                        delta -> send(emitter, AiWebAssembler.toAguiTextChunk(traceId, delta)),
-                        reasoning -> send(emitter, AiWebAssembler.toAguiThinkingChunk(traceId, reasoning)),
-                        tool -> {
-                            String toolCallId = traceId + "-tool-" + toolSequence.incrementAndGet();
-                            send(emitter, AiWebAssembler.toAguiToolStart(traceId, toolCallId, tool));
-                            send(emitter, AiWebAssembler.toAguiToolResult(traceId, toolCallId, tool));
-                        },
-                        progress -> sendActivity(emitter, traceId, activityStarted, progress.action(), progress.content()));
-                send(emitter, AiWebAssembler.toAguiRunFinished(traceId, result));
-                emitter.complete();
-            } catch (Exception e) {
-                String message = e instanceof online.yudream.base.domain.common.exception.BizException biz
-                        ? biz.getMessage()
-                        : "生成失败，请稍后重试（traceId=" + traceId + "）";
-                send(emitter, AiWebAssembler.toAguiRunError(traceId, message));
-                emitter.complete();
-            } finally {
-                running.set(false);
-                if (heartbeat != null) {
-                    heartbeat.cancel(true);
-                }
-            }
-        });
-        return emitter;
+        var principal = SecurityPrincipalSupport.current();
+        var run = businessRuns.workspace(principal.userId(), principal.permissions(), targetKey, request.question(), request.history(), request.providerCode(), request.modelCode());
+        return runStreams.subscribe(principal.userId(), run.id(), 0, true);
     }
 
     public record WorkspaceChatRequest(
@@ -237,36 +206,6 @@ public class CmsWorkspaceController {
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(isBinary(data) ? MediaType.APPLICATION_OCTET_STREAM : MediaType.TEXT_HTML);
-    }
-
-    private static void send(SseEmitter emitter, Object payload) {
-        try {
-            emitter.send(SseEmitter.event().data(payload, MediaType.APPLICATION_JSON));
-        } catch (Exception ignored) {
-            // 客户端断开由容器回调处理
-        }
-    }
-
-    private static void sendActivity(SseEmitter emitter, String traceId, AtomicBoolean started,
-                                     String phase, String content) {
-        if (started.compareAndSet(false, true) || true) {
-            send(emitter, AiWebAssembler.toAguiActivityDelta(traceId, phase, content));
-        }
-    }
-
-    private static CompletableFuture<Void> startHeartbeat(
-            SseEmitter emitter, String traceId, AtomicBoolean running, AtomicBoolean activityStarted) {
-        return CompletableFuture.runAsync(() -> {
-            while (running.get()) {
-                try {
-                    Thread.sleep(4000);
-                    sendActivity(emitter, traceId, activityStarted, "heartbeat", "仍在生成中…");
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-        });
     }
 
     private static Long currentUserId() {

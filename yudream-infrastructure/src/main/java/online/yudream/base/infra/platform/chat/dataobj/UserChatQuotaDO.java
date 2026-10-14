@@ -17,4 +17,9 @@ public class UserChatQuotaDO extends BaseDO {
     private LocalDate usageDate;
     private long usedTokens;
     private long limitTokens;
+    private long reservedTokens;
+    private long uncertainTokens;
+    private java.util.Map<String, ChatQuotaReservationDO> reservations;
+    private java.util.Map<String, Long> settledReservations;
+    private java.util.Map<String, ChatQuotaReservationDO> uncertainReservations;
 }

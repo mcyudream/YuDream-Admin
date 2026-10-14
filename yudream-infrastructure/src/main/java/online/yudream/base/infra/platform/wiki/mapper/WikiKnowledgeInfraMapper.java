@@ -92,6 +92,8 @@ public final class WikiKnowledgeInfraMapper {
                 .finishedAt(dataObj.getFinishedAt())
                 .sortOrder(dataObj.getSortOrder())
                 .payloadJson(dataObj.getPayloadJson())
+                .requestedByUserId(dataObj.getRequestedByUserId())
+                .aiRunId(dataObj.getAiRunId())
                 .build();
     }
 
@@ -112,6 +114,8 @@ public final class WikiKnowledgeInfraMapper {
         dataObj.setFinishedAt(domain.getFinishedAt());
         dataObj.setSortOrder(domain.getSortOrder());
         dataObj.setPayloadJson(domain.getPayloadJson());
+        dataObj.setRequestedByUserId(domain.getRequestedByUserId());
+        dataObj.setAiRunId(domain.getAiRunId());
         return dataObj;
     }
 

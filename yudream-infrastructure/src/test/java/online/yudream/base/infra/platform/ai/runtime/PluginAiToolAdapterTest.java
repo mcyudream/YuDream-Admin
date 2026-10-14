@@ -63,6 +63,16 @@ class PluginAiToolAdapterTest {
     }
 
     @Test
+    void frameworkBypassModeCannotOverrideDestructiveConfirmation() {
+        var state = io.agentscope.core.permission.PermissionContextState.builder()
+                .mode(io.agentscope.core.permission.PermissionMode.BYPASS).build();
+        var engine = new io.agentscope.core.permission.PermissionEngine(state);
+        var adapter = new PluginAiToolAdapter(pluginTool("qbank.wipe", PluginAiToolRisk.DESTRUCTIVE, false),
+                context("qbank.wipe"));
+        assertEquals(PermissionBehavior.ASK, engine.checkPermission(adapter, Map.of()).block().getBehavior());
+    }
+
+    @Test
     void ungrantedExecutionReturnsDenied() {
         PluginAiTool write = pluginTool("qbank.import", PluginAiToolRisk.WRITE, false);
         PluginAiToolAdapter adapter = new PluginAiToolAdapter(write, context());
@@ -76,6 +86,7 @@ class PluginAiToolAdapterTest {
         PluginAiToolAdapter adapter = new PluginAiToolAdapter(write, context("qbank.import"));
         var result = adapter.callAsync(param()).block();
         assertEquals(ToolResultState.SUCCESS, result.getState());
+        assertFalse(result.getOutput().toString().contains("trace-1"));
     }
 
     private ToolCallParam param() {

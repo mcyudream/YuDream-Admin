@@ -97,9 +97,18 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
             return risk == PluginAiToolRisk.READ ? AgentToolRisk.READ : AgentToolRisk.WRITE;
         }
 
+        @Override public boolean pluginProvided() { return true; }
+
+        @Override public boolean requiresConfirmation() {
+            return tool.descriptor().requiresConfirmation() || tool.descriptor().risk() == PluginAiToolRisk.DESTRUCTIVE;
+        }
+
         @Override
         public AiAgentToolResult execute(AiAgentToolCall call) {
             PluginAiToolDescriptor source = tool.descriptor();
+            if (source.requiresConfirmation() || source.risk() == PluginAiToolRisk.DESTRUCTIVE) {
+                throw new BizException("需要审批的插件工具必须通过原生 Agent 模型节点确认后执行：" + source.title());
+            }
             if (context == null) {
                 throw new BizException("插件工具仅可在插件触发的会话中调用：" + source.title());
             }

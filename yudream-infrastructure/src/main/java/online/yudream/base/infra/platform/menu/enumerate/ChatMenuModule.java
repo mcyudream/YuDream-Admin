@@ -28,6 +28,14 @@ public enum ChatMenuModule {
             parentName = "CHAT", permission = "platform:chat:session:edit")
     CHAT_SESSION_EDIT,
 
+    @MenuNode(code = "platform:chat:quota:view", name = "查看 AI 额度结算", type = MenuNodeType.BUTTON,
+            parentName = "CHAT", permission = "platform:chat:quota:view")
+    CHAT_QUOTA_VIEW,
+
+    @MenuNode(code = "platform:chat:quota:edit", name = "核对 AI 额度结算", type = MenuNodeType.BUTTON,
+            parentName = "CHAT", permission = "platform:chat:quota:edit")
+    CHAT_QUOTA_EDIT,
+
     @MenuNode(code = "platform:chat:quota:config", name = "配置 AI 助手额度", type = MenuNodeType.BUTTON,
             parentName = "CHAT", permission = "platform:chat:quota:config")
     CHAT_QUOTA_CONFIG

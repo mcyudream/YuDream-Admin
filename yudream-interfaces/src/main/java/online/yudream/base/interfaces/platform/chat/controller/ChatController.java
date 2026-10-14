@@ -43,6 +43,7 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 @Slf4j
 public class ChatController {
+    private final online.yudream.base.application.platform.chat.service.ChatRunAppService chatRuns;
 
     private final ChatSessionAppService sessionService;
     private final ChatQuotaAppService quotaService;
@@ -85,6 +86,16 @@ public class ChatController {
         return Result.ok(sessionService.messages(userId, id).stream().map(ChatWebAssembler::message).toList());
     }
 
+    @PostMapping("/sessions/{id}/runs")
+    @PermissionRegister(code = "platform:chat:use", name = "运行 AI 助手", module = "平台能力", desc = "创建可恢复的后台 AI 助手运行")
+    public Result<online.yudream.base.interfaces.platform.ai.res.AiRunRes> startRun(
+            @PathVariable Long id, @Valid @RequestBody ChatSendRequest request) {
+        var principal = SecurityPrincipalSupport.current();
+        var cmd = ChatWebAssembler.send(request, principal);
+        cmd.setSessionId(id);
+        return Result.ok(online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler.run(chatRuns.start(principal.userId(), cmd)));
+    }
+
     @PostMapping(value = "/sessions/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:chat:use", name = "AI 助手流式问答", module = "平台能力", desc = "在指定会话中进行 AG-UI 流式问答")
     public SseEmitter stream(@PathVariable Long id, @Valid @RequestBody ChatSendRequest request) {
@@ -95,7 +106,7 @@ public class ChatController {
     }
 
     @PostMapping(value = "/stream-once", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PermissionRegister(code = "platform:chat:use", name = "AI 助手临时问答", module = "平台能力", desc = "不创建会话直接进行 AG-UI 流式问答")
+    @PermissionRegister(code = "platform:chat:use", name = "AI 助手临时问答", module = "平台能力", desc = "创建可恢复会话并进行 AG-UI 流式问答")
     public SseEmitter streamOnce(@Valid @RequestBody ChatSendRequest request) {
         var principal = SecurityPrincipalSupport.current();
         return streamSupport.streamOnce(principal.userId(), ChatWebAssembler.send(request, principal));
@@ -131,13 +142,26 @@ public class ChatController {
     @GetMapping("/quota/config")
     @PermissionRegister(code = "platform:chat:quota:config", name = "查看 AI 助手额度配置", module = "平台能力", desc = "查看 AI 助手每日 token 上限配置")
     public Result<ChatQuotaConfigRes> quotaConfig() {
-        return Result.ok(ChatWebAssembler.quotaConfig(quotaService.dailyLimit()));
+        return Result.ok(ChatWebAssembler.quotaConfig(quotaService.dailyLimit(), quotaService.systemDailyLimit()));
+    }
+    @GetMapping("/quota/unresolved")
+    @PermissionRegister(code = "platform:chat:quota:view", name = "查看待核对 AI 用量", module = "平台能力", desc = "查看个人或系统后台任务未知用量所保留的预算")
+    public Result<List<online.yudream.base.interfaces.platform.chat.res.ChatQuotaUncertainRes>> unresolvedQuota(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate usageDate) {
+        return Result.ok(ChatWebAssembler.uncertainQuotas(quotaService.unresolved(SecurityPrincipalSupport.current().userId(), userId, usageDate)));
+    }
+    @PostMapping("/quota/reconcile")
+    @PermissionRegister(code = "platform:chat:quota:edit", name = "核对 AI 实际用量", module = "平台能力", desc = "根据提供方实际用量核销待核对预算，操作进入审计")
+    public Result<Void> reconcileQuota(@Valid @RequestBody online.yudream.base.interfaces.platform.chat.request.ChatQuotaReconcileRequest request) {
+        quotaService.reconcile(ChatWebAssembler.reconcile(request)); return Result.ok();
     }
 
     @PutMapping("/quota/config")
     @PermissionRegister(code = "platform:chat:quota:config", name = "配置 AI 助手额度", module = "平台能力", desc = "配置 AI 助手每日 token 上限")
     public Result<ChatQuotaConfigRes> updateQuotaConfig(@Valid @RequestBody ChatQuotaConfigRequest request) {
         long dailyTokenLimit = quotaService.updateLimit(ChatWebAssembler.quotaConfig(request));
-        return Result.ok(ChatWebAssembler.quotaConfig(dailyTokenLimit));
+        return Result.ok(ChatWebAssembler.quotaConfig(dailyTokenLimit, quotaService.systemDailyLimit()));
     }
 }

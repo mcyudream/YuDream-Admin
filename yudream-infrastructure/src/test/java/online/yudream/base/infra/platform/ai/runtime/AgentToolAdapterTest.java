@@ -47,6 +47,17 @@ class AgentToolAdapterTest {
     }
 
     @Test
+    void writeConfirmationCannotBeBypassedByPermissionMode() {
+        AgentToolAdapter adapter = new AgentToolAdapter(tool("demo.write", "写入", AgentToolRisk.WRITE, null),
+                granted -> true, null);
+        var context = io.agentscope.core.permission.PermissionContextState.builder()
+                .mode(io.agentscope.core.permission.PermissionMode.BYPASS).build();
+        var decision = new io.agentscope.core.permission.PermissionEngine(context)
+                .checkPermission(adapter, Map.of()).block();
+        assertEquals(PermissionBehavior.ASK, decision.getBehavior());
+    }
+
+    @Test
     void deniesWhenPermissionSnapshotMissing() {
         AiAgentTool tool = tool("cms.canvas.patch", "画布补丁", AgentToolRisk.WRITE, "platform:ai:tool:cms");
         AtomicInteger checked = new AtomicInteger();
@@ -121,6 +132,26 @@ class AgentToolAdapterTest {
         AgentToolAdapter adapter = new AgentToolAdapter(tool, granted -> true, null);
         var result = adapter.callAsync(param(RuntimeContext.empty())).block();
         assertEquals(ToolResultState.ERROR, result.getState());
+    }
+
+    @Test
+    void deniedAndErrorResultsUseActualCallIdentityInPersistentToolProjection() {
+        HarnessToolCollector denied = new HarnessToolCollector(null);
+        var deniedAdapter = new AgentToolAdapter(tool("demo.write", "写入", AgentToolRisk.WRITE, "demo:edit"),
+                permission -> false, null);
+        deniedAdapter.callAsync(param(RuntimeContext.builder().put(HarnessToolCollector.class, denied).build())).block();
+        assertEquals("denied", denied.snapshot().getFirst().action());
+        assertEquals("call-1", denied.snapshot().getFirst().payload().get("_toolCallId"));
+        HarnessToolCollector errors = new HarnessToolCollector(null);
+        var failed = new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() { return descriptorOf("failed", null); }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) { throw new IllegalStateException("真实失败"); }
+        };
+        new AgentToolAdapter(failed, permission -> true, null)
+                .callAsync(param(RuntimeContext.builder().put(HarnessToolCollector.class, errors).build())).block();
+        assertEquals("error", errors.snapshot().getFirst().action());
+        assertEquals("ERROR", errors.snapshot().getFirst().payload().get("_nativeToolState"));
+        assertEquals("call-1", errors.snapshot().getFirst().payload().get("_toolCallId"));
     }
 
     private ToolCallParam param(RuntimeContext context) {

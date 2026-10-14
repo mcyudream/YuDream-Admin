@@ -13,6 +13,8 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +26,7 @@ import java.util.concurrent.Executors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = {"yudream.platform.capabilities.wiki.enabled", "yudream.platform.capabilities.ai.enabled"}, havingValue = "true")
 public class WikiIngestQueueExecutor implements DisposableBean {
 
     private static final long IDLE_SLEEP_MILLIS = 500L;
@@ -32,15 +35,20 @@ public class WikiIngestQueueExecutor implements DisposableBean {
     private final WikiIngestTaskRunner runner;
     private final WikiIngestProgressGateway progressGateway;
     private final WikiIngestCancellationRegistry cancellationRegistry;
+    private final CapabilityModuleRepo capabilities;
+    private online.yudream.base.domain.platform.ai.repo.AiRunRepo aiRuns;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAiRuns(online.yudream.base.domain.platform.ai.repo.AiRunRepo aiRuns) { this.aiRuns = aiRuns; }
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(
             Thread.ofVirtual().name("wiki-ingest-queue-", 0).factory()
     );
     private volatile boolean running = true;
+    private boolean recovered;
 
     @EventListener(ApplicationReadyEvent.class)
     public void start() {
-        recoverInterruptedTasks();
         worker.submit(this::loop);
     }
 
@@ -78,6 +86,14 @@ public class WikiIngestQueueExecutor implements DisposableBean {
     private void loop() {
         while (running) {
             try {
+                if (!enabled("wiki") || !enabled("ai")) {
+                    Thread.sleep(IDLE_SLEEP_MILLIS);
+                    continue;
+                }
+                if (!recovered) {
+                    recoverInterruptedTasks();
+                    recovered = true;
+                }
                 Optional<WikiIngestTask> next = taskRepo.findNextQueued();
                 if (next.isPresent()) {
                     execute(next.get());
@@ -97,6 +113,10 @@ public class WikiIngestQueueExecutor implements DisposableBean {
         }
     }
 
+    private boolean enabled(String code) {
+        return capabilities.findByCode(code).map(module -> module.enabled()).orElse(false);
+    }
+
     private void execute(WikiIngestTask task) {
         log.info("ingest execute start task={}", task.getId());
         task.start();
@@ -109,8 +129,8 @@ public class WikiIngestQueueExecutor implements DisposableBean {
                         taskRepo.save(task);
                         publish(task, progress.message());
                     },
-                    () -> cancellationRegistry.isCancelled(task.getId()));
-            if (cancellationRegistry.isCancelled(task.getId())) {
+                    () -> cancelled(task));
+            if (cancelled(task)) {
                 task.cancel();
                 taskRepo.save(task);
                 publish(task, "任务已取消");
@@ -121,7 +141,7 @@ public class WikiIngestQueueExecutor implements DisposableBean {
             publish(task, "任务执行完成");
         }
         catch (Exception exception) {
-            if (cancellationRegistry.isCancelled(task.getId())) {
+            if (cancelled(task)) {
                 task.cancel();
                 taskRepo.save(task);
                 publish(task, "任务已取消");
@@ -140,8 +160,16 @@ public class WikiIngestQueueExecutor implements DisposableBean {
             }
         }
         finally {
+            // 用户停止会中断该任务的模型等待；串行队列还要处理下一项。应用关闭保留中断。
+            if (running && cancelled(task)) Thread.interrupted();
             cancellationRegistry.clear(task.getId());
         }
+    }
+
+    private boolean cancelled(WikiIngestTask task) {
+        if (cancellationRegistry.isCancelled(task.getId())) return true;
+        return aiRuns != null && task.getAiRunId() != null && aiRuns.find(task.getAiRunId())
+                .map(run -> run.isCancelRequested() || run.getStatus() == online.yudream.base.domain.platform.ai.enumerate.AiRunStatus.CANCELLED).orElse(false);
     }
 
     private void publish(WikiIngestTask task, String message) {

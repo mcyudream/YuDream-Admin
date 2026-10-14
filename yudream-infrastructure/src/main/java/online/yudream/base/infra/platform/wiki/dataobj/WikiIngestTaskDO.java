@@ -30,4 +30,6 @@ public class WikiIngestTaskDO extends BaseDO {
     private LocalDateTime finishedAt;
     private long sortOrder;
     private String payloadJson;
+    private Long requestedByUserId;
+    private String aiRunId;
 }

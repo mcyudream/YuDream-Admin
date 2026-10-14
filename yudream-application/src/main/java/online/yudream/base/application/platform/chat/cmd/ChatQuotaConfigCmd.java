@@ -5,4 +5,5 @@ import lombok.Data;
 @Data
 public class ChatQuotaConfigCmd {
     private long dailyTokenLimit;
+    private Long systemDailyTokenLimit;
 }

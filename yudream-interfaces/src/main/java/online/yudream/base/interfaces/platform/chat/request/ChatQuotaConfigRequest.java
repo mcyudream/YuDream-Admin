@@ -7,4 +7,6 @@ import lombok.Data;
 public class ChatQuotaConfigRequest {
     @Min(value = 1, message = "每日 token 上限必须大于 0")
     private long dailyTokenLimit;
+    @Min(value = 1, message = "系统任务每日 token 上限必须大于 0")
+    private Long systemDailyTokenLimit;
 }

@@ -9,6 +9,7 @@ import online.yudream.base.application.platform.wiki.dto.WikiChatResultDTO;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
+import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.HarnessAgentGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
@@ -26,6 +27,7 @@ import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.valobj.WikiFrontmatter;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -53,7 +55,7 @@ public class WikiChatAppService {
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final HarnessAgentGateway harnessAgents;
+    private final ObjectProvider<HarnessAgentGateway> harnessAgents;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
     private final WikiPageVersionRepo versionRepo;
@@ -103,9 +105,19 @@ public class WikiChatAppService {
                                         Consumer<String> onDelta, Consumer<String> onReasoningDelta,
                                         Consumer<AiAgentToolResult> onTool,
                                         Consumer<WikiChatActivityDTO> onActivity) {
+        return chatStream(spaceId, userId, sessionId, question, history, List.of(), onDelta,
+                onReasoningDelta, onTool, onActivity);
+    }
+
+    public WikiChatResultDTO chatStream(Long spaceId, Long userId, String sessionId, String question,
+                                        List<AiChatMessage> history, List<String> permissionCodes,
+                                        Consumer<String> onDelta, Consumer<String> onReasoningDelta,
+                                        Consumer<AiAgentToolResult> onTool,
+                                        Consumer<WikiChatActivityDTO> onActivity) {
         Prepared prepared = prepare(spaceId, question, history, onActivity);
         return generateAndFinish(prepared, wikiSearchTool, ADMIN_TOOL_NAME,
-                "platform:wiki:tool:search", userId, sessionId, onDelta, onReasoningDelta, onTool, onActivity);
+                "platform:wiki:tool:search", userId, sessionId, onDelta, onReasoningDelta, onTool, onActivity,
+                permissionCodes);
     }
 
     /**
@@ -169,6 +181,16 @@ public class WikiChatAppService {
                                                 Consumer<String> onReasoningDelta,
                                                 Consumer<AiAgentToolResult> onTool,
                                                 Consumer<WikiChatActivityDTO> onActivity) {
+        return generateAndFinish(prepared, searchTool, allowedToolName, toolPermissionCode, userId, sessionId,
+                onDelta, onReasoningDelta, onTool, onActivity, List.of());
+    }
+
+    private WikiChatResultDTO generateAndFinish(Prepared prepared, AiAgentTool searchTool, String allowedToolName,
+                                                String toolPermissionCode, Long userId, String sessionId,
+                                                Consumer<String> onDelta, Consumer<String> onReasoningDelta,
+                                                Consumer<AiAgentToolResult> onTool,
+                                                Consumer<WikiChatActivityDTO> onActivity,
+                                                List<String> permissionCodes) {
         emitActivity(onActivity, progress("generate", "running", "生成回答", "正在生成回答…"));
         StringBuilder reasoning = new StringBuilder();
         Consumer<String> reasoningConsumer = delta -> {
@@ -180,7 +202,7 @@ public class WikiChatAppService {
                 onReasoningDelta.accept(delta);
             }
         };
-        boolean stateful = userId != null && sessionId != null && !sessionId.isBlank();
+        boolean stateful = sessionId != null && !sessionId.isBlank();
         HarnessRunRequest request = new HarnessRunRequest(
                 userId,
                 stateful ? "wiki-" + prepared.spaceKey() + "-" + sessionId : null,
@@ -192,10 +214,14 @@ public class WikiChatAppService {
                 prepared.modelCode(),
                 prepared.config(),
                 true,
-                toolPermissionCode == null ? List.of() : List.of(toolPermissionCode),
+                permissionCodes == null ? List.of() : permissionCodes,
                 stateful ? List.of() : prepared.history(),
                 List.of(allowedToolName));
-        HarnessRunResult result = harnessAgents.run(request, onDelta, reasoningConsumer, onTool);
+        HarnessRunResult result;
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(searchTool))) {
+            result = harnessAgents.getObject().run(request, onDelta, reasoningConsumer, onTool,
+                    progress -> emitActivity(onActivity, progress(progress.action(), "running", "模型运行", progress.content())));
+        }
         emitActivity(onActivity, progress("complete", "completed", "回答完成", "回答已生成。"));
         return toResult(result, reasoning.toString(), prepared.hits());
     }

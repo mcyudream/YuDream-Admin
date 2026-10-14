@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.service.HarnessAgentGateway;
+import online.yudream.base.domain.platform.ai.service.HarnessExecutionScope;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
@@ -95,10 +96,20 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         int toolResultsBefore = state.toolResultCount();
         List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults = new ArrayList<>();
         AiGenerationResult generated;
-        if (useWorkspace) {
-            HarnessRunResult result = workspaceRun(node, system, userPrompt, providerCode, modelCode, toolMode, tools,
-                    callbackResults);
+        boolean statefulChat = StringUtils.hasText(state.command().getSessionId())
+                && ("llm".equals(kind) || "vision".equals(kind));
+        boolean nativeTools = ("llm".equals(kind) || "vision".equals(kind)) && !tools.isEmpty();
+        if (useWorkspace || statefulChat || nativeTools) {
+            HarnessRunResult result;
+            try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools);
+                 HarnessExecutionScope invocation = HarnessExecutionScope.child(state.nextModelInvocation(node.id()))) {
+                result = harnessRun(node, system, userPrompt, providerCode, modelCode, toolMode, tools,
+                        callbackResults, useWorkspace, images);
+            }
             state.addUsage(result.usage());
+            if ("suspended".equals(result.status())) {
+                throw new online.yudream.base.application.platform.agent.workflow.AgentWorkflowSuspendedException(result);
+            }
             if (toolMode == AiToolMode.REQUIRED && state.toolResultCount() == toolResultsBefore) {
                 throw new BizException(node.title() + "必须调用工具后才能继续");
             }
@@ -119,9 +130,8 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         );
 
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools)) {
-            generated = "understand".equals(kind)
-                    ? gateway.generate(request)
-                    : gateway.generateStream(request, state::emitDelta, state::emitReasoningDelta, result -> {
+            generated = gateway.generateStream(request, "understand".equals(kind) ? null : state::emitDelta,
+                    state::emitReasoningDelta, result -> {
                         callbackResults.add(result);
                         state.addToolResult(result);
                     }, state::emitProgress);
@@ -134,12 +144,20 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         return values.result(node, output(node, generated.summary()));
     }
 
+    /** 原生 respond 已完成同一轮，恢复业务图时只转换其输出，不再提交输入或执行模型。 */
+    public AgentWorkflowNodeResult completeNative(AgentWorkflowNode node, HarnessRunResult result) {
+        if (!"completed".equals(result.status())) {
+            throw new IllegalArgumentException("原生任务尚未完成，不能作为业务节点输出");
+        }
+        return values.result(node, output(node, result.content()));
+    }
+
     /**
-     * 工作区运行（仅 llm 节点、节点勾选 workspace 时）：走 Harness 会话代理，
-     * agentCode「workflow」profile 启用文件工具；同一运行内的节点共享会话上下文，
-     * 工作区文件按 (workflow agent, userId) 跨运行复用；不用工作区的节点保持无状态网关路径。
+     * 有状态聊天与显式工作区节点都由 Harness 管理上下文，按 Agent/节点隔离会话。
+     * 普通聊天使用 agent-chat profile，不开放文件或 shell；仅 workspace=true 的
+     * 节点使用 workflow 文件工具。无状态结构化节点仍由统一生成网关执行。
      */
-    private HarnessRunResult workspaceRun(
+    private HarnessRunResult harnessRun(
             AgentWorkflowNode node,
             String system,
             String userPrompt,
@@ -147,20 +165,24 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             String modelCode,
             AiToolMode toolMode,
             List<AiAgentTool> tools,
-            List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults
+            List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults,
+            boolean workspace,
+            List<String> images
     ) {
-        LinkedHashSet<String> allowed = new LinkedHashSet<>(WORKSPACE_FILE_TOOLS);
+        LinkedHashSet<String> allowed = new LinkedHashSet<>(workspace ? WORKSPACE_FILE_TOOLS : List.of());
         for (AiAgentTool tool : tools) {
             allowed.add(AgentToolNames.safeName(tool.descriptor().name()));
         }
         var command = state.command();
         HarnessRunRequest request = new HarnessRunRequest(
                 command.getUserId(),
-                "wf-" + state.runKey(),
-                "workflow",
+                StringUtils.hasText(command.getSessionId())
+                        ? command.getSessionId() + ":" + state.application().getCode() + ":" + node.id()
+                        : "wf-" + state.runKey() + ":" + state.application().getCode() + ":" + node.id(),
+                workspace ? "workflow" : "agent-chat-" + state.application().getCode(),
                 system,
                 userPrompt,
-                List.of(),
+                images,
                 providerCode,
                 modelCode,
                 state.aiConfig(),
@@ -171,7 +193,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         return harnessAgents.run(request, state::emitDelta, state::emitReasoningDelta, result -> {
             callbackResults.add(result);
             state.addToolResult(result);
-        });
+        }, state::emitProgress);
     }
 
     private Object output(AgentWorkflowNode node, String summary) {

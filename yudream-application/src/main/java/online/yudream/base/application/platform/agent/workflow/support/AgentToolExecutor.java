@@ -83,7 +83,7 @@ public final class AgentToolExecutor {
         this.systemTools = systemTools == null ? List.of() : List.copyOf(systemTools);
         this.permissionGateway = permissionGateway;
         this.pluginToolGateways = pluginToolGateways;
-        this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard;
+        this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard.capture();
     }
 
     /**
@@ -182,11 +182,13 @@ public final class AgentToolExecutor {
                 return delegate.risk();
             }
 
+            @Override public boolean requiresConfirmation() { return delegate.requiresConfirmation(); }
+            @Override public boolean pluginProvided() { return delegate.pluginProvided(); }
+
             @Override
             public AiAgentToolResult execute(AiAgentToolCall call) {
                 AiAgentToolDescriptor descriptor = delegate.descriptor();
-                executionGuard.check(descriptor.name(), delegate.risk(), descriptor.permissionCode());
-                return delegate.execute(call);
+                return executionGuard.execute(descriptor.name(), delegate.risk(), descriptor.permissionCode(), () -> delegate.execute(call));
             }
         };
     }

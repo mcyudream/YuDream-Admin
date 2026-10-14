@@ -1,9 +1,11 @@
 package online.yudream.base.interfaces.platform.wiki.controller;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiIngestAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.interfaces.platform.wiki.assembler.WikiKnowledgeWebAssembler;
 import online.yudream.base.interfaces.platform.wiki.res.WikiIngestTaskRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,8 +30,10 @@ public class WikiIngestController {
     @PostMapping("/spaces/{spaceId}/sources/{sourceId}/ingest")
     @PermissionRegister(code = "platform:wiki:publish", name = "摄入 Wiki 资料", module = "平台能力", desc = "将原始资料入队并执行两步思维链摄入")
     public Result<Void> enqueue(@PathVariable Long spaceId, @PathVariable Long sourceId) {
-        service.enqueueIngest(spaceId, sourceId);
-        return Result.ok();
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            service.enqueueIngest(spaceId, sourceId);
+            return Result.ok();
+        }
     }
 
     @GetMapping("/spaces/{spaceId}/ingest-tasks")

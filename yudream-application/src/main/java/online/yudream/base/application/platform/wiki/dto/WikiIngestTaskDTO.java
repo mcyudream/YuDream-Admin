@@ -16,6 +16,8 @@ public record WikiIngestTaskDTO(
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
         long sortOrder,
-        String payloadJson
+        String payloadJson,
+        String requestedByUserId,
+        String aiRunId
 ) {
 }

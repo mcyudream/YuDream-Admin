@@ -125,8 +125,15 @@ class AgentWorkflowRuntimeServiceTest {
             }
         });
         var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
+        online.yudream.base.domain.platform.ai.service.HarnessAgentGateway harness = (request, delta, reasoning, tool) ->
+                new online.yudream.base.domain.platform.ai.valobj.HarnessRunResult("done", "",
+                        online.yudream.base.domain.platform.ai.valobj.AiUsage.empty(), List.of());
+        ObjectProvider<online.yudream.base.domain.platform.ai.service.HarnessAgentGateway> harnesses = new ObjectProvider<>() {
+            @Override public online.yudream.base.domain.platform.ai.service.HarnessAgentGateway getObject() { return harness; }
+            @Override public Stream<online.yudream.base.domain.platform.ai.service.HarnessAgentGateway> stream() { return Stream.of(harness); }
+        };
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
-                new ObjectMapper(), mock(RuntimeExecutor.class), toolRepo, gateways, EMPTY_HARNESS, tools,
+                new ObjectMapper(), mock(RuntimeExecutor.class), toolRepo, gateways, harnesses, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability,
                 disabledTracer()
         );

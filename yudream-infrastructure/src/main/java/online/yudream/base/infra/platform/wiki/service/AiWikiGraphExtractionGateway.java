@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiGraphExtractionGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiGraphRelation;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,7 @@ public class AiWikiGraphExtractionGateway implements WikiGraphExtractionGateway 
             只保留内容明确支持的关系，实体名称不超过 80 个字符，最多 50 项。
             """;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final AiGenerationGateway generationGateway;
+    private final ObjectProvider<AiGenerationGateway> generationGateway;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -31,7 +32,7 @@ public class AiWikiGraphExtractionGateway implements WikiGraphExtractionGateway 
         Map<String, String> config = capabilityModuleRepo.findByCode("ai")
                 .filter(module -> module.enabled()).map(module -> module.getConfig())
                 .orElseThrow(() -> new BizException("AI 能力未启用"));
-        String content = generationGateway.generate(new AiGenerationRequest(PROMPT,
+        String content = generationGateway.getObject().generate(new AiGenerationRequest(PROMPT,
                 "标题：" + title + "\n\n" + markdown, null, providerCode, modelCode, config)).summary();
         try {
             String json = stripFence(content);

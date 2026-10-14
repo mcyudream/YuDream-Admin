@@ -37,9 +37,8 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class ChatAppService {
-
-    private static final int HISTORY_LIMIT = 10;
 
     private final CapabilityAppService capabilities;
     private final ChatSessionRepo sessionRepo;
@@ -74,7 +73,7 @@ public class ChatAppService {
         List<String> permissionCodes = permissionSnapshot(cmd);
         ChatWikiContextResolver.ResolvedContext wikiContext = wikiContextResolver.resolve(
                 cmd.getContextRefs(), cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
-        List<AiChatMessage> history = buildHistory(session);
+        List<AiChatMessage> history = List.of();
         ChatMessage userMessage = persistUserMessage(session, userId, cmd);
         ChatRunState runState = new ChatRunState();
         ChatMessage assistantMessage = persistAssistantMessage(session, userId);
@@ -91,8 +90,10 @@ public class ChatAppService {
                     history,
                     permissionCodes,
                     cmd.getConfirmDecisions() == null ? List.of() : cmd.getConfirmDecisions(),
-                    onDelta == null ? ignored -> {
-                    } : onDelta,
+                    delta -> {
+                        runState.appendContent(delta);
+                        if (onDelta != null) onDelta.accept(delta);
+                    },
                     delta -> {
                         runState.appendReasoning(delta);
                         if (delta != null && !delta.isEmpty() && onReasoningDelta != null) {
@@ -111,7 +112,7 @@ public class ChatAppService {
                             onActivity.accept(activity);
                         }
                     });
-            ChatDispatchResult result = dispatcher(scopeType).dispatch(context);
+            ChatDispatchResult result = dispatch(cmd, scopeType, context);
             if (!wikiContext.citations().isEmpty()) {
                 result = ChatDispatchResult.of(result.content(), result.reasoning(), result.usage(),
                         mergeCitations(result.citations(), wikiContext.citations()));
@@ -122,7 +123,7 @@ public class ChatAppService {
             assistantMessage.setTools(settleTools(snapshot.tools(), "complete"));
             assistantMessage.setActivities(settleActivities(snapshot.activities(), "completed"));
             messageRepo.save(assistantMessage);
-            quota = quotaService.recordUsage(userId, result.usage().totalTokens());
+            quota = quotaService.todayQuota(userId);
             session.recordMessage();
             if (!StringUtils.hasText(session.getTitle()) || "新的对话".equals(session.getTitle())) {
                 session.rename(truncate(cmd.getQuestion(), 40));
@@ -130,11 +131,17 @@ public class ChatAppService {
             sessionRepo.save(session);
             return resultOf(session, userMessage, assistantMessage, quota);
         } catch (ChatStreamCancelledException error) {
+            assistantMessage.setContent(runState.snapshot().content());
+            assistantMessage.setReasoning(runState.snapshot().reasoning());
+            assistantMessage.cancel();
+            messageRepo.save(assistantMessage);
             throw error;
         } catch (Exception error) {
             ChatRunSnapshot snapshot = runState.snapshot();
+            assistantMessage.setContent(snapshot.content());
             assistantMessage.setReasoning(snapshot.reasoning());
-            assistantMessage.fail(error.getMessage());
+            if (Thread.currentThread().isInterrupted()) assistantMessage.cancel();
+            else assistantMessage.fail(error.getMessage());
             assistantMessage.setTools(settleTools(snapshot.tools(), "error"));
             assistantMessage.setActivities(settleActivities(snapshot.activities(), "failed"));
             messageRepo.save(assistantMessage);
@@ -200,13 +207,33 @@ public class ChatAppService {
                         onActivity.accept(activity);
                     }
                 });
-        ChatDispatchResult result = dispatcher(scopeType).dispatch(context);
+        ChatDispatchResult result = dispatch(cmd, scopeType, context);
         List<ChatCitation> citations = wikiContext.citations().isEmpty()
                 ? result.citations()
                 : mergeCitations(result.citations(), wikiContext.citations());
         result = ChatDispatchResult.of(result.content(), runState.snapshot().reasoning(), result.usage(), citations);
-        quotaService.recordUsage(userId, result.usage().totalTokens());
         return result;
+    }
+
+    /** 在后台运行创建前校验用户归属并确定稳定会话寻址。 */
+    public void prepare(Long userId, ChatSendCmd cmd) {
+        capabilities.ensureEnabled("ai", "AI 助手");
+        requireUser(userId);
+        if (cmd == null || !StringUtils.hasText(cmd.getQuestion())) throw new BizException("问题不能为空");
+        ChatSession session = sessionFor(userId, cmd);
+        cmd.setSessionId(session.getId());
+        cmd.setScopeType(session.getScopeType());
+        cmd.setAgentCode(session.getAgentCode());
+        cmd.setSpaceSlug(session.getSpaceSlug());
+        if (!StringUtils.hasText(cmd.getProviderCode())) cmd.setProviderCode(session.getProviderCode());
+        if (!StringUtils.hasText(cmd.getModelCode())) cmd.setModelCode(session.getModelCode());
+    }
+
+    private ChatDispatchResult dispatch(ChatSendCmd cmd, ChatScopeType scopeType, ChatDispatchContext context) {
+        if (cmd.getScopedTools() == null) return dispatcher(scopeType).dispatch(context);
+        try (var ignored = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(cmd.getScopedTools())) {
+            return dispatcher(scopeType).dispatch(context);
+        }
     }
 
     private List<String> permissionSnapshot(ChatSendCmd cmd) {
@@ -241,19 +268,6 @@ public class ChatAppService {
         return messageRepo.save(ChatMessage.assistant(session.getId(), userId));
     }
 
-    private List<AiChatMessage> buildHistory(ChatSession session) {
-        List<ChatMessage> messages = messageRepo.findBySessionId(session.getId()).stream()
-                .filter(message -> message.getRole() == ChatMessageRole.USER || message.getRole() == ChatMessageRole.ASSISTANT)
-                .filter(message -> StringUtils.hasText(message.getContent()))
-                .toList();
-        int from = Math.max(0, messages.size() - HISTORY_LIMIT * 2);
-        return messages.subList(from, messages.size()).stream()
-                .map(message -> new AiChatMessage(
-                        message.getRole() == ChatMessageRole.USER ? "user" : "assistant",
-                        message.getContent()))
-                .toList();
-    }
-
     private String effectiveQuestion(ChatSendCmd cmd) {
         List<String> documentTexts = cmd.getAttachments() == null
                 ? List.of()
@@ -262,9 +276,9 @@ public class ChatAppService {
                   .map(attachment -> "【" + attachment.fileName() + "】\n" + attachment.extractedText())
                   .toList();
         if (documentTexts.isEmpty()) {
-            return cmd.getQuestion();
+            return cmd.getQuestion() + cmd.getFrontendContextPrompt();
         }
-        return cmd.getQuestion() + "\n\n以下是附件抽取出的文本内容，请基于这些内容回答问题：\n\n" + String.join("\n\n", documentTexts);
+        return cmd.getQuestion() + cmd.getFrontendContextPrompt() + "\n\n以下是附件抽取出的文本内容，请基于这些内容回答问题：\n\n" + String.join("\n\n", documentTexts);
     }
 
     private List<ChatCitation> mergeCitations(List<ChatCitation> first, List<ChatCitation> second) {
@@ -309,6 +323,11 @@ public class ChatAppService {
         private final List<ChatActivity> activities = new ArrayList<>();
         private final List<ChatToolCall> tools = new ArrayList<>();
         private final StringBuilder reasoning = new StringBuilder();
+        private final StringBuilder content = new StringBuilder();
+
+        private synchronized void appendContent(String delta) {
+            if (delta != null) content.append(delta);
+        }
 
         private synchronized void appendReasoning(String delta) {
             if (delta != null && !delta.isEmpty()) {
@@ -338,11 +357,12 @@ public class ChatAppService {
         }
 
         private synchronized ChatRunSnapshot snapshot() {
-            return new ChatRunSnapshot(reasoning.toString(), List.copyOf(tools), List.copyOf(activities));
+            return new ChatRunSnapshot(content.toString(), reasoning.toString(), List.copyOf(tools), List.copyOf(activities));
         }
     }
 
     private record ChatRunSnapshot(
+            String content,
             String reasoning,
             List<ChatToolCall> tools,
             List<ChatActivity> activities

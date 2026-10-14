@@ -21,6 +21,8 @@ public class UserChatQuota extends BaseDomain {
     private LocalDate usageDate;
     private long usedTokens;
     private long limitTokens;
+    private long reservedTokens;
+    private long uncertainTokens;
 
     public static UserChatQuota of(Long userId, LocalDate usageDate, long limitTokens) {
         return UserChatQuota.builder()
@@ -32,7 +34,11 @@ public class UserChatQuota extends BaseDomain {
     }
 
     public long remaining() {
-        return Math.max(0, limitTokens - usedTokens);
+        if (usedTokens >= limitTokens) return 0;
+        long remaining = limitTokens - Math.max(0, usedTokens);
+        if (reservedTokens >= remaining) return 0;
+        remaining -= Math.max(0, reservedTokens);
+        return uncertainTokens >= remaining ? 0 : remaining - Math.max(0, uncertainTokens);
     }
 
     public boolean exceed(AiUsage usage) {
