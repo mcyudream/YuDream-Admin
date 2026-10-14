@@ -12,7 +12,7 @@
 
 `preset` 可选 `vibrant` / `calm` / `compact`；`motion` 可选 `system` / `reduced`。旧配置与未知值自动回落默认值。三套外观都保留已启用的功能动画，包括计数、翻词、加载、流光、跑马灯和轮播。灵动保留完整动效；雅致与紧凑在 `motion=reduced` 或操作系统 `prefers-reduced-motion: reduce` 时柔化动作、降低装饰密度、放慢循环，不统一停用动画或将计数直接跳到终值。外观设置继续由宿主持久化，YD 组件读取根节点设置，不增加 SPI 主题字段。
 
-应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在共享 `@yudream/components/appearance.css` 的 `@layer yudream-base` 根节点中声明，宿主 `src/assets/styles/admin-appearance.css` 仅导入该文件。YD 控件、后台布局和实时预览均消费这些变量；业务页面仍只使用中性语义变量。宿主和预览共用 `@fantastic-admin/themes/runtime` 的主色转换，默认值从 FA settings 读取，为 `#6366f1`。
+应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在共享 `@yudream/components/appearance.css` 的 `@layer yudream-base` 根节点中声明，宿主 `src/assets/styles/admin-appearance.css` 仅导入该文件。YD 控件、后台布局和实时预览均消费这些变量；业务页面仍只使用中性语义变量。宿主和预览共用 `@fantastic-admin/themes/runtime` 的主色转换，默认值从 FA settings 读取，为 `#18181b`。
 
 ## ADMIN 主题插件
 

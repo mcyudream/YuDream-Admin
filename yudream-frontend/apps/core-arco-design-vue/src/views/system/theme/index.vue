@@ -10,7 +10,7 @@ const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
 
 const saving = ref(false)
-const colorPresets = ['#6366f1', '#18181b', '#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c']
+const colorPresets = ['#18181b', '#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c']
 
 const pluginThemeOverview = ref<PluginThemeOverview>({ themes: [], active: {} })
 
