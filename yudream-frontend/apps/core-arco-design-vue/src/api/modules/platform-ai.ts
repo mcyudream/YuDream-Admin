@@ -66,7 +66,7 @@ export default {
   },
   /** CMS/AI 场景的可用模型清单（provider-first，platform:ai:generate 权限） */
   availableModels: () => {
-    return systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/ai/models/available')
+    return systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/ai/models/available', { skipGlobalToast: true })
   },
   generateCmsPageStreamEndpoint: () => {
     return streamEndpoint('/api/platform/ai/cms/pages/generate/stream')

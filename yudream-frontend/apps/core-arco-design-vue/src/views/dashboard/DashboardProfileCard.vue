@@ -120,7 +120,8 @@ const week = computed(() => {
 
 .dashboard-profile__week .is-today {
   color: var(--yd-dashboard-feature-text);
-  background: color-mix(in srgb, var(--yd-dashboard-feature-text) 13%, transparent);
+  background: color-mix(in srgb, rgb(var(--primary-6)) 52%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, rgb(var(--primary-6)) 36%, transparent);
 }
 
 .dashboard-profile__week i {
@@ -189,6 +190,14 @@ const week = computed(() => {
   background: color-mix(in srgb, var(--yd-dashboard-feature-text) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--yd-dashboard-feature-text) 24%, transparent);
   border-radius: var(--yd-surface-radius, 18px);
+  transition: rotate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring), scale var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-profile__avatar:hover {
+    rotate: 6deg;
+    scale: 1.06;
+  }
 }
 
 .dashboard-profile__chips {

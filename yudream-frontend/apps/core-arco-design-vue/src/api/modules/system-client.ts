@@ -10,6 +10,8 @@ declare module 'axios' {
     apiPlainData?: unknown
     skipTokenRefresh?: boolean
     tokenRetried?: boolean
+    /** 引导期/可降级调用置 true：失败由调用方自行呈现，不弹全局错误 toast */
+    skipGlobalToast?: boolean
   }
 }
 
@@ -63,7 +65,9 @@ systemClient.interceptors.response.use(
     if (result?.code === 401) {
       return retryAfterRefresh(systemClient, response.config)
     }
-    useYdToast().error('错误', { description: hintForMessage(result?.message || '请求失败') })
+    if (!response.config?.skipGlobalToast) {
+      useYdToast().error('错误', { description: hintForMessage(result?.message || '请求失败') })
+    }
     return Promise.reject(new Error(result?.message || '请求失败'))
   },
   async (error: AxiosError) => {
@@ -73,7 +77,9 @@ systemClient.interceptors.response.use(
     if (error.response?.status === 401) {
       return retryAfterRefresh(systemClient, error.config)
     }
-    await toastApiError(error)
+    if (!error.config?.skipGlobalToast) {
+      await toastApiError(error)
+    }
     return Promise.reject(error)
   },
 )

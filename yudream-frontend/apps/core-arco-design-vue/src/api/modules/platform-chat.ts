@@ -115,13 +115,13 @@ export interface ChatSendPayload {
   attachments?: ChatAttachment[]
 }
 
-export const listChatSessions = () => systemClient.get<unknown, ApiResponse<ChatSession[]>>('api/platform/chat/sessions')
+export const listChatSessions = () => systemClient.get<unknown, ApiResponse<ChatSession[]>>('api/platform/chat/sessions', { skipGlobalToast: true })
 export const createChatSession = (data: Partial<ChatSession>) => systemClient.post<unknown, ApiResponse<ChatSession>>('api/platform/chat/sessions', data)
 export const updateChatSession = (id: string, data: Partial<ChatSession>) => systemClient.patch<unknown, ApiResponse<ChatSession>>(`api/platform/chat/sessions/${id}`, data)
 export const deleteChatSession = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/chat/sessions/${id}`)
 export const listChatMessages = (id: string) => systemClient.get<unknown, ApiResponse<ChatMessage[]>>(`api/platform/chat/sessions/${id}/messages`)
 export async function fetchMyChatQuota() {
-  const response = await systemClient.get<unknown, ApiResponse<unknown>>('api/platform/chat/quota/me')
+  const response = await systemClient.get<unknown, ApiResponse<unknown>>('api/platform/chat/quota/me', { skipGlobalToast: true })
   return { ...response, data: normalizeAiQuota(response.data) }
 }
 export async function fetchChatQuotaConfig() {
