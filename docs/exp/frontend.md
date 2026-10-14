@@ -1,0 +1,133 @@
+# 前端经验：组件解析、样式级联与真实验收
+
+> **适用范围**：宿主 Vue 前端、共享组件与插件远程前端。
+> **目标**：记录静默降级、CSS 优先级、响应式布局和浏览器验收的已知陷阱。
+
+## 1. Vue 组件与工具类
+
+### 页面内容在但 YD 组件外壳消失
+
+- **现象**：模板插槽内容还在，组件边框/触发器/props 不工作，控制台可能有 Failed to resolve component。
+- **根因**：只有 Fa*/Yd* 全局注册，兄弟业务组件不会自动解析；漏 import 后 Vue 把标签当原生元素。
+- **规避**：逐一显式 import 所有本地大写组件；组件规则见 `docs/dev/frontend.md`。
+- **来源**：`unresolved-local-component-silent-degrade`。
+
+### 插件工具类覆盖宿主弹窗宽度
+
+- **现象**：插件页面的宿主 FaModal 在桌面被拉成全宽，像是宿主响应式类失效。
+- **根因**：旧插件 CSS 未分层，插件 `.max-w-full` 等同名工具类优先级高于宿主工具类。
+- **规避**：升级 SDK 至 1.6.0+ 并重建 `style.css`，所有插件工具类进入 `@layer yudream-plugin`；宿主层序 `yudream-base < yudream-plugin < unlayered host utilities`。
+- **来源**：`plugin-remote-style-injection`；`docs/dev/plugin-system.md`。
+
+### 宿主不显示插件原子类样式
+
+- **现象**：插件 DOM 有 UnoCSS class，但看不到对应样式。
+- **根因**：宿主构建不会扫描插件包。
+- **规避**：插件构建产物自行包含所需工具类，不能依赖宿主运行时补扫。
+- **来源**：`plugin-remote-style-injection`。
+
+## 2. 布局与交互
+
+### 首页插件卡片保存成功但刷新后消失
+
+- **现象**：窄屏或非 lg 断点下保存后，刷新卡片被当成旧单列布局过滤。
+- **根因**：`isLegacyAutoStackedLayout` 用 md/sm 判断历史单列；md/sm 默认竖排，不代表遗留状态。
+- **规避**：只用 lg 判定旧布局；验收保存+刷新后 placements。
+- **来源**：`dashboard-legacy-stack-lg-only`。
+
+### 拖拽手柄只在按钮边缘生效
+
+- **现象**：GridStack 只有点按钮边缘才能拖，点中间图标无反应。
+- **根因**：事件命中图标后代，GridStack `_mouseDown` 把交互元素过滤为非拖拽。
+- **规避**：拖拽手柄内图标根节点设 `pointer-events:none`；浏览器实测从图标中心拖并验证保存/刷新。
+- **来源**：`gridstack-button-handle-icon`。
+
+### Dialog 已关闭但仍挡点击
+
+- **现象**：自动化认为 dialog 还在无障碍树中，或关闭后短暂拦截指针。
+- **根因**：IAB/Chromium 后台标签页节流动画帧，Reka Presence 收不到 `animationend`，`data-state=closed`、`opacity=0` 节点暂留。
+- **规避**：关闭验收不能只查 `getByRole(dialog).count()`；激活标签页出帧并等卸载，或根据截图/可见性确认真实状态。
+- **来源**：`reka-presence-background-animation-throttle`。
+
+### `pnpm lint:eslint` 全仓验证改写了无关文件
+
+- **现象**：改了一条 ESLint 配置后，全仓 lint 大量修改无关源码或 pnpm catalog。
+- **根因**：根脚本带 `--fix`，改 `eslint.config.js` 又会让 eslint cache 失效，导致全仓修复全部文件。
+- **规避**：规则变更用 `npx eslint <paths> --no-cache` 定向验证；提交只暂存本工作项文件，禁止用全仓 `--fix` 充当只读检查。
+- **来源**：`eslint-full-fix-mass-rewrite`。
+
+### 固定高度工作台的长工具列表被裁切
+
+- **现象**：侧栏内容超出后不可滚动或底部工具不可达。
+- **根因**：Grid/Flex 子项默认 `min-height:auto`，高度约束无法传递。
+- **规避**：根节点 `height:100%; min-height:0; overflow:hidden`，内部滚动区 `min-height:0; overflow:auto`。
+- **来源**：`workflow-editor-scroll-container`。
+
+### 浮动调试面板被侧栏/模态遮挡
+
+- **现象**：面板在布局容器里被侧栏压住；或抽屉打开时遮罩阻断系统操作。
+- **根因**：布局 stacking context 与 z-index 层级不匹配，FaDrawer 会锁滚动并盖遮罩。
+- **规避**：宿主级面板 Teleport 到 body，z-index ≥2100；面板用非模态浮窗，不用 Drawer；内部模态 2200，嵌套 2300。
+- **来源**：`host-zindex-scale-floating-overlay`。
+
+## 3. 主题与登录
+
+### 深色 SITE 主题下登录页文字不可读
+
+- **现象**：无插件可读，启用 SITE 主题后登录页文字与背景对比度不足。
+- **根因**：主题只覆盖站点容器变量，登录页另消费 `--color-*`/组件语义变量；或相对 URL 从宿主 CSS 解析。
+- **规避**：同时验收无插件/启用 SITE 主题；在 `.login-page` 桥接 `--color-*` 与组件语义变量，回落浅色默认；相对资源 URL 在插件自己的 CSS 选择器中消费；匹配 `text-primary` 用完整类名，勿误伤 `text-primary-foreground`。
+- **来源**：`site-theme-login-contrast`。
+
+### 主题启动动画偶尔先显示宿主默认皮肤
+
+- **现象**：首次公开页加载先显示默认 loading，稍后才切主题；已登录后台 `/` 不应套 SITE 主题。
+- **根因**：主题 CSS 直到 Vue main.ts 请求 active 后才挂载，而 loading 在 Vue/router 之前注入。
+- **规避**：公开路径 index.html 用 localStorage 缓存的 SITE CSS 先行注入/preload loading 图；theme-runtime 在 router ready 前按 URL 公共前缀启用 stylesheet；等 CSS 与图像就绪再 fade；后台 media=not all。主题资产只在插件 JAR，不放宿主 public。
+- **来源**：`plugin-theme-splash`。
+
+### 主题 image 配置清空后又恢复默认图
+
+- **现象**：管理端清空图片并保存，重新打开仍显示 schema 默认图。
+- **根因**：保存空值被当作“未设置”，读取又合并 schema default。
+- **规避**：image 清空存空串，读取不得回落 schema default。
+- **来源**：`plugin-theme-splash`。
+
+## 4. 登录布局与浏览器表单
+
+### 登录 Tab 切回账号密码后按钮无反应
+
+- **现象**：切到第三方 Tab 再切回，浏览器自动填充值仍在输入框但登录无响应。
+- **根因**：账号输入与「记住账号」通过 `v-if` 卸载，浏览器自动填充和 vee-validate field 注册失效。
+- **规避**：账号字段常驻，用 `v-show`；Tab 切换不卸载输入。
+- **来源**：`plugin-menu` 经验与 SPI 2.32.0 登录规范；`docs/dev/plugin-system.md`。
+
+### 登录页默认 center 但几何位置偏移
+
+- **现象**：配置为 center，却出现双栏/偏左/偏右布局，短视口内容被工具栏或版权挤压。
+- **根因**：selector 值没有对应真实几何样式，center 与 right 共用了全屏双栏；登录/注册/找回/绑定容器实现不一致。
+- **规避**：桌面 center 用限宽盒、自动外边距与内容高度；左右布局保留通栏方向；手机统一上下布局；短视口允许滚动并为工具栏/版权留空间。四类页面共用同一容器并实测三种对齐。
+- **来源**：`login-center-layout-contract`。
+
+### Chrome 自动填充背景覆盖输入组边框
+
+- **现象**：登录输入框自动填充后上下边框消失；密码切换后模型值被清空。
+- **根因**：原生输入高度与带边框外壳同高；切换 input type 时浏览器自动填充值尚未触发 input。
+- **规避**：输入高度落在外壳内容区内，输入/自动填充同中性底色，外壳裁切圆角；切换类型前同步原生输入值；密码切换按钮始终有显示/隐藏名称并透传 disabled。
+- **来源**：`login-autofill-input-group`。
+
+## 5. 真实视觉验收
+
+### 工作台卡片仅在默认布局看似正常
+
+- **现象**：用户自定义宽高或小屏下卡片内容被裁切、按钮越界、滚动区域消失。
+- **根因**：只验收默认卡片集合与桌面断点，忽略隐藏插件卡片、容器实际尺寸和手机宽度。
+- **规避**：浏览器中加入全部当前可用卡片（含默认隐藏插件卡），逐卡检查默认/最小/宽矮/宽高尺寸及桌面/390/320px；同时核对正文 client/scroll 尺寸与关键操作边界，不能只隐藏滚动条而裁内容。
+- **来源**：`dashboard-all-card-size-audit`。
+
+### YdSelect 显示了第一项但模型为空
+
+- **现象**：空值控件显示第一候选像已选；多选标签溢出或远程选择不可检索。
+- **根因**：显示 fallback 与真实 model 脱节，或把本地过滤组件用于远程分页。
+- **规避**：空值显示“没有选择”，不回落首项；multiple 全部标签在 trigger 内并可取消；`allowSearch` 仅本地过滤且保留选中；远程分页用 YdTablePicker。
+- **来源**：`yd-select-selection-feedback`。

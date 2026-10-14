@@ -1,0 +1,38 @@
+# 双仓同步地图（权威）
+
+> **适用范围**：`yudream-admim`（主仓）与 `yudream-admin-plugins`（插件仓）。
+> **目标**：规范事实一处定义、两仓一致；修改任一仓规范前查本图，命中即同工作项同步。
+
+本文件是双仓同步关系的**唯一权威**，只存在于主仓；插件仓 `docs/dev/` 文件头部引用本图。
+
+## 1. 强制规则（两仓 AGENTS.md 同文）
+
+1. 修改任一仓的 `AGENTS.md`、`docs/dev/**`，或写入约束性记忆前，**必须**对照本图；命中映射的，**同一工作项内**同步对方仓对应文件，提交信息注明同步面。
+2. 暂不能同步的：提交信息标 `[sync-pending]` 并记入本文件「待同步」节。
+3. 两边冲突以主仓 `docs/dev` 为准，同工作项收敛。
+4. 本图自身的变更同时更新两仓 AGENTS.md 的双仓同步条款。
+
+## 2. 同步映射
+
+| 规范事实 | 主仓（权威） | 插件仓（副本/对应） | 同步方向 |
+|---|---|---|---|
+| YD 视觉语言与组件选型 | `docs/yd-ui-guidelines.md` | `docs/yd-ui-guidelines.md`（同步副本） | 主仓 → 插件仓 |
+| 权限动作词表 | `docs/dev/permission-codes.md` + `yudream-frontend/.../src/utils/permission-catalog.ts` | 插件仓 AGENTS/docs 对应节 + 各插件权限注册 | 主仓 → 插件仓 |
+| 插件系统契约细则 | `docs/plugin-system/specification.md` | 插件仓 `docs/dev/plugin-development.md` 引用并遵守 | 主仓 → 插件仓 |
+| 插件工程规范 | `docs/dev/plugin-system.md` | 插件仓 `docs/dev/plugin-development.md` | 主仓 → 插件仓（插件仓可补插件侧操作细则） |
+| 契约发布流程 | `docs/dev/contract-release.md` | 插件仓发布/同步节 | 主仓 → 插件仓 |
+| 后端分层硬规则 | `docs/dev/backend-architecture.md` | 插件仓后端规范节（插件内同套 DDD） | 主仓 → 插件仓 |
+| AI 基座与 SPI 契约 | `docs/platform/ai-foundation.md` + `docs/plugin-system/spi-*.md` | 插件 AI 消费方对应文档/代码 | 主仓 → 插件仓（随契约发布节奏） |
+| 硬规则与工程总纲 | `AGENTS.md` + `docs/dev/conventions.md` | 插件仓 `AGENTS.md` + `docs/dev/conventions.md` | 双向互检，冲突以主仓为准 |
+| 组件库公开面 | `docs/yd-components.md` 等 yd-*.md | 插件仓经 SDK/components 契约消费 | 主仓 → 插件仓（随 components 发布） |
+
+## 3. 操作要点
+
+- 命中映射的修改：同一工作项改两边、分别提交，提交信息注明同步面（如「同步插件仓副本」）。
+- 涉及未发布契约（SPI/SDK/components）的同步**必须**等发布验签通过后再落插件仓，但规范文档的同步不等待。
+- 插件仓独有的操作细则（脚手架、热重载工作流、发布脚本用法）留在插件仓 `docs/dev/`，不回流主仓。
+- 新增强规范事实时：先定主仓落点，再在本图登记映射，再同步插件仓。
+
+## 4. 待同步
+
+（暂无）

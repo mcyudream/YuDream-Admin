@@ -67,3 +67,7 @@ hs_err_pid*.log
 .zcode/
 .idea/dataSources.xml
 yd-docs/.dev-server.log
+
+# Local-only engineering notes and secrets
+/docs/plan/
+/docs/local.md
