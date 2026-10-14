@@ -10,6 +10,10 @@ import { systemRoutes as systemRoutesRaw } from '@/router/routes'
 import { indexPluginRuntimeModules, resolvePluginRuntimeRoute } from './plugin-route-runtime'
 import { collectBackendMatcherRoutes, flattenBackendRouteGroups, mergeBackendStructuralRoutes, stripBackendStructuralAuth } from './route-auth'
 
+// 管理端布局的统一引用：后端 'Layout' 转换与叶子包装层共用，供 deleteMiddleRouteComponent
+// 以身份比较识别「布局提供层」（es-toolkit cloneDeep 保函数引用）
+const adminLayoutComponent = () => import('@/layouts/index.vue')
+
 export const useAppRouteStore = defineStore(
   'appRoute',
   () => {
@@ -47,7 +51,7 @@ export const useAppRouteStore = defineStore(
             if (!hasDefaultPageChild(item.children)) {
               item.redirect ||= resolveFirstVisibleChildPath(item.children)
             }
-            item.children = deleteMiddleRouteComponent(item.children)
+            item.children = deleteMiddleRouteComponent(item.children, item.component === adminLayoutComponent)
           }
           return item
         })
@@ -67,16 +71,21 @@ export const useAppRouteStore = defineStore(
       })
       return routes
     })
-    // 删除路由中间层级对应的组件
-    function deleteMiddleRouteComponent(routes: RouteRecordRaw[]) {
+    // 删除路由中间层级对应的组件。仅当祖先已提供管理端布局时才剥组件：
+    // 挂在无组件分类节点下的叶子包装层（adminLayoutComponent）必须保留，
+    // 否则插件页会失去侧栏布局整页裸渲染
+    function deleteMiddleRouteComponent(routes: RouteRecordRaw[], hasLayoutAncestor = false) {
       const res: RouteRecordRaw[] = []
       routes.forEach((route) => {
         if (route.children?.length) {
           if (!hasDefaultPageChild(route.children)) {
             route.redirect ||= resolveFirstVisibleChildPath(route.children)
           }
-          delete route.component
-          route.children = deleteMiddleRouteComponent(route.children)
+          const providesLayout = route.component === adminLayoutComponent
+          if (hasLayoutAncestor || !providesLayout) {
+            delete route.component
+          }
+          route.children = deleteMiddleRouteComponent(route.children, hasLayoutAncestor || providesLayout)
         }
         else {
           delete route.children
@@ -160,7 +169,7 @@ export const useAppRouteStore = defineStore(
         else if (typeof route.component === 'string') {
           switch (route.component) {
             case 'Layout':
-              route.component = () => import('@/layouts/index.vue')
+              route.component = adminLayoutComponent
               break
             default:
               route.component = views[`/src/views/${route.component}`]
@@ -172,7 +181,7 @@ export const useAppRouteStore = defineStore(
         if (typeof originalComponent === 'string' && originalComponent !== 'Layout' && route.component && !route.children?.length) {
           const pageComponent = route.component
           const pageName = route.name
-          route.component = () => import('@/layouts/index.vue')
+          route.component = adminLayoutComponent
           route.name = `${pageName || route.path}-layout`
           route.children = [{
             path: '',
