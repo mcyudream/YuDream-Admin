@@ -129,7 +129,7 @@ function handleJump() {
       {{ props.textTemplates.total?.(props.total) }}
     </div>
     <div v-if="layoutConfig.sizes.show" :style="{ order: layoutConfig.sizes.order }">
-      <Select v-model="size" :options="props.sizes.map(size => ({ label: props.textTemplates.sizes?.(size) ?? '', value: size }))" class="w-auto" />
+      <Select v-model="size" placeholder="条/页" :options="props.sizes.map(size => ({ label: props.textTemplates.sizes?.(size) ?? '', value: size }))" class="w-auto" />
     </div>
     <div v-if="layoutConfig.jumper.show" class="flex-center gap-2" :style="{ order: layoutConfig.jumper.order }">
       <span class="text-sm text-muted-foreground">{{ props.textTemplates.jumper?.before }}</span>

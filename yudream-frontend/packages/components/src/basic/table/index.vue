@@ -714,7 +714,7 @@ function resolveColumnClass<TContext>(
 function getHeaderClass(header: Header<TData, unknown>) {
   const columnDef = header.column.columnDef as TableColumn<TData, unknown>
   return cn(
-    'sticky z-2 bg-muted text-muted-foreground after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border after:content-empty',
+    'sticky z-2 bg-muted/60 text-muted-foreground after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border after:content-empty',
     getAlignClass(columnDef.align),
     getHeaderBorderClass(header),
     getPinnedColumnClass(header.column, 'header'),
@@ -863,7 +863,7 @@ function getCellBorderClass(cell: Cell<TData, unknown>) {
 function getRowClass(row: Row<TData>, rowIndex: number) {
   return cn(
     'bg-background',
-    '[&:hover:not([data-state=selected])>td[data-pinned]]:bg-muted [&[data-state=selected]>td]:bg-accent/70 [&[data-state=selected]>td[data-pinned]]:bg-accent/70',
+    '[&:hover:not([data-state=selected])>td[data-pinned]]:bg-muted [&[data-state=selected]>td]:bg-primary/8 [&[data-state=selected]>td[data-pinned]]:bg-primary/8',
     props.stripe && rowIndex % 2 === 1 && '[&>td]:bg-muted/50',
     props.stripe && rowIndex % 2 === 1 && '[&>td[data-pinned]]:bg-muted',
     stripeInteractionClass.value,
