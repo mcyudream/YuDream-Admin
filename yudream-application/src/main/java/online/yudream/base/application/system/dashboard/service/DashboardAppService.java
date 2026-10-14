@@ -112,8 +112,9 @@ public class DashboardAppService {
         if (stored == null) {
             return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, normalizeSubmittedItems(defaultItems(cards), cards));
         }
-        List<DashboardLayoutItem> normalized = normalizeSubmittedItems(stored.getItems(), cards);
-        return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, appendMissingSystemItems(normalized, cards));
+        // 保留已保存默认布局的 id：前端以 id 识别已保存布局并保留其尺寸位置
+        stored.replaceItems(appendMissingSystemItems(normalizeSubmittedItems(stored.getItems(), cards), cards));
+        return stored;
     }
 
     private DashboardLayout applyFirstVisitGuideCondition(DashboardLayout defaultLayout, List<DashboardCardDefinition> cards,
@@ -147,6 +148,12 @@ public class DashboardAppService {
                     .forEach(item -> defaults.put(item.cardCode(), item));
         }
         List<DashboardLayoutItem> merged = new ArrayList<>(defaults.values());
+        if (overrideLayout != null) {
+            // 有效布局必须承载用户已保存布局的 id：前端以 id 区分“已保存布局”
+            // 与“首次访问的生成布局”，合成无 id 对象会令已保存尺寸被推荐引擎重排
+            overrideLayout.replaceItems(normalizeSubmittedItems(merged, cards));
+            return overrideLayout;
+        }
         return DashboardLayout.create(ownerType, ownerType == DashboardLayoutOwnerType.USER ? ownerId : null, normalizeSubmittedItems(merged, cards));
     }
 
