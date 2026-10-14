@@ -50,9 +50,8 @@ public class DashboardAppService {
         List<DashboardCardDefinition> cards = visibleCards(permissions);
         DashboardLayout defaultLayout = defaultLayout(cards);
         DashboardLayout userLayout = dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, userId).orElse(null);
-        DashboardLayout overrideLayout = isLegacyAutoStackedLayout(userLayout, cards) ? null : userLayout;
         DashboardLayout effectiveDefaultLayout = applyFirstVisitGuideCondition(defaultLayout, cards, userLayout == null);
-        DashboardLayout effectiveLayout = mergeLayout(userId, effectiveDefaultLayout, overrideLayout, cards, DashboardLayoutOwnerType.USER);
+        DashboardLayout effectiveLayout = mergeLayout(userId, effectiveDefaultLayout, userLayout, cards, DashboardLayoutOwnerType.USER);
         return DashboardWorkspaceDTO.builder()
                 .cards(cards.stream().map(DashboardAssembler::toDTO).toList())
                 .defaultLayout(DashboardAssembler.toDTO(defaultLayout))
@@ -110,11 +109,10 @@ public class DashboardAppService {
 
     private DashboardLayout defaultLayout(List<DashboardCardDefinition> cards) {
         DashboardLayout stored = dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.DEFAULT, null).orElse(null);
-        DashboardLayout override = isLegacyAutoStackedLayout(stored, cards) ? null : stored;
-        if (override == null) {
+        if (stored == null) {
             return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, normalizeSubmittedItems(defaultItems(cards), cards));
         }
-        List<DashboardLayoutItem> normalized = normalizeSubmittedItems(override.getItems(), cards);
+        List<DashboardLayoutItem> normalized = normalizeSubmittedItems(stored.getItems(), cards);
         return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, appendMissingSystemItems(normalized, cards));
     }
 
@@ -246,59 +244,6 @@ public class DashboardAppService {
         int columns = BREAKPOINT_COLUMNS.getOrDefault(breakpoint, 12);
         int width = "xs".equals(breakpoint) ? 1 : Math.min(card.defaultW(), columns);
         return new DashboardGridPlacement(0, y, width, card.defaultH());
-    }
-
-    private boolean isLegacyAutoStackedLayout(DashboardLayout stored, List<DashboardCardDefinition> cards) {
-        if (stored == null || stored.getItems().size() < 3) {
-            return false;
-        }
-        if (stored.getItems().stream().anyMatch(item -> !item.visible())) {
-            return false;
-        }
-        Map<String, DashboardCardDefinition> cardMap = cards.stream()
-                .collect(Collectors.toMap(DashboardCardDefinition::code, Function.identity(), (left, right) -> left));
-        return isExactLegacyStackedLayout(stored, cardMap) || isSingleColumnStackedLayout(stored);
-    }
-
-    private boolean isExactLegacyStackedLayout(DashboardLayout stored, Map<String, DashboardCardDefinition> cardMap) {
-        int expectedY = 0;
-        for (DashboardLayoutItem item : stored.getItems()) {
-            DashboardCardDefinition card = cardMap.get(item.cardCode());
-            DashboardGridPlacement placement = item.placements().get("lg");
-            if (card == null || !item.visible() || placement == null) {
-                return false;
-            }
-            int width = Math.min(card.defaultW(), BREAKPOINT_COLUMNS.get("lg"));
-            int height = Math.max(card.defaultH(), card.minH());
-            if (placement.x() != 0 || placement.y() != expectedY || placement.w() != width || placement.h() != height) {
-                return false;
-            }
-            expectedY += height;
-        }
-        return true;
-    }
-
-    private boolean isSingleColumnStackedLayout(DashboardLayout stored) {
-        List<DashboardGridPlacement> placements = stored.getItems().stream()
-                .filter(DashboardLayoutItem::visible)
-                .map(item -> item.placements().get("lg"))
-                .toList();
-        if (placements.size() < 3 || placements.stream().anyMatch(placement -> placement == null || placement.x() != 0)) {
-            return false;
-        }
-        List<DashboardGridPlacement> sorted = placements.stream()
-                .sorted(Comparator.comparingInt(DashboardGridPlacement::y))
-                .toList();
-        int previousBottom = 0;
-        boolean hasVerticalOffset = false;
-        for (DashboardGridPlacement placement : sorted) {
-            if (placement.y() < previousBottom) {
-                return false;
-            }
-            hasVerticalOffset = hasVerticalOffset || placement.y() > 0;
-            previousBottom = Math.max(previousBottom, placement.y() + placement.h());
-        }
-        return hasVerticalOffset;
     }
 
     private DashboardGridPlacement nextDefaultPlacement(DashboardCardDefinition card, String breakpoint, int[] heights) {
