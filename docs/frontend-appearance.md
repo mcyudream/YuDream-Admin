@@ -12,7 +12,7 @@
 
 `preset` 可选 `vibrant` / `calm` / `compact`；`motion` 可选 `system` / `reduced`。旧配置与未知值自动回落默认值。三套外观都保留已启用的功能动画，包括计数、翻词、加载、流光、跑马灯和轮播。灵动保留完整动效；雅致与紧凑在 `motion=reduced` 或操作系统 `prefers-reduced-motion: reduce` 时柔化动作、降低装饰密度、放慢循环，不统一停用动画或将计数直接跳到终值。外观设置继续由宿主持久化，YD 组件读取根节点设置，不增加 SPI 主题字段。
 
-应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在共享 `@yudream/components/appearance.css` 的 `@layer yudream-base` 根节点中声明，宿主 `src/assets/styles/admin-appearance.css` 仅导入该文件。YD 控件、后台布局和实时预览均消费这些变量；业务页面仍只使用中性语义变量。宿主和预览共用 `@fantastic-admin/themes/runtime` 的主色转换，默认值从 FA settings 读取，为 `#18181b`。
+应用 store 将配置投射到 `html[data-admin-style][data-admin-motion]`。样式默认值统一在共享 `@yudream/components/appearance.css` 的 `@layer yudream-base` 根节点中声明，宿主 `src/assets/styles/admin-appearance.css` 仅导入该文件。YD 控件、后台布局和实时预览均消费这些变量；业务页面仍只使用中性语义变量。宿主和预览共用 `@fantastic-admin/themes/runtime` 的主色转换，默认值从 FA settings 读取，为 `#6366f1`。
 
 ## ADMIN 主题插件
 
@@ -20,9 +20,9 @@
 
 | 变量 | 用途 | 灵动默认值 |
 | --- | --- | --- |
-| `--yd-surface-radius` | 工作台、主题设置的卡片圆角 | `18px` |
+| `--yd-surface-radius` | 工作台、主题设置的卡片圆角 | `20px` |
 | `--yd-control-radius` | 导航项圆角 | `12px` |
-| `--yd-surface-shadow` / `--yd-surface-shadow-hover` | 卡片静态与聚焦/悬停阴影 | 中性色阴影 |
+| `--yd-surface-shadow` / `--yd-surface-shadow-hover` | 卡片静态与聚焦/悬停阴影 | 中性色阴影 / 悬停带主色微光 |
 | `--yd-workspace-gap` | 工作台外侧间距 | `24px` |
 | `--yd-surface-padding` / `--yd-content-gap` | YD 卡片内边距与内容间距 | `24px` / `16px` |
 | `--yd-control-height` / `--yd-control-font-size` | 默认控件高度与字号，显式 size 优先 | `40px` / `14px` |
@@ -30,11 +30,11 @@
 | `--yd-motion-loop-scale` | 循环时长倍率；雅致/紧凑减少偏好默认 `1.6` | `1` |
 | `--yd-emphasis` | 文字与装饰强调色，深色模式提升可读性 | 从 FA 主色与前景色派生 |
 | `--yd-motion-duration-fast` / `normal` / `slow` | 按压、常规过渡、入场时长 | `140ms` / `260ms` / `440ms` |
-| `--yd-motion-ease` / `--yd-motion-ease-spring` | 常规与轻弹缓动曲线 | 缓出 / 轻弹 |
-| `--yd-motion-lift` | 可交互元素悬停位移（负数向上） | `-3px` |
-| `--yd-motion-press` | 按压缩放 | `.975` |
-| `--yd-motion-enter-y` | 入场纵向位移 | `14px` |
-| `--yd-motion-stagger` | 工作台卡片错峰间隔 | `45ms` |
+| `--yd-motion-ease` / `--yd-motion-ease-spring` | 常规与轻弹缓动曲线 | 缓出 / 轻弹（带过冲） |
+| `--yd-motion-lift` | 可交互元素悬停位移（负数向上） | `-4px` |
+| `--yd-motion-press` | 按压缩放 | `.96` |
+| `--yd-motion-enter-y` | 入场纵向位移 | `16px` |
+| `--yd-motion-stagger` | 工作台卡片错峰间隔 | `40ms` |
 
 例如插件可以在自己的声明式样式内设置：
 
