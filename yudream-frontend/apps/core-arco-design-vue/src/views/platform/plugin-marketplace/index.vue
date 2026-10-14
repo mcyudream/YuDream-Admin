@@ -33,8 +33,8 @@ const rollingBackCode = ref('')
 const installPlan = ref<PluginMarketplaceInstallPlan | null>(null)
 const installPlanOpen = ref(false)
 const installPlanLoading = ref(false)
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const router = useRouter()
 const featureStore = useAppFeatureStore()
 const publicMarketEnabled = computed(() => featureStore.publicPluginMarketEnabled)
@@ -443,92 +443,96 @@ function rollbackConfirmationContent(cascade: boolean) {
 
 <template>
   <div>
-    <FaPageHeader title="插件市场" class="mb-0">
+    <YdPageHeader title="插件市场" class="mb-0">
       <template #description>
         从已订阅的市场源安装、更新插件。远程源随时可添加；本机源与公开社区需启用「插件市场源」能力。
       </template>
-    </FaPageHeader>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="marketplace-toolbar">
         <div class="marketplace-filters">
-          <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
-          <FaSelect v-model="status" :options="statusOptions" class="marketplace-status" />
-          <FaSelect v-model="categoryFilter" :options="categoryOptions" class="marketplace-category" />
-          <FaSelect v-if="showSourceFilter" v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
+          <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
+          <YdSelect v-model="status" :options="statusOptions" class="marketplace-status" />
+          <YdSelect v-model="categoryFilter" :options="categoryOptions" class="marketplace-category" />
+          <YdSelect v-if="showSourceFilter" v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
           <div class="marketplace-time">
             <span class="marketplace-time__label">发布时间</span>
-            <FaInput v-model="publishedAfter" type="date" class="marketplace-time__input" />
+            <YdInput v-model="publishedAfter" type="date" class="marketplace-time__input" />
             <span class="marketplace-time__dash">–</span>
-            <FaInput v-model="publishedBefore" type="date" class="marketplace-time__input" />
+            <YdInput v-model="publishedBefore" type="date" class="marketplace-time__input" />
           </div>
         </div>
         <div class="marketplace-toolbar-actions">
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
-          <FaButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</FaButton>
-          <FaButton variant="outline" :loading="loading" @click="load">
-            <FaIcon name="morph:refresh-cw" />
+          <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</YdButton>
+          <YdButton variant="outline" :loading="loading" @click="load">
+            <YdIcon name="morph:refresh-cw" />
             刷新
-          </FaButton>
-          <FaButton v-auth="'platform:plugin-market-source:create'" variant="outline" @click="openAddSource">
-            <FaIcon name="morph:plus" />
+          </YdButton>
+          <YdButton v-auth="'platform:plugin-market-source:create'" variant="outline" @click="openAddSource">
+            <YdIcon name="morph:plus" />
             添加市场源
-          </FaButton>
-          <FaButton v-if="publicMarketEnabled" variant="outline" @click="openPublicMarket">
-            <FaIcon name="morph:external-link" />
+          </YdButton>
+          <YdButton v-if="publicMarketEnabled" variant="outline" @click="openPublicMarket">
+            <YdIcon name="morph:external-link" />
             公开社区
-          </FaButton>
+          </YdButton>
         </div>
       </div>
 
       <div v-if="tagOptions.length" class="marketplace-tags">
-        <button
+        <YdButton
           v-for="tag in tagOptions"
           :key="tag.name"
           type="button"
+          :variant="tagFilter.includes(tag.name) ? 'secondary' : 'ghost'"
           class="marketplace-tag"
           :class="{ active: tagFilter.includes(tag.name) }"
+          :aria-pressed="tagFilter.includes(tag.name)"
           @click="toggleTag(tag.name)"
         >
           {{ tag.name }}<em>{{ tag.count }}</em>
-        </button>
+        </YdButton>
       </div>
 
       <div v-if="pagedRows.length" class="marketplace-grid">
-        <button
+        <YdButton
           v-for="item in pagedRows"
           :key="item.code"
+          :variant="selectedCode === item.code ? 'secondary' : 'ghost'"
           class="plugin-card"
           :class="{ active: selectedCode === item.code }"
           type="button"
+          :aria-pressed="selectedCode === item.code"
           @click="selectPlugin(item.code)"
         >
-          <FaIcon :name="getDescriptor(item).icon || 'morph:store'" class="plugin-icon" />
+          <YdIcon :name="getDescriptor(item).icon || 'morph:store'" class="plugin-icon" />
           <div class="plugin-card-body">
             <div class="plugin-card-title">
               <strong>{{ getDescriptor(item).displayName || getDescriptor(item).code }}</strong>
-              <FaTag variant="secondary">{{ getDescriptor(item).version }}</FaTag>
+              <YdTag variant="secondary">{{ getDescriptor(item).version }}</YdTag>
             </div>
             <div class="plugin-card-meta">
-              <FaTag variant="secondary">{{ marketplaceStatusLabel(item) }}</FaTag>
-              <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
-              <FaTag v-if="getDescriptor(item).category" variant="secondary" :title="`分类：${getDescriptor(item).category}`">{{ getDescriptor(item).category }}</FaTag>
+              <YdTag variant="secondary">{{ marketplaceStatusLabel(item) }}</YdTag>
+              <YdTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</YdTag>
+              <YdTag v-if="getDescriptor(item).category" variant="secondary" :title="`分类：${getDescriptor(item).category}`">{{ getDescriptor(item).category }}</YdTag>
             </div>
             <p class="plugin-card-description" :title="getDescriptor(item).description || '暂无插件简介。'">
               {{ getDescriptor(item).description || '暂无插件简介。' }}
             </p>
           </div>
-        </button>
+        </YdButton>
       </div>
       <div v-else-if="!loading" class="empty-state">
-        <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<FaButton variant="link" @click="resetFilters">重置筛选</FaButton></template>
+        <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
         <template v-else>
           还没有可用插件。请先
-          <FaButton v-auth="'platform:plugin-market-source:create'" variant="link" @click="openAddSource">添加远程市场源</FaButton>
+          <YdButton v-auth="'platform:plugin-market-source:create'" variant="link" @click="openAddSource">添加远程市场源</YdButton>
           ，或启用「插件市场源」能力以使用本机源。
         </template>
       </div>
-      <FaPagination
+      <YdPagination
         v-if="pagination.total > pagination.size"
         v-model:page="pagination.page"
         v-model:size="pagination.size"
@@ -542,20 +546,20 @@ function rollbackConfirmationContent(cascade: boolean) {
             <h2>{{ getDescriptor(selected).displayName || getDescriptor(selected).code }}</h2>
             <p>{{ getDescriptor(selected).description || '暂无插件简介。' }}</p>
             <div class="detail-meta">
-              <FaTag v-if="getDescriptor(selected).category" variant="secondary">{{ getDescriptor(selected).category }}</FaTag>
-              <FaTag v-for="tag in (getDescriptor(selected).tags || []).slice(0, 6)" :key="tag" variant="secondary">{{ tag }}</FaTag>
-              <FaButton
+              <YdTag v-if="getDescriptor(selected).category" variant="secondary">{{ getDescriptor(selected).category }}</YdTag>
+              <YdTag v-for="tag in (getDescriptor(selected).tags || []).slice(0, 6)" :key="tag" variant="secondary">{{ tag }}</YdTag>
+              <YdButton
                 v-if="getDescriptor(selected).gitUrl || getDescriptor(selected).source?.repository"
                 variant="link"
                 class="detail-git"
                 @click="openGit(getDescriptor(selected))"
               >
-                <FaIcon name="i-ri:github-line" />
+                <YdIcon name="i-ri:github-line" />
                 源码仓库
-              </FaButton>
+              </YdButton>
             </div>
           </div>
-          <FaButton
+          <YdButton
             v-if="canRollback"
             v-auth="'platform:plugin:manage'"
             size="sm"
@@ -565,7 +569,7 @@ function rollbackConfirmationContent(cascade: boolean) {
             @click="previewAndConfirmRollback"
           >
             回滚本地备份
-          </FaButton>
+          </YdButton>
         </div>
 
         <template v-if="latestVersion">
@@ -584,10 +588,10 @@ function rollbackConfirmationContent(cascade: boolean) {
         </template>
 
         <div v-if="historyVersions.length" class="history-versions">
-          <button class="history-toggle" type="button" @click="showHistory = !showHistory">
-            <FaIcon name="morph:chevron-right" class="history-caret" :class="{ expanded: showHistory }" />
+          <YdButton class="history-toggle" variant="ghost" type="button" :aria-expanded="showHistory" @click="showHistory = !showHistory">
+            <YdIcon name="morph:chevron-right" class="history-caret" :class="{ expanded: showHistory }" />
             历史版本（{{ historyVersions.length }}）
-          </button>
+          </YdButton>
           <div v-show="showHistory" class="history-list">
             <VersionCard
               v-for="item in historyVersions"
@@ -611,7 +615,7 @@ function rollbackConfirmationContent(cascade: boolean) {
         :loading="installPlanLoading"
         @confirm="confirmInstallWithDependencies"
       />
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 
@@ -697,9 +701,9 @@ function rollbackConfirmationContent(cascade: boolean) {
 }
 
 .marketplace-tag.active {
-  border-color: rgb(var(--primary-6));
-  background: rgb(var(--primary-1));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
 }
 
 .detail-meta {
@@ -763,7 +767,7 @@ function rollbackConfirmationContent(cascade: boolean) {
 
 .plugin-card.active,
 .plugin-card:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
   background: var(--color-fill-2);
 }
 
@@ -785,7 +789,7 @@ function rollbackConfirmationContent(cascade: boolean) {
 
 .plugin-icon-fallback {
   background: var(--color-fill-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   font-size: 20px;
 }
 
@@ -877,7 +881,7 @@ function rollbackConfirmationContent(cascade: boolean) {
 }
 
 .history-toggle:hover {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .history-caret {

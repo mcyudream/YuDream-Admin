@@ -10,10 +10,10 @@ defineProps<{
 <template>
   <div class="dashboard-card__content dashboard-guide">
     <p>{{ card.description || '完成必要配置后，即可开始使用此功能。' }}</p>
-    <FaButton v-if="card.actionPath" variant="ghost" size="sm" @click="onOpen(card)">
+    <YdButton v-if="card.actionPath" variant="ghost" size="sm" @click="onOpen(card)">
       开始配置
-      <FaIcon name="morph:arrow-up-right" />
-    </FaButton>
+      <YdIcon name="morph:arrow-up-right" />
+    </YdButton>
   </div>
 </template>
 

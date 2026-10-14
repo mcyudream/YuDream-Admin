@@ -82,7 +82,7 @@ async function runDiscover() {
     prefillFromDiscovery()
   }
   catch (error: any) {
-    useFaToast().error('中间件自动发现失败', { description: installerErrorMessage(error) })
+    useYdToast().error('中间件自动发现失败', { description: installerErrorMessage(error) })
   }
   finally {
     discoverLoading.value = false
@@ -335,7 +335,7 @@ async function finishIntegrations() {
 }
 
 function toastSetup(description: string) {
-  useFaToast().error('请补全配置', { description })
+  useYdToast().error('请补全配置', { description })
 }
 
 // ==================== 站点与管理员（原有初始化表单） ====================
@@ -422,7 +422,7 @@ const onSubmit = form.handleSubmit((values) => {
             class="wizard-step"
             :class="{ 'wizard-step-active': index === wizardActiveIndex, 'wizard-step-done': index < wizardActiveIndex }"
           >
-            <FaIcon :name="index < wizardActiveIndex ? 'i-lucide:circle-check-big' : index === wizardActiveIndex ? 'i-lucide:circle-dot' : 'i-lucide:circle'" />
+            <YdIcon :name="index < wizardActiveIndex ? 'i-lucide:circle-check-big' : index === wizardActiveIndex ? 'i-lucide:circle-dot' : 'i-lucide:circle'" />
             <span>{{ step.label }}</span>
           </div>
         </div>
@@ -436,22 +436,22 @@ const onSubmit = form.handleSubmit((values) => {
 
           <div v-if="discovery" class="space-y-1 text-xs text-muted-foreground">
             <div v-for="probe in discovery.mongo.filter(p => p.reachable)" :key="`m-${probe.target}`" class="flex items-center gap-1">
-              <FaIcon name="i-lucide:database" class="text-emerald-600 dark:text-emerald-400" />
+              <YdIcon name="i-lucide:database" class="text-emerald-600 dark:text-emerald-400" />
               <span>发现 MongoDB {{ probe.target }}{{ probe.version ? `（${probe.version}）` : '' }}{{ probe.authRequired ? '，需要认证' : '' }}</span>
             </div>
             <div v-for="probe in discovery.redis.filter(p => p.reachable)" :key="`r-${probe.target}`" class="flex items-center gap-1">
-              <FaIcon name="i-lucide:zap" class="text-emerald-600 dark:text-emerald-400" />
+              <YdIcon name="i-lucide:zap" class="text-emerald-600 dark:text-emerald-400" />
               <span>发现 Redis {{ probe.target }}{{ probe.version ? `（${probe.version}）` : '' }}{{ probe.authRequired ? '，需要密码' : '' }}</span>
             </div>
           </div>
 
           <div class="space-y-1">
             <div class="text-sm font-medium">MongoDB 连接串</div>
-            <FaInput v-model="mongoUri" type="text" placeholder="mongodb://账号:密码@主机:27017/yudream" class="w-full" @change="mongoProbeState = null">
+            <YdInput v-model="mongoUri" type="text" placeholder="mongodb://账号:密码@主机:27017/yudream" class="w-full" @change="mongoProbeState = null">
               <template #start>
-                <FaIcon name="i-lucide:database" />
+                <YdIcon name="i-lucide:database" />
               </template>
-            </FaInput>
+            </YdInput>
             <div v-if="mongoProbeState && !mongoProbeState.loading" class="text-xs" :class="mongoProbeState.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
               {{ mongoProbeState.text }}
             </div>
@@ -460,33 +460,33 @@ const onSubmit = form.handleSubmit((values) => {
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <div class="text-sm font-medium">Redis 地址</div>
-              <FaInput v-model="redisHost" type="text" placeholder="localhost" class="w-full" @change="redisProbeState = null">
+              <YdInput v-model="redisHost" type="text" placeholder="localhost" class="w-full" @change="redisProbeState = null">
                 <template #start>
-                  <FaIcon name="i-lucide:server" />
+                  <YdIcon name="i-lucide:server" />
                 </template>
-              </FaInput>
+              </YdInput>
             </div>
             <div class="space-y-1">
               <div class="text-sm font-medium">端口</div>
-              <FaInput v-model="redisPort" type="number" placeholder="6379" class="w-full" @change="redisProbeState = null" />
+              <YdInput v-model="redisPort" type="number" placeholder="6379" class="w-full" @change="redisProbeState = null" />
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <div class="text-sm font-medium">Redis 密码<span class="text-muted-foreground">（选填）</span></div>
-              <FaInput v-model="redisPassword" type="password" placeholder="无密码留空" class="w-full" @change="redisProbeState = null" />
+              <YdInput v-model="redisPassword" type="password" placeholder="无密码留空" class="w-full" @change="redisProbeState = null" />
             </div>
             <div class="space-y-1">
               <div class="text-sm font-medium">数据库编号</div>
-              <FaInput v-model="redisDatabase" type="number" placeholder="0" class="w-full" @change="redisProbeState = null" />
+              <YdInput v-model="redisDatabase" type="number" placeholder="0" class="w-full" @change="redisProbeState = null" />
             </div>
           </div>
 
-          <FaInput v-if="installerStatus?.setupTokenRequired" v-model="setupToken" type="password" placeholder="安装令牌（部署侧已启用 YUDREAM_SETUP_TOKEN）" class="w-full">
+          <YdInput v-if="installerStatus?.setupTokenRequired" v-model="setupToken" type="password" placeholder="安装令牌（部署侧已启用 YUDREAM_SETUP_TOKEN）" class="w-full">
             <template #start>
-              <FaIcon name="i-lucide:key-round" />
+              <YdIcon name="i-lucide:key-round" />
             </template>
-          </FaInput>
+          </YdInput>
 
           <div v-if="redisProbeState && !redisProbeState.loading" class="text-xs" :class="redisProbeState.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
             {{ redisProbeState.text }}
@@ -496,37 +496,37 @@ const onSubmit = form.handleSubmit((values) => {
           </div>
 
           <div class="grid grid-cols-2 gap-3 pt-2">
-            <FaButton variant="outline" :loading="discoverLoading" @click="runDiscover">
-              <FaIcon name="i-lucide:radar" /> 重新检测
-            </FaButton>
-            <FaButton variant="outline" :disabled="!mongoUri.trim()" :loading="mongoProbeState?.loading === true" @click="testMongo">
-              <FaIcon name="i-lucide:plug-zap" /> 测试 MongoDB
-            </FaButton>
+            <YdButton variant="outline" :loading="discoverLoading" @click="runDiscover">
+              <YdIcon name="i-lucide:radar" /> 重新检测
+            </YdButton>
+            <YdButton variant="outline" :disabled="!mongoUri.trim()" :loading="mongoProbeState?.loading === true" @click="testMongo">
+              <YdIcon name="i-lucide:plug-zap" /> 测试 MongoDB
+            </YdButton>
           </div>
-          <FaButton variant="outline" class="w-full" :disabled="!redisHost.trim()" :loading="redisProbeState?.loading === true" @click="testRedis">
-            <FaIcon name="i-lucide:plug-zap" /> 测试 Redis
-          </FaButton>
-          <FaButton size="lg" class="w-full" :disabled="!canApply" @click="applyInstall">
+          <YdButton variant="outline" class="w-full" :disabled="!redisHost.trim()" :loading="redisProbeState?.loading === true" @click="testRedis">
+            <YdIcon name="i-lucide:plug-zap" /> 测试 Redis
+          </YdButton>
+          <YdButton size="lg" class="w-full" :disabled="!canApply" @click="applyInstall">
             保存并安装
-          </FaButton>
+          </YdButton>
         </div>
 
         <!-- 步骤过渡：落盘中 -->
         <div v-else-if="wizardStep === 'applying'" class="w-full flex-col-center gap-3 py-16 text-muted-foreground">
-          <FaIcon name="i-lucide:loader-circle" class="size-8 animate-spin" />
+          <YdIcon name="i-lucide:loader-circle" class="size-8 animate-spin" />
           <span class="text-sm">正在写入引导配置…</span>
         </div>
 
         <!-- 步骤过渡：等待重启 -->
         <div v-else-if="wizardStep === 'restarting'" class="w-full flex-col-center gap-3 py-16 text-muted-foreground">
-          <FaIcon name="i-lucide:loader-circle" class="size-8 animate-spin" />
+          <YdIcon name="i-lucide:loader-circle" class="size-8 animate-spin" />
           <span class="text-sm">安装配置已写入，服务正在重启，请稍候…</span>
           <span class="text-xs">容器部署会自动拉起；本地开发需手动重启一次后端</span>
           <template v-if="restartTimedOut">
             <span class="text-xs text-destructive">等待超时，请确认后端已重启</span>
-            <FaButton variant="outline" size="sm" @click="pollAfterRestart">
+            <YdButton variant="outline" size="sm" @click="pollAfterRestart">
               重新检查
-            </FaButton>
+            </YdButton>
           </template>
         </div>
 
@@ -535,35 +535,35 @@ const onSubmit = form.handleSubmit((values) => {
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <div class="text-sm font-medium">SMTP 主机<span class="text-muted-foreground">（选填）</span></div>
-              <FaInput v-model="setupMail.host" type="text" placeholder="smtp.example.com" class="w-full">
+              <YdInput v-model="setupMail.host" type="text" placeholder="smtp.example.com" class="w-full">
                 <template #start>
-                  <FaIcon name="i-lucide:mail" />
+                  <YdIcon name="i-lucide:mail" />
                 </template>
-              </FaInput>
+              </YdInput>
             </div>
             <div class="space-y-1">
               <div class="text-sm font-medium">端口</div>
-              <FaInput v-model="setupMail.port" type="number" class="w-full" />
+              <YdInput v-model="setupMail.port" type="number" class="w-full" />
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <div class="text-sm font-medium">邮箱账号</div>
-              <FaInput v-model="setupMail.username" type="text" placeholder="发件邮箱账号" class="w-full" />
+              <YdInput v-model="setupMail.username" type="text" placeholder="发件邮箱账号" class="w-full" />
             </div>
             <div class="space-y-1">
               <div class="text-sm font-medium">密码/授权码</div>
-              <FaInput v-model="setupMail.password" type="password" placeholder="SMTP 授权码" class="w-full" />
+              <YdInput v-model="setupMail.password" type="password" placeholder="SMTP 授权码" class="w-full" />
             </div>
           </div>
           <div class="flex items-end gap-2">
             <div class="flex-1 space-y-1">
               <div class="text-sm font-medium">测试收件地址</div>
-              <FaInput v-model="setupMailTestTo" type="text" placeholder="接收测试邮件" class="w-full" />
+              <YdInput v-model="setupMailTestTo" type="text" placeholder="接收测试邮件" class="w-full" />
             </div>
-            <FaButton variant="outline" :loading="testingSetupMail" @click="testSetupMail">
+            <YdButton variant="outline" :loading="testingSetupMail" @click="testSetupMail">
               测试邮件
-            </FaButton>
+            </YdButton>
           </div>
           <p v-if="setupMailResult" class="text-xs" :class="setupMailResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
             {{ setupMailResult.message }}
@@ -571,42 +571,42 @@ const onSubmit = form.handleSubmit((values) => {
 
           <div class="space-y-1">
             <div class="text-sm font-medium">对象存储 Endpoint<span class="text-muted-foreground">（选填，S3 兼容）</span></div>
-            <FaInput v-model="setupStorage.endpoint" type="text" placeholder="http://localhost:9000" class="w-full">
+            <YdInput v-model="setupStorage.endpoint" type="text" placeholder="http://localhost:9000" class="w-full">
               <template #start>
-                <FaIcon name="i-lucide:hard-drive" />
+                <YdIcon name="i-lucide:hard-drive" />
               </template>
-            </FaInput>
+            </YdInput>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <div class="text-sm font-medium">AccessKey</div>
-              <FaInput v-model="setupStorage.accessKey" type="text" placeholder="对象存储 AccessKey" class="w-full" />
+              <YdInput v-model="setupStorage.accessKey" type="text" placeholder="对象存储 AccessKey" class="w-full" />
             </div>
             <div class="space-y-1">
               <div class="text-sm font-medium">SecretKey</div>
-              <FaInput v-model="setupStorage.secretKey" type="password" placeholder="对象存储 SecretKey" class="w-full" />
+              <YdInput v-model="setupStorage.secretKey" type="password" placeholder="对象存储 SecretKey" class="w-full" />
             </div>
           </div>
           <div class="flex items-end gap-2">
             <div class="flex-1 space-y-1">
               <div class="text-sm font-medium">Bucket</div>
-              <FaInput v-model="setupStorage.bucket" type="text" class="w-full" />
+              <YdInput v-model="setupStorage.bucket" type="text" class="w-full" />
             </div>
-            <FaButton variant="outline" :loading="testingSetupStorage" @click="testSetupStorage">
+            <YdButton variant="outline" :loading="testingSetupStorage" @click="testSetupStorage">
               测试连接
-            </FaButton>
+            </YdButton>
           </div>
           <p v-if="setupStorageResult" class="text-xs" :class="setupStorageResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
             {{ setupStorageResult.message }}
           </p>
 
           <div class="grid grid-cols-2 gap-3 pt-2">
-            <FaButton variant="outline" :disabled="savingIntegrations" @click="wizardStep = 'admin'">
+            <YdButton variant="outline" :disabled="savingIntegrations" @click="wizardStep = 'admin'">
               稍后再配置
-            </FaButton>
-            <FaButton :loading="savingIntegrations" @click="finishIntegrations">
+            </YdButton>
+            <YdButton :loading="savingIntegrations" @click="finishIntegrations">
               保存并继续
-            </FaButton>
+            </YdButton>
           </div>
         </div>
 
@@ -615,11 +615,11 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="siteName">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="text" placeholder="站点名称" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="text" placeholder="站点名称" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:globe" />
+                    <YdIcon name="i-lucide:globe" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -629,11 +629,11 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="adminUsername">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="text" placeholder="管理员用户名" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="text" placeholder="管理员用户名" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:user" />
+                    <YdIcon name="i-lucide:user" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -643,11 +643,11 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="adminEmail">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="text" placeholder="管理员邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="text" placeholder="管理员邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:mail" />
+                    <YdIcon name="i-lucide:mail" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -657,11 +657,11 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="adminNickname">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="text" placeholder="管理员昵称（选填）" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="text" placeholder="管理员昵称（选填）" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:smile" />
+                    <YdIcon name="i-lucide:smile" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -671,11 +671,11 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="adminPassword">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="password" placeholder="管理员密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="password" placeholder="管理员密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:lock" />
+                    <YdIcon name="i-lucide:lock" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -685,20 +685,20 @@ const onSubmit = form.handleSubmit((values) => {
           <FormField v-slot="{ componentField, errors }" name="adminConfirmPassword">
             <FormItem class="pb-6 relative space-y-0">
               <FormControl>
-                <FaInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+                <YdInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                   <template #start>
-                    <FaIcon name="i-lucide:lock" />
+                    <YdIcon name="i-lucide:lock" />
                   </template>
-                </FaInput>
+                </YdInput>
               </FormControl>
               <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
                 <FormMessage class="text-xs m-0 bottom-1 absolute" />
               </Transition>
             </FormItem>
           </FormField>
-          <FaButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
+          <YdButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
             完成初始化
-          </FaButton>
+          </YdButton>
         </form>
       </div>
     </div>

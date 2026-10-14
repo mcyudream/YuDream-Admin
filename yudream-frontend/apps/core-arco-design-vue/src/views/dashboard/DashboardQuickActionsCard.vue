@@ -24,7 +24,7 @@ defineProps<Props>()
 <template>
   <div class="dashboard-card__content dashboard-quick">
     <div v-if="actions.length" class="dashboard-quick__grid">
-      <FaButton
+      <YdButton
         v-for="action in actions"
         :key="action.code"
         type="button"
@@ -34,10 +34,10 @@ defineProps<Props>()
         @click="onOpen?.(action)"
       >
         <span class="dashboard-quick__icon" :class="toneIconClass(action.tone || card.tone)">
-          <FaIcon :name="action.icon || 'morph:arrow-right'" />
+          <YdIcon :name="action.icon || 'morph:arrow-right'" />
         </span>
         <span class="dashboard-quick__label">{{ action.title }}</span>
-      </FaButton>
+      </YdButton>
     </div>
     <div v-else class="dashboard-quick__empty">
       当前角色暂无可展示入口

@@ -35,7 +35,7 @@ interface DashboardAction {
 }
 
 const router = useRouter()
-const toast = useFaToast()
+const toast = useYdToast()
 const accountStore = useAppAccountStore()
 const featureStore = useAppFeatureStore()
 const menuStore = useAppMenuStore()
@@ -511,52 +511,52 @@ function cardProps(card: DashboardCard) {
           </p>
         </div>
         <div class="dashboard-toolbar">
-          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="ghost" size="sm" class="dashboard-home-action" aria-label="访问首页" @click="openPublicHome">
-            <FaIcon name="morph:house" />
+          <YdButton v-if="!editMode && featureStore.cmsEnabled" variant="ghost" size="sm" class="dashboard-home-action" aria-label="访问首页" @click="openPublicHome">
+            <YdIcon name="morph:house" />
             <span>访问首页</span>
-          </FaButton>
-          <FaButton v-if="!editMode" size="sm" aria-label="自定义工作台" :disabled="!workspace || loading" @click="startEdit">
-            <FaIcon name="morph:sliders-horizontal" />
+          </YdButton>
+          <YdButton v-if="!editMode" size="sm" aria-label="自定义工作台" :disabled="!workspace || loading" @click="startEdit">
+            <YdIcon name="morph:sliders-horizontal" />
             <span class="dashboard-customize-label">自定义<span>工作台</span></span>
-          </FaButton>
-          <FaDropdown v-if="!editMode && canConfigureDefault" :items="[[{ label: '配置默认工作台', icon: 'morph:users', handle: startDefaultEdit }]]" align="end">
-            <FaButton variant="ghost" size="icon-sm" aria-label="工作台设置" :disabled="loading">
-              <FaIcon name="morph:ellipsis" />
-            </FaButton>
-          </FaDropdown>
+          </YdButton>
+          <YdDropdown v-if="!editMode && canConfigureDefault" :items="[[{ label: '配置默认工作台', icon: 'morph:users', handle: startDefaultEdit }]]" align="end">
+            <YdButton variant="ghost" size="icon-sm" aria-label="工作台设置" :disabled="loading">
+              <YdIcon name="morph:ellipsis" />
+            </YdButton>
+          </YdDropdown>
           <template v-if="editMode">
             <span class="dashboard-save-state" role="status">{{ dirty ? '有未保存的调整' : '已与保存的布局同步' }}</span>
-            <FaButton variant="outline" size="sm" :disabled="saving" @click="cancelEdit">
+            <YdButton variant="outline" size="sm" :disabled="saving" @click="cancelEdit">
               取消
-            </FaButton>
-            <FaButton size="sm" :loading="saving" @click="saveLayout">
-              <FaIcon name="morph:check" />保存并退出
-            </FaButton>
+            </YdButton>
+            <YdButton size="sm" :loading="saving" @click="saveLayout">
+              <YdIcon name="morph:check" />保存并退出
+            </YdButton>
           </template>
         </div>
       </div>
 
       <div v-if="editMode" class="dashboard-editor-bar" :inert="saving || undefined">
         <div class="dashboard-editor-bar__group">
-          <FaButton size="sm" @click="drawerVisible = true">
-            <FaIcon name="morph:plus" />添加卡片
-          </FaButton>
-          <FaButton size="icon-sm" variant="ghost" :disabled="!canUndo" aria-label="撤销调整" @click="undo">
-            <FaIcon name="morph:undo-2" />
-          </FaButton>
-          <FaButton size="icon-sm" variant="ghost" :disabled="!canRedo" aria-label="重做调整" @click="redo">
-            <FaIcon name="morph:redo-2" />
-          </FaButton>
+          <YdButton size="sm" @click="drawerVisible = true">
+            <YdIcon name="morph:plus" />添加卡片
+          </YdButton>
+          <YdButton size="icon-sm" variant="ghost" :disabled="!canUndo" aria-label="撤销调整" @click="undo">
+            <YdIcon name="morph:undo-2" />
+          </YdButton>
+          <YdButton size="icon-sm" variant="ghost" :disabled="!canRedo" aria-label="重做调整" @click="redo">
+            <YdIcon name="morph:redo-2" />
+          </YdButton>
           <span class="dashboard-editor-divider" />
-          <FaButton size="sm" variant="ghost" title="保持尺寸，收紧当前屏幕的卡片间隙" @click="arrange('compact')">
-            <FaIcon name="morph:align-start-vertical" />整理空隙
-          </FaButton>
-          <FaButton size="sm" variant="ghost" title="为所有屏幕重新推荐尺寸与位置，可撤销" @click="arrange('recommended')">
-            <FaIcon name="morph:panels-top-left" />推荐排布
-          </FaButton>
-          <FaButton size="sm" variant="ghost" @click="resetLayout">
+          <YdButton size="sm" variant="ghost" title="保持尺寸，收紧当前屏幕的卡片间隙" @click="arrange('compact')">
+            <YdIcon name="morph:align-start-vertical" />整理空隙
+          </YdButton>
+          <YdButton size="sm" variant="ghost" title="为所有屏幕重新推荐尺寸与位置，可撤销" @click="arrange('recommended')">
+            <YdIcon name="morph:panels-top-left" />推荐排布
+          </YdButton>
+          <YdButton size="sm" variant="ghost" @click="resetLayout">
             使用默认布局
-          </FaButton>
+          </YdButton>
         </div>
         <span class="dashboard-editor-caption">{{ breakpointLabel }} · {{ COLUMNS[activeBreakpoint] }} 列 · {{ visibleItems.length }} 张卡片</span>
       </div>
@@ -573,12 +573,12 @@ function cardProps(card: DashboardCard) {
       </div>
 
       <div v-else-if="loadError && !workspace" class="dashboard-empty" role="status">
-        <FaIcon name="morph:cloud-off" />
+        <YdIcon name="morph:cloud-off" />
         <strong>工作台暂时无法加载</strong>
         <p>{{ loadError }}</p>
-        <FaButton variant="outline" size="sm" @click="loadWorkspace">
+        <YdButton variant="outline" size="sm" @click="loadWorkspace">
           重新加载
-        </FaButton>
+        </YdButton>
       </div>
 
       <DashboardCanvas v-else :items="draftItems" :cards="cards" :editing="editMode && !saving" @change="changeLayout" @breakpoint="activeBreakpoint = $event">
@@ -595,19 +595,19 @@ function cardProps(card: DashboardCard) {
             <YdSpotlightCard class="dashboard-card__surface" :gradient-opacity="editMode ? 0 : 0.08" :gradient-size="320">
               <header class="dashboard-card__header">
                 <div class="dashboard-card__heading">
-                  <FaIcon v-if="editMode" name="morph:grip-vertical" class="dashboard-card__grip" />
+                  <YdIcon v-if="editMode" name="morph:grip-vertical" class="dashboard-card__grip" />
                   <span v-else class="dashboard-card__icon" :class="toneIconClass(card.tone)">
-                    <FaIcon :name="card.icon || 'morph:layout-grid'" />
+                    <YdIcon :name="card.icon || 'morph:layout-grid'" />
                   </span>
                   <div class="dashboard-card__title-block">
                     <h2>{{ displayCardTitle(card) }}</h2>
                   </div>
                 </div>
-                <FaDropdown v-if="editMode" :items="cardMenu(card)" align="end">
-                  <FaButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
-                    <FaIcon name="morph:ellipsis" />
-                  </FaButton>
-                </FaDropdown>
+                <YdDropdown v-if="editMode" :items="cardMenu(card)" align="end">
+                  <YdButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
+                    <YdIcon name="morph:ellipsis" />
+                  </YdButton>
+                </YdDropdown>
               </header>
               <div class="dashboard-card__body" :inert="editMode || undefined">
                 <YdBlurReveal class="dashboard-card__reveal" :duration="0.32" :delay="0" blur="2px" :y-offset="6">
@@ -619,46 +619,46 @@ function cardProps(card: DashboardCard) {
         </template>
       </DashboardCanvas>
       <div v-if="!loading && workspace && !visibleItems.length" class="dashboard-empty">
-        <FaIcon name="morph:panels-top-left" />
+        <YdIcon name="morph:panels-top-left" />
         <strong>从一张卡片开始</strong>
         <p>把常用入口与关心的数据放到工作台。</p>
-        <FaButton size="sm" @click="openCardPicker">
-          <FaIcon name="morph:plus" />
+        <YdButton size="sm" @click="openCardPicker">
+          <YdIcon name="morph:plus" />
           添加卡片
-        </FaButton>
+        </YdButton>
       </div>
     </div>
 
-    <FaDrawer v-model="drawerVisible" title="卡片库" :footer="false" content-class="w-full sm:max-w-[460px]">
+    <YdDrawer v-model="drawerVisible" title="卡片库" :footer="false" content-class="w-full sm:max-w-[460px]">
       <div class="card-picker">
         <p class="card-picker-intro">
           系统信息与插件内容，都可以自由组合。添加后保存布局即可保留。
         </p>
-        <FaInput v-model="cardSearch" clearable placeholder="搜索卡片、功能或插件" aria-label="搜索卡片" />
+        <YdInput v-model="cardSearch" clearable placeholder="搜索卡片、功能或插件" aria-label="搜索卡片" />
         <div v-for="group in hiddenCardGroups" :key="group.name" class="card-picker-group">
           <div class="card-picker-group__title">
             <strong>{{ group.name }}</strong>
             <span>{{ group.items.length }}</span>
           </div>
-          <button v-for="card in group.items" :key="card.code" type="button" class="picker-card" :aria-label="`添加${card.title}`" @click="addCard(card)">
+          <YdAction v-for="card in group.items" :key="card.code" class="picker-card" :aria-label="`添加${card.title}`" @click="addCard(card)">
             <span class="picker-card__icon" :class="toneIconClass(card.tone)">
-              <FaIcon :name="card.icon || 'morph:layout-grid'" />
+              <YdIcon :name="card.icon || 'morph:layout-grid'" />
             </span>
             <span class="picker-card__main">
               <strong>{{ card.title }}</strong>
               <small>{{ card.description || card.category }}</small>
             </span>
             <span class="picker-card__add">
-              <FaIcon name="morph:plus" />
+              <YdIcon name="morph:plus" />
             </span>
-          </button>
+          </YdAction>
         </div>
         <div v-if="!hiddenCardGroups.length" class="picker-empty">
-          <FaIcon name="morph:search" />
+          <YdIcon name="morph:search" />
           <strong>{{ cardSearch ? '没有匹配的卡片' : '所有可用卡片已加入工作台' }}</strong>
         </div>
       </div>
-    </FaDrawer>
+    </YdDrawer>
   </div>
 </template>
 

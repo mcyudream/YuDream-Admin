@@ -12,7 +12,7 @@ interface DesignerRef {
 
 const route = useRoute()
 const router = useRouter()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -221,40 +221,40 @@ function defaultOptions() {
 
 <template>
   <div>
-    <FaPageHeader :title="pageTitle" class="mb-0">
-      <FaButton variant="outline" @click="returnToList">
-        <FaIcon name="morph:arrow-left" />
+    <YdPageHeader :title="pageTitle" class="mb-0">
+      <YdButton variant="outline" @click="returnToList">
+        <YdIcon name="morph:arrow-left" />
         返回列表
-      </FaButton>
-      <FaButton v-if="selected" v-auth="'platform:form:submission:view'" variant="outline" @click="openSubmissions">
-        <FaIcon name="morph:archive" />
+      </YdButton>
+      <YdButton v-if="selected" v-auth="'platform:form:submission:view'" variant="outline" @click="openSubmissions">
+        <YdIcon name="morph:archive" />
         提交结果
-      </FaButton>
-      <FaButton v-auth="'platform:form:edit'" :loading="saving" @click="saveDesigner">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton v-auth="'platform:form:edit'" :loading="saving" @click="saveDesigner">
+        <YdIcon name="morph:save" />
         保存设计
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain v-loading="loading">
+    <YdLoadingOverlay :loading="loading"><YdPageMain >
       <section class="designer-page">
-        <a-form :model="form" layout="vertical" class="meta-grid">
-          <a-form-item label="表单名称" required>
-            <FaInput v-model="form.name" />
-          </a-form-item>
-          <a-form-item label="表单编码" required>
-            <FaInput v-model="form.code" placeholder="form-contact" :disabled="!!selected" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="form.status" :options="statusOptions" />
-          </a-form-item>
-          <a-form-item label="公开填写">
-            <FaSwitch v-model="form.allowAnonymous" />
-          </a-form-item>
-          <a-form-item label="描述" class="meta-full">
-            <FaTextarea v-model="form.description" rows="3" />
-          </a-form-item>
-        </a-form>
+        <YdForm :model="form" layout="vertical" class="meta-grid">
+          <YdFormItem label="表单名称" required>
+            <YdInput v-model="form.name" />
+          </YdFormItem>
+          <YdFormItem label="表单编码" required>
+            <YdInput v-model="form.code" placeholder="form-contact" :disabled="!!selected" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="form.status" :options="statusOptions" />
+          </YdFormItem>
+          <YdFormItem label="公开填写">
+            <YdSwitch v-model="form.allowAnonymous" />
+          </YdFormItem>
+          <YdFormItem label="描述" class="meta-full">
+            <YdTextarea v-model="form.description" rows="3" />
+          </YdFormItem>
+        </YdForm>
 
         <div class="designer-toolbar">
           <span>{{ selected ? `正在编辑：${selected.name}` : '正在创建新表单' }}</span>
@@ -265,11 +265,11 @@ function defaultOptions() {
           <fc-designer ref="designerRef" height="720px" />
         </div>
       </section>
-    </FaPageMain>
+    </YdPageMain></YdLoadingOverlay>
 
-    <FaModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
+    <YdModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
       <FormSubmissionPanel :form="selected" :form-id="selected?.id" :form-name="selected?.name" embedded />
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 

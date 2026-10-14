@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { WikiSource } from '@/api/modules/platform-wiki'
+import { useYdFilePicker } from '@yudream/components'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
   captionWikiSourceImages,
@@ -16,9 +17,9 @@ import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { extractionStatusLabel, ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
-const modal = useFaModal()
-const imagePreview = useFaImagePreview()
+const toast = useYdToast()
+const modal = useYdModal()
+const imagePreview = useYdImagePreview()
 
 const sources = ref<WikiSource[]>([])
 const loading = ref(false)
@@ -26,7 +27,7 @@ const folderPath = ref('/')
 const urlsText = ref('')
 const importing = ref(false)
 const uploading = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
+const filePicker = useYdFilePicker()
 const expandedSource = ref('')
 
 const sortedSources = computed(() => [...sources.value].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)))
@@ -56,13 +57,11 @@ async function load() {
 }
 
 function pickFile() {
-  fileInput.value?.click()
+  void filePicker.open().then(onFileChange)
 }
 
-async function onFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function onFileChange(files: File[]) {
+  const file = files[0]
   if (!file || !store.spaceId.value) {
     return
   }
@@ -189,58 +188,58 @@ watch(() => store.spaceId.value, load)
 
 <template>
   <div class="src-panel">
-    <FaScrollArea class="src-scroll">
+    <YdScrollArea class="src-scroll">
       <div class="src-inner">
         <!-- 导入工具栏 -->
-        <FaCard class="src-import">
+        <YdCard class="src-import">
           <div class="src-import__grid">
             <label class="src-field">
-              <span><FaIcon name="morph:folder" /> 目标目录</span>
-              <FaInput v-model="folderPath" placeholder="/" />
+              <span><YdIcon name="morph:folder" /> 目标目录</span>
+              <YdInput v-model="folderPath" placeholder="/" />
             </label>
             <div class="src-field">
-              <span><FaIcon name="morph:cloud-upload" /> 上传文件</span>
+              <span><YdIcon name="morph:cloud-upload" /> 上传文件</span>
               <div>
-                <FaButton variant="outline" :loading="uploading" @click="pickFile">
-                  <FaIcon name="morph:upload" /> 选择文件上传
-                </FaButton>
-                <input ref="fileInput" type="file" hidden @change="onFileChange">
+                <YdButton variant="outline" :loading="uploading" @click="pickFile">
+                  <YdIcon name="morph:upload" /> 选择文件上传
+                </YdButton>
+
               </div>
             </div>
             <div class="src-field">
-              <span><FaIcon name="i-ri:markdown-line" /> 在线文档</span>
+              <span><YdIcon name="i-ri:markdown-line" /> 在线文档</span>
               <div>
-                <FaButton variant="outline" @click="openTextEditor()">
-                  <FaIcon name="morph:feather" /> 新建 Markdown 文档
-                </FaButton>
+                <YdButton variant="outline" @click="openTextEditor()">
+                  <YdIcon name="morph:feather" /> 新建 Markdown 文档
+                </YdButton>
               </div>
             </div>
             <label class="src-field src-field--urls">
-              <span><FaIcon name="morph:link" /> 批量 URL 导入（每行一个）</span>
-              <FaTextarea v-model="urlsText" :rows="3" placeholder="https://example.com/docs/a&#10;https://example.com/docs/b" />
+              <span><YdIcon name="morph:link" /> 批量 URL 导入（每行一个）</span>
+              <YdTextarea v-model="urlsText" :rows="3" placeholder="https://example.com/docs/a&#10;https://example.com/docs/b" />
             </label>
             <div class="src-field src-field--action">
-              <FaButton :loading="importing" @click="importUrls">
-                <FaIcon name="morph:cloud-download" /> 导入 URL
-              </FaButton>
+              <YdButton :loading="importing" @click="importUrls">
+                <YdIcon name="morph:cloud-download" /> 导入 URL
+              </YdButton>
             </div>
           </div>
-        </FaCard>
+        </YdCard>
 
         <!-- 资料列表 -->
         <div v-if="loading && !sources.length" class="src-loading">
-          <FaIcon name="morph:loader-circle" class="src-spin" /> 加载资料中…
+          <YdIcon name="morph:loader-circle" class="src-spin" /> 加载资料中…
         </div>
         <div v-else-if="!sortedSources.length" class="src-empty">
-          <FaIcon name="morph:database" />
+          <YdIcon name="morph:database" />
           <strong>暂无资料</strong>
           <p>上传文件或导入 URL，系统会自动抽取文本与图片</p>
         </div>
         <div v-else class="src-list">
-          <FaCard v-for="source in pagedSources" :key="source.id" class="src-card">
+          <YdCard v-for="source in pagedSources" :key="source.id" class="src-card">
             <div class="src-card__head">
               <div class="src-card__title">
-                <FaIcon :name="source.kind === 'URL' ? 'morph:globe' : source.kind === 'TEXT' ? 'i-ri:markdown-line' : 'morph:file'" class="src-card__kind-icon" />
+                <YdIcon :name="source.kind === 'URL' ? 'morph:globe' : source.kind === 'TEXT' ? 'i-ri:markdown-line' : 'morph:file'" class="src-card__kind-icon" />
                 <strong>{{ source.title }}</strong>
                 <span class="src-card__path">{{ source.folderPath }} · {{ source.format || source.mimeType }}</span>
               </div>
@@ -255,11 +254,11 @@ watch(() => store.spaceId.value, load)
             </div>
 
             <p v-if="source.extractionError || source.ingestError" class="src-card__error">
-              <FaIcon name="morph:triangle-alert" /> {{ source.extractionError || source.ingestError }}
+              <YdIcon name="morph:triangle-alert" /> {{ source.extractionError || source.ingestError }}
             </p>
 
             <div v-if="(source.images || []).length" class="src-card__images">
-              <button
+              <YdAction
                 v-for="(img, index) in source.images.slice(0, expandedSource === source.id ? source.images.length : 6)"
                 :key="img.fileObjectId"
                 type="button"
@@ -268,40 +267,40 @@ watch(() => store.spaceId.value, load)
                 @click="previewImage(source, index)"
               >
                 <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
-                <span v-else class="src-thumb__placeholder"><FaIcon name="morph:image" /></span>
+                <span v-else class="src-thumb__placeholder"><YdIcon name="morph:image" /></span>
                 <span v-if="img.caption" class="src-thumb__caption">{{ img.caption }}</span>
-              </button>
-              <button
+              </YdAction>
+              <YdAction
                 v-if="source.images.length > 6"
                 type="button"
                 class="src-thumb src-thumb--more"
                 @click="expandedSource = expandedSource === source.id ? '' : source.id"
               >
                 {{ expandedSource === source.id ? '收起' : `+${source.images.length - 6}` }}
-              </button>
+              </YdAction>
             </div>
 
             <div class="src-card__footer">
-              <span class="src-card__count"><FaIcon name="morph:image" /> {{ (source.images || []).length }} 张图片</span>
+              <span class="src-card__count"><YdIcon name="morph:image" /> {{ (source.images || []).length }} 张图片</span>
               <span v-if="source.url" class="src-card__url">{{ source.url }}</span>
               <div class="src-card__actions">
-                <FaButton v-if="source.kind === 'TEXT'" size="sm" variant="outline" @click="openTextEditor(source)">
-                  <FaIcon name="morph:pencil" /> 编辑
-                </FaButton>
-                <FaButton size="sm" @click="ingest(source)">
-                  <FaIcon name="morph:play" /> 摄入
-                </FaButton>
-                <FaButton size="sm" variant="outline" :disabled="!(source.images || []).length" @click="caption(source)">
-                  <FaIcon name="morph:sparkles" /> 补 caption
-                </FaButton>
-                <FaButton size="sm" variant="ghost" class="src-danger" @click="removeSource(source)">
-                  <FaIcon name="morph:trash-2" /> 删除
-                </FaButton>
+                <YdButton v-if="source.kind === 'TEXT'" size="sm" variant="outline" @click="openTextEditor(source)">
+                  <YdIcon name="morph:pencil" /> 编辑
+                </YdButton>
+                <YdButton size="sm" @click="ingest(source)">
+                  <YdIcon name="morph:play" /> 摄入
+                </YdButton>
+                <YdButton size="sm" variant="outline" :disabled="!(source.images || []).length" @click="caption(source)">
+                  <YdIcon name="morph:sparkles" /> 补 caption
+                </YdButton>
+                <YdButton size="sm" variant="ghost" class="src-danger" @click="removeSource(source)">
+                  <YdIcon name="morph:trash-2" /> 删除
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </div>
-        <FaPagination
+        <YdPagination
           v-if="sortedSources.length > pageSize"
           v-model:page="page"
           v-model:size="pageSize"
@@ -309,10 +308,10 @@ watch(() => store.spaceId.value, load)
           class="src-pagination"
         />
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
 
     <!-- 在线 Markdown 文档编辑器 -->
-    <FaModal
+    <YdModal
       v-model="textEditorVisible"
       :title="textEditingId ? '编辑在线文档' : '新建在线文档'"
       class="w-[min(960px,92vw)]"
@@ -321,13 +320,13 @@ watch(() => store.spaceId.value, load)
       @confirm="saveTextSource"
     >
       <div class="src-text-form">
-        <FaInput v-model="textTitle" placeholder="资料标题（展示在资料列表与引用中）" />
+        <YdInput v-model="textTitle" placeholder="资料标题（展示在资料列表与引用中）" />
         <CmsMarkdownEditor v-model="textContent" class="src-text-editor" />
         <p class="src-text-hint">
           保存后自动进入摄入队列，生成对应的 Wiki 页面；内容变更会触发重新摄入。
         </p>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -399,7 +398,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 36px;
 }
 
@@ -434,7 +433,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-card__kind-icon {
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 17px;
 }
 
@@ -468,8 +467,8 @@ watch(() => store.spaceId.value, load)
   margin: 10px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #ef444412;
-  color: #dc2626;
+  background: var(--color-text-2)12;
+  color: var(--color-text-2);
   font-size: 12px;
 }
 
@@ -513,7 +512,7 @@ watch(() => store.spaceId.value, load)
   overflow: hidden;
   padding: 2px 5px;
   background: rgb(0 0 0 / 55%);
-  color: #fff;
+  color: var(--color-bg-1);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -559,7 +558,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .src-danger {
-  color: #dc2626;
+  color: var(--color-text-2);
 }
 
 .src-pagination {

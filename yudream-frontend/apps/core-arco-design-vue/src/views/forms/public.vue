@@ -11,7 +11,7 @@ interface DynamicFormRendererExpose {
 const route = useRoute()
 const appFeatureStore = useAppFeatureStore()
 const appSettingsStore = useAppSettingsStore()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -99,7 +99,7 @@ function invalid() {
 .public-form-page {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgb(var(--primary-6) / 0.12), transparent 30%),
+    radial-gradient(circle at top left, var(--color-fill-2), transparent 30%),
     linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-3) 100%);
   color: var(--color-text-1);
 }

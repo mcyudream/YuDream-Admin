@@ -49,16 +49,16 @@ const week = computed(() => {
   <div class="dashboard-card__content dashboard-profile">
     <div class="dashboard-profile__welcome">
       <div class="dashboard-profile__copy">
-        <span class="dashboard-profile__date"><FaIcon name="morph:calendar-days" />{{ todayText }}</span>
+        <span class="dashboard-profile__date"><YdIcon name="morph:calendar-days" />{{ todayText }}</span>
         <h3>{{ greeting }}，{{ displayName }}</h3>
       </div>
-      <FaAvatar
+      <YdAvatar
         :src="avatar || ''"
         :fallback="displayName.slice(0, 2)"
         class="dashboard-profile__avatar"
       >
-        <FaIcon name="morph:circle-user-round" />
-      </FaAvatar>
+        <YdIcon name="morph:circle-user-round" />
+      </YdAvatar>
     </div>
 
     <div class="dashboard-profile__week" aria-label="本周日历">
@@ -68,17 +68,17 @@ const week = computed(() => {
     </div>
     <div class="dashboard-profile__chips">
       <span>
-        <FaIcon name="morph:shield-user" />
+        <YdIcon name="morph:shield-user" />
         {{ role || '未选择角色' }}
       </span>
       <span>
-        <FaIcon name="morph:building" />
+        <YdIcon name="morph:building" />
         {{ dept || '未选择部门' }}
       </span>
     </div>
 
     <div v-if="impersonating" class="dashboard-profile__impersonate">
-      <FaIcon name="morph:venetian-mask" />
+      <YdIcon name="morph:venetian-mask" />
       正在以 {{ impersonatorAccount }} 发起伪装访问
     </div>
   </div>

@@ -52,12 +52,12 @@ function add(template: AgentNodeTemplate) {
         <strong>节点库</strong>
         <span>拖拽到画布或单击添加</span>
       </div>
-      <FaIcon name="morph:layout-grid" />
+      <YdIcon name="morph:layout-grid" />
     </div>
 
     <div class="palette-search">
-      <FaIcon name="morph:search" />
-      <FaInput v-model="keyword" clearable class="w-full" placeholder="搜索节点" aria-label="搜索节点" />
+      <YdIcon name="morph:search" />
+      <YdInput v-model="keyword" clearable class="w-full" placeholder="搜索节点" aria-label="搜索节点" />
     </div>
 
     <div class="palette-content">
@@ -65,29 +65,31 @@ function add(template: AgentNodeTemplate) {
         <div class="group-title">
           {{ group.title }}
         </div>
-        <button
+        <YdButton
           v-for="item in group.items"
           :key="item.kind"
+          variant="ghost"
           type="button"
           draggable="true"
           class="palette-item"
+          :aria-label="`${item.label}，拖拽或点击添加`"
           @dragstart="onDragStart($event, item)"
           @dragend="onDragEnd"
           @click="add(item)"
         >
           <span class="palette-icon" :style="{ '--item-color': item.color }">
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
           </span>
           <span class="palette-copy">
             <strong>{{ item.label }}</strong>
             <small>{{ item.description }}</small>
           </span>
-          <FaIcon class="palette-grip" name="morph:move" />
-        </button>
+          <YdIcon class="palette-grip" name="morph:move" />
+        </YdButton>
       </section>
 
       <div v-if="!visibleGroups.length" class="palette-empty">
-        <FaIcon name="morph:zoom-in" />
+        <YdIcon name="morph:zoom-in" />
         <span>没有匹配的节点</span>
       </div>
     </div>
@@ -100,7 +102,7 @@ function add(template: AgentNodeTemplate) {
 .palette-heading > div { display: grid; gap: 3px; }
 .palette-heading strong { color: var(--color-text-1); font-size: 14px; }
 .palette-heading span { color: var(--color-text-3); font-size: 11px; }
-.palette-heading > :last-child { color: rgb(var(--primary-6)); font-size: 20px; }
+.palette-heading > :last-child { color: var(--color-text-1); font-size: 20px; }
 .palette-search { display: grid; align-items: center; padding: 12px 14px 4px; grid-template-columns: 20px minmax(0, 1fr); }
 .palette-search > :first-child { z-index: 1; margin-right: -24px; color: var(--color-text-3); }
 .palette-search :deep(input) { padding-left: 30px; }

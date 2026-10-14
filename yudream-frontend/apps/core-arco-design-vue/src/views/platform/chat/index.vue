@@ -269,16 +269,16 @@ onMounted(async () => {
     <aside class="chat-page__sessions">
       <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
     </aside>
-    <FaDrawer v-model="sessionDrawerVisible" title="会话记录" :footer="false" content-class="chat-page__session-drawer sm:max-w-[320px]">
+    <YdDrawer v-model="sessionDrawerVisible" title="会话记录" :footer="false" content-class="chat-page__session-drawer sm:max-w-[320px]">
       <div class="-m-4 h-full min-h-0">
         <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
       </div>
-    </FaDrawer>
+    </YdDrawer>
     <section class="chat-page__main">
       <header class="chat-page__top">
-        <FaTooltip text="会话记录">
-          <button type="button" class="chat-page__history" aria-label="会话记录" @click="sessionDrawerVisible = true"><FaIcon name="morph:menu" /></button>
-        </FaTooltip>
+        <YdTooltip text="会话记录">
+          <YdAction type="button" class="chat-page__history" aria-label="会话记录" @click="sessionDrawerVisible = true"><YdIcon name="morph:menu" /></YdAction>
+        </YdTooltip>
         <div v-if="quota" class="chat-page__quota" :title="`今日已用 ${quota.usedTokens.toLocaleString()} tokens`"><span class="chat-page__quota-ring" />剩余额度 {{ quota.remainingTokens.toLocaleString() }}</div>
       </header>
       <div v-if="isEmpty" class="chat-page__empty"><YdWelcome :title="welcomeTitle" :suggestions="suggestions" @select="send" /></div>
@@ -287,28 +287,28 @@ onMounted(async () => {
         <template #actions>
           <div class="chat-page__context-controls">
             <div class="chat-context">
-              <FaTooltip text="引用知识库。也可输入 @wiki 选择并自动填充"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': wikiContextSlug }" aria-label="知识库上下文" @click="wikiMenuOpen = !wikiMenuOpen"><FaIcon name="morph:library" /><span>{{ wikiContextLabel || '知识库' }}</span></button></FaTooltip>
+              <YdTooltip text="引用知识库。也可输入 @wiki 选择并自动填充"><YdAction type="button" class="chat-control chat-control--icon" :class="{ 'is-active': wikiContextSlug }" aria-label="知识库上下文" @click="wikiMenuOpen = !wikiMenuOpen"><YdIcon name="morph:library" /><span>{{ wikiContextLabel || '知识库' }}</span></YdAction></YdTooltip>
               <div v-if="wikiMenuOpen" class="chat-context__menu">
-                <button type="button" :class="{ active: wikiContextSlug === '__all__' }" @click="selectWikiContext('__all__')"><FaIcon name="morph:globe" />检索全部知识库</button>
-                <button v-for="space in wikiSpaces" :key="space.slug" type="button" :class="{ active: wikiContextSlug === space.slug }" @click="selectWikiContext(space.slug)"><FaIcon name="morph:book" />{{ space.name }}</button>
-                <button v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><FaIcon name="morph:x" />关闭知识库</button>
+                <YdAction type="button" :class="{ active: wikiContextSlug === '__all__' }" @click="selectWikiContext('__all__')"><YdIcon name="morph:globe" />检索全部知识库</YdAction>
+                <YdAction v-for="space in wikiSpaces" :key="space.slug" type="button" :class="{ active: wikiContextSlug === space.slug }" @click="selectWikiContext(space.slug)"><YdIcon name="morph:book" />{{ space.name }}</YdAction>
+                <YdAction v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><YdIcon name="morph:x" />关闭知识库</YdAction>
               </div>
             </div>
             <div class="chat-context">
-              <FaTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="consoleMenuOpen = !consoleMenuOpen"><FaIcon name="morph:terminal" /><span>{{ consoleProfileLabel }}</span></button></FaTooltip>
+              <YdTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><YdAction type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="consoleMenuOpen = !consoleMenuOpen"><YdIcon name="morph:terminal" /><span>{{ consoleProfileLabel }}</span></YdAction></YdTooltip>
               <div v-if="consoleMenuOpen" class="chat-context__menu">
-                <button type="button" @click="selectConsoleProfile(null)"><FaIcon name="morph:x" />关闭控制台</button>
-                <button type="button" :class="{ active: consoleProfile === 'general' }" @click="selectConsoleProfile('general')"><FaIcon name="morph:terminal" />通用助手（纯对话）</button>
-                <button type="button" :class="{ active: consoleProfile === 'cms-builder' }" @click="selectConsoleProfile('cms-builder')"><FaIcon name="morph:layout-template" />CMS 站点构建（可读写站点文件）</button>
+                <YdAction type="button" @click="selectConsoleProfile(null)"><YdIcon name="morph:x" />关闭控制台</YdAction>
+                <YdAction type="button" :class="{ active: consoleProfile === 'general' }" @click="selectConsoleProfile('general')"><YdIcon name="morph:terminal" />通用助手（纯对话）</YdAction>
+                <YdAction type="button" :class="{ active: consoleProfile === 'cms-builder' }" @click="selectConsoleProfile('cms-builder')"><YdIcon name="morph:layout-template" />CMS 站点构建（可读写站点文件）</YdAction>
               </div>
             </div>
             <div class="chat-control chat-control--select">
-              <FaIcon name="morph:bot" />
-              <FaSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
+              <YdIcon name="morph:bot" />
+              <YdSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
             </div>
             <div class="chat-control chat-control--select chat-control--model" :title="activeModel ? `${activeModel.providerName} · ${activeModel.modelName}` : '选择模型'">
-              <FaIcon name="morph:cpu" />
-              <FaSelect v-model="modelValue" placeholder="选择模型" :options="modelOptions" class="w-full" />
+              <YdIcon name="morph:cpu" />
+              <YdSelect v-model="modelValue" placeholder="选择模型" :options="modelOptions" class="w-full" />
             </div>
           </div>
         </template>

@@ -31,8 +31,8 @@ interface CmsNavigationItem {
   children?: CmsNavigationItem[]
 }
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
 const appAccountStore = useAppAccountStore()
@@ -86,7 +86,7 @@ const currentThemeStyleUrls = computed(() => {
 const presetDialogVisible = ref(false)
 const presetSaving = ref(false)
 const presetForm = reactive({ name: '', description: '' })
-const mediaInput = ref<HTMLInputElement>()
+const mediaInput = ref<InstanceType<typeof YdFilePicker>>()
 const aiModelOptions = ref<CmsModelSelectOption[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
@@ -640,13 +640,12 @@ function selectPage(page: CmsPage) {
 }
 
 function pickMedia() {
-  mediaInput.value?.click()
+  mediaInput.value?.open()
 }
 
-async function uploadMedia(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function uploadMedia(files: File[]) {
+  const file = files[0]
+  mediaInput.value?.reset()
   if (!file) {
     return
   }
@@ -1022,71 +1021,71 @@ function sectionTitle(type: HomeSectionType) {
 
 <template>
   <div class="cms-workbench">
-    <FaPageHeader title="主题中心" class="cms-header">
-      <FaButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
-        <FaIcon name="morph:save" />
+    <YdPageHeader title="主题中心" class="cms-header">
+      <YdButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
+        <YdIcon name="morph:save" />
         保存页面
-      </FaButton>
-      <FaButton v-else-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
+        <YdIcon name="morph:save" />
         保存首页
-      </FaButton>
-      <FaButton v-else-if="activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveNavigation">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveNavigation">
+        <YdIcon name="morph:save" />
         保存首页配置
-      </FaButton>
-      <FaButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
-        <FaIcon :name="home.published ? 'morph:archive-restore' : 'morph:send'" />
+      </YdButton>
+      <YdButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
+        <YdIcon :name="home.published ? 'morph:archive-restore' : 'morph:send'" />
         {{ home.published ? '取消发布首页' : '发布首页' }}
-      </FaButton>
-      <FaButton v-else-if="activeTab === 'presets'" v-auth="'platform:cms:edit'" @click="openPresetDialog">
-        <FaIcon name="morph:bookmark" />
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'presets'" v-auth="'platform:cms:edit'" @click="openPresetDialog">
+        <YdIcon name="morph:bookmark" />
         把当前首页存为方案
-      </FaButton>
-      <FaButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
-        <FaIcon name="morph:cloud-upload" />
+      </YdButton>
+      <YdButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+        <YdIcon name="morph:cloud-upload" />
         上传媒体
-      </FaButton>
-      <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
-    </FaPageHeader>
+      </YdButton>
+      <YdFilePicker ref="mediaInput" accept="image/*" label="选择媒体图片" class="hidden" @select="uploadMedia"><template #default /></YdFilePicker>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="cms-tabs">
-        <button type="button" :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
-          <FaIcon name="morph:palette" />
+        <YdAction type="button" :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
+          <YdIcon name="morph:palette" />
           整站主题
-        </button>
-        <button type="button" :class="{ active: activeTab === 'pages' }" @click="activeTab = 'pages'">
-          <FaIcon name="morph:file-text" />
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'pages' }" @click="activeTab = 'pages'">
+          <YdIcon name="morph:file-text" />
           页面库
-        </button>
-        <button type="button" :class="{ active: activeTab === 'home' }" @click="activeTab = 'home'">
-          <FaIcon name="morph:house" />
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'home' }" @click="activeTab = 'home'">
+          <YdIcon name="morph:house" />
           首页外观
-        </button>
-        <button type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
-          <FaIcon name="morph:text-search" />
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
+          <YdIcon name="morph:text-search" />
           导航菜单
-        </button>
-        <button type="button" :class="{ active: activeTab === 'presets' }" @click="activeTab = 'presets'">
-          <FaIcon name="morph:layers" />
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'presets' }" @click="activeTab = 'presets'">
+          <YdIcon name="morph:layers" />
           首页方案
-        </button>
-        <button type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
-          <FaIcon name="morph:image" />
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
+          <YdIcon name="morph:image" />
           媒体库
-        </button>
+        </YdAction>
         <div class="theme-scope-picker">
           <span class="theme-scope-picker__label">编辑主题</span>
-          <FaSelect v-model="currentTheme" :options="editableThemeOptions" />
+          <YdSelect v-model="currentTheme" :options="editableThemeOptions" />
         </div>
         <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
-          <FaIcon name="morph:external-link" />
+          <YdIcon name="morph:external-link" />
           访问站点
         </a>
       </div>
 
-      <section v-if="activeTab === 'theme'" v-loading="themeSwitching" class="theme-workspace">
+      <YdLoadingOverlay v-if="activeTab === 'theme'" :loading="themeSwitching"><section   class="theme-workspace">
         <div class="preset-toolbar">
           <div>
             <h3>整站主题</h3>
@@ -1098,62 +1097,62 @@ function sectionTitle(type: HomeSectionType) {
             <div class="theme-card__preview">
               <img v-if="themePreviewUrl(theme)" :src="themePreviewUrl(theme)" :alt="theme.name">
               <div v-else class="theme-card__preview-fallback">
-                <FaIcon :name="theme.pluginCode ? 'morph:puzzle' : 'morph:house'" />
+                <YdIcon :name="theme.pluginCode ? 'morph:puzzle' : 'morph:house'" />
               </div>
-              <FaTag v-if="theme.active" class="theme-card__current" variant="default">
+              <YdTag v-if="theme.active" class="theme-card__current" variant="default">
                 当前
-              </FaTag>
+              </YdTag>
             </div>
             <div class="theme-card__body">
               <div class="preset-card__head">
                 <strong>{{ theme.name }}</strong>
-                <FaTag v-if="theme.pluginCode && theme.enabled === false" variant="outline">
+                <YdTag v-if="theme.pluginCode && theme.enabled === false" variant="outline">
                   未启用
-                </FaTag>
+                </YdTag>
               </div>
               <p v-if="theme.description" class="preset-card__desc">
                 {{ theme.description }}
               </p>
               <div class="preset-card__meta">
-                <FaTag v-if="theme.hasHomePreset" variant="secondary">
+                <YdTag v-if="theme.hasHomePreset" variant="secondary">
                   含首页方案
-                </FaTag>
-                <FaTag v-if="theme.hasPageSet" variant="secondary">
+                </YdTag>
+                <YdTag v-if="theme.hasPageSet" variant="secondary">
                   含页面集
-                </FaTag>
-                <FaTag v-if="!theme.pluginCode" variant="secondary">
+                </YdTag>
+                <YdTag v-if="!theme.pluginCode" variant="secondary">
                   系统内置
-                </FaTag>
+                </YdTag>
               </div>
               <div class="preset-card__actions">
-                <FaButton
+                <YdButton
                   v-if="theme.hasConfigSchema" v-auth="'platform:theme-center:config'"
                   size="sm" variant="outline" @click="openThemeConfig(theme)"
                 >
-                  <FaIcon name="morph:settings" />
+                  <YdIcon name="morph:settings" />
                   配置
-                </FaButton>
-                <FaButton
+                </YdButton>
+                <YdButton
                   v-if="theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" :loading="themeSwitching" @click="confirmActivateTheme(theme)"
                 >
-                  <FaIcon name="morph:check" />
+                  <YdIcon name="morph:check" />
                   启用主题
-                </FaButton>
-                <FaButton
+                </YdButton>
+                <YdButton
                   v-if="theme.pluginCode && theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" variant="outline" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
                 >
-                  <FaIcon name="morph:refresh-cw" />
+                  <YdIcon name="morph:refresh-cw" />
                   恢复默认
-                </FaButton>
-                <FaButton
+                </YdButton>
+                <YdButton
                   v-if="!theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
                 >
-                  <FaIcon name="morph:refresh-cw" />
+                  <YdIcon name="morph:refresh-cw" />
                   恢复默认主题
-                </FaButton>
+                </YdButton>
               </div>
             </div>
           </article>
@@ -1161,60 +1160,60 @@ function sectionTitle(type: HomeSectionType) {
         <div v-else class="empty-state">
           暂无可用主题。
         </div>
-      </section>
+      </section></YdLoadingOverlay>
 
       <section v-else-if="activeTab === 'pages'" class="cms-layout">
         <aside class="page-list">
           <div class="page-list__toolbar">
-            <FaInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
-            <FaButton v-auth="'platform:cms:edit'" @click="createPage">
-              <FaIcon name="morph:plus" />
-            </FaButton>
-            <FaButton v-auth="'platform:cms:edit'" variant="outline" @click="blockLibraryVisible = true">
-              <FaIcon name="morph:building-2" />
+            <YdInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
+            <YdButton v-auth="'platform:cms:edit'" @click="createPage">
+              <YdIcon name="morph:plus" />
+            </YdButton>
+            <YdButton v-auth="'platform:cms:edit'" variant="outline" @click="blockLibraryVisible = true">
+              <YdIcon name="morph:building-2" />
               区块库
-            </FaButton>
+            </YdButton>
           </div>
-          <div v-loading="loading" class="page-list__items">
+          <YdLoadingOverlay :loading="loading"><div  class="page-list__items">
             <article v-for="item in pages" :key="item.id" class="page-list-card" :class="{ active: item.id === selectedPageId }">
-              <button type="button" class="page-list-card__main" @click="selectPage(item)">
+              <YdAction type="button" class="page-list-card__main" @click="selectPage(item)">
                 <span class="page-list-card__title">{{ item.title }}</span>
                 <span class="page-list-card__path">/site/{{ item.slug }}</span>
                 <span class="page-list-card__meta">
-                  <FaTag :variant="item.status === 'PUBLISHED' ? 'default' : 'secondary'">
+                  <YdTag :variant="item.status === 'PUBLISHED' ? 'default' : 'secondary'">
                     {{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }}
-                  </FaTag>
-                  <FaTag variant="outline">
+                  </YdTag>
+                  <YdTag variant="outline">
                     {{ themeLabel(item.themeCode) }}
-                  </FaTag>
-                  <FaTag v-if="item.sourcePluginCode" variant="secondary">
+                  </YdTag>
+                  <YdTag v-if="item.sourcePluginCode" variant="secondary">
                     插件托管
-                  </FaTag>
+                  </YdTag>
                   <span>{{ dateText(item.publishedAt || item.updateTime || item.createTime) || '未发布' }}</span>
                 </span>
-              </button>
+              </YdAction>
               <div class="page-list-card__actions">
                 <a :href="`/site/${item.slug}`" target="_blank" rel="noopener noreferrer" title="预览">
-                  <FaIcon name="morph:external-link" />
+                  <YdIcon name="morph:external-link" />
                 </a>
-                <button v-auth="'platform:cms:delete'" type="button" title="删除" @click.stop="confirmDeletePage(item)">
-                  <FaIcon name="morph:trash-2" />
-                </button>
+                <YdAction v-auth="'platform:cms:delete'" type="button" title="删除" @click.stop="confirmDeletePage(item)">
+                  <YdIcon name="morph:trash-2" />
+                </YdAction>
               </div>
             </article>
             <div v-if="!pages.length" class="empty-state">
               暂无页面
             </div>
-          </div>
+          </div></YdLoadingOverlay>
         </aside>
 
         <main class="page-editor">
           <div class="editor-top">
-            <FaInput v-model="pageForm.title" class="title-input" />
+            <YdInput v-model="pageForm.title" class="title-input" />
             <div class="editor-mode">
-              <button type="button" :class="{ active: editorMode === 'builder' }" @click="editorMode = 'builder'">可视化</button>
-              <button type="button" :class="{ active: editorMode === 'markdown' }" @click="editorMode = 'markdown'">Markdown</button>
-              <button type="button" :class="{ active: editorMode === 'html' }" @click="editorMode = 'html'">HTML</button>
+              <YdAction type="button" :class="{ active: editorMode === 'builder' }" @click="editorMode = 'builder'">可视化</YdAction>
+              <YdAction type="button" :class="{ active: editorMode === 'markdown' }" @click="editorMode = 'markdown'">Markdown</YdAction>
+              <YdAction type="button" :class="{ active: editorMode === 'html' }" @click="editorMode = 'html'">HTML</YdAction>
             </div>
           </div>
 
@@ -1226,14 +1225,14 @@ function sectionTitle(type: HomeSectionType) {
                 <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS、JS 和可继续编辑的 Project JSON。</p>
               </div>
               <div class="builder-entry__actions">
-                <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
-                  <FaIcon name="i-ri:drag-drop-line" />
+                <YdButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
+                  <YdIcon name="i-ri:drag-drop-line" />
                   打开构建器
-                </FaButton>
-                <FaButton variant="outline" @click="editorMode = 'html'">
-                  <FaIcon name="morph:code" />
+                </YdButton>
+                <YdButton variant="outline" @click="editorMode = 'html'">
+                  <YdIcon name="morph:code" />
                   查看 HTML
-                </FaButton>
+                </YdButton>
               </div>
             </section>
             <section class="cms-runtime-overview">
@@ -1242,21 +1241,21 @@ function sectionTitle(type: HomeSectionType) {
                   <span>YD 内容引擎</span>
                   <strong>{{ aiEnabled ? 'AI 页面构建助手已就绪' : '等待配置 AI 模型' }}</strong>
                 </div>
-                <FaTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</FaTag>
+                <YdTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</YdTag>
               </div>
               <div class="runtime-overview__grid">
                 <article>
-                  <FaIcon name="morph:clock" />
+                  <YdIcon name="morph:clock" />
                   <strong>{{ templateContext.knowledge.latest.length }}</strong>
                   <span>最新 Wiki 条目</span>
                 </article>
                 <article>
-                  <FaIcon name="morph:star" />
+                  <YdIcon name="morph:star" />
                   <strong>{{ templateContext.knowledge.featured.length }}</strong>
                   <span>编辑推荐条目</span>
                 </article>
                 <article>
-                  <FaIcon name="morph:newspaper" />
+                  <YdIcon name="morph:newspaper" />
                   <strong>{{ templateContext.cms.pages.latest.length }}</strong>
                   <span>最新 CMS 页面</span>
                 </article>
@@ -1272,12 +1271,12 @@ function sectionTitle(type: HomeSectionType) {
           </template>
 
           <CmsMarkdownEditor v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" />
-          <FaTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
+          <YdTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
         </main>
 
         <aside class="publish-panel">
           <nav class="publish-panel__tabs" role="tablist" aria-label="页面设置">
-            <button
+            <YdAction
               v-for="tab in publishTabs"
               :key="tab.value"
               type="button"
@@ -1286,82 +1285,82 @@ function sectionTitle(type: HomeSectionType) {
               :aria-selected="publishTab === tab.value"
               @click="publishTab = tab.value"
             >
-              <FaIcon :name="tab.icon" />
+              <YdIcon :name="tab.icon" />
               {{ tab.label }}
-            </button>
+            </YdAction>
           </nav>
 
           <section v-if="publishTab === 'publish'" class="publish-panel__section">
             <h3>发布</h3>
-            <a-form :model="pageForm" layout="vertical">
-              <a-form-item label="路径">
-                <FaInput v-model="pageForm.slug" />
-              </a-form-item>
-              <a-form-item label="状态">
-                <FaSelect v-model="pageForm.status" :options="statusOptions" />
-              </a-form-item>
-              <a-form-item label="模板">
-                <FaSelect v-model="pageForm.template" :options="templateOptions" />
-              </a-form-item>
-              <a-form-item label="分类">
-                <FaInput
+            <YdForm :model="pageForm" layout="vertical">
+              <YdFormItem label="路径">
+                <YdInput v-model="pageForm.slug" />
+              </YdFormItem>
+              <YdFormItem label="状态">
+                <YdSelect v-model="pageForm.status" :options="statusOptions" />
+              </YdFormItem>
+              <YdFormItem label="模板">
+                <YdSelect v-model="pageForm.template" :options="templateOptions" />
+              </YdFormItem>
+              <YdFormItem label="分类">
+                <YdInput
                   :model-value="splitTerms(pageForm.categories)"
                   placeholder="新闻, 产品, 案例"
                   @update:model-value="value => value && updateTerms('categories', value)"
                 />
-              </a-form-item>
-              <a-form-item label="标签">
-                <FaInput
+              </YdFormItem>
+              <YdFormItem label="标签">
+                <YdInput
                   :model-value="splitTerms(pageForm.tags)"
                   placeholder="低代码, CMS, 首页"
                   @update:model-value="value => value && updateTerms('tags', value)"
                 />
-              </a-form-item>
-            </a-form>
+              </YdFormItem>
+            </YdForm>
             <div class="term-chips">
-              <FaTag v-for="item in pageForm.categories" :key="`cat-${item}`" variant="secondary">
+              <YdTag v-for="item in pageForm.categories" :key="`cat-${item}`" variant="secondary">
                 {{ item }}
-              </FaTag>
-              <FaTag v-for="item in pageForm.tags" :key="`tag-${item}`">
+              </YdTag>
+              <YdTag v-for="item in pageForm.tags" :key="`tag-${item}`">
                 #{{ item }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="publish-actions">
-              <FaButton v-auth="'platform:cms:publish'" variant="outline" @click="confirmPublish">
+              <YdButton v-auth="'platform:cms:publish'" variant="outline" @click="confirmPublish">
                 {{ selectedPage?.status === 'PUBLISHED' ? '取消发布' : '发布' }}
-              </FaButton>
-              <FaButton v-if="selectedPage" v-auth="'platform:cms:delete'" variant="ghost" @click="confirmDeletePage()">
-                <FaIcon name="morph:trash-2" />
+              </YdButton>
+              <YdButton v-if="selectedPage" v-auth="'platform:cms:delete'" variant="ghost" @click="confirmDeletePage()">
+                <YdIcon name="morph:trash-2" />
                 删除
-              </FaButton>
+              </YdButton>
               <a :href="pagePublicUrl" target="_blank" rel="noopener noreferrer">预览公开页</a>
             </div>
           </section>
 
           <section v-else-if="publishTab === 'seo'" class="publish-panel__section">
             <h3>SEO 与封面</h3>
-            <a-form :model="pageForm" layout="vertical">
-              <a-form-item label="摘要">
-                <FaInput v-model="pageForm.summary" />
-              </a-form-item>
-              <a-form-item label="摘录">
-                <FaTextarea v-model="pageForm.excerpt" rows="3" />
-              </a-form-item>
-              <a-form-item label="封面图">
-                <FaInput v-model="pageForm.coverImageUrl" />
-              </a-form-item>
-              <a-form-item label="SEO 标题">
-                <FaInput v-model="pageForm.seoTitle" />
-              </a-form-item>
-              <a-form-item label="SEO 描述">
-                <FaTextarea v-model="pageForm.seoDescription" rows="3" />
-              </a-form-item>
-            </a-form>
+            <YdForm :model="pageForm" layout="vertical">
+              <YdFormItem label="摘要">
+                <YdInput v-model="pageForm.summary" />
+              </YdFormItem>
+              <YdFormItem label="摘录">
+                <YdTextarea v-model="pageForm.excerpt" rows="3" />
+              </YdFormItem>
+              <YdFormItem label="封面图">
+                <YdInput v-model="pageForm.coverImageUrl" />
+              </YdFormItem>
+              <YdFormItem label="SEO 标题">
+                <YdInput v-model="pageForm.seoTitle" />
+              </YdFormItem>
+              <YdFormItem label="SEO 描述">
+                <YdTextarea v-model="pageForm.seoDescription" rows="3" />
+              </YdFormItem>
+            </YdForm>
           </section>
 
           <section v-else-if="publishTab === 'js'" class="publish-panel__section">
             <h3>页面 JS</h3>
-            <FaTextarea
+            <YdTextarea
               v-model="pageForm.jsContent"
               rows="8"
               input-class="font-mono"
@@ -1372,22 +1371,22 @@ function sectionTitle(type: HomeSectionType) {
           <section v-else-if="publishTab === 'variables'" class="publish-panel__section">
             <div class="panel-title-row">
               <h3>动态变量</h3>
-              <button type="button" @click="showAllVariables = !showAllVariables">
+              <YdAction type="button" @click="showAllVariables = !showAllVariables">
                 {{ showAllVariables ? '收起' : `全部 ${cmsVariables.length}` }}
-              </button>
+              </YdAction>
             </div>
             <div class="variable-list compact">
-              <button v-for="item in visibleCmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
+              <YdAction v-for="item in visibleCmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
                 <strong>{{ item.key }}</strong>
                 <span>{{ item.label }}</span>
-              </button>
+              </YdAction>
             </div>
           </section>
 
         </aside>
       </section>
 
-      <section v-else-if="activeTab === 'home'" v-loading="loading" class="home-layout">
+      <YdLoadingOverlay v-else-if="activeTab === 'home'" :loading="loading"><section   class="home-layout">
         <main class="home-form">
           <section v-if="currentThemeHasHomeComponent" class="builder-entry">
             <div>
@@ -1403,14 +1402,14 @@ function sectionTitle(type: HomeSectionType) {
                 <p>画布会同时展示固定 Header、首页主体和固定 Footer；首页主体可自由组合内容，Header/Footer 只开放样式调整。</p>
               </div>
               <div class="builder-entry__actions">
-                <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
-                  <FaIcon name="morph:layout-grid" />
+                <YdButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
+                  <YdIcon name="morph:layout-grid" />
                   打开首页构建器
-                </FaButton>
-                <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
-                  <FaIcon name="morph:eraser" />
+                </YdButton>
+                <YdButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
+                  <YdIcon name="morph:eraser" />
                   清空动态内容
-                </FaButton>
+                </YdButton>
               </div>
             </section>
 
@@ -1421,27 +1420,27 @@ function sectionTitle(type: HomeSectionType) {
                 <p>没有动态首页内容时，公开站点会回退渲染这些旧区块。</p>
               </div>
               <div class="block-toolbar">
-                <FaButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" @click="addHomeSection(preset.type)">
-                  <FaIcon :name="preset.icon" />
+                <YdButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" @click="addHomeSection(preset.type)">
+                  <YdIcon :name="preset.icon" />
                   {{ preset.label }}
-                </FaButton>
+                </YdButton>
               </div>
             </div>
             <article v-for="section in home.sections" :key="section.id || section.title" class="builder-block">
               <div class="builder-block__head">
-                <FaTag variant="secondary">{{ section.type }}</FaTag>
-                <FaButton size="sm" variant="ghost" @click="removeHomeSection(section)">
-                  <FaIcon name="morph:trash-2" />
-                </FaButton>
+                <YdTag variant="secondary">{{ section.type }}</YdTag>
+                <YdButton size="sm" variant="ghost" @click="removeHomeSection(section)">
+                  <YdIcon name="morph:trash-2" />
+                </YdButton>
               </div>
-              <FaInput v-model="section.title" placeholder="区块标题" />
-              <FaTextarea v-model="section.subtitle" rows="3" placeholder="区块说明" />
+              <YdInput v-model="section.title" placeholder="区块标题" />
+              <YdTextarea v-model="section.subtitle" rows="3" placeholder="区块说明" />
               <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <FaInput v-model="section.mediaUrl" placeholder="图片地址" />
-                <FaInput v-model="section.actionUrl" placeholder="按钮链接" />
-                <FaInput v-model="section.actionText" placeholder="按钮文案" />
+                <YdInput v-model="section.mediaUrl" placeholder="图片地址" />
+                <YdInput v-model="section.actionUrl" placeholder="按钮链接" />
+                <YdInput v-model="section.actionText" placeholder="按钮文案" />
                 <label class="inline-flex items-center gap-2 text-sm">
-                  <FaSwitch v-model="section.visible" />
+                  <YdSwitch v-model="section.visible" />
                   显示区块
                 </label>
               </div>
@@ -1453,84 +1452,79 @@ function sectionTitle(type: HomeSectionType) {
         <aside class="home-preview">
           <section>
             <h3>首页基础信息</h3>
-            <a-form :model="home" layout="vertical">
-              <a-form-item label="首页标题">
-                <FaInput v-model="home.title" />
-              </a-form-item>
-              <a-form-item label="站点布局">
-                <FaSelect v-model="homeLayoutMode" :options="layoutOptions" />
-              </a-form-item>
-              <a-form-item label="副标题">
-                <FaInput v-model="home.subtitle" />
-              </a-form-item>
-              <a-form-item label="首屏图片">
-                <FaInput v-model="home.heroImageUrl" />
-              </a-form-item>
-              <a-form-item label="发布首页">
+            <YdForm :model="home" layout="vertical">
+              <YdFormItem label="首页标题">
+                <YdInput v-model="home.title" />
+              </YdFormItem>
+              <YdFormItem label="站点布局">
+                <YdSelect v-model="homeLayoutMode" :options="layoutOptions" />
+              </YdFormItem>
+              <YdFormItem label="副标题">
+                <YdInput v-model="home.subtitle" />
+              </YdFormItem>
+              <YdFormItem label="首屏图片">
+                <YdInput v-model="home.heroImageUrl" />
+              </YdFormItem>
+              <YdFormItem label="发布首页">
                 <div class="home-publish-field">
-                  <FaSwitch v-model="home.published" />
-                  <FaTag :variant="home.published ? 'default' : 'secondary'">
+                  <YdSwitch v-model="home.published" />
+                  <YdTag :variant="home.published ? 'default' : 'secondary'">
                     {{ home.published ? '已发布' : '未发布' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
-              </a-form-item>
-            </a-form>
+              </YdFormItem>
+            </YdForm>
           </section>
         </aside>
-      </section>
+      </section></YdLoadingOverlay>
 
-      <section v-else-if="activeTab === 'navigation'" v-loading="loading" class="navigation-layout">
+      <YdLoadingOverlay v-else-if="activeTab === 'navigation'" :loading="loading"><section   class="navigation-layout">
         <main class="navigation-panel">
           <div class="legacy-sections__head">
             <div>
               <h3>站点导航</h3>
               <p>管理当前编辑主题的导航菜单：可新增、删除、改名、调整链接、上级与排序。导航随主题保存与切换，当该主题是公开站当前主题时立即生效。</p>
             </div>
-            <FaButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
-              <FaIcon name="morph:plus" />
+            <YdButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
+              <YdIcon name="morph:plus" />
               新增菜单
-            </FaButton>
+            </YdButton>
           </div>
-          <a-empty v-if="!navigationItems.length" description="暂无导航菜单，点击右上角新增" />
+          <YdEmpty v-if="!navigationItems.length" description="暂无导航菜单，点击右上角新增" />
           <article v-for="item in navigationItems" :key="item.id" class="builder-block">
             <div class="builder-block__head">
               <div class="navigation-item-title">
-                <FaTag variant="secondary">{{ item.parentId ? '二级菜单' : '一级菜单' }}</FaTag>
+                <YdTag variant="secondary">{{ item.parentId ? '二级菜单' : '一级菜单' }}</YdTag>
                 <span>{{ item.label || '未命名菜单' }}</span>
               </div>
               <div class="navigation-item-actions">
-                <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="addNavigationItem(item.id)">
-                  <FaIcon name="morph:plus" />
+                <YdButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="addNavigationItem(item.id)">
+                  <YdIcon name="morph:plus" />
                   子菜单
-                </FaButton>
-                <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="removeNavigationItem(item)">
-                  <FaIcon name="morph:trash-2" />
+                </YdButton>
+                <YdButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="removeNavigationItem(item)">
+                  <YdIcon name="morph:trash-2" />
                   删除
-                </FaButton>
+                </YdButton>
               </div>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FaInput v-model="item.label" placeholder="菜单名称" />
-              <FaInput v-model="item.url" placeholder="/site/about 或 https://..." />
+              <YdInput v-model="item.label" placeholder="菜单名称" />
+              <YdInput v-model="item.url" placeholder="/site/about 或 https://..." />
               <label class="cms-field">
                 <span>上级菜单</span>
-                <select v-model="item.parentId" class="cms-native-select">
-                  <option value="">一级菜单</option>
-                  <option v-for="parent in rootNavigationItems.filter(parent => parent.id !== item.id)" :key="parent.id" :value="parent.id">
-                    {{ parent.label }}
-                  </option>
-                </select>
+                <YdSelect v-model="item.parentId" :options="[{ label: '一级菜单', value: '' }, ...rootNavigationItems.filter(parent => parent.id !== item.id).map(parent => ({ label: parent.label, value: parent.id }))]" class="w-full" />
               </label>
-              <FaInput v-model="item.sort" type="number" placeholder="排序" />
+              <label class="cms-field"><span>排序</span><YdNumberField v-model="item.sort" class="w-full" /></label>
               <label class="cms-field">
                 <span>外链打开方式</span>
                 <span class="inline-flex items-center gap-2 text-sm">
-                  <FaSwitch v-model="item.embed" :disabled="!/^https?:\/\//i.test(item.url.trim())" />
+                  <YdSwitch v-model="item.embed" :disabled="!/^https?:\/\//i.test(item.url.trim())" />
                   {{ /^https?:\/\//i.test(item.url.trim()) ? '在站内 iframe 嵌入' : '仅 http(s) 外链可嵌入' }}
                 </span>
               </label>
               <label class="inline-flex items-center gap-2 text-sm">
-                <FaSwitch v-model="item.visible" />
+                <YdSwitch v-model="item.visible" />
                 显示菜单
               </label>
             </div>
@@ -1546,7 +1540,7 @@ function sectionTitle(type: HomeSectionType) {
                   <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__menu">
                     <a :href="item.url" class="cms-nav-preview__link">
                       {{ item.label }}
-                      <FaIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="morph:chevron-down" />
+                      <YdIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="morph:chevron-down" />
                     </a>
                     <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__dropdown">
                       <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url" class="cms-nav-preview__sublink">
@@ -1565,20 +1559,20 @@ function sectionTitle(type: HomeSectionType) {
             </p>
           </section>
         </aside>
-      </section>
+      </section></YdLoadingOverlay>
 
-      <section v-else-if="activeTab === 'media'" v-loading="loading" class="media-workspace">
+      <YdLoadingOverlay v-else-if="activeTab === 'media'" :loading="loading"><section   class="media-workspace">
         <div class="media-toolbar-main">
           <div>
             <h3>媒体库</h3>
             <p>用于 CMS 构建器、首页和文章封面的图片资产，上传后会进入 RustFS/S3 对象存储。</p>
           </div>
           <div class="media-actions">
-            <FaInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
-            <FaButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
-              <FaIcon name="morph:cloud-upload" />
+            <YdInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
+            <YdButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+              <YdIcon name="morph:cloud-upload" />
               上传
-            </FaButton>
+            </YdButton>
           </div>
         </div>
 
@@ -1588,14 +1582,14 @@ function sectionTitle(type: HomeSectionType) {
               <img :src="mediaUrl(item)" :alt="item.originalName || 'CMS 媒体'">
               <div class="media-card__overlay">
                 <div class="media-card__actions">
-                  <FaButton size="sm" variant="outline" @click="copyMediaUrl(item)">
-                    <FaIcon name="morph:copy" />
+                  <YdButton size="sm" variant="outline" @click="copyMediaUrl(item)">
+                    <YdIcon name="morph:copy" />
                     复制地址
-                  </FaButton>
-                  <FaButton size="sm" @click="useMediaAsCover(item)">
-                    <FaIcon name="i-ri:image-edit-line" />
+                  </YdButton>
+                  <YdButton size="sm" @click="useMediaAsCover(item)">
+                    <YdIcon name="i-ri:image-edit-line" />
                     设为封面
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
             </div>
@@ -1609,30 +1603,30 @@ function sectionTitle(type: HomeSectionType) {
         <div v-else class="empty-state media-empty">
           暂无媒体，点击上传添加第一张 CMS 图片。
         </div>
-      </section>
+      </section></YdLoadingOverlay>
 
-      <section v-else-if="activeTab === 'presets'" v-loading="loading" class="preset-workspace">
+      <YdLoadingOverlay v-else-if="activeTab === 'presets'" :loading="loading"><section   class="preset-workspace">
         <div class="preset-toolbar">
           <div>
             <h3>首页方案</h3>
             <p>把当前编辑主题的首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。方案按主题隔离，每个主题只看到自己的方案；启用自带方案的主题时，对应方案出现在该主题名下。</p>
           </div>
-          <FaButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
-            <FaIcon name="morph:bookmark" />
+          <YdButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
+            <YdIcon name="morph:bookmark" />
             存为方案
-          </FaButton>
+          </YdButton>
         </div>
 
         <div v-if="presets.length" class="preset-grid">
           <article v-for="preset in presets" :key="preset.code" class="preset-card">
             <div class="preset-card__head">
               <strong>{{ preset.name }}</strong>
-              <FaTag v-if="preset.active" variant="default">
+              <YdTag v-if="preset.active" variant="default">
                 当前
-              </FaTag>
-              <FaTag :variant="presetSourceVariant(preset.source)">
+              </YdTag>
+              <YdTag :variant="presetSourceVariant(preset.source)">
                 {{ presetSourceText(preset.source) }}
-              </FaTag>
+              </YdTag>
             </div>
             <p v-if="preset.description" class="preset-card__desc">
               {{ preset.description }}
@@ -1642,41 +1636,41 @@ function sectionTitle(type: HomeSectionType) {
               <span>{{ dateText(preset.updateTime || preset.createTime) }}</span>
             </div>
             <div class="preset-card__actions">
-              <FaButton v-auth="'platform:cms:publish'" size="sm" @click="confirmApplyPreset(preset)">
-                <FaIcon name="morph:check" />
+              <YdButton v-auth="'platform:cms:publish'" size="sm" @click="confirmApplyPreset(preset)">
+                <YdIcon name="morph:check" />
                 应用
-              </FaButton>
-              <FaButton v-auth="'platform:cms:delete'" size="sm" variant="ghost" @click="confirmDeletePreset(preset)">
-                <FaIcon name="morph:trash-2" />
+              </YdButton>
+              <YdButton v-auth="'platform:cms:delete'" size="sm" variant="ghost" @click="confirmDeletePreset(preset)">
+                <YdIcon name="morph:trash-2" />
                 删除
-              </FaButton>
+              </YdButton>
             </div>
           </article>
         </div>
         <div v-else class="empty-state">
           暂无方案，点击右上角「把当前首页存为方案」保存当前首页定制。
         </div>
-      </section>
-    </FaPageMain>
+      </section></YdLoadingOverlay>
+    </YdPageMain>
 
-    <FaModal v-model="presetDialogVisible" title="把当前首页存为方案" class="sm:max-w-lg">
+    <YdModal v-model="presetDialogVisible" title="把当前首页存为方案" class="sm:max-w-lg">
       <div class="gap-4 grid">
         <div>
           <label class="preset-form-label">方案名称</label>
-          <FaInput v-model="presetForm.name" placeholder="例如：活动专题首页" maxlength="50" />
+          <YdInput v-model="presetForm.name" placeholder="例如：活动专题首页" maxlength="50" />
         </div>
         <div>
           <label class="preset-form-label">方案描述（可选）</label>
-          <FaTextarea v-model="presetForm.description" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="记录这套首页定制的用途" maxlength="200" />
+          <YdTextarea v-model="presetForm.description" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="记录这套首页定制的用途" maxlength="200" />
         </div>
         <div class="preset-form-actions">
-          <FaButton :loading="presetSaving" @click="savePreset">
-            <FaIcon name="morph:save" />
+          <YdButton :loading="presetSaving" @click="savePreset">
+            <YdIcon name="morph:save" />
             保存方案
-          </FaButton>
+          </YdButton>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
 
     <div v-if="grapesEditorVisible" class="grapes-editor-shell">
       <CmsGrapesEditor
@@ -2299,23 +2293,6 @@ function sectionTitle(type: HomeSectionType) {
   font-size: 13px;
 }
 
-.cms-native-select {
-  width: 100%;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-  color: var(--color-text-1);
-  font-size: 14px;
-  outline: none;
-}
-
-.cms-native-select:focus {
-  border-color: var(--color-text-1);
-  box-shadow: 0 0 0 2px var(--color-fill-2);
-}
-
 .footer-settings {
   display: grid;
   gap: 12px;
@@ -2710,7 +2687,7 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .theme-card.active {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
 }
 
 .theme-card__preview {

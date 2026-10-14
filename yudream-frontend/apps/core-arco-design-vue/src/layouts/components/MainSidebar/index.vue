@@ -32,7 +32,7 @@ useHotkeyBindings({
       <Component :is="useSlots('main-sidebar-top')" />
       <Logo :show-title="false" class="sidebar-logo" />
       <Component :is="useSlots('main-sidebar-after-logo')" />
-      <FaScrollArea :scrollbar="false" mask gradient-color="var(--g-main-sidebar-bg)" class="menu overscroll-contain flex-1">
+      <YdScrollArea :scrollbar="false" mask gradient-color="var(--g-main-sidebar-bg)" class="menu overscroll-contain flex-1">
         <!-- 侧边栏模式（含主导航） -->
         <div
           v-if="appSettingsStore.settings.menu.mode === 'side' || (appSettingsStore.mode === 'mobile' && appSettingsStore.settings.menu.mode !== 'single')" class="py-1 flex flex-col w-full transition-all of-hidden -mt-2"
@@ -43,8 +43,10 @@ useHotkeyBindings({
                 active: index === appMenuStore.actived,
               }"
             >
-              <FaTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="right">
-                <button
+              <YdTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="right">
+                <YdButton
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   :aria-label="generateTitle(item.meta?.title)"
                   :aria-pressed="index === appMenuStore.actived"
@@ -52,13 +54,13 @@ useHotkeyBindings({
                     'text-[var(--g-main-sidebar-menu-active-color)]! bg-[var(--g-main-sidebar-menu-active-bg)]!': index === appMenuStore.actived,
                   }" @click="switchTo(index)"
                 >
-                  <FaIcon :name="item.meta?.icon || 'morph:folder'" class="menu-item-container-icon" aria-hidden="true" />
-                </button>
-              </FaTooltip>
+                  <YdIcon :name="item.meta?.icon || 'morph:folder'" class="menu-item-container-icon" aria-hidden="true" />
+                </YdButton>
+              </YdTooltip>
             </div>
           </template>
         </div>
-      </FaScrollArea>
+      </YdScrollArea>
       <Component :is="useSlots('main-sidebar-after-menu')" />
       <div class="px-4 py-3 flex-center">
         <AppAccountButton only-avatar :button-variant="appSettingsStore.settings.menu.mode === 'side' ? 'secondary' : 'ghost'" class="p-2 size-12" />

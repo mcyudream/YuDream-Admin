@@ -36,10 +36,10 @@ defineEmits<{
     </dl>
     <div class="dashboard-metrics__footer">
       <span :title="message" role="status">{{ message }}</span>
-      <FaButton v-if="showAction" size="sm" variant="ghost" @click="$emit('open')">
+      <YdButton v-if="showAction" size="sm" variant="ghost" @click="$emit('open')">
         {{ actionLabel || '查看' }}
-        <FaIcon name="morph:arrow-up-right" />
-      </FaButton>
+        <YdIcon name="morph:arrow-up-right" />
+      </YdButton>
     </div>
   </div>
 </template>

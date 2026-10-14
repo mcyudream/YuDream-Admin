@@ -47,12 +47,12 @@ function toggleColorScheme(event: MouseEvent) {
 </script>
 
 <template>
-  <FaButton variant="ghost" size="icon-sm" @click="toggleColorScheme">
-    <FaIcon
+  <YdButton variant="ghost" size="icon-sm" @click="toggleColorScheme">
+    <YdIcon
       :name="{
         light: 'morph:sun',
         dark: 'morph:moon',
       }[appSettingsStore.currentColorScheme!]" class="size-4"
     />
-  </FaButton>
+  </YdButton>
 </template>

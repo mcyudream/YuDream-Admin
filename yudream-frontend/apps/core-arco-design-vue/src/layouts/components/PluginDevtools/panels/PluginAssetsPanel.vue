@@ -12,7 +12,7 @@ import apiDevtools from '@/api/modules/platform-devtools'
 import apiPlugin from '@/api/modules/platform-plugin'
 import AssetSection from './AssetSection.vue'
 
-const toast = useFaToast()
+const toast = useYdToast()
 const devtoolsStore = usePluginDevtoolsStore()
 
 const plugins = ref<PluginDevPlugin[]>([])
@@ -307,45 +307,45 @@ async function runCommandTest() {
     <template v-if="!selectedPlugin">
       <div class="plugins-toolbar">
         <span class="plugins-toolbar__title">已安装插件</span>
-        <FaTag variant="secondary" class="text-xs">
+        <YdTag variant="secondary" class="text-xs">
           {{ plugins.length }}
-        </FaTag>
+        </YdTag>
         <div class="flex-1" />
-        <FaButton
+        <YdButton
           variant="outline"
           size="icon"
           :title="viewMode === 'graph' ? '返回清单视图' : '依赖图：查看插件间硬/软依赖与禁用影响'"
           @click="viewMode = viewMode === 'graph' ? 'list' : 'graph'"
         >
-          <FaIcon :name="viewMode === 'graph' ? 'morph:list-checks' : 'morph:list-tree'" />
-        </FaButton>
-        <FaButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
-          <FaIcon name="morph:refresh-cw" />
-        </FaButton>
+          <YdIcon :name="viewMode === 'graph' ? 'morph:list-checks' : 'morph:list-tree'" />
+        </YdButton>
+        <YdButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
+          <YdIcon name="morph:refresh-cw" />
+        </YdButton>
       </div>
 
       <template v-if="viewMode === 'graph'">
         <div v-for="plugin in plugins" :key="plugin.code" class="dep-card">
           <div class="dep-card__head">
             <span class="dep-card__name font-medium">{{ plugin.name }}</span>
-            <FaTag :variant="statusVariant(plugin)" class="text-xs">
+            <YdTag :variant="statusVariant(plugin)" class="text-xs">
               {{ plugin.status }}
-            </FaTag>
-            <FaTag v-if="plugin.devMode" class="text-xs">
+            </YdTag>
+            <YdTag v-if="plugin.devMode" class="text-xs">
               开发模式
-            </FaTag>
+            </YdTag>
             <div class="flex-1" />
-            <FaButton variant="ghost" size="sm" title="预览禁用该插件时的级联影响" @click="openDisablePreview(plugin.code)">
-              <FaIcon name="morph:eye" />
+            <YdButton variant="ghost" size="sm" title="预览禁用该插件时的级联影响" @click="openDisablePreview(plugin.code)">
+              <YdIcon name="morph:eye" />
               禁用预览
-            </FaButton>
+            </YdButton>
           </div>
           <div class="dep-card__code">
             {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
           </div>
           <div v-if="plugin.dependencies?.length" class="dep-row">
             <span class="dep-label">依赖</span>
-            <FaTag
+            <YdTag
               v-for="dependency in plugin.dependencies"
               :key="dependency"
               :variant="dependencyMissing(dependency) ? 'destructive' : 'outline'"
@@ -353,11 +353,11 @@ async function runCommandTest() {
               :title="dependencyMissing(dependency) ? '硬依赖未安装，该插件无法启用' : ''"
             >
               {{ dependency }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="plugin.softDependencies?.length" class="dep-row">
             <span class="dep-label">可选依赖</span>
-            <FaTag
+            <YdTag
               v-for="dependency in plugin.softDependencies"
               :key="dependency"
               :variant="dependencyMissing(dependency) ? 'destructive' : 'secondary'"
@@ -365,19 +365,19 @@ async function runCommandTest() {
               :title="dependencyMissing(dependency) ? '可选依赖未安装，相关集成不可用' : ''"
             >
               {{ dependency }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="reverseDependencies.hard.get(plugin.code)?.length" class="dep-row">
             <span class="dep-label">被依赖</span>
-            <FaTag v-for="dependent in reverseDependencies.hard.get(plugin.code)" :key="dependent" variant="outline" class="text-xs font-mono">
+            <YdTag v-for="dependent in reverseDependencies.hard.get(plugin.code)" :key="dependent" variant="outline" class="text-xs font-mono">
               {{ dependent }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="reverseDependencies.soft.get(plugin.code)?.length" class="dep-row">
             <span class="dep-label">被可选依赖</span>
-            <FaTag v-for="dependent in reverseDependencies.soft.get(plugin.code)" :key="dependent" variant="secondary" class="text-xs font-mono">
+            <YdTag v-for="dependent in reverseDependencies.soft.get(plugin.code)" :key="dependent" variant="secondary" class="text-xs font-mono">
               {{ dependent }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="!hasAnyDependency(plugin)" class="dep-row dep-row--empty">
             无依赖关系
@@ -386,7 +386,7 @@ async function runCommandTest() {
       </template>
 
       <template v-else>
-        <div
+        <YdAction
           v-for="plugin in plugins"
           :key="plugin.code"
           class="plugin-row"
@@ -395,22 +395,22 @@ async function runCommandTest() {
           <div class="plugin-row__main">
             <div class="plugin-row__title">
               <span class="font-medium">{{ plugin.name }}</span>
-              <FaTag :variant="statusVariant(plugin)" class="text-xs">
+              <YdTag :variant="statusVariant(plugin)" class="text-xs">
                 {{ plugin.status }}
-              </FaTag>
-              <FaTag v-if="plugin.devMode" class="text-xs">
+              </YdTag>
+              <YdTag v-if="plugin.devMode" class="text-xs">
                 开发模式
-              </FaTag>
-              <FaTag v-if="plugin.devMode && plugin.devProject" variant="outline" class="text-xs">
+              </YdTag>
+              <YdTag v-if="plugin.devMode && plugin.devProject" variant="outline" class="text-xs">
                 {{ plugin.devProject.source === 'CONFIG' ? '配置文件' : '面板登记' }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="plugin-row__sub">
               {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
             </div>
           </div>
-          <FaIcon name="morph:chevron-right" class="text-secondary-foreground/60 shrink-0 size-4" />
-        </div>
+          <YdIcon name="morph:chevron-right" class="text-secondary-foreground/60 shrink-0 size-4" />
+        </YdAction>
       </template>
       <div v-if="!plugins.length && !pluginsLoading" class="panel-empty">
         暂无已安装插件
@@ -420,52 +420,52 @@ async function runCommandTest() {
     <!-- 插件详情 -->
     <template v-else>
       <div class="plugins-toolbar">
-        <FaButton variant="ghost" size="sm" @click="backToList">
-          <FaIcon name="morph:chevron-left" />
+        <YdButton variant="ghost" size="sm" @click="backToList">
+          <YdIcon name="morph:chevron-left" />
           插件清单
-        </FaButton>
+        </YdButton>
         <div class="flex-1" />
-        <FaTooltip v-if="selectedPlugin.status !== 'ENABLED'" text="启用插件，注册端点、指令、权限等运行时贡献" side="bottom">
-          <FaButton size="sm" :loading="enabling" @click="enablePlugin">
-            <FaIcon name="morph:play" />
+        <YdTooltip v-if="selectedPlugin.status !== 'ENABLED'" text="启用插件，注册端点、指令、权限等运行时贡献" side="bottom">
+          <YdButton size="sm" :loading="enabling" @click="enablePlugin">
+            <YdIcon name="morph:play" />
             启用
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="重挂载该插件前端远程模块，不回收 Java 运行时" side="bottom">
-          <FaButton
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="重挂载该插件前端远程模块，不回收 Java 运行时" side="bottom">
+          <YdButton
             variant="outline"
             size="sm"
             :disabled="!selectedPlugin.devMode || selectedPlugin.status !== 'ENABLED'"
             :loading="frontendReloading"
             @click="reloadFrontend()"
           >
-            <FaIcon name="morph:refresh-cw" />
+            <YdIcon name="morph:refresh-cw" />
             前端重载
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
-          <FaButton
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
+          <YdButton
             variant="outline"
             size="sm"
             :disabled="!selectedPlugin.devMode || selectedPlugin.status !== 'ENABLED'"
             :loading="reloading"
             @click="reloadPlugin()"
           >
-            <FaIcon name="morph:rotate-cw" />
+            <YdIcon name="morph:rotate-cw" />
             Java 重载
-          </FaButton>
-        </FaTooltip>
+          </YdButton>
+        </YdTooltip>
       </div>
 
       <div class="plugin-brief">
         <div class="plugin-brief__title">
           <span class="font-medium">{{ selectedPlugin.name }}</span>
-          <FaTag :variant="statusVariant(selectedPlugin)" class="text-xs">
+          <YdTag :variant="statusVariant(selectedPlugin)" class="text-xs">
             {{ selectedPlugin.status }}
-          </FaTag>
-          <FaTag v-if="selectedPlugin.devMode" class="text-xs">
+          </YdTag>
+          <YdTag v-if="selectedPlugin.devMode" class="text-xs">
             开发模式
-          </FaTag>
+          </YdTag>
         </div>
         <div v-if="selectedPlugin.devProject" class="plugin-brief__path">
           {{ selectedPlugin.devProject.path }}
@@ -477,7 +477,7 @@ async function runCommandTest() {
       </div>
       <template v-else-if="assets">
         <div v-if="!assets.enabled" class="plugin-not-enabled">
-          <FaIcon name="morph:info" class="shrink-0 size-4" />
+          <YdIcon name="morph:info" class="shrink-0 size-4" />
           <span>插件当前未启用，下方运行时贡献为空属预期；点击右上角「启用」后才会注册端点、指令、权限等。</span>
         </div>
         <AssetSection title="HTTP 端点" icon="morph:globe" :count="assets.httpEndpoints.length" default-open>
@@ -485,13 +485,13 @@ async function runCommandTest() {
             v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`"
             class="asset-row"
           >
-            <FaTag variant="outline" class="method-tag text-xs">
+            <YdTag variant="outline" class="method-tag text-xs">
               {{ endpoint.method }}
-            </FaTag>
+            </YdTag>
             <span class="asset-row__main text-xs font-mono">{{ endpoint.fullPath }}</span>
-            <FaButton variant="ghost" size="sm" class="shrink-0" @click="openEndpointTester(endpoint)">
+            <YdButton variant="ghost" size="sm" class="shrink-0" @click="openEndpointTester(endpoint)">
               试用
-            </FaButton>
+            </YdButton>
           </div>
           <div v-if="!assets.httpEndpoints.length" class="asset-empty">
             该插件未注册 HTTP 端点
@@ -505,12 +505,12 @@ async function runCommandTest() {
               command.name
             }}{{ command.description ? `：${command.description}` : '' }}</span>
             <div class="asset-row__actions">
-              <FaButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(command.command)">
+              <YdButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(command.command)">
                 QQ沙盒
-              </FaButton>
-              <FaButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
+              </YdButton>
+              <YdButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
                 模拟触发
-              </FaButton>
+              </YdButton>
             </div>
           </div>
           <div v-if="!assets.commands.length" class="asset-empty">
@@ -521,13 +521,13 @@ async function runCommandTest() {
         <AssetSection title="前端模块与路由" icon="morph:app-window" :count="assets.frontendModules.length">
           <div v-for="module in assets.frontendModules" :key="module.pluginCode" class="frontend-module">
             <div class="asset-row">
-              <FaTag variant="outline" class="text-xs">
+              <YdTag variant="outline" class="text-xs">
                 {{ module.menuTitle || module.moduleName || '未命名模块' }}
-              </FaTag>
+              </YdTag>
               <span class="asset-row__main text-xs font-mono">{{ module.entry }}</span>
             </div>
             <div v-for="route in module.routes" :key="route.path" class="asset-row asset-row--sub">
-              <FaIcon v-if="route.icon" :name="route.icon" class="size-3.5" />
+              <YdIcon v-if="route.icon" :name="route.icon" class="size-3.5" />
               <span class="text-xs">{{ route.title || route.name }}</span>
               <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ route.path }}</span>
             </div>
@@ -549,12 +549,12 @@ async function runCommandTest() {
 
         <AssetSection title="菜单" icon="morph:menu" :count="assets.menus.length">
           <div v-for="menu in assets.menus" :key="menu.path" class="asset-row">
-            <FaIcon v-if="menu.icon" :name="menu.icon" class="size-3.5" />
+            <YdIcon v-if="menu.icon" :name="menu.icon" class="size-3.5" />
             <span class="text-xs">{{ menu.title }}</span>
             <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ menu.path }}</span>
-            <FaTag v-if="menu.permission" variant="secondary" class="text-xs shrink-0">
+            <YdTag v-if="menu.permission" variant="secondary" class="text-xs shrink-0">
               {{ menu.permission }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="!assets.menus.length" class="asset-empty">
             无注册菜单
@@ -565,12 +565,12 @@ async function runCommandTest() {
           <div v-for="tool in assets.aiTools" :key="tool.name" class="asset-row">
             <span class="text-xs font-mono">{{ tool.name }}</span>
             <span class="asset-row__main text-xs">{{ tool.title || tool.description }}</span>
-            <FaTag
+            <YdTag
               v-if="tool.risk" :variant="tool.risk === 'HIGH' ? 'destructive' : 'secondary'"
               class="text-xs shrink-0"
             >
               {{ tool.risk }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="!assets.aiTools.length" class="asset-empty">
             无 AI 工具
@@ -579,12 +579,12 @@ async function runCommandTest() {
 
         <AssetSection title="声明式 Agent" icon="morph:bot" :count="assets.agents.length">
           <div v-for="agent in assets.agents" :key="agent.id" class="asset-row">
-            <FaIcon v-if="agent.icon" :name="agent.icon" class="size-3.5" />
+            <YdIcon v-if="agent.icon" :name="agent.icon" class="size-3.5" />
             <span class="text-xs">{{ agent.name }}</span>
             <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ agent.code }}</span>
-            <FaTag v-if="agent.status" variant="secondary" class="text-xs shrink-0">
+            <YdTag v-if="agent.status" variant="secondary" class="text-xs shrink-0">
               {{ agent.status }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="!assets.agents.length" class="asset-empty">
             无声明式 Agent
@@ -595,9 +595,9 @@ async function runCommandTest() {
           <div v-for="capability in assets.capabilities" :key="capability.code" class="asset-row">
             <span class="text-xs">{{ capability.name }}</span>
             <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ capability.code }}</span>
-            <FaTag v-if="capability.type" variant="secondary" class="text-xs shrink-0">
+            <YdTag v-if="capability.type" variant="secondary" class="text-xs shrink-0">
               {{ capability.type }}
-            </FaTag>
+            </YdTag>
           </div>
           <div v-if="!assets.capabilities.length" class="asset-empty">
             无平台能力
@@ -606,14 +606,14 @@ async function runCommandTest() {
 
         <AssetSection title="消息交互" icon="morph:message-square" :count="assets.messageInteractions.length">
           <div v-for="(interaction, index) in assets.messageInteractions" :key="index" class="asset-row">
-            <FaTag variant="outline" class="text-xs">
+            <YdTag variant="outline" class="text-xs">
               {{ interaction.kind }}
-            </FaTag>
+            </YdTag>
             <span class="asset-row__main text-xs">{{ interaction.eventTypes.join('、') }}</span>
             <span v-if="interaction.command" class="text-xs font-mono shrink-0">/{{ interaction.command }}</span>
-            <FaButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(interaction.command)">
+            <YdButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(interaction.command)">
               QQ沙盒
-            </FaButton>
+            </YdButton>
           </div>
           <div v-if="!assets.messageInteractions.length" class="asset-empty">
             无消息交互
@@ -645,92 +645,92 @@ async function runCommandTest() {
     </template>
 
     <!-- 端点测试器 -->
-    <FaModal v-model="endpointTesterOpen" title="端点测试" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
+    <YdModal v-model="endpointTesterOpen" title="端点测试" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
       <div v-if="endpointTarget" class="tester">
         <div class="tester__target">
-          <FaTag variant="outline" class="text-xs">
+          <YdTag variant="outline" class="text-xs">
             {{ endpointTarget.method }}
-          </FaTag>
+          </YdTag>
           <span class="text-xs font-mono break-all">{{ endpointResolvedPath }}</span>
         </div>
 
         <template v-if="Object.keys(endpointPathParams).length">
           <div v-for="(_, name) in endpointPathParams" :key="name" class="tester__field">
             <span class="tester__label">路径参数 {{ name }}</span>
-            <FaInput v-model="endpointPathParams[name]" :placeholder="`{${name}}`" />
+            <YdInput v-model="endpointPathParams[name]" :placeholder="`{${name}}`" />
           </div>
         </template>
 
         <div class="tester__field">
           <span class="tester__label">查询字符串（可选，原样拼接）</span>
-          <FaInput v-model="endpointQuery" placeholder="key=value&..." />
+          <YdInput v-model="endpointQuery" placeholder="key=value&..." />
         </div>
 
         <div v-if="endpointMethodSupportsBody" class="tester__field">
           <span class="tester__label">请求体（JSON，可选）</span>
-          <FaTextarea v-model="endpointBody" :rows="5" placeholder="{ }" class="text-xs font-mono" />
+          <YdTextarea v-model="endpointBody" :rows="5" placeholder="{ }" class="text-xs font-mono" />
         </div>
 
         <div class="tester__actions">
-          <FaButton :loading="endpointTesting" @click="runEndpointTest">
-            <FaIcon name="morph:send" />
+          <YdButton :loading="endpointTesting" @click="runEndpointTest">
+            <YdIcon name="morph:send" />
             发送请求
-          </FaButton>
+          </YdButton>
         </div>
 
         <div v-if="endpointResult" class="tester__result">
           <div class="tester__result-meta">
-            <FaTag :variant="endpointResult.ok ? 'default' : 'destructive'" class="text-xs">
+            <YdTag :variant="endpointResult.ok ? 'default' : 'destructive'" class="text-xs">
               HTTP {{ endpointResult.status }} {{ endpointResult.statusText }}
-            </FaTag>
+            </YdTag>
             <span class="text-xs text-secondary-foreground/60">{{ endpointResult.durationMs }}ms</span>
           </div>
-          <FaScrollArea class="tester__result-body">
+          <YdScrollArea class="tester__result-body">
             <pre>{{ formatEndpointBody(endpointResult.body) }}</pre>
-          </FaScrollArea>
+          </YdScrollArea>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
 
     <!-- 指令模拟器 -->
-    <FaModal v-model="commandTestOpen" title="模拟触发指令" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
+    <YdModal v-model="commandTestOpen" title="模拟触发指令" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
       <div v-if="commandTarget" class="tester">
         <div class="tester__target">
-          <FaTag variant="outline" class="text-xs">
+          <YdTag variant="outline" class="text-xs">
             {{ commandTarget.pluginCode }}
-          </FaTag>
+          </YdTag>
           <span class="text-xs text-secondary-foreground/70">{{ commandTarget.name }}</span>
         </div>
 
         <div class="tester__field">
           <span class="tester__label">指令名</span>
-          <FaInput v-model="commandInput" placeholder="指令名（不带 /）" />
+          <YdInput v-model="commandInput" placeholder="指令名（不带 /）" />
         </div>
         <div class="tester__field">
           <span class="tester__label">参数（空格分隔）</span>
-          <FaInput v-model="commandArguments" placeholder="arg1 arg2 ..." />
+          <YdInput v-model="commandArguments" placeholder="arg1 arg2 ..." />
         </div>
         <div class="tester__field">
           <span class="tester__label">消息原文（可选，缺省按 /指令 参数 构造）</span>
-          <FaTextarea v-model="commandContent" :rows="3" />
+          <YdTextarea v-model="commandContent" :rows="3" />
         </div>
 
         <div class="tester__actions">
-          <FaButton :loading="commandTesting" :disabled="!commandInput.trim()" @click="runCommandTest">
-            <FaIcon name="morph:play" />
+          <YdButton :loading="commandTesting" :disabled="!commandInput.trim()" @click="runCommandTest">
+            <YdIcon name="morph:play" />
             触发
-          </FaButton>
+          </YdButton>
           <span class="text-xs text-secondary-foreground/60">在插件作用域内同步调用处理器，绕过权限与匿名检查</span>
         </div>
 
         <div v-if="commandResult" class="tester__result">
           <div class="tester__result-meta">
-            <FaTag :variant="commandResult.success ? 'default' : 'destructive'" class="text-xs">
+            <YdTag :variant="commandResult.success ? 'default' : 'destructive'" class="text-xs">
               {{ commandResult.success ? '执行成功' : '执行失败' }}
-            </FaTag>
-            <FaTag v-if="!commandResult.matched" variant="secondary" class="text-xs">
+            </YdTag>
+            <YdTag v-if="!commandResult.matched" variant="secondary" class="text-xs">
               未匹配到处理器
-            </FaTag>
+            </YdTag>
             <span class="text-xs text-secondary-foreground/60">{{ commandResult.durationMs ?? 0 }}ms</span>
           </div>
           <div v-if="commandResult.errorMessage" class="tester__result-body tester__result-body--error">
@@ -738,10 +738,10 @@ async function runCommandTest() {
           </div>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
 
     <!-- 禁用级联预览 -->
-    <FaModal v-model="previewOpen" title="禁用级联预览" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+    <YdModal v-model="previewOpen" title="禁用级联预览" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
       <div v-if="previewLoading" class="panel-empty">
         正在计算依赖影响…
       </div>
@@ -751,7 +751,7 @@ async function runCommandTest() {
           <span class="text-xs font-mono">{{ preview.code }}</span>
         </div>
         <div v-if="previewSafe" class="preview-safe">
-          <FaIcon name="morph:circle-check" class="shrink-0 size-4" />
+          <YdIcon name="morph:circle-check" class="shrink-0 size-4" />
           <span>没有其他插件依赖它，可安全禁用或卸载。</span>
         </div>
         <template v-else>
@@ -761,14 +761,14 @@ async function runCommandTest() {
             </div>
             <div class="preview-chain">
               <template v-for="blocker in preview.blockers" :key="blocker">
-                <FaTag variant="destructive" class="text-xs font-mono">
+                <YdTag variant="destructive" class="text-xs font-mono">
                   {{ blocker }}
-                </FaTag>
-                <FaIcon name="morph:arrow-right" class="text-secondary-foreground/60 shrink-0 size-3.5" />
+                </YdTag>
+                <YdIcon name="morph:arrow-right" class="text-secondary-foreground/60 shrink-0 size-3.5" />
               </template>
-              <FaTag variant="outline" class="text-xs font-mono">
+              <YdTag variant="outline" class="text-xs font-mono">
                 {{ preview.code }}
-              </FaTag>
+              </YdTag>
             </div>
             <span class="preview-hint">顺次禁用左侧插件后，目标插件即可禁用。</span>
           </div>
@@ -777,9 +777,9 @@ async function runCommandTest() {
               可选集成将降级 — 以下已启用插件可选依赖它：
             </div>
             <div class="preview-chain">
-              <FaTag v-for="dependent in preview.softDependents" :key="dependent" variant="secondary" class="text-xs font-mono">
+              <YdTag v-for="dependent in preview.softDependents" :key="dependent" variant="secondary" class="text-xs font-mono">
                 {{ dependent }}
-              </FaTag>
+              </YdTag>
             </div>
           </div>
           <div v-if="preview.unloadBlockers.length" class="preview-section">
@@ -787,14 +787,14 @@ async function runCommandTest() {
               卸载/重载将被拒绝 — 以下插件已加载且依赖它（需先禁用并卸载）：
             </div>
             <div class="preview-chain">
-              <FaTag v-for="dependent in preview.unloadBlockers" :key="dependent" variant="outline" class="text-xs font-mono">
+              <YdTag v-for="dependent in preview.unloadBlockers" :key="dependent" variant="outline" class="text-xs font-mono">
                 {{ dependent }}
-              </FaTag>
+              </YdTag>
             </div>
           </div>
         </template>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -820,6 +820,8 @@ async function runCommandTest() {
 
 .plugin-row {
   display: flex;
+  width: 100%;
+  text-align: left;
   gap: 10px;
   align-items: center;
   min-width: 0;

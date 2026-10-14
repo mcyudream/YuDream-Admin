@@ -37,9 +37,9 @@ function goBack() {
           <div class="text-xl text-secondary-foreground/50 mx-0 text-center">
             抱歉，你无权访问该页面
           </div>
-          <FaButton variant="link" class="text-unset" @click="goBack">
+          <YdButton variant="link" class="text-unset" @click="goBack">
             返回主页
-          </FaButton>
+          </YdButton>
         </div>
       </div>
       <div class="w-[5vh] lg:w-[10vh]" />

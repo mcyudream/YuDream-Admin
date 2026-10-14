@@ -12,7 +12,7 @@ import apiAbout from '@/api/modules/system-about'
 
 defineOptions({ name: 'SystemAbout' })
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const overview = ref<AboutOverview | null>(null)
 const overviewLoading = ref(false)
@@ -369,15 +369,15 @@ onMounted(() => {
 
 <template>
   <div>
-    <FaPageHeader title="关于系统" class="mb-0">
+    <YdPageHeader title="关于系统" class="mb-0">
       <template #description>
         框架与契约包的当前/最新版本、插件依赖与装载状态总览。
       </template>
-    </FaPageHeader>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <div v-loading="overviewLoading" class="gap-4 grid grid-cols-1 lg:grid-cols-2">
-        <FaCard title="框架运行时">
+    <YdPageMain>
+      <YdLoadingOverlay :loading="overviewLoading"><div  class="gap-4 grid grid-cols-1 lg:grid-cols-2">
+        <YdCard title="框架运行时">
           <div class="version-grid">
             <span class="version-label">框架版本</span>
             <span class="version-value font-mono">{{ overview?.framework.version || '源码运行（未注入构建版本）' }}</span>
@@ -390,9 +390,9 @@ onMounted(() => {
             <span class="version-label">操作系统</span>
             <span class="version-value">{{ overview?.framework.osName }} {{ overview?.framework.osArch }}</span>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="插件装载">
+        <YdCard title="插件装载">
           <div class="flex gap-6">
             <div class="stat">
               <div class="stat-value">
@@ -422,18 +422,18 @@ onMounted(() => {
           <p class="text-sm text-secondary-foreground mt-4">
             依赖与装载状态见下方依赖图；插件的安装、启用与回滚在「平台 → 插件管理」操作。
           </p>
-        </FaCard>
-      </div>
-    </FaPageMain>
+        </YdCard>
+      </div></YdLoadingOverlay>
+    </YdPageMain>
 
-    <FaPageMain>
-      <FaCard title="契约版本">
+    <YdPageMain>
+      <YdCard title="契约版本">
         <template #header>
           <div class="flex w-full items-center justify-between">
             <span>契约版本</span>
-            <FaButton size="sm" variant="outline" :loading="latestLoading" @click="loadLatest">
+            <YdButton size="sm" variant="outline" :loading="latestLoading" @click="loadLatest">
               重新探测最新版本
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <div class="contract-table">
@@ -445,30 +445,30 @@ onMounted(() => {
           </div>
           <div v-for="row in versionRows" :key="row.key" class="contract-row">
             <span>{{ row.name }}</span>
-            <span><FaTag variant="outline">{{ row.kind }}</FaTag></span>
+            <span><YdTag variant="outline">{{ row.kind }}</YdTag></span>
             <span class="font-mono">{{ row.current || '未知' }}</span>
             <span>
-              <FaTag :variant="versionState(row).variant">{{ versionState(row).text }}</FaTag>
+              <YdTag :variant="versionState(row).variant">{{ versionState(row).text }}</YdTag>
             </span>
           </div>
         </div>
         <p class="text-xs text-secondary-foreground mt-3">
           最新版本由后端只读探测发布仓库（Nexus Maven/npm 公共组）得出并缓存 10 分钟；探测失败不阻塞页面。
         </p>
-      </FaCard>
-    </FaPageMain>
+      </YdCard>
+    </YdPageMain>
 
-    <FaPageMain>
-      <FaCard title="插件依赖图">
+    <YdPageMain>
+      <YdCard title="插件依赖图">
         <template #header>
           <div class="flex w-full items-center justify-between">
             <span>插件依赖与装载状态</span>
-            <FaButton size="sm" variant="outline" :loading="graphLoading" @click="loadGraph">
+            <YdButton size="sm" variant="outline" :loading="graphLoading" @click="loadGraph">
               刷新
-            </FaButton>
+            </YdButton>
           </div>
         </template>
-        <div v-loading="graphLoading" class="graph-wrap">
+        <YdLoadingOverlay :loading="graphLoading"><div  class="graph-wrap">
           <div v-if="!graphLoading && graphNodes.length === 0" class="graph-empty">
             暂无已安装插件
           </div>
@@ -486,7 +486,7 @@ onMounted(() => {
                 <!-- 图例默认收成胶囊，悬停/聚焦展开，避免遮住内圈节点 -->
                 <div class="graph-panel graph-legend-panel">
                   <div class="graph-panel-title">
-                    <FaIcon name="morph:info" />
+                    <YdIcon name="morph:info" />
                     图例
                   </div>
                   <div class="graph-legend-body">
@@ -508,14 +508,14 @@ onMounted(() => {
 
                 <div v-if="selectedNode" class="graph-panel graph-detail-panel">
                   <div class="graph-panel-title">
-                    <FaIcon name="morph:layout-grid" />
+                    <YdIcon name="morph:layout-grid" />
                     {{ selectedNode.name }}
                   </div>
                   <div class="graph-detail">
                     <div>
-                      <FaTag :variant="statusVariant(selectedNode.status)">
+                      <YdTag :variant="statusVariant(selectedNode.status)">
                         {{ STATUS_TEXT[selectedNode.status] ?? selectedNode.status }}
-                      </FaTag>
+                      </YdTag>
                       <span v-if="selectedNode.version" class="text-xs font-mono ml-2">v{{ selectedNode.version }}</span>
                     </div>
                     <div v-if="selectedNode.errorMessage" class="graph-error">
@@ -532,9 +532,9 @@ onMounted(() => {
               </div>
             </template>
           </YdGraphCanvas>
-        </div>
-      </FaCard>
-    </FaPageMain>
+        </div></YdLoadingOverlay>
+      </YdCard>
+    </YdPageMain>
   </div>
 </template>
 

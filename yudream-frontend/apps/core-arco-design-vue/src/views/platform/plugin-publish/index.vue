@@ -12,8 +12,8 @@ interface PluginGroup {
   versions: PluginMarketPublication[]
 }
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const { auth } = useAppAuth()
 
 const loading = ref(false)
@@ -36,7 +36,7 @@ const currentCiTemplate = computed(() => ciTemplateFiles.value.find(file => file
 const uploadVisible = ref(false)
 const uploading = ref(false)
 const uploadFile = ref<File | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
+const fileInput = ref<InstanceType<typeof YdFilePicker> | null>(null)
 const uploadForm = reactive({
   releaseNotes: '',
   category: '',
@@ -136,8 +136,9 @@ function openUpload(group?: PluginGroup) {
   uploadVisible.value = true
 }
 
-function onUploadFileChange(event: Event) {
-  uploadFile.value = (event.target as HTMLInputElement).files?.[0] || null
+function onUploadFileChange(files: File[]) {
+  uploadFile.value = files[0] || null
+  fileInput.value?.reset()
 }
 
 function parseCompatibility(raw: string): Record<string, string> | undefined | false {
@@ -331,16 +332,16 @@ const uploadHint = computed(() => {
 
 <template>
   <div>
-    <FaPageHeader title="插件发布" class="mb-0">
+    <YdPageHeader title="插件发布" class="mb-0">
       <template #description>
         管理你发布到本机市场源的插件：上传新版本、编辑分类标签，或通过 API Key 走流水线发布。
       </template>
-      <FaButton v-auth="'platform:plugin-market-source:upload'" @click="openUpload()">
-        <FaIcon name="morph:upload" />
+      <YdButton v-auth="'platform:plugin-market-source:upload'" @click="openUpload()">
+        <YdIcon name="morph:upload" />
         上传插件
-      </FaButton>
-    </FaPageHeader>
-    <FaPageMain>
+      </YdButton>
+    </YdPageHeader>
+    <YdPageMain>
       <div class="mb-4 grid gap-3 md:grid-cols-2">
         <div class="rounded-lg border p-3 text-sm">
           <div class="font-medium">发布提示</div>
@@ -362,42 +363,42 @@ const uploadHint = computed(() => {
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <code class="min-w-0 break-all text-xs">{{ publicV2Url }}</code>
-            <FaButton variant="link" size="sm" @click="copyPublicUrl">复制 v2 基址</FaButton>
-            <FaButton variant="outline" size="sm" @click="openCiTemplates">
-              <FaIcon name="morph:code" />
+            <YdButton variant="link" size="sm" @click="copyPublicUrl">复制 v2 基址</YdButton>
+            <YdButton variant="outline" size="sm" @click="openCiTemplates">
+              <YdIcon name="morph:code" />
               查看 CI 模板
-            </FaButton>
+            </YdButton>
           </div>
         </div>
       </div>
 
       <div class="mb-3 flex flex-wrap items-center gap-2">
-        <FaSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
+        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
       </div>
 
-      <a-spin :loading="loading" class="block w-full">
+      <YdLoadingOverlay :loading="loading"><div  class="block w-full">
         <div v-if="!groups.length && !loading" class="rounded-lg border p-10 text-center text-sm text-secondary-foreground/60">
           还没有你的发布物。点击右上角上传插件 JAR。
         </div>
         <div v-else class="grid gap-3">
-          <FaCard v-for="group in groups" :key="group.code" class="w-full">
+          <YdCard v-for="group in groups" :key="group.code" class="w-full">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="text-base font-semibold">{{ group.displayName }}</span>
-                  <FaTag variant="secondary">{{ group.code }}</FaTag>
-                  <FaTag v-if="group.latest.category" variant="secondary">{{ group.latest.category }}</FaTag>
+                  <YdTag variant="secondary">{{ group.code }}</YdTag>
+                  <YdTag v-if="group.latest.category" variant="secondary">{{ group.latest.category }}</YdTag>
                 </div>
                 <div class="mt-1 text-sm text-secondary-foreground/60">
                   最新 {{ group.latest.pluginVersion }} · {{ publicationStatusText(group.latest.status) }} · {{ formatTime(group.latest.createTime) }}
                 </div>
                 <div v-if="group.latest.tags?.length" class="mt-2 flex flex-wrap gap-1">
-                  <FaTag v-for="tag in group.latest.tags" :key="tag" variant="secondary">{{ tag }}</FaTag>
+                  <YdTag v-for="tag in group.latest.tags" :key="tag" variant="secondary">{{ tag }}</YdTag>
                 </div>
               </div>
-              <FaButton v-auth="'platform:plugin-market-source:upload'" variant="outline" size="sm" @click="openUpload(group)">
+              <YdButton v-auth="'platform:plugin-market-source:upload'" variant="outline" size="sm" @click="openUpload(group)">
                 升版上传
-              </FaButton>
+              </YdButton>
             </div>
             <div class="mt-3 overflow-x-auto">
               <table class="w-full min-w-[720px] text-left text-sm">
@@ -414,7 +415,7 @@ const uploadHint = computed(() => {
                   <tr v-for="row in group.versions" :key="row.id" class="border-t">
                     <td class="py-2">{{ row.pluginVersion }}</td>
                     <td class="py-2">
-                      <FaTag :variant="publicationStatusVariant(row.status)">{{ publicationStatusText(row.status) }}</FaTag>
+                      <YdTag :variant="publicationStatusVariant(row.status)">{{ publicationStatusText(row.status) }}</YdTag>
                       <div v-if="row.reviewNote" class="mt-1 max-w-[240px] truncate text-xs text-secondary-foreground/60" :title="row.reviewNote">
                         {{ row.reviewNote }}
                       </div>
@@ -423,10 +424,10 @@ const uploadHint = computed(() => {
                     <td class="py-2">{{ formatTime(row.createTime) }}</td>
                     <td class="py-2">
                       <div class="flex flex-wrap gap-2">
-                        <FaButton variant="link" size="sm" :disabled="actingPublicationId === row.id" @click="openEdit(row)">
+                        <YdButton variant="link" size="sm" :disabled="actingPublicationId === row.id" @click="openEdit(row)">
                           编辑
-                        </FaButton>
-                        <FaButton
+                        </YdButton>
+                        <YdButton
                           v-if="row.status === 'PUBLISHED'"
                           variant="destructive"
                           size="sm"
@@ -434,21 +435,21 @@ const uploadHint = computed(() => {
                           @click="confirmUnpublish(row)"
                         >
                           下架
-                        </FaButton>
-                        <FaButton variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
+                        </YdButton>
+                        <YdButton variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
                           删除
-                        </FaButton>
+                        </YdButton>
                       </div>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </FaCard>
+          </YdCard>
         </div>
-      </a-spin>
+      </div></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -458,69 +459,69 @@ const uploadHint = computed(() => {
         @size-change="onSizeChange"
       />
 
-      <FaModal v-model="uploadVisible" title="上传插件" show-cancel-button class="sm:max-w-xl" :confirm-loading="uploading" @confirm="submitUpload">
-        <a-form :model="uploadForm" layout="vertical">
-          <a-form-item label="插件 JAR">
-            <input ref="fileInput" type="file" accept=".jar" class="hidden" @change="onUploadFileChange">
+      <YdModal v-model="uploadVisible" title="上传插件" show-cancel-button class="sm:max-w-xl" :confirm-loading="uploading" @confirm="submitUpload">
+        <YdForm :model="uploadForm" layout="vertical">
+          <YdFormItem label="插件 JAR">
+            <YdFilePicker ref="fileInput" accept=".jar" label="选择插件 JAR" class="hidden" @select="onUploadFileChange"><template #default /></YdFilePicker>
             <div class="flex items-center gap-2">
-              <FaButton variant="outline" @click="fileInput?.click()">
-                <FaIcon name="morph:file-plus" />
+              <YdButton variant="outline" @click="fileInput?.open()">
+                <YdIcon name="morph:file-plus" />
                 选择文件
-              </FaButton>
+              </YdButton>
               <span class="min-w-0 break-all text-sm text-secondary-foreground/60">{{ uploadFile?.name || '未选择' }}</span>
             </div>
             <div class="mt-1 text-xs text-secondary-foreground/60">
               元数据从 JAR 内 plugin.yml 自动解析。{{ uploadHint }}
             </div>
-          </a-form-item>
-          <a-form-item label="分类（可选）">
-            <FaSelect v-model="uploadForm.category" allow-clear :options="categoryOptions" placeholder="未分类" />
-          </a-form-item>
-          <a-form-item label="标签（可选，逗号分隔）">
-            <FaInput v-model="uploadForm.tags" placeholder="如 chat, wiki" />
-          </a-form-item>
-          <a-form-item label="许可证（可选）">
-            <FaInput v-model="uploadForm.license" placeholder="如 MIT、Apache-2.0" />
-          </a-form-item>
-          <a-form-item label="兼容性 JSON（可选）">
-            <FaTextarea v-model="uploadForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
-          </a-form-item>
-          <a-form-item label="发布说明（可选）">
-            <FaTextarea v-model="uploadForm.releaseNotes" :rows="4" placeholder="本版本更新内容；换行会合并为空格" />
-          </a-form-item>
-        </a-form>
-      </FaModal>
+          </YdFormItem>
+          <YdFormItem label="分类（可选）">
+            <YdSelect v-model="uploadForm.category" allow-clear :options="categoryOptions" placeholder="未分类" />
+          </YdFormItem>
+          <YdFormItem label="标签（可选，逗号分隔）">
+            <YdInput v-model="uploadForm.tags" placeholder="如 chat, wiki" />
+          </YdFormItem>
+          <YdFormItem label="许可证（可选）">
+            <YdInput v-model="uploadForm.license" placeholder="如 MIT、Apache-2.0" />
+          </YdFormItem>
+          <YdFormItem label="兼容性 JSON（可选）">
+            <YdTextarea v-model="uploadForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
+          </YdFormItem>
+          <YdFormItem label="发布说明（可选）">
+            <YdTextarea v-model="uploadForm.releaseNotes" :rows="4" placeholder="本版本更新内容；换行会合并为空格" />
+          </YdFormItem>
+        </YdForm>
+      </YdModal>
 
-      <FaModal v-model="editVisible" title="编辑发布物" show-cancel-button class="sm:max-w-xl" :confirm-loading="editSaving" @confirm="submitEdit">
-        <a-form :model="editForm" layout="vertical">
+      <YdModal v-model="editVisible" title="编辑发布物" show-cancel-button class="sm:max-w-xl" :confirm-loading="editSaving" @confirm="submitEdit">
+        <YdForm :model="editForm" layout="vertical">
           <div class="mb-2 text-xs text-secondary-foreground/60">
             {{ editingPublication?.code }}@{{ editingPublication?.pluginVersion }} · 编辑展示信息与分类标签，不重置审核状态。
           </div>
-          <a-form-item label="显示名称">
-            <FaInput v-model="editForm.displayName" placeholder="显示名称" />
-          </a-form-item>
-          <a-form-item label="描述">
-            <FaTextarea v-model="editForm.description" :rows="3" placeholder="插件简介" />
-          </a-form-item>
-          <a-form-item label="分类">
-            <FaSelect v-model="editForm.category" allow-clear :options="categoryOptions" placeholder="未分类" />
-          </a-form-item>
-          <a-form-item label="标签（逗号分隔）">
-            <FaInput v-model="editForm.tags" placeholder="如 chat, wiki" />
-          </a-form-item>
-          <a-form-item label="许可证">
-            <FaInput v-model="editForm.license" placeholder="如 MIT" />
-          </a-form-item>
-          <a-form-item label="发布说明">
-            <FaTextarea v-model="editForm.releaseNotes" :rows="4" placeholder="本版本更新内容" />
-          </a-form-item>
-          <a-form-item label="兼容性 JSON（可选）">
-            <FaTextarea v-model="editForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
-          </a-form-item>
-        </a-form>
-      </FaModal>
+          <YdFormItem label="显示名称">
+            <YdInput v-model="editForm.displayName" placeholder="显示名称" />
+          </YdFormItem>
+          <YdFormItem label="描述">
+            <YdTextarea v-model="editForm.description" :rows="3" placeholder="插件简介" />
+          </YdFormItem>
+          <YdFormItem label="分类">
+            <YdSelect v-model="editForm.category" allow-clear :options="categoryOptions" placeholder="未分类" />
+          </YdFormItem>
+          <YdFormItem label="标签（逗号分隔）">
+            <YdInput v-model="editForm.tags" placeholder="如 chat, wiki" />
+          </YdFormItem>
+          <YdFormItem label="许可证">
+            <YdInput v-model="editForm.license" placeholder="如 MIT" />
+          </YdFormItem>
+          <YdFormItem label="发布说明">
+            <YdTextarea v-model="editForm.releaseNotes" :rows="4" placeholder="本版本更新内容" />
+          </YdFormItem>
+          <YdFormItem label="兼容性 JSON（可选）">
+            <YdTextarea v-model="editForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
+          </YdFormItem>
+        </YdForm>
+      </YdModal>
 
-      <FaModal
+      <YdModal
         v-model="ciTemplateVisible"
         title="流水线 CI 模板"
         class="sm:max-w-5xl"
@@ -545,14 +546,14 @@ const uploadHint = computed(() => {
           </p>
           <div class="flex flex-wrap items-center gap-2">
             <code class="min-w-0 break-all text-xs">YUDREAM_MARKET_URL={{ marketOrigin }}</code>
-            <FaButton variant="link" size="sm" @click="copyMarketOrigin">复制变量值</FaButton>
-            <FaButton variant="outline" size="sm" @click="copyCurrentCiTemplate">
-              <FaIcon name="morph:copy" />
+            <YdButton variant="link" size="sm" @click="copyMarketOrigin">复制变量值</YdButton>
+            <YdButton variant="outline" size="sm" @click="copyCurrentCiTemplate">
+              <YdIcon name="morph:copy" />
               复制当前文件
-            </FaButton>
-            <FaButton variant="outline" size="sm" @click="copyAllCiTemplates">复制全部文件</FaButton>
+            </YdButton>
+            <YdButton variant="outline" size="sm" @click="copyAllCiTemplates">复制全部文件</YdButton>
           </div>
-          <FaTabs v-model="ciTemplateTab" :list="ciTemplateTabList" class="w-full" list-class="flex-wrap justify-start" content-class="mt-3">
+          <YdTabs v-model="ciTemplateTab" :list="ciTemplateTabList" class="w-full" list-class="flex-wrap justify-start" content-class="mt-3">
             <template v-for="file in ciTemplateFiles" :key="file.id" #[file.id]>
               <div class="space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
@@ -562,9 +563,9 @@ const uploadHint = computed(() => {
                 <pre class="max-h-[60vh] overflow-auto rounded-lg border bg-[var(--color-fill-1)] p-3 text-xs leading-5 text-[var(--color-text-1)] whitespace-pre">{{ file.content }}</pre>
               </div>
             </template>
-          </FaTabs>
+          </YdTabs>
         </div>
-      </FaModal>
-    </FaPageMain>
+      </YdModal>
+    </YdPageMain>
   </div>
 </template>

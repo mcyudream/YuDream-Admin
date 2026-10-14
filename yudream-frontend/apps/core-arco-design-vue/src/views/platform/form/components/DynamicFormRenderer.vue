@@ -216,7 +216,7 @@ function uploadPublicFile(option: UploadRequestOption) {
     const maxSizeMb = Number(props.form.maxUploadSizeMb || 0)
     if (maxSizeMb > 0 && file.size > maxSizeMb * 1024 * 1024) {
       const message = `文件「${file.name}」超过大小限制，最大允许 ${maxSizeMb}MB`
-      useFaToast().error('上传失败', { description: message })
+      useYdToast().error('上传失败', { description: message })
       option.onError?.(new Error(message))
       return
     }
@@ -311,9 +311,9 @@ function isRecord(value: unknown): value is Record<string, any> {
     <form-create v-model="formModel" v-model:api="formApi" :rule="rules" :option="options" />
 
     <div v-if="!readonly" class="submit-row">
-      <FaButton size="lg" :loading="submitting" @click="submit">
+      <YdButton size="lg" :loading="submitting" @click="submit">
         {{ submitText }}
-      </FaButton>
+      </YdButton>
     </div>
   </section>
 </template>

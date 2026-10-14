@@ -22,9 +22,9 @@ const emit = defineEmits<{
         <span>连线设置</span>
         <strong>{{ sourceName }} → {{ targetName }}</strong>
       </div>
-      <button type="button" title="关闭连线设置" aria-label="关闭连线设置" @click="emit('close')">
-        <FaIcon name="morph:x" />
-      </button>
+      <YdButton type="button" variant="ghost" size="icon-sm" title="关闭连线设置" aria-label="关闭连线设置" @click="emit('close')">
+        <YdIcon name="morph:x" />
+      </YdButton>
     </header>
 
     <div class="inspector-body">
@@ -34,14 +34,14 @@ const emit = defineEmits<{
           用于表达节点间的数据流向，新建连线会沿用画布顶部的默认样式。
         </p>
         <div class="style-options">
-          <button type="button" :class="{ active: (edge.data?.connectionStyle || 'arrow') === 'arrow' }" @click="emit('changeStyle', 'arrow')">
+          <YdButton type="button" variant="ghost" :aria-pressed="(edge.data?.connectionStyle || 'arrow') === 'arrow'" :class="{ active: (edge.data?.connectionStyle || 'arrow') === 'arrow' }" @click="emit('changeStyle', 'arrow')">
             <span class="line-preview arrow" />
             <span><strong>箭头</strong><small>有明确方向的数据流</small></span>
-          </button>
-          <button type="button" :class="{ active: edge.data?.connectionStyle === 'line' }" @click="emit('changeStyle', 'line')">
+          </YdButton>
+          <YdButton type="button" variant="ghost" :aria-pressed="edge.data?.connectionStyle === 'line'" :class="{ active: edge.data?.connectionStyle === 'line' }" @click="emit('changeStyle', 'line')">
             <span class="line-preview" />
             <span><strong>线段</strong><small>不显示终点箭头</small></span>
-          </button>
+          </YdButton>
         </div>
       </section>
 
@@ -49,7 +49,7 @@ const emit = defineEmits<{
         <h3>连线信息</h3>
         <label class="form-field">
           <span>连线标签</span>
-          <FaInput :model-value="String(edge.label || '')" class="w-full" maxlength="40" placeholder="例如：条件成立" @update:model-value="emit('changeLabel', String($event || ''))" />
+          <YdInput :model-value="String(edge.label || '')" class="w-full" maxlength="40" placeholder="例如：条件成立" @update:model-value="emit('changeLabel', String($event || ''))" />
         </label>
         <div class="meta-row">
           <span>起点</span><b>{{ sourceName }}</b>
@@ -61,9 +61,9 @@ const emit = defineEmits<{
     </div>
 
     <footer class="inspector-footer">
-      <FaButton class="w-full" variant="destructive" @click="emit('delete')">
-        <FaIcon name="morph:trash-2" /> 删除连线
-      </FaButton>
+      <YdButton class="w-full" variant="destructive" @click="emit('delete')">
+        <YdIcon name="morph:trash-2" /> 删除连线
+      </YdButton>
     </footer>
   </aside>
 </template>
@@ -81,8 +81,8 @@ const emit = defineEmits<{
 .section-help { margin: 0 0 13px; color: var(--color-text-3); font-size: 9px; line-height: 1.6; }
 .style-options { display: grid; gap: 9px; }
 .style-options button { display: grid; min-height: 60px; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--color-border-2); border-radius: 6px; color: var(--color-text-2); background: var(--color-bg-1); text-align: left; cursor: pointer; }
-.style-options button:hover { border-color: rgb(var(--primary-3)); }
-.style-options button.active { border-color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); box-shadow: 0 0 0 2px rgb(var(--primary-2)); }
+.style-options button:hover { border-color: var(--color-border-3); }
+.style-options button.active { border-color: var(--color-text-1); background: var(--color-fill-2); box-shadow: 0 0 0 2px var(--color-border-2); }
 .style-options button > span:last-child { display: grid; gap: 3px; }
 .style-options strong { color: var(--color-text-1); font-size: 11px; }
 .style-options small { color: var(--color-text-3); font-size: 9px; }

@@ -49,7 +49,7 @@ setupApi.interceptors.response.use(
       } as any)
     }
     const message = result?.message || '请求失败'
-    useFaToast().error('错误', { description: hintForMessage(message) })
+    useYdToast().error('错误', { description: hintForMessage(message) })
     return Promise.reject(new Error(message))
   },
   async (error) => {

@@ -21,27 +21,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <FaDrawer v-model="isShow" title="系统信息" :footer="false">
+  <YdDrawer v-model="isShow" title="系统信息" :footer="false">
     <div v-if="pkg.version">
-      <FaDivider>
+      <YdDivider>
         版本号
-      </FaDivider>
+      </YdDivider>
       <div class="text-lg font-bold font-sans text-center">
         {{ pkg.version }}
       </div>
     </div>
     <div>
-      <FaDivider>
+      <YdDivider>
         最后编译时间
-      </FaDivider>
+      </YdDivider>
       <div class="text-lg font-bold font-sans text-center">
         {{ lastBuildTime }}
       </div>
     </div>
     <div>
-      <FaDivider>
+      <YdDivider>
         生产环境依赖
-      </FaDivider>
+      </YdDivider>
       <ul class="text-sm list-none">
         <li v-for="(val, key) in (pkg.dependencies as object)" :key="key" class="px-2 py-1.5 rounded-lg flex items-center justify-between hover-bg-secondary">
           <div class="font-bold">
@@ -54,9 +54,9 @@ onUnmounted(() => {
       </ul>
     </div>
     <div>
-      <FaDivider>
+      <YdDivider>
         开发环境依赖
-      </FaDivider>
+      </YdDivider>
       <ul class="text-sm list-none">
         <li v-for="(val, key) in (pkg.devDependencies as object)" :key="key" class="px-2 py-1.5 rounded-lg flex items-center justify-between hover-bg-secondary">
           <div class="font-bold">
@@ -68,5 +68,5 @@ onUnmounted(() => {
         </li>
       </ul>
     </div>
-  </FaDrawer>
+  </YdDrawer>
 </template>

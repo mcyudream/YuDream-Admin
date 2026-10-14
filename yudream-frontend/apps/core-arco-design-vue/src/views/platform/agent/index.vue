@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentApplication, AgentApplicationStatus, AgentRunAttachment, AgentRunResult } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
+import { useYdFilePicker } from '@yudream/components'
 import { agentRunCapabilities, buildAgentRunInput } from './config/agent-run-input'
 
 interface RunnerAttachment extends AgentRunAttachment {
@@ -10,8 +11,8 @@ interface RunnerAttachment extends AgentRunAttachment {
 }
 
 const router = useRouter()
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const loading = ref(false)
 const actionLoading = ref('')
 const rows = ref<AgentApplication[]>([])
@@ -21,7 +22,7 @@ const runInput = ref('')
 const runResult = ref<AgentRunResult | null>(null)
 const runAttachments = ref<RunnerAttachment[]>([])
 const runnerError = ref('')
-const runnerFileInput = useTemplateRef<HTMLInputElement>('runnerFileInput')
+const runnerFilePicker = useYdFilePicker({ multiple: true })
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const search = reactive<{ keyword: string, status: AgentApplicationStatus | '' }>({ keyword: '', status: '' })
 const runnerCapabilities = computed(() => agentRunCapabilities(runner.value?.workflowJson || ''))
@@ -133,13 +134,12 @@ async function run() {
   }
 }
 function pickRunnerFiles() {
-  runnerFileInput.value?.click()
+  void runnerFilePicker.open({ accept: runnerAccept.value }).then(onRunnerFiles)
 }
-async function onRunnerFiles(event: Event) {
-  const target = event.target as HTMLInputElement
+async function onRunnerFiles(files: File[]) {
   runnerError.value = ''
   try {
-    for (const file of Array.from(target.files || [])) {
+    for (const file of files) {
       const image = file.type.startsWith('image/')
       if (image && !runnerCapabilities.value.allowImage) {
         throw new Error('当前工作流不支持图片输入')
@@ -171,7 +171,6 @@ async function onRunnerFiles(event: Event) {
     runnerError.value = error instanceof Error ? error.message : '附件读取失败'
   }
   finally {
-    target.value = ''
   }
 }
 function readDataUrl(file: File) {
@@ -195,74 +194,76 @@ function statusVariant(status: AgentApplicationStatus) {
 
 <template>
   <div>
-    <FaPageHeader title="Agent 应用" class="mb-0">
+    <YdPageHeader title="Agent 应用" class="mb-0">
       <div class="flex gap-2">
-        <FaButton variant="outline" @click="router.push('/platform/agent/tools')">
-          <FaIcon name="morph:wrench" /> 工具
-        </FaButton>
-        <FaButton v-auth="'platform:agent:edit'" @click="create">
-          <FaIcon name="morph:plus" /> 新建应用
-        </FaButton>
+        <YdButton variant="outline" @click="router.push('/platform/agent/tools')">
+          <YdIcon name="morph:wrench" /> 工具
+        </YdButton>
+        <YdButton v-auth="'platform:agent:edit'" @click="create">
+          <YdIcon name="morph:plus" /> 新建应用
+        </YdButton>
       </div>
-    </FaPageHeader>
-    <FaPageMain>
-      <FaSearchBar class="mb-4">
+    </YdPageHeader>
+    <YdPageMain>
+      <YdSearchBar class="mb-4">
         <div class="gap-3 grid md:grid-cols-[minmax(260px,1fr)_180px_auto]">
-          <FaInput v-model="search.keyword" clearable placeholder="应用名称 / 编码 / 描述" @keydown.enter="load" />
-          <FaSelect v-model="search.status" :options="statuses" placeholder="状态" />
+          <YdInput v-model="search.keyword" clearable placeholder="应用名称 / 编码 / 描述" @keydown.enter="load" />
+          <YdSelect v-model="search.status" :options="statuses" placeholder="状态" />
           <div class="flex gap-2">
-            <FaButton variant="outline" @click="Object.assign(search, { keyword: '', status: '' }); load()">
+            <YdButton variant="outline" @click="Object.assign(search, { keyword: '', status: '' }); load()">
               重置
-            </FaButton><FaButton :loading="loading" @click="load">
+            </YdButton><YdButton :loading="loading" @click="load">
               筛选
-            </FaButton>
+            </YdButton>
           </div>
         </div>
-      </FaSearchBar>
-      <div v-loading="loading" class="agent-grid">
+      </YdSearchBar>
+      <YdLoadingOverlay :loading="loading">
+        <div class="agent-grid">
         <article v-for="row in rows" :key="row.id" class="agent-card">
           <div class="agent-card__head">
-            <span class="agent-icon"><FaIcon :name="row.icon || 'morph:bot'" /></span><FaTag :variant="statusVariant(row.status)">
+            <span class="agent-icon"><YdIcon :name="row.icon || 'morph:bot'" /></span><YdTag :variant="statusVariant(row.status)">
               {{ statusText(row.status) }}
-            </FaTag>
+            </YdTag>
           </div>
           <h3>{{ row.name }}</h3><p>{{ row.description || '尚未填写应用描述' }}</p>
           <div class="agent-meta">
             <code>{{ row.code }}</code><span>{{ row.toolCodes?.length || 0 }} 个工具</span>
           </div>
           <div class="agent-actions">
-            <FaButton v-if="!row.id.startsWith('-')" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
+            <YdButton v-if="!row.id.startsWith('-')" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
               运行
-            </FaButton><FaButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" title="导入并编辑" :loading="actionLoading === `import-${row.id}`" @click="edit(row)">
+            </YdButton><YdButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" title="导入并编辑" :loading="actionLoading === `import-${row.id}`" @click="edit(row)">
               {{ row.id.startsWith('-') ? '导入并编辑' : '编排' }}
-            </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
+            </YdButton><YdButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
               发布
-            </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
+            </YdButton><YdButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
               删除
-            </FaButton>
+            </YdButton>
           </div>
         </article>
-        <FaEmpty v-if="!loading && !rows.length" class="col-span-full" description="暂无 Agent 应用" />
-      </div>
-      <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-4" @page-change="load" @size-change="load" />
-    </FaPageMain>
-    <FaModal v-model="runnerVisible" :title="runner ? `运行 ${runner.name}` : '运行 Agent'" class="sm:max-w-3xl">
+        <YdEmpty v-if="!loading && !rows.length" class="col-span-full" description="暂无 Agent 应用" />
+        </div>
+      </YdLoadingOverlay>
+      <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-4" @page-change="load" @size-change="load" />
+    </YdPageMain>
+    <YdModal v-model="runnerVisible" :title="runner ? `运行 ${runner.name}` : '运行 Agent'" class="sm:max-w-3xl">
       <div class="gap-4 grid">
-        <FaTextarea v-model="runInput" :autosize="{ minRows: 4, maxRows: 8 }" placeholder="输入任务或问题" />
+        <YdTextarea v-model="runInput" :autosize="{ minRows: 4, maxRows: 8 }" placeholder="输入任务或问题" />
         <div v-if="runAttachments.length" class="runner-attachments">
-          <span v-for="item in runAttachments" :key="item.id"><img v-if="item.type.startsWith('image/')" :src="item.dataUrl" :alt="item.name"><FaIcon v-else name="morph:file-text" /><b>{{ item.name }}</b><button type="button" title="移除附件" @click="runAttachments = runAttachments.filter(current => current.id !== item.id)"><FaIcon name="morph:x" /></button></span>
+          <span v-for="item in runAttachments" :key="item.id"><img v-if="item.type.startsWith('image/')" :src="item.dataUrl" :alt="item.name"><YdIcon v-else name="morph:file-text" /><b>{{ item.name }}</b><YdAction type="button" title="移除附件" @click="runAttachments = runAttachments.filter(current => current.id !== item.id)"><YdIcon name="morph:x" /></YdAction></span>
         </div>
         <p v-if="runnerError" class="runner-error">
           {{ runnerError }}
         </p>
         <div class="runner-actions">
-          <FaButton v-if="runnerAccept" variant="outline" @click="pickRunnerFiles">
-            <FaIcon name="morph:paperclip" /> 添加附件
-          </FaButton>
-          <input ref="runnerFileInput" class="hidden" type="file" multiple :accept="runnerAccept" @change="onRunnerFiles">
-          <FaButton :loading="actionLoading === 'run'" :disabled="!runInput.trim() && !runAttachments.length" @click="run">
-            <FaIcon name="morph:play" /> 运行应用
-          </FaButton>
+          <YdButton v-if="runnerAccept" variant="outline" @click="pickRunnerFiles">
+            <YdIcon name="morph:paperclip" /> 添加附件
+          </YdButton>
+
+          <YdButton :loading="actionLoading === 'run'" :disabled="!runInput.trim() && !runAttachments.length" @click="run">
+            <YdIcon name="morph:play" /> 运行应用
+          </YdButton>
         </div>
         <section v-if="runResult" class="run-result">
           <strong>输出</strong><p>{{ runResult.content }}</p><div v-for="tool in runResult.toolResults" :key="`${tool.toolName}-${tool.action}`" class="tool-result">
@@ -270,13 +271,13 @@ function statusVariant(status: AgentApplicationStatus) {
           </div>
         </section>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
 <style scoped>
 .agent-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .agent-card { display: grid; gap: 12px; min-height: 210px; padding: 18px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }
-.agent-card__head, .agent-actions, .agent-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.agent-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 6px; background: var(--color-fill-2); color: rgb(var(--primary-6)); }.agent-card h3 { margin: 0; font-size: 17px; }.agent-card p { min-height: 42px; margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }.agent-meta { color: var(--color-text-3); font-size: 12px; }.agent-actions { justify-content: flex-start; flex-wrap: wrap; }.run-result { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; white-space: pre-wrap; }.run-result p { margin: 0; line-height: 1.7; }.tool-result { padding: 8px; background: var(--color-fill-1); font-size: 12px; }
+.agent-card__head, .agent-actions, .agent-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.agent-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 6px; background: var(--color-fill-2); color: rgb(var(--color-text-2)); }.agent-card h3 { margin: 0; font-size: 17px; }.agent-card p { min-height: 42px; margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }.agent-meta { color: var(--color-text-3); font-size: 12px; }.agent-actions { justify-content: flex-start; flex-wrap: wrap; }.run-result { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; white-space: pre-wrap; }.run-result p { margin: 0; line-height: 1.7; }.tool-result { padding: 8px; background: var(--color-fill-1); font-size: 12px; }
 .runner-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.runner-attachments { display: flex; gap: 8px; overflow-x: auto; }.runner-attachments span { display: flex; max-width: 220px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--color-border-2); border-radius: 5px; }.runner-attachments img { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; }.runner-attachments b { overflow: hidden; font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }.runner-attachments button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; color: var(--color-text-3); background: transparent; cursor: pointer; }.runner-error { margin: 0; color: rgb(var(--danger-6)); font-size: 12px; }
 </style>

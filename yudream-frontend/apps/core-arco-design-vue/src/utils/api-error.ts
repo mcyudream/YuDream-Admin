@@ -73,5 +73,5 @@ export async function resolveApiErrorMessage(error: AxiosError) {
 /** 统一的接口错误 toast：提取后端 message 并附带修复指引。 */
 export async function toastApiError(error: AxiosError) {
   const message = await resolveApiErrorMessage(error)
-  useFaToast().error('错误', { description: hintForMessage(message) })
+  useYdToast().error('错误', { description: hintForMessage(message) })
 }

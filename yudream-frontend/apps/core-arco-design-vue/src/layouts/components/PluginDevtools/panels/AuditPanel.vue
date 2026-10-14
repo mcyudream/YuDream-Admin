@@ -58,14 +58,14 @@ const ruleGroups = computed(() => {
         报告生成于 {{ new Date(report.generatedAt).toLocaleString() }}
       </span>
       <div class="flex-1" />
-      <FaButton variant="outline" size="sm" :loading="loading" @click="loadReport">
-        <FaIcon name="morph:refresh-cw" />
+      <YdButton variant="outline" size="sm" :loading="loading" @click="loadReport">
+        <YdIcon name="morph:refresh-cw" />
         刷新
-      </FaButton>
+      </YdButton>
     </div>
 
     <div v-if="unavailable" class="audit-unavailable">
-      <FaIcon name="morph:zoom-in" class="size-8" />
+      <YdIcon name="morph:zoom-in" class="size-8" />
       <p>审查服务未就绪（{{ unavailable }}）</p>
       <p class="text-xs">
         该报告由 vite dev 中间件 /__yudream-devtools/audit.json 提供（pnpm audit:ui 生成），
@@ -95,12 +95,12 @@ const ruleGroups = computed(() => {
 
       <div v-for="group in ruleGroups" :key="group.rule" class="audit-group">
         <div class="audit-group__header">
-          <FaTag variant="outline" class="text-xs font-mono">
+          <YdTag variant="outline" class="text-xs font-mono">
             {{ group.rule }}
-          </FaTag>
-          <FaTag variant="secondary" class="text-xs">
+          </YdTag>
+          <YdTag variant="secondary" class="text-xs">
             {{ group.violations.length }}
-          </FaTag>
+          </YdTag>
         </div>
         <div v-for="(violation, index) in group.violations" :key="index" class="audit-violation">
           <div class="audit-violation__file">
@@ -113,7 +113,7 @@ const ruleGroups = computed(() => {
       </div>
 
       <div v-if="!ruleGroups.length" class="audit-clean">
-        <FaIcon name="morph:circle-check" class="size-6" />
+        <YdIcon name="morph:circle-check" class="size-6" />
         未发现违规项
       </div>
     </template>

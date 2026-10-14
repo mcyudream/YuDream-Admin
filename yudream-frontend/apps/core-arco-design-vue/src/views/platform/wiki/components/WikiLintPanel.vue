@@ -5,14 +5,14 @@ import { lintWiki } from '@/api/modules/platform-wiki'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
+const toast = useYdToast()
 
 const report = ref<WikiLintReport | null>(null)
 const running = ref(false)
 
 const severityMeta: Record<string, { label: string, color: string, icon: string }> = {
-  error: { label: '错误', color: '#ef4444', icon: 'morph:circle-x' },
-  warn: { label: '警告', color: '#f59e0b', icon: 'morph:triangle-alert' },
+  error: { label: '错误', color: 'var(--color-text-2)', icon: 'morph:circle-x' },
+  warn: { label: '警告', color: 'var(--color-text-2)', icon: 'morph:triangle-alert' },
   info: { label: '提示', color: '#0ea5e9', icon: 'morph:info' },
 }
 
@@ -43,63 +43,63 @@ function meta(severity: string) {
 
 <template>
   <div class="lint-panel">
-    <FaScrollArea class="lint-scroll">
+    <YdScrollArea class="lint-scroll">
       <div class="lint-inner">
-        <FaCard class="lint-head-card">
+        <YdCard class="lint-head-card">
           <div class="lint-head">
             <div>
               <strong>知识库 Lint</strong>
               <p>检查孤立页面、断链、覆盖缺口与结构问题</p>
             </div>
-            <FaButton :loading="running" @click="run">
-              <FaIcon name="morph:shield-check" /> 运行 Lint
-            </FaButton>
+            <YdButton :loading="running" @click="run">
+              <YdIcon name="morph:shield-check" /> 运行 Lint
+            </YdButton>
           </div>
           <p v-if="report" class="lint-summary">
-            <FaIcon name="morph:file-text" /> {{ report.summary }}
+            <YdIcon name="morph:file-text" /> {{ report.summary }}
             <span class="lint-summary__time">{{ new Date(report.generatedAt).toLocaleString('zh-CN') }}</span>
           </p>
-        </FaCard>
+        </YdCard>
 
         <div v-if="!report && !running" class="lint-empty">
-          <FaIcon name="morph:shield-check" />
+          <YdIcon name="morph:shield-check" />
           <strong>还没有 Lint 报告</strong>
           <p>点击「运行 Lint」对当前知识库做一次全面体检</p>
         </div>
 
         <template v-else-if="report">
           <div v-if="!report.issues.length" class="lint-empty">
-            <FaIcon name="morph:circle-check" />
+            <YdIcon name="morph:circle-check" />
             <strong>未发现问题</strong>
             <p>知识库结构健康</p>
           </div>
-          <FaCard v-for="(issue, index) in report.issues" :key="`${issue.category}-${index}`" class="lint-issue">
+          <YdCard v-for="(issue, index) in report.issues" :key="`${issue.category}-${index}`" class="lint-issue">
             <div class="lint-issue__head">
               <span class="lint-issue__severity" :style="{ color: meta(issue.severity).color, background: `${meta(issue.severity).color}1a` }">
-                <FaIcon :name="meta(issue.severity).icon" /> {{ meta(issue.severity).label }}
+                <YdIcon :name="meta(issue.severity).icon" /> {{ meta(issue.severity).label }}
               </span>
-              <FaTag variant="secondary">{{ issue.category }}</FaTag>
+              <YdTag variant="secondary">{{ issue.category }}</YdTag>
               <strong>{{ issue.title }}</strong>
             </div>
             <p class="lint-issue__desc">{{ issue.description }}</p>
             <div v-if="issue.pageTitles?.length" class="lint-issue__pages">
-              <button
+              <YdAction
                 v-for="title in issue.pageTitles"
                 :key="title"
                 type="button"
                 class="lint-issue__page"
                 @click="store.openPage({ title })"
               >
-                <FaIcon name="morph:file-text" /> {{ title }}
-              </button>
+                <YdIcon name="morph:file-text" /> {{ title }}
+              </YdAction>
             </div>
             <p v-if="issue.suggestedAction" class="lint-issue__action">
-              <FaIcon name="morph:lightbulb" /> 建议：{{ issue.suggestedAction }}
+              <YdIcon name="morph:lightbulb" /> 建议：{{ issue.suggestedAction }}
             </p>
-          </FaCard>
+          </YdCard>
         </template>
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </div>
 </template>
 
@@ -166,7 +166,7 @@ function meta(severity: string) {
 }
 
 .lint-empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 36px;
 }
 
@@ -217,15 +217,15 @@ function meta(severity: string) {
   border: 1px solid var(--color-border-2);
   border-radius: 999px;
   background: transparent;
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   cursor: pointer;
   font: inherit;
   font-size: 12px;
 }
 
 .lint-issue__page:hover {
-  border-color: rgba(var(--primary-6), 0.4);
-  background: rgba(var(--primary-6), 0.06);
+  border-color: rgba(var(--color-text-2), 0.4);
+  background: rgba(var(--color-text-2), 0.06);
 }
 
 .lint-issue__action {

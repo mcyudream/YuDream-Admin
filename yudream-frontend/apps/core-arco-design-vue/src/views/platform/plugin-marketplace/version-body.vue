@@ -37,9 +37,9 @@ const installDisabledReason = computed(() => props.item.installDisabledReason ||
         兼容性要求
       </div>
       <div class="compatibility-list">
-        <FaTag v-if="descriptor.compatibility?.host" variant="secondary">宿主：{{ descriptor.compatibility?.host }}</FaTag>
-        <FaTag v-if="descriptor.compatibility?.spi" variant="secondary">SPI：{{ descriptor.compatibility?.spi }}</FaTag>
-        <FaTag v-if="descriptor.compatibility?.frontendSdk" variant="secondary">前端 SDK：{{ descriptor.compatibility?.frontendSdk }}</FaTag>
+        <YdTag v-if="descriptor.compatibility?.host" variant="secondary">宿主：{{ descriptor.compatibility?.host }}</YdTag>
+        <YdTag v-if="descriptor.compatibility?.spi" variant="secondary">SPI：{{ descriptor.compatibility?.spi }}</YdTag>
+        <YdTag v-if="descriptor.compatibility?.frontendSdk" variant="secondary">前端 SDK：{{ descriptor.compatibility?.frontendSdk }}</YdTag>
       </div>
     </div>
     <div v-if="descriptor.dependencies?.length" class="metadata-panel">
@@ -47,9 +47,9 @@ const installDisabledReason = computed(() => props.item.installDisabledReason ||
         插件依赖
       </div>
       <div class="dependency-list">
-        <FaTag v-for="dependency in descriptor.dependencies" :key="dependency.code" variant="secondary">
+        <YdTag v-for="dependency in descriptor.dependencies" :key="dependency.code" variant="secondary">
           {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }} · {{ dependency.required === false ? '可选' : '必需' }}
-        </FaTag>
+        </YdTag>
       </div>
     </div>
     <div v-if="descriptor.publisher || descriptor.license" class="metadata-panel">
@@ -60,7 +60,7 @@ const installDisabledReason = computed(() => props.item.installDisabledReason ||
         <template v-if="descriptor.publisher">
           <strong>{{ descriptor.publisher?.name }}</strong>
           <span>{{ descriptor.publisher?.id }}</span>
-          <FaTag v-if="descriptor.publisher?.verified" variant="secondary">已验证</FaTag>
+          <YdTag v-if="descriptor.publisher?.verified" variant="secondary">已验证</YdTag>
           <a v-if="descriptor.publisher?.url" :href="descriptor.publisher?.url" target="_blank" rel="noopener noreferrer" class="metadata-link">
             发布者主页
           </a>
@@ -141,7 +141,7 @@ const installDisabledReason = computed(() => props.item.installDisabledReason ||
 
 .metadata-link {
   max-width: 100%;
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   overflow-wrap: anywhere;
 }
 

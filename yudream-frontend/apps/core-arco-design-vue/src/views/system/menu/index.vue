@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult, YdTreeNode } from '@yudream/components'
 import type { MenuCandidate, MenuManageItem, MenuNodeType, MenuPayload, MenuSource, MenuStatus } from '@/api/modules/system-menu'
 import apiExcel from '@/api/modules/system-excel'
 import apiMenu from '@/api/modules/system-menu'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
-interface TreeNode {
-  key: string
-  title: string
+interface TreeNode extends YdTreeNode {
   menu?: MenuManageItem
   children?: TreeNode[]
 }
@@ -16,8 +14,8 @@ interface TreeNode {
 const ROOT_LABEL = '根目录'
 const DEFAULT_MODULE = '系统管理'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const router = useRouter()
 const route = useRoute()
 const { auth } = useAppAuth()
@@ -112,7 +110,7 @@ const sortValue = computed({
 
 const treeData = computed<TreeNode[]>(() => [{
   key: '__root__',
-  title: ROOT_LABEL,
+  label: ROOT_LABEL,
   children: buildTreeNodes(rows.value),
 }])
 
@@ -421,7 +419,7 @@ function buildTreeNodes(items: MenuManageItem[]): TreeNode[] {
     .filter(item => item.type !== 'BUTTON')
     .map(item => ({
       key: item.code,
-      title: item.name,
+      label: item.name,
       menu: item,
       children: buildTreeNodes(item.children || []),
     }))
@@ -464,6 +462,10 @@ function importMenus() {
     await loadTree()
   })
 }
+function menuForTreeNode(node?: YdTreeNode) {
+  return node ? findMenu(rows.value, node.key) : undefined
+}
+
 </script>
 
 <template>
@@ -473,19 +475,19 @@ function importMenus() {
         <div class="menu-sidebar__header">
           <h2>菜单列表</h2>
           <div class="menu-toolbar">
-            <FaButton v-auth="'system:menu:export'" variant="ghost" size="sm" title="导出菜单" @click="exportMenus">
-              <FaIcon name="morph:file-spreadsheet" />
-            </FaButton>
-            <FaButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="下载模板" @click="downloadMenuTemplate">
-              <FaIcon name="morph:download" />
-            </FaButton>
-            <FaButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="导入菜单" @click="importMenus">
-              <FaIcon name="morph:upload" />
-            </FaButton>
-            <FaButton v-auth="'system:menu:create'" variant="ghost" size="sm" title="新增菜单" @click="openCreate()">
-              <FaIcon name="morph:plus" />
-            </FaButton>
-            <FaButton
+            <YdButton v-auth="'system:menu:export'" variant="ghost" size="sm" title="导出菜单" @click="exportMenus">
+              <YdIcon name="morph:file-spreadsheet" />
+            </YdButton>
+            <YdButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="下载模板" @click="downloadMenuTemplate">
+              <YdIcon name="morph:download" />
+            </YdButton>
+            <YdButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="导入菜单" @click="importMenus">
+              <YdIcon name="morph:upload" />
+            </YdButton>
+            <YdButton v-auth="'system:menu:create'" variant="ghost" size="sm" title="新增菜单" @click="openCreate()">
+              <YdIcon name="morph:plus" />
+            </YdButton>
+            <YdButton
               v-if="selectedMenu?.status === 'DISABLED'"
               v-auth="'system:menu:edit'"
               variant="ghost"
@@ -493,9 +495,9 @@ function importMenus() {
               title="启用菜单"
               @click="confirmEnable()"
             >
-              <FaIcon name="morph:circle-play" />
-            </FaButton>
-            <FaButton
+              <YdIcon name="morph:circle-play" />
+            </YdButton>
+            <YdButton
               v-if="selectedMenu?.status === 'ACTIVE'"
               v-auth="'system:menu:edit'"
               variant="ghost"
@@ -503,9 +505,9 @@ function importMenus() {
               title="停用菜单"
               @click="confirmDisable()"
             >
-              <FaIcon name="morph:circle-pause" />
-            </FaButton>
-            <FaButton
+              <YdIcon name="morph:circle-pause" />
+            </YdButton>
+            <YdButton
               v-if="selectedMenu"
               v-auth="'system:menu:delete'"
               variant="ghost"
@@ -513,12 +515,12 @@ function importMenus() {
               title="删除菜单"
               @click="confirmDelete()"
             >
-              <FaIcon name="morph:trash-2" />
-            </FaButton>
+              <YdIcon name="morph:trash-2" />
+            </YdButton>
           </div>
         </div>
 
-        <FaInput
+        <YdInput
           v-model="searchKeyword"
           clearable
           placeholder="请输入菜单名称"
@@ -528,39 +530,38 @@ function importMenus() {
         />
 
         <div class="menu-tree">
-          <a-tree
+          <YdTree
             v-model:selected-keys="selectedKeys"
             :data="treeData"
             :default-expand-all="true"
-            block-node
           >
-            <template #title="node">
+            <template #default="{ node }">
               <div class="menu-tree-node">
                 <span class="menu-tree-node__main">
                   <span class="menu-tree-node__icon">
-                    <FaIcon :name="menuIcon(node.menu)" />
+                    <YdIcon :name="menuIcon(menuForTreeNode(node))" />
                   </span>
-                  <span>{{ node.title }}</span>
+                  <span>{{ node?.label ?? '' }}</span>
                   <span
-                    v-if="node.menu?.source === 'PLUGIN'"
+                    v-if="menuForTreeNode(node)?.source === 'PLUGIN'"
                     class="plugin-source-marker"
                     title="插件菜单"
                     aria-label="插件菜单"
                   />
                 </span>
-                <FaButton
-                  v-if="node.menu && node.menu.type !== 'LINK'"
+                <YdButton
+                  v-if="menuForTreeNode(node) && menuForTreeNode(node)?.type !== 'LINK'"
                   v-auth="'system:menu:create'"
                   variant="ghost"
                   size="sm"
                   title="新增子菜单"
-                  @click.stop="openCreate(node.menu)"
+                  @click.stop="openCreate(menuForTreeNode(node))"
                 >
-                  <FaIcon name="morph:plus" />
-                </FaButton>
+                  <YdIcon name="morph:plus" />
+                </YdButton>
               </div>
             </template>
-          </a-tree>
+          </YdTree>
         </div>
       </aside>
 
@@ -569,75 +570,75 @@ function importMenus() {
           <div class="menu-section__header">
             <h2>菜单详情</h2>
             <div class="menu-actions">
-              <FaButton v-auth="'system:menu:create'" variant="outline" size="sm" :disabled="!canCreateChild" @click="openCreateFromSelected">
-                <FaIcon name="morph:plus" />
+              <YdButton v-auth="'system:menu:create'" variant="outline" size="sm" :disabled="!canCreateChild" @click="openCreateFromSelected">
+                <YdIcon name="morph:plus" />
                 新增子菜单
-              </FaButton>
-              <FaButton v-auth="'system:menu:edit'" variant="outline" size="sm" :disabled="!selectedMenu" @click="openEdit()">
-                <FaIcon name="morph:pencil" />
+              </YdButton>
+              <YdButton v-auth="'system:menu:edit'" variant="outline" size="sm" :disabled="!selectedMenu" @click="openEdit()">
+                <YdIcon name="morph:pencil" />
                 编辑
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-if="selectedMenu?.status === 'DISABLED'"
                 v-auth="'system:menu:edit'"
                 variant="outline"
                 size="sm"
                 @click="confirmEnable()"
               >
-                <FaIcon name="morph:circle-play" />
+                <YdIcon name="morph:circle-play" />
                 启用
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-if="selectedMenu?.status === 'ACTIVE'"
                 v-auth="'system:menu:edit'"
                 variant="outline"
                 size="sm"
                 @click="confirmDisable()"
               >
-                <FaIcon name="morph:circle-pause" />
+                <YdIcon name="morph:circle-pause" />
                 停用
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-if="selectedMenu"
                 v-auth="'system:menu:delete'"
                 variant="destructive"
                 size="sm"
                 @click="confirmDelete()"
               >
-                <FaIcon name="morph:trash-2" />
+                <YdIcon name="morph:trash-2" />
                 删除
-              </FaButton>
+              </YdButton>
             </div>
           </div>
 
           <div v-if="selectedMenu" class="detail-grid">
             <div class="detail-cell detail-cell--label">菜单类型</div>
             <div class="detail-cell">
-              <FaTag :variant="typeVariant(selectedMenu.type)">
+              <YdTag :variant="typeVariant(selectedMenu.type)">
                 {{ typeText(selectedMenu.type) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">菜单状态</div>
             <div class="detail-cell">
-              <FaTag :variant="statusVariant(selectedMenu.status)">
+              <YdTag :variant="statusVariant(selectedMenu.status)">
                 {{ statusText(selectedMenu.status) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">来源</div>
             <div class="detail-cell">
-              <FaTag :variant="sourceVariant(selectedMenu.source)">
+              <YdTag :variant="sourceVariant(selectedMenu.source)">
                 {{ sourceText(selectedMenu.source) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">运行状态</div>
             <div class="detail-cell">
-              <FaTag :variant="runtimeVariant(selectedMenu)">
+              <YdTag :variant="runtimeVariant(selectedMenu)">
                 {{ runtimeText(selectedMenu) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">菜单名称</div>
             <div class="detail-cell detail-cell__name">
-              <FaIcon :name="menuIcon(selectedMenu)" />
+              <YdIcon :name="menuIcon(selectedMenu)" />
               <span>{{ selectedMenu.name }}</span>
             </div>
             <div class="detail-cell detail-cell--label">路由地址</div>
@@ -654,15 +655,15 @@ function importMenus() {
             <div class="detail-cell">{{ displayValue(selectedMenu.component) }}</div>
             <div class="detail-cell detail-cell--label">菜单显示</div>
             <div class="detail-cell">
-              <FaTag :variant="visibleVariant(selectedMenu)">
+              <YdTag :variant="visibleVariant(selectedMenu)">
                 {{ visibleText(selectedMenu) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">是否外链</div>
             <div class="detail-cell">
-              <FaTag :variant="isExternal(selectedMenu) ? 'outline' : 'secondary'">
+              <YdTag :variant="isExternal(selectedMenu) ? 'outline' : 'secondary'">
                 {{ displayValue(isExternal(selectedMenu)) }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="detail-cell detail-cell--label">外链地址</div>
             <div class="detail-cell detail-cell--wide">{{ displayValue(selectedMenu.link) }}</div>
@@ -683,8 +684,8 @@ function importMenus() {
             <h2>按钮权限列表</h2>
           </div>
 
-          <FaResponsiveTable
-            v-loading="loading"
+          <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
             row-key="code"
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[720px]"
@@ -697,16 +698,16 @@ function importMenus() {
               {{ row.index + 1 }}
             </template>
             <template #cell-status="{ row }">
-              <FaTag :variant="statusVariant(row.original.status)">
+              <YdTag :variant="statusVariant(row.original.status)">
                 {{ statusText(row.original.status) }}
-              </FaTag>
+              </YdTag>
             </template>
             <template #cell-operation="{ row }">
               <div class="flex-center gap-2">
-                <FaButton v-auth="'system:menu:edit'" variant="ghost" size="sm" title="编辑" @click="openEdit(row.original)">
-                  <FaIcon name="morph:pencil" />
-                </FaButton>
-                <FaButton
+                <YdButton v-auth="'system:menu:edit'" variant="ghost" size="sm" title="编辑" @click="openEdit(row.original)">
+                  <YdIcon name="morph:pencil" />
+                </YdButton>
+                <YdButton
                   v-if="row.original.status === 'DISABLED'"
                   v-auth="'system:menu:edit'"
                   variant="ghost"
@@ -714,9 +715,9 @@ function importMenus() {
                   title="启用"
                   @click="confirmEnable(row.original)"
                 >
-                  <FaIcon name="morph:circle-play" />
-                </FaButton>
-                <FaButton
+                  <YdIcon name="morph:circle-play" />
+                </YdButton>
+                <YdButton
                   v-if="row.original.status === 'ACTIVE'"
                   v-auth="'system:menu:edit'"
                   variant="ghost"
@@ -724,28 +725,28 @@ function importMenus() {
                   title="停用"
                   @click="confirmDisable(row.original)"
                 >
-                  <FaIcon name="morph:circle-pause" />
-                </FaButton>
-                <FaButton
+                  <YdIcon name="morph:circle-pause" />
+                </YdButton>
+                <YdButton
                   v-auth="'system:menu:delete'"
                   variant="ghost"
                   size="sm"
                   title="删除"
                   @click="confirmDelete(row.original)"
                 >
-                  <FaIcon name="morph:trash-2" />
-                </FaButton>
+                  <YdIcon name="morph:trash-2" />
+                </YdButton>
               </div>
             </template>
 
             <template #card="{ row }">
-              <FaCard class="w-full">
+              <YdCard class="w-full">
                 <div class="flex flex-col gap-3">
                   <div class="flex items-center justify-between gap-2">
                     <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                    <FaTag :variant="statusVariant(row.status)">
+                    <YdTag :variant="statusVariant(row.status)">
                       {{ statusText(row.status) }}
-                    </FaTag>
+                    </YdTag>
                   </div>
                   <div class="flex flex-col gap-1 text-sm">
                     <div v-if="row.permission" class="flex gap-2">
@@ -758,58 +759,58 @@ function importMenus() {
                     </div>
                   </div>
                   <div class="flex flex-wrap gap-2 border-t pt-3">
-                    <FaButton v-auth="'system:menu:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                    <YdButton v-auth="'system:menu:edit'" variant="outline" size="sm" @click="openEdit(row)">
                       编辑
-                    </FaButton>
-                    <FaButton v-if="row.status === 'DISABLED'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                    </YdButton>
+                    <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
                       启用
-                    </FaButton>
-                    <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmDisable(row)">
+                    </YdButton>
+                    <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmDisable(row)">
                       停用
-                    </FaButton>
-                    <FaButton v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDelete(row)">
+                    </YdButton>
+                    <YdButton v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDelete(row)">
                       删除
-                    </FaButton>
+                    </YdButton>
                   </div>
                 </div>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable></YdLoadingOverlay>
         </section>
       </main>
     </div>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑菜单' : '新增菜单'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
-      <a-form :model="form" layout="vertical">
-        <a-grid :cols="2" :col-gap="16">
-          <a-grid-item>
-            <a-form-item label="菜单编码" required>
-              <FaInput
+    <YdModal v-model="formVisible" :title="editing ? '编辑菜单' : '新增菜单'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
+      <YdForm :model="form" layout="vertical">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <YdFormItem label="菜单编码" required>
+              <YdInput
                 v-model="form.code"
                 :disabled="!!editing"
                 placeholder="system:menu"
                 class="w-full"
               />
-            </a-form-item>
+            </YdFormItem>
             <div v-if="isPluginEditing" class="form-help-text">
               插件菜单编码用于恢复插件注册关系，编辑时仅支持查看。
             </div>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="菜单名称" required>
-              <FaInput v-model="form.name" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="类型" required>
-              <FaSelect v-model="form.type" :options="typeOptions" class="w-full" />
-            </a-form-item>
+          </div>
+          <div>
+            <YdFormItem label="菜单名称" required>
+              <YdInput v-model="form.name" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="类型" required>
+              <YdSelect v-model="form.type" :options="typeOptions" class="w-full" />
+            </YdFormItem>
             <p class="form-help-text">
               一级大图标导航默认使用业务分类（如 MC、待办、社交），功能菜单归入分类。旧菜单和明确需要独立入口的个例可保留原结构。
             </p>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="上级菜单">
+          </div>
+          <div>
+            <YdFormItem label="上级菜单">
               <YdTablePicker
                 v-model="parentPickerValue"
                 :columns="parentColumns"
@@ -822,64 +823,64 @@ function importMenus() {
                 placeholder="根目录"
                 class="w-full"
               />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="模块">
-              <FaInput v-model="form.module" :placeholder="DEFAULT_MODULE" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="排序">
-              <FaNumberField v-model="sortValue" :min="0" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="导航菜单">
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="模块">
+              <YdInput v-model="form.module" :placeholder="DEFAULT_MODULE" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="排序">
+              <YdNumberField v-model="sortValue" :min="0" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="导航菜单">
               <div class="flex items-center gap-3 pt-1">
-                <FaSwitch v-model="form.visible" />
+                <YdSwitch v-model="form.visible" />
                 <span class="text-sm text-muted-foreground">{{ form.visible ? '显示在导航中' : '仅保留路由访问' }}</span>
               </div>
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="form.type !== 'BUTTON'">
-            <a-form-item label="图标">
+            </YdFormItem>
+          </div>
+          <div v-if="form.type !== 'BUTTON'">
+            <YdFormItem label="图标">
               <YdIconPicker v-model="form.icon" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="['MENU', 'LAYOUT', 'LINK'].includes(form.type)">
-            <a-form-item label="路由路径">
-              <FaInput v-model="form.path" :placeholder="form.type === 'LINK' ? '/external/docs' : '/system/menu'" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="form.type === 'MENU'">
-            <a-form-item label="组件路径">
-              <FaInput v-model="form.component" placeholder="system/menu/index.vue" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="form.type === 'LAYOUT'">
-            <a-form-item label="组件路径">
-              <FaInput model-value="Layout" disabled class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="form.type === 'LINK'">
-            <a-form-item label="外链地址">
-              <FaInput v-model="form.link" placeholder="https://www.yudream.online" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="!['CATEGORY', 'LAYOUT'].includes(form.type)">
-            <a-form-item label="权限标识">
-              <FaInput v-model="form.permission" placeholder="为空时使用菜单编码" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="editing">
-            <a-form-item label="状态">
-              <FaSelect v-model="form.status" :options="statusOptions" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-        </a-grid>
-      </a-form>
-    </FaModal>
+            </YdFormItem>
+          </div>
+          <div v-if="['MENU', 'LAYOUT', 'LINK'].includes(form.type)">
+            <YdFormItem label="路由路径">
+              <YdInput v-model="form.path" :placeholder="form.type === 'LINK' ? '/external/docs' : '/system/menu'" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="form.type === 'MENU'">
+            <YdFormItem label="组件路径">
+              <YdInput v-model="form.component" placeholder="system/menu/index.vue" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="form.type === 'LAYOUT'">
+            <YdFormItem label="组件路径">
+              <YdInput model-value="Layout" disabled class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="form.type === 'LINK'">
+            <YdFormItem label="外链地址">
+              <YdInput v-model="form.link" placeholder="https://www.yudream.online" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="!['CATEGORY', 'LAYOUT'].includes(form.type)">
+            <YdFormItem label="权限标识">
+              <YdInput v-model="form.permission" placeholder="为空时使用菜单编码" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="editing">
+            <YdFormItem label="状态">
+              <YdSelect v-model="form.status" :options="statusOptions" class="w-full" />
+            </YdFormItem>
+          </div>
+        </div>
+      </YdForm>
+    </YdModal>
   </div>
 </template>
 

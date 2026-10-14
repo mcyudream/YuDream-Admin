@@ -25,7 +25,7 @@ const appKeepAliveStore = useAppKeepAliveStore()
 const appMenuStore = useAppMenuStore()
 const appAccountStore = useAppAccountStore()
 const mainPage = useAppPage()
-const toast = useFaToast()
+const toast = useYdToast()
 const verificationMailSending = ref(false)
 
 useHotkeyBindings({
@@ -175,7 +175,9 @@ async function resendVerificationEmail() {
         <SubSidebar :enable="isSubSidebarEnable" />
       </div>
       <!-- 移动端下，展开侧边栏时的遮罩层 -->
-      <div :class="cn('invisible fixed inset-0 z-1009 bg-black/50 op-0 backdrop-blur-sm transition-opacity', { 'op-100 visible': appSettingsStore.mode === 'mobile' && !appSettingsStore.settings.menu.subMenuCollapse })" @click="appSettingsStore.toggleSidebarCollapse()" />
+      <YdAction
+        type="button"
+        aria-label="关闭侧边栏" :class="cn('invisible fixed inset-0 z-1009 bg-black/50 op-0 backdrop-blur-sm transition-opacity', { 'op-100 visible': appSettingsStore.mode === 'mobile' && !appSettingsStore.settings.menu.subMenuCollapse })" @click="appSettingsStore.toggleSidebarCollapse()" />
       <FloatingSidebarMenuButton />
       <PluginDevtools />
       <PluginGlobalWidgets />
@@ -190,13 +192,13 @@ async function resendVerificationEmail() {
           <div id="fixed-content-before-area" ref="fixedContentBeforeAreaRef" class="shadow-[0_1px_0_0_oklch(var(--border)),0_-1px_0_0_oklch(var(--border))] relative z-1 empty:hidden">
             <div v-if="appAccountStore.isEmailUnverified" class="email-verification-banner">
               <div class="email-verification-banner__content">
-                <FaIcon name="morph:triangle-alert" />
+                <YdIcon name="morph:triangle-alert" />
                 <span>当前账户未验证无法使用其他功能，或者点击重新发送验证邮件</span>
               </div>
-              <FaButton size="sm" variant="outline" :loading="verificationMailSending" @click="resendVerificationEmail">
-                <FaIcon name="morph:send" />
+              <YdButton size="sm" variant="outline" :loading="verificationMailSending" @click="resendVerificationEmail">
+                <YdIcon name="morph:send" />
                 重新发送验证邮件
-              </FaButton>
+              </YdButton>
             </div>
           </div>
         </div>

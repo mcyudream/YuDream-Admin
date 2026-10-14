@@ -2,7 +2,7 @@
 import type { ApiDocSettings } from '@/api/modules/platform-docs'
 import apiDocs from '@/api/modules/platform-docs'
 
-const toast = useFaToast()
+const toast = useYdToast()
 const appSettingsStore = useAppSettingsStore()
 const defaultDocTitle = computed(() => {
   const siteName = appSettingsStore.siteName || ''
@@ -178,84 +178,84 @@ function appendQuery(url: string, params: Record<string, string>) {
 
 <template>
   <div>
-    <FaPageHeader title="API 文档" class="mb-0">
-      <FaButton variant="outline" :disabled="!form.enabled" @click="openOpenApi">
-        <FaIcon name="morph:braces" />
+    <YdPageHeader title="API 文档" class="mb-0">
+      <YdButton variant="outline" :disabled="!form.enabled" @click="openOpenApi">
+        <YdIcon name="morph:braces" />
         OpenAPI
-      </FaButton>
-      <FaButton variant="outline" :disabled="!form.enabled" @click="openSwagger">
-        <FaIcon name="morph:external-link" />
+      </YdButton>
+      <YdButton variant="outline" :disabled="!form.enabled" @click="openSwagger">
+        <YdIcon name="morph:external-link" />
         Swagger UI
-      </FaButton>
-      <FaButton v-auth="'platform:docs:config'" :loading="saving" @click="saveSettings">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton v-auth="'platform:docs:config'" :loading="saving" @click="saveSettings">
+        <YdIcon name="morph:save" />
         保存配置
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <div v-loading="loading" class="docs-layout">
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><div  class="docs-layout">
         <section class="settings-panel">
-          <a-form :model="form" layout="vertical">
+          <YdForm :model="form" layout="vertical">
             <div class="switch-grid">
               <div class="switch-item">
                 <div class="switch-label">
-                  <FaIcon name="morph:file-text" />
+                  <YdIcon name="morph:file-text" />
                   <span>启用文档</span>
                 </div>
-                <FaSwitch v-model="form.enabled" />
+                <YdSwitch v-model="form.enabled" />
               </div>
               <div class="switch-item">
                 <div class="switch-label">
-                  <FaIcon name="morph:key-round" />
+                  <YdIcon name="morph:key-round" />
                   <span>允许 API Key</span>
                 </div>
-                <FaSwitch v-model="form.apiKeyAccessEnabled" />
+                <YdSwitch v-model="form.apiKeyAccessEnabled" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-              <a-form-item label="文档标题" required>
-                <FaInput v-model="form.title" class="w-full" />
-              </a-form-item>
-              <a-form-item label="版本">
-                <FaInput v-model="form.version" class="w-full" />
-              </a-form-item>
-              <a-form-item label="OpenAPI 地址">
-                <FaInput v-model="form.openApiPath" class="w-full" />
-              </a-form-item>
-              <a-form-item label="Swagger UI 地址">
-                <FaInput v-model="form.swaggerUiPath" class="w-full" />
-              </a-form-item>
-              <a-form-item label="描述" class="md:col-span-2">
-                <FaTextarea v-model="form.description" rows="3" class="w-full" />
-              </a-form-item>
+              <YdFormItem label="文档标题" required>
+                <YdInput v-model="form.title" class="w-full" />
+              </YdFormItem>
+              <YdFormItem label="版本">
+                <YdInput v-model="form.version" class="w-full" />
+              </YdFormItem>
+              <YdFormItem label="OpenAPI 地址">
+                <YdInput v-model="form.openApiPath" class="w-full" />
+              </YdFormItem>
+              <YdFormItem label="Swagger UI 地址">
+                <YdInput v-model="form.swaggerUiPath" class="w-full" />
+              </YdFormItem>
+              <YdFormItem label="描述" class="md:col-span-2">
+                <YdTextarea v-model="form.description" rows="3" class="w-full" />
+              </YdFormItem>
             </div>
-          </a-form>
+          </YdForm>
         </section>
 
         <section class="preview-panel">
           <div class="preview-toolbar">
             <div class="preview-title">
-              <FaIcon name="morph:app-window" />
+              <YdIcon name="morph:app-window" />
               <span>文档预览</span>
             </div>
-            <FaTag :variant="form.enabled ? 'default' : 'secondary'">
+            <YdTag :variant="form.enabled ? 'default' : 'secondary'">
               {{ form.enabled ? '已启用' : '未启用' }}
-            </FaTag>
+            </YdTag>
           </div>
           <iframe v-if="swaggerPreviewReady" :srcdoc="swaggerPreviewHtml" title="Swagger UI" />
           <div v-else-if="form.enabled" class="empty-preview">
-            <FaIcon name="morph:loader-circle" />
+            <YdIcon name="morph:loader-circle" />
             <span>正在获取 API 文档访问票据</span>
           </div>
           <div v-else class="empty-preview">
-            <FaIcon name="morph:file-lock" />
+            <YdIcon name="morph:file-lock" />
             <span>API 文档未启用</span>
           </div>
         </section>
-      </div>
-    </FaPageMain>
+      </div></YdLoadingOverlay>
+    </YdPageMain>
   </div>
 </template>
 

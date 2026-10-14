@@ -148,6 +148,18 @@ function keyDown() {
 function keyEnter() {
   searchResultItemRef.value?.find(item => Number.parseInt(item.dataset.index!) === actived.value)?.click()
 }
+
+function onSearchKeydown(event: KeyboardEvent) {
+  if (event.isComposing) {
+    return
+  }
+  const handlers: Record<string, () => void> = { Escape: () => { isShow.value = false }, ArrowUp: keyUp, ArrowDown: keyDown, Enter: keyEnter }
+  const handler = handlers[event.key]
+  if (handler) {
+    event.preventDefault()
+    handler()
+  }
+}
 function handleScroll() {
   if (searchResultRef.value?.ref?.el?.viewportElement) {
     const contentDom = searchResultRef.value.ref.el.viewportElement
@@ -186,15 +198,17 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
 </script>
 
 <template>
-  <FaModal v-model="isShow" :footer="appSettingsStore.mode === 'pc'" :closable="false" open-auto-focus border class="w-full lg-max-w-2xl" content-class="flex flex-col p-0 min-h-auto" header-class="p-0" footer-class="p-0">
+  <YdModal v-model="isShow" :footer="appSettingsStore.mode === 'pc'" :closable="false" open-auto-focus border class="w-full lg-max-w-2xl" content-class="flex flex-col p-0 min-h-auto" header-class="p-0" footer-class="p-0">
     <template #header>
       <div class="flex flex-shrink-0 h-12 items-center">
         <div class="flex-center h-full w-14">
-          <FaIcon name="morph:search" class="text-foreground/30 size-4" />
+          <YdIcon name="morph:search" class="text-foreground/30 size-4" />
         </div>
-        <input v-model="searchInput" placeholder="支持标题、拼音(首字母)、URL模糊查询" class="text-base text-foreground border-0 rounded-md bg-transparent h-full w-full focus-outline-none placeholder-foreground/30" @keydown.esc.prevent="isShow = false" @keydown.up.prevent="keyUp" @keydown.down.prevent="keyDown" @keydown.enter.prevent="keyEnter">
+        <YdInput v-model="searchInput" placeholder="支持标题、拼音(首字母)、URL模糊查询" aria-label="搜索菜单" class="h-full w-full border-0 rounded-none bg-transparent shadow-none" input-class="text-base text-foreground border-0 rounded-md bg-transparent h-full w-full focus-outline-none placeholder-foreground/30" @keydown="onSearchKeydown" />
         <div v-if="appSettingsStore.mode === 'mobile'" class="border-s flex-center h-full w-14">
-          <FaIcon name="morph:x" class="size-4" @click="isShow = false" />
+          <YdButton type="button" variant="ghost" size="icon-sm" aria-label="关闭菜单搜索" @click="isShow = false">
+            <YdIcon name="morph:x" class="size-4" />
+          </YdButton>
         </div>
       </div>
     </template>
@@ -202,31 +216,31 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
       <div class="px-4 py-3 flex w-full justify-between">
         <div class="flex gap-8">
           <div class="text-xs inline-flex gap-1 items-center">
-            <FaKbd>⏎</FaKbd>
+            <YdKbd>⏎</YdKbd>
             <span>访问</span>
           </div>
           <div class="text-xs inline-flex gap-1 items-center">
-            <FaKbd>
-              <FaIcon name="morph:chevron-up" />
-            </FaKbd>
-            <FaKbd>
-              <FaIcon name="morph:chevron-down" />
-            </FaKbd>
+            <YdKbd>
+              <YdIcon name="morph:chevron-up" />
+            </YdKbd>
+            <YdKbd>
+              <YdIcon name="morph:chevron-down" />
+            </YdKbd>
             <span>切换</span>
           </div>
         </div>
         <div v-if="appSettingsStore.settings.toolbar.menuSearch.hotkeys" class="text-xs inline-flex gap-1 items-center">
-          <FaKbd>Esc</FaKbd>
+          <YdKbd>Esc</YdKbd>
           <span>退出</span>
         </div>
       </div>
     </template>
-    <FaScrollArea ref="searchResultRef">
+    <YdScrollArea ref="searchResultRef">
       <template v-if="resultList.length > 0">
-        <div v-for="(item, index) in resultList" ref="searchResultItemRef" :key="item.path" class="p-4" :data-index="index" @click="pageJump(item.path, item.link)" @mouseover="actived = index">
-          <a class="border rounded-lg flex cursor-pointer items-center" :class="{ '-mt-4': index !== 0, 'bg-accent border-primary shadow-[0_0_0_1px_oklch(var(--primary))]': index === actived, 'op-50': index !== actived }">
+        <div v-for="(item, index) in resultList" ref="searchResultItemRef" :key="item.path" class="p-4" :data-index="index"  @mouseover="actived = index">
+          <YdAction type="button" class="border rounded-lg flex cursor-pointer items-center" :class="{ '-mt-4': index !== 0, 'bg-accent border-primary shadow-[0_0_0_1px_oklch(var(--primary))]': index === actived, 'op-50': index !== actived }" @click="pageJump(item.path, item.link)">
             <div class="flex-center basis-16 -me-4">
-              <FaIcon v-if="item.icon" :name="item.icon" class="size-5 transition" :class="{ 'scale-120 text-primary': index === actived }" />
+              <YdIcon v-if="item.icon" :name="item.icon" class="size-5 transition" :class="{ 'scale-120 text-primary': index === actived }" />
             </div>
             <div class="px-4 py-3 flex flex-1 flex-col gap-1 truncate">
               <div class="text-base font-bold text-start truncate">{{ generateTitle(item.title) }}</div>
@@ -236,12 +250,12 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
                 </BreadcrumbItem>
               </Breadcrumb>
             </div>
-          </a>
+          </YdAction>
         </div>
       </template>
       <template v-else-if="searchInput === ''">
         <div class="text-secondary-foreground/50 py-6 flex-col-center h-full">
-          <FaIcon name="morph:smile" class="size-10" />
+          <YdIcon name="morph:smile" class="size-10" />
           <p class="text-base m-2">
             输入你要搜索的导航
           </p>
@@ -249,12 +263,12 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
       </template>
       <template v-else>
         <div class="text-secondary-foreground/50 py-6 flex-col-center h-full">
-          <FaIcon name="morph:meh" class="size-10" />
+          <YdIcon name="morph:meh" class="size-10" />
           <p class="text-base m-2">
             没有找到你想要的
           </p>
         </div>
       </template>
-    </FaScrollArea>
-  </FaModal>
+    </YdScrollArea>
+  </YdModal>
 </template>

@@ -15,8 +15,8 @@ import {
 } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 
 const editorTitle = ref('')
 const editorBody = ref('')
@@ -192,110 +192,115 @@ function removeSourceChip(source: string) {
     <!-- 目录树 -->
     <aside class="dir-tree">
       <div class="dir-tree__toolbar">
-        <FaInput v-model="treeKeyword" clearable placeholder="搜索页面…">
+        <YdInput v-model="treeKeyword" clearable placeholder="搜索页面…">
           <template #start>
-            <FaIcon name="morph:search" />
+            <YdIcon name="morph:search" />
           </template>
-        </FaInput>
+        </YdInput>
         <div class="dir-tree__actions">
-          <FaTooltip text="新建页面">
-            <FaButton size="icon-sm" variant="ghost" @click="openCreate('PAGE')">
-              <FaIcon name="morph:file-plus" />
-            </FaButton>
-          </FaTooltip>
-          <FaTooltip text="新建目录">
-            <FaButton size="icon-sm" variant="ghost" @click="openCreate('DIRECTORY')">
-              <FaIcon name="morph:folder-plus" />
-            </FaButton>
-          </FaTooltip>
-          <FaTooltip text="刷新目录">
-            <FaButton size="icon-sm" variant="ghost" :loading="store.loadingTree.value" @click="store.reloadTree()">
-              <FaIcon name="morph:refresh-cw" />
-            </FaButton>
-          </FaTooltip>
+          <YdTooltip text="新建页面">
+            <YdButton size="icon-sm" variant="ghost" @click="openCreate('PAGE')">
+              <YdIcon name="morph:file-plus" />
+            </YdButton>
+          </YdTooltip>
+          <YdTooltip text="新建目录">
+            <YdButton size="icon-sm" variant="ghost" @click="openCreate('DIRECTORY')">
+              <YdIcon name="morph:folder-plus" />
+            </YdButton>
+          </YdTooltip>
+          <YdTooltip text="刷新目录">
+            <YdButton size="icon-sm" variant="ghost" :loading="store.loadingTree.value" @click="store.reloadTree()">
+              <YdIcon name="morph:refresh-cw" />
+            </YdButton>
+          </YdTooltip>
         </div>
       </div>
 
-      <FaScrollArea class="dir-tree__list">
-        <button
+      <YdScrollArea class="dir-tree__list">
+        <div
           v-for="item in filteredTree"
           :key="item.id"
-          type="button"
           class="dir-node"
           :class="{ 'dir-node--active': node?.id === item.id }"
           :style="{ paddingLeft: `${10 + item._depth * 16}px` }"
-          @click="store.selectNode(item)"
         >
-          <FaIcon
-            :name="item.nodeType === 'DIRECTORY' ? 'morph:folder' : 'morph:file-text'"
-            class="dir-node__icon"
-            :class="{ 'dir-node__icon--dir': item.nodeType === 'DIRECTORY' }"
-          />
-          <span class="dir-node__title" :title="item.title">{{ item.title }}</span>
-          <span
-            v-if="item.nodeType === 'PAGE' && item.pageType"
-            class="dir-node__type"
-            :style="{ color: pageTypeColor(item.pageType), background: `${pageTypeColor(item.pageType)}1a` }"
-          >{{ pageTypeLabel(item.pageType) }}</span>
-          <span v-if="item.nodeType === 'PAGE' && item.publishedVersionId" class="dir-node__dot" title="已发布" />
-          <span
+          <YdAction
+            class="dir-node__main"
+            :aria-current="node?.id === item.id ? 'page' : undefined"
+            @click="store.selectNode(item)"
+          >
+            <YdIcon
+              :name="item.nodeType === 'DIRECTORY' ? 'morph:folder' : 'morph:file-text'"
+              class="dir-node__icon"
+              :class="{ 'dir-node__icon--dir': item.nodeType === 'DIRECTORY' }"
+            />
+            <span class="dir-node__title" :title="item.title">{{ item.title }}</span>
+            <span
+              v-if="item.nodeType === 'PAGE' && item.pageType"
+              class="dir-node__type"
+              :style="{ color: pageTypeColor(item.pageType), background: `${pageTypeColor(item.pageType)}1a` }"
+            >{{ pageTypeLabel(item.pageType) }}</span>
+            <span v-if="item.nodeType === 'PAGE' && item.publishedVersionId" class="dir-node__dot" title="已发布" />
+          </YdAction>
+          <YdAction
             class="dir-node__delete"
             :class="{ 'dir-node__delete--busy': deletingNodeId === item.id }"
+            :aria-label="`删除${item.nodeType === 'DIRECTORY' ? '目录' : '页面'}`"
             :title="`删除${item.nodeType === 'DIRECTORY' ? '目录' : '页面'}`"
-            @click.stop="removeNode(item)"
+            @click="removeNode(item)"
           >
-            <FaIcon name="morph:trash-2" />
-          </span>
-        </button>
+            <YdIcon name="morph:trash-2" />
+          </YdAction>
+        </div>
         <div v-if="!filteredTree.length" class="dir-tree__empty">
-          <FaIcon name="morph:folder-open" />
+          <YdIcon name="morph:folder-open" />
           <p>{{ treeKeyword ? '没有匹配的页面' : '暂无页面，先在「资料源」导入资料' }}</p>
         </div>
-      </FaScrollArea>
+      </YdScrollArea>
     </aside>
 
     <!-- 编辑区 -->
     <section v-if="node" class="dir-editor">
       <header class="dir-editor__head">
         <div class="dir-editor__title-row">
-          <FaInput v-model="editorTitle" class="dir-editor__title" placeholder="页面标题" :disabled="node.nodeType === 'DIRECTORY'" />
+          <YdInput v-model="editorTitle" class="dir-editor__title" placeholder="页面标题" :disabled="node.nodeType === 'DIRECTORY'" />
           <div class="dir-editor__mode">
-            <button type="button" :class="{ active: viewMode === 'edit' }" @click="viewMode = 'edit'">
-              <FaIcon name="morph:pencil" /> 编辑
-            </button>
-            <button type="button" :class="{ active: viewMode === 'preview' }" @click="viewMode = 'preview'">
-              <FaIcon name="morph:eye" /> 预览
-            </button>
+            <YdButton type="button" variant="ghost" :aria-pressed="viewMode === 'edit'" :class="{ active: viewMode === 'edit' }" @click="viewMode = 'edit'">
+              <YdIcon name="morph:pencil" /> 编辑
+            </YdButton>
+            <YdButton type="button" variant="ghost" :aria-pressed="viewMode === 'preview'" :class="{ active: viewMode === 'preview' }" @click="viewMode = 'preview'">
+              <YdIcon name="morph:eye" /> 预览
+            </YdButton>
           </div>
         </div>
         <div class="dir-editor__meta">
-          <FaSelect v-model="editorPageType" :options="pageTypeOptions" class="dir-editor__type" />
-          <FaInput v-model="editorSummary" placeholder="一句话摘要（展示在页面头部）" class="dir-editor__summary" />
+          <YdSelect v-model="editorPageType" :options="pageTypeOptions" class="dir-editor__type" />
+          <YdInput v-model="editorSummary" placeholder="一句话摘要（展示在页面头部）" class="dir-editor__summary" />
         </div>
         <div class="dir-editor__meta">
-          <a-input-tag v-model:model-value="editorRelated" placeholder="相关页面（wikilink 标题）" allow-clear class="dir-editor__tags" />
-          <a-input-tag v-model:model-value="editorTags" placeholder="标签" allow-clear class="dir-editor__tags" />
+          <YdInputTag v-model="editorRelated" placeholder="相关页面（wikilink 标题）" allow-clear aria-label="相关页面" class="dir-editor__tags" />
+          <YdInputTag v-model="editorTags" placeholder="标签" allow-clear aria-label="页面标签" class="dir-editor__tags" />
         </div>
         <div v-if="node.sources?.length" class="dir-editor__sources">
-          <span class="dir-editor__sources-label"><FaIcon name="morph:database" /> 资料来源</span>
+          <span class="dir-editor__sources-label"><YdIcon name="morph:database" /> 资料来源</span>
           <span v-for="source in node.sources" :key="source" class="dir-source-chip">
             {{ source }}
-            <FaIcon name="morph:x" class="dir-source-chip__close" @click="removeSourceChip(source)" />
+            <YdIcon name="morph:x" class="dir-source-chip__close" @click="removeSourceChip(source)" />
           </span>
         </div>
         <div class="dir-editor__actions">
-          <FaButton :loading="saving" @click="saveNode">
-            <FaIcon name="morph:save" /> 保存
-          </FaButton>
-          <FaButton v-if="node.nodeType === 'PAGE' && !node.publishedVersionId" variant="outline" @click="publish">
-            <FaIcon name="morph:send" /> 发布
-          </FaButton>
-          <FaButton v-if="node.nodeType === 'PAGE' && node.publishedVersionId" variant="outline" @click="unpublish">
-            <FaIcon name="morph:undo-2" /> 取消发布
-          </FaButton>
-          <FaButton variant="destructive" :loading="deletingNodeId === node.id" @click="removeNode(node)">
-            <FaIcon name="morph:trash-2" /> 删除
-          </FaButton>
+          <YdButton :loading="saving" @click="saveNode">
+            <YdIcon name="morph:save" /> 保存
+          </YdButton>
+          <YdButton v-if="node.nodeType === 'PAGE' && !node.publishedVersionId" variant="outline" @click="publish">
+            <YdIcon name="morph:send" /> 发布
+          </YdButton>
+          <YdButton v-if="node.nodeType === 'PAGE' && node.publishedVersionId" variant="outline" @click="unpublish">
+            <YdIcon name="morph:undo-2" /> 取消发布
+          </YdButton>
+          <YdButton variant="destructive" :loading="deletingNodeId === node.id" @click="removeNode(node)">
+            <YdIcon name="morph:trash-2" /> 删除
+          </YdButton>
           <span v-if="node.path" class="dir-editor__path">{{ node.path }}</span>
         </div>
       </header>
@@ -303,7 +308,7 @@ function removeSourceChip(source: string) {
       <div v-if="viewMode === 'edit'" class="dir-editor__body">
         <CmsMarkdownEditor v-model="editorBody" />
       </div>
-      <FaScrollArea v-else class="dir-editor__preview" @click="onPreviewClick">
+      <YdScrollArea v-else class="dir-editor__preview" @click="onPreviewClick">
         <MdPreview
           :model-value="previewMarkdown"
           language="zh-CN"
@@ -311,16 +316,16 @@ function removeSourceChip(source: string) {
           code-theme="github"
           class="dir-markdown"
         />
-      </FaScrollArea>
+      </YdScrollArea>
     </section>
 
     <section v-else class="dir-empty">
-      <FaIcon name="morph:list-tree" />
+      <YdIcon name="morph:list-tree" />
       <strong>选择左侧页面开始编辑</strong>
       <p>页面内容支持 [[wikilink]] 语法，预览中可点击跳转</p>
     </section>
 
-    <FaModal
+    <YdModal
       v-model="createVisible"
       :title="createForm.nodeType === 'PAGE' ? '新建页面' : '新建目录'"
       show-cancel-button
@@ -330,17 +335,17 @@ function removeSourceChip(source: string) {
       <div class="dir-create-form">
         <label class="dir-field">
           <span>标题</span>
-          <FaInput v-model="createForm.title" placeholder="标题" />
+          <YdInput v-model="createForm.title" placeholder="标题" />
         </label>
         <label class="dir-field">
           <span>slug（留空自动生成）</span>
-          <FaInput v-model="createForm.slug" placeholder="url-friendly-slug" />
+          <YdInput v-model="createForm.slug" placeholder="url-friendly-slug" />
         </label>
         <p v-if="node?.nodeType === 'DIRECTORY'" class="dir-field-hint">
           将创建在当前目录「{{ node.title }}」下
         </p>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -381,30 +386,36 @@ function removeSourceChip(source: string) {
 
 .dir-node {
   display: flex;
-  align-items: flex-start;
-  gap: 7px;
+  align-items: stretch;
+  gap: 2px;
   width: 100%;
   min-width: 0;
-  padding: 7px 10px;
-  border: 0;
   border-radius: 8px;
-  background: transparent;
-  color: var(--color-text-1);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.45;
-  text-align: left;
 }
 
-.dir-node:hover {
+.dir-node:hover,
+.dir-node--active {
   background: var(--color-fill-2);
 }
 
 .dir-node--active {
-  background: var(--color-fill-2);
   color: var(--color-text-1);
   font-weight: 600;
+}
+
+.dir-node__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0 7px 10px;
+  border-radius: 8px;
+  color: var(--color-text-1);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .dir-node__icon {
@@ -455,6 +466,7 @@ function removeSourceChip(source: string) {
 .dir-node__delete {
   display: none;
   flex-shrink: 0;
+  align-self: center;
   align-items: center;
   padding: 2px;
   border-radius: 4px;

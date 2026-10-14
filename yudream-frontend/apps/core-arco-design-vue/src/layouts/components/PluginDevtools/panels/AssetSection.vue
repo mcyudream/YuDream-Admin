@@ -14,21 +14,21 @@ const open = ref(props.defaultOpen)
 </script>
 
 <template>
-  <FaCollapsible v-model="open" class="asset-section">
+  <YdCollapsible v-model="open" class="asset-section">
     <template #trigger>
       <div class="asset-section__trigger">
-        <FaIcon v-if="icon" :name="icon" class="size-4" />
+        <YdIcon v-if="icon" :name="icon" class="size-4" />
         <span class="asset-section__title">{{ title }}</span>
-        <FaTag variant="secondary" class="text-xs">
+        <YdTag variant="secondary" class="text-xs">
           {{ count ?? 0 }}
-        </FaTag>
-        <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="size-4" />
+        </YdTag>
+        <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="size-4" />
       </div>
     </template>
     <div class="asset-section__body">
       <slot />
     </div>
-  </FaCollapsible>
+  </YdCollapsible>
 </template>
 
 <style scoped>

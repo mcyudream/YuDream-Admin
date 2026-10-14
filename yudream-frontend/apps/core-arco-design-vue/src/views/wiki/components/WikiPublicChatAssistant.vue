@@ -91,13 +91,13 @@ function goLogin() {
         >
           <template #empty>
             <div v-if="!isLogin" class="wiki-assistant__empty">
-              <FaIcon name="morph:log-in" />
+              <YdIcon name="morph:log-in" />
               <strong>登录后即可提问</strong>
               <p>登录后可在知识库助手中进行流式问答。</p>
-              <button type="button" class="wiki-assistant__login" @click="goLogin">去登录</button>
+              <YdAction type="button" class="wiki-assistant__login" @click="goLogin">去登录</YdAction>
             </div>
             <div v-else class="wiki-assistant__empty">
-              <FaIcon name="morph:message-circle-more" />
+              <YdIcon name="morph:message-circle-more" />
               <strong>关于这份文档，有什么想问的？</strong>
               <p>我会基于知识库内容回答，并附上可跳转的引用来源。</p>
             </div>
@@ -116,10 +116,10 @@ function goLogin() {
       </YdChatWindow>
     </Transition>
 
-    <button type="button" class="wiki-assistant__fab" @click="toggle">
-      <FaIcon :name="open ? 'morph:x' : 'morph:message-circle-more'" />
+    <YdAction type="button" class="wiki-assistant__fab" @click="toggle">
+      <YdIcon :name="open ? 'morph:x' : 'morph:message-circle-more'" />
       <span v-if="!open">文档助手</span>
-    </button>
+    </YdAction>
   </div>
 </template>
 

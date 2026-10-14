@@ -5,7 +5,7 @@ import AppearancePresets from './AppearancePresets.vue'
 
 const route = useRoute()
 const router = useRouter()
-const toast = useFaToast()
+const toast = useYdToast()
 const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
 
@@ -67,18 +67,18 @@ async function saveTheme() {
 
 <template>
   <div>
-    <FaPageHeader title="主题配置" description="让工作空间拥有适合你的风格与节奏" class="mb-0" />
+    <YdPageHeader title="主题配置" description="让工作空间拥有适合你的风格与节奏" class="mb-0" />
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="mb-4 flex flex-wrap gap-3 items-center justify-between">
         <div class="text-sm text-muted-foreground">
           设置即时预览，保存后刷新或重新登录仍会生效。
         </div>
         <div class="flex gap-2 items-center">
-          <FaButton v-auth="'system:setting:theme:edit'" :loading="saving" @click="saveTheme">
-            <FaIcon name="morph:save" />
+          <YdButton v-auth="'system:setting:theme:edit'" :loading="saving" @click="saveTheme">
+            <YdIcon name="morph:save" />
             保存设置
-          </FaButton>
+          </YdButton>
         </div>
       </div>
 
@@ -93,17 +93,17 @@ async function saveTheme() {
             <div class="label">
               &#39068;&#33394;&#26041;&#26696;
             </div>
-            <FaButtonGroup>
-              <FaButton
+            <YdButtonGroup>
+              <YdButton
                 v-for="item in [
                   { icon: 'morph:sun', value: 'light' },
                   { icon: 'morph:moon', value: 'dark' },
                   { icon: 'morph:sun-moon', value: '' },
                 ]" :key="item.icon" :variant="appSettingsStore.settings.theme.colorScheme === item.value ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.theme.colorScheme = (item.value as any)"
               >
-                <FaIcon :name="item.icon" />
-              </FaButton>
-            </FaButtonGroup>
+                <YdIcon :name="item.icon" />
+              </YdButton>
+            </YdButtonGroup>
           </div>
           <div class="setting-item items-start">
             <div class="label pt-2">
@@ -111,18 +111,21 @@ async function saveTheme() {
             </div>
             <div class="color-control">
               <div class="flex gap-2 items-center">
-                <input v-model="appSettingsStore.settings.theme.primaryColor" type="color" class="color-input">
-                <FaInput v-model="appSettingsStore.settings.theme.primaryColor" class="font-mono w-32" />
+                <YdInput v-model="appSettingsStore.settings.theme.primaryColor" type="color" class="color-input border-0 rounded-none bg-transparent shadow-none" input-class="color-input__control" aria-label="选择全局主色" />
+                <YdInput v-model="appSettingsStore.settings.theme.primaryColor" class="font-mono w-32" />
               </div>
               <div class="flex flex-wrap gap-2">
-                <button
+                <YdButton
                   v-for="color in colorPresets"
                   :key="color"
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   class="color-swatch"
                   :class="{ active: appSettingsStore.settings.theme.primaryColor?.toLowerCase() === color }"
                   :style="{ backgroundColor: color }"
                   :aria-label="color"
+                  :aria-pressed="appSettingsStore.settings.theme.primaryColor?.toLowerCase() === color"
                   @click="appSettingsStore.settings.theme.primaryColor = color"
                 />
               </div>
@@ -132,13 +135,13 @@ async function saveTheme() {
             <div class="label">
               &#22278;&#35282;
             </div>
-            <FaSlider v-model="themeRadius" :min="0" :max="1" :step="0.25" class="w-1/2" />
+            <YdSlider v-model="themeRadius" :min="0" :max="1" :step="0.25" class="w-1/2" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#33394;&#24369;&#27169;&#24335;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.theme.colorAmblyopia" />
+            <YdSwitch v-model="appSettingsStore.settings.theme.colorAmblyopia" />
           </div>
         </section>
 
@@ -160,16 +163,16 @@ async function saveTheme() {
               <div class="flex gap-2 items-center justify-between">
                 <div class="font-medium flex gap-2 items-center">
                   {{ theme.name }}
-                  <FaTag v-for="scope in theme.scopes" :key="scope" variant="secondary">
+                  <YdTag v-for="scope in theme.scopes" :key="scope" variant="secondary">
                     {{ scopeLabels[scope] }}
-                  </FaTag>
-                  <FaTag v-if="theme.homePreset" variant="outline">
+                  </YdTag>
+                  <YdTag v-if="theme.homePreset" variant="outline">
                     含首页方案
-                  </FaTag>
+                  </YdTag>
                 </div>
-                <FaTag v-if="theme.scopes?.some(scope => isThemeActive(theme.pluginCode, scope))" variant="default">
+                <YdTag v-if="theme.scopes?.some(scope => isThemeActive(theme.pluginCode, scope))" variant="default">
                   当前
-                </FaTag>
+                </YdTag>
               </div>
               <div v-if="theme.description" class="text-sm text-muted-foreground mt-1">
                 {{ theme.description }}
@@ -180,14 +183,14 @@ async function saveTheme() {
             </div>
           </div>
           <div class="flex flex-wrap gap-2 justify-end">
-            <FaButton variant="outline" size="sm" @click="router.push('/platform/theme-center')">
-              <FaIcon name="morph:panels-top-left" />
+            <YdButton variant="outline" size="sm" @click="router.push('/platform/theme-center')">
+              <YdIcon name="morph:panels-top-left" />
               公开站主题中心
-            </FaButton>
-            <FaButton variant="outline" size="sm" @click="goPluginManage">
-              <FaIcon name="morph:puzzle" />
+            </YdButton>
+            <YdButton variant="outline" size="sm" @click="goPluginManage">
+              <YdIcon name="morph:puzzle" />
               前往插件管理
-            </FaButton>
+            </YdButton>
           </div>
         </section>
 
@@ -199,57 +202,57 @@ async function saveTheme() {
             <div class="label">
               &#33756;&#21333;&#27169;&#24335;
             </div>
-            <FaButtonGroup>
-              <FaButton :variant="appSettingsStore.settings.menu.mode === 'side' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'side'">
+            <YdButtonGroup>
+              <YdButton :variant="appSettingsStore.settings.menu.mode === 'side' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'side'">
                 &#20391;&#36793;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.menu.mode === 'head' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'head'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.menu.mode === 'head' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'head'">
                 &#39030;&#37096;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.menu.mode === 'single' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'single'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.menu.mode === 'single' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mode = 'single'">
                 &#21333;&#26639;
-              </FaButton>
-            </FaButtonGroup>
+              </YdButton>
+            </YdButtonGroup>
           </div>
           <div class="setting-item">
             <div class="label">
               &#28857;&#20987;&#20027;&#23548;&#33322;&#33756;&#21333;
             </div>
-            <FaButtonGroup>
-              <FaButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'switch' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'switch'">
+            <YdButtonGroup>
+              <YdButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'switch' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'switch'">
                 &#20999;&#25442;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'jump' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'jump'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'jump' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'jump'">
                 &#36339;&#36716;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'smart' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'smart'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.menu.mainMenuClickMode === 'smart' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.menu.mainMenuClickMode = 'smart'">
                 &#26234;&#33021;
-              </FaButton>
-            </FaButtonGroup>
+              </YdButton>
+            </YdButtonGroup>
           </div>
           <div class="setting-item">
             <div class="label">
               &#27425;&#23548;&#33322;&#33756;&#21333;&#21807;&#19968;&#23637;&#24320;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.menu.subMenuUniqueExpand" />
+            <YdSwitch v-model="appSettingsStore.settings.menu.subMenuUniqueExpand" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#27425;&#23548;&#33322;&#33756;&#21333;&#25910;&#36215;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.menu.subMenuCollapse" />
+            <YdSwitch v-model="appSettingsStore.settings.menu.subMenuCollapse" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#27425;&#23548;&#33322;&#23637;&#24320;&#25910;&#36215;&#25353;&#38062;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.menu.subMenuCollapseButton" />
+            <YdSwitch v-model="appSettingsStore.settings.menu.subMenuCollapseButton" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#24555;&#25463;&#38190;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.menu.hotkeys" :disabled="appSettingsStore.settings.menu.mode === 'single'" />
+            <YdSwitch v-model="appSettingsStore.settings.menu.hotkeys" :disabled="appSettingsStore.settings.menu.mode === 'single'" />
           </div>
         </section>
 
@@ -261,29 +264,29 @@ async function saveTheme() {
             <div class="label">
               &#26631;&#31614;&#26639;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.topbar.tabbar" />
+            <YdSwitch v-model="appSettingsStore.settings.topbar.tabbar" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#24037;&#20855;&#26639;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.topbar.toolbar" />
+            <YdSwitch v-model="appSettingsStore.settings.topbar.toolbar" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#27169;&#24335;
             </div>
-            <FaButtonGroup>
-              <FaButton :variant="appSettingsStore.settings.topbar.mode === 'static' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'static'">
+            <YdButtonGroup>
+              <YdButton :variant="appSettingsStore.settings.topbar.mode === 'static' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'static'">
                 &#38745;&#24577;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.topbar.mode === 'fixed' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'fixed'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.topbar.mode === 'fixed' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'fixed'">
                 &#22266;&#23450;
-              </FaButton>
-              <FaButton :variant="appSettingsStore.settings.topbar.mode === 'sticky' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'sticky'">
+              </YdButton>
+              <YdButton :variant="appSettingsStore.settings.topbar.mode === 'sticky' ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.topbar.mode = 'sticky'">
                 &#31896;&#24615;
-              </FaButton>
-            </FaButtonGroup>
+              </YdButton>
+            </YdButtonGroup>
           </div>
         </section>
 
@@ -295,13 +298,13 @@ async function saveTheme() {
             <div class="label">
               &#26174;&#31034;&#22270;&#26631;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.tabbar.icon" />
+            <YdSwitch v-model="appSettingsStore.settings.tabbar.icon" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#24555;&#25463;&#38190;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.tabbar.hotkeys" />
+            <YdSwitch v-model="appSettingsStore.settings.tabbar.hotkeys" />
           </div>
         </section>
 
@@ -311,31 +314,31 @@ async function saveTheme() {
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="morph:chevrons-right" />
+              <YdIcon name="morph:chevrons-right" />
               &#38754;&#21253;&#23633;&#23548;&#33322;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.toolbar.breadcrumb" />
+            <YdSwitch v-model="appSettingsStore.settings.toolbar.breadcrumb" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="morph:search" />
+              <YdIcon name="morph:search" />
               &#23548;&#33322;&#25628;&#32034;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.toolbar.menuSearch.enable" />
+            <YdSwitch v-model="appSettingsStore.settings.toolbar.menuSearch.enable" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="morph:maximize" />
+              <YdIcon name="morph:maximize" />
               &#20840;&#23631;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.toolbar.fullscreen" />
+            <YdSwitch v-model="appSettingsStore.settings.toolbar.fullscreen" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="morph:sun" />
+              <YdIcon name="morph:sun" />
               &#39068;&#33394;&#20027;&#39064;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.toolbar.colorScheme" />
+            <YdSwitch v-model="appSettingsStore.settings.toolbar.colorScheme" />
           </div>
         </section>
 
@@ -347,41 +350,41 @@ async function saveTheme() {
             <div class="label">
               &#36733;&#20837;&#36827;&#24230;&#26465;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.page.progress" />
+            <YdSwitch v-model="appSettingsStore.settings.page.progress" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#26435;&#38480;&#39564;&#35777;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.app.account.auth" />
+            <YdSwitch v-model="appSettingsStore.settings.app.account.auth" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#21160;&#24577;&#26631;&#39064;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.app.dynamicTitle" />
+            <YdSwitch v-model="appSettingsStore.settings.app.dynamicTitle" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#31227;&#21160;&#31471;&#35775;&#38382;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.app.mobile" />
+            <YdSwitch v-model="appSettingsStore.settings.app.mobile" />
           </div>
           <div class="setting-item">
             <div class="label">
               &#39318;&#39029;&#21551;&#29992;
             </div>
-            <FaSwitch v-model="appSettingsStore.settings.app.home.enable" />
+            <YdSwitch v-model="appSettingsStore.settings.app.home.enable" />
           </div>
           <div class="setting-item items-start">
             <div class="label pt-2">
               &#39318;&#39029;&#26631;&#39064;
             </div>
-            <FaInput v-model="appSettingsStore.settings.app.home.title" class="max-w-80" />
+            <YdInput v-model="appSettingsStore.settings.app.home.title" class="max-w-80" />
           </div>
         </section>
       </div>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 
@@ -420,6 +423,11 @@ async function saveTheme() {
 .color-input {
   width: 36px;
   height: 36px;
+}
+
+.color-input__control {
+  width: 36px;
+  height: 36px;
   padding: 0;
   background: transparent;
   border: 1px solid var(--color-border-2);
@@ -429,6 +437,7 @@ async function saveTheme() {
 .color-swatch {
   width: 24px;
   height: 24px;
+  padding: 0;
   cursor: pointer;
   border: 2px solid transparent;
   border-radius: 999px;

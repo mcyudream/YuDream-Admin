@@ -3,8 +3,8 @@
 
 <template>
   <div>
-    <FaPageMain>
+    <YdPageMain>
       导航1
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>

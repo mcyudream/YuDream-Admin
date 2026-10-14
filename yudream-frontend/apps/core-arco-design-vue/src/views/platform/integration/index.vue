@@ -14,8 +14,8 @@ import type {
 } from '@/api/modules/platform-integration'
 import apiIntegration from '@/api/modules/platform-integration'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const activeTab = ref<'connectors' | 'httpLogs' | 'scripts' | 'runtimeLogs'>('connectors')
 const loading = ref(false)
@@ -443,34 +443,34 @@ function executionVariant(status: ExecutionStatus) {
 
 <template>
   <div>
-    <FaPageHeader title="集成调用" class="mb-0">
-      <FaButton v-if="activeTab === 'connectors'" v-auth="'platform:integration:edit'" @click="openCreateConnector">
-        <FaIcon name="morph:plus" />
+    <YdPageHeader title="集成调用" class="mb-0">
+      <YdButton v-if="activeTab === 'connectors'" v-auth="'platform:integration:edit'" @click="openCreateConnector">
+        <YdIcon name="morph:plus" />
         新增连接器
-      </FaButton>
-      <FaButton v-if="activeTab === 'scripts'" v-auth="'platform:integration:edit'" @click="openCreateScript">
-        <FaIcon name="morph:plus" />
+      </YdButton>
+      <YdButton v-if="activeTab === 'scripts'" v-auth="'platform:integration:edit'" @click="openCreateScript">
+        <YdIcon name="morph:plus" />
         新增脚本
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="integration-tabs">
-        <button
+        <YdAction
           v-for="tab in tabs"
           :key="tab.key"
           type="button"
           :class="{ active: activeTab === tab.key }"
           @click="activeTab = tab.key"
         >
-          <FaIcon :name="tab.icon" />
+          <YdIcon :name="tab.icon" />
           <span>{{ tab.label }}</span>
-        </button>
+        </YdAction>
       </div>
 
-      <FaResponsiveTable
-        v-if="activeTab === 'connectors'"
-        v-loading="loading"
+      <YdLoadingOverlay v-if="activeTab === 'connectors'" :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -481,47 +481,47 @@ function executionVariant(status: ExecutionStatus) {
         :data="connectorRows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-method="{ row }">
-          <FaTag variant="secondary">{{ row.original.method }}</FaTag>
+          <YdTag variant="secondary">{{ row.original.method }}</YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
-            <FaButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openInvoke(row.original)">
+            <YdButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openInvoke(row.original)">
               调用
-            </FaButton>
-            <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row.original)">
+            </YdButton>
+            <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row.original)">
               编辑
-            </FaButton>
-            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row.original)">
+            </YdButton>
+            <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row.original)">
               停用
-            </FaButton>
-            <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row.original)">
+            </YdButton>
+            <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row.original)">
               启用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -546,27 +546,27 @@ function executionVariant(status: ExecutionStatus) {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openInvoke(row)">
+                <YdButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openInvoke(row)">
                   调用
-                </FaButton>
-                <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row)">
                   编辑
-                </FaButton>
-                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row)">
                   停用
-                </FaButton>
-                <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row)">
+                </YdButton>
+                <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row)">
                   启用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaResponsiveTable
-        v-else-if="activeTab === 'httpLogs'"
-        v-loading="loading"
+      <YdLoadingOverlay v-else-if="activeTab === 'httpLogs'" :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1320px]"
@@ -577,24 +577,24 @@ function executionVariant(status: ExecutionStatus) {
         :data="httpLogRows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-method="{ row }">
-          <FaTag variant="secondary">{{ row.original.method }}</FaTag>
+          <YdTag variant="secondary">{{ row.original.method }}</YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</FaTag>
+          <YdTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</YdTag>
         </template>
         <template #cell-invokedAt="{ row }">
           {{ dateText(row.original.invokedAt) }}
@@ -603,11 +603,11 @@ function executionVariant(status: ExecutionStatus) {
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.connectorCode }}</span>
-                <FaTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</FaTag>
+                <YdTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -636,13 +636,13 @@ function executionVariant(status: ExecutionStatus) {
                 </div>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaResponsiveTable
-        v-else-if="activeTab === 'scripts'"
-        v-loading="loading"
+      <YdLoadingOverlay v-else-if="activeTab === 'scripts'" :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1080px]"
@@ -653,50 +653,50 @@ function executionVariant(status: ExecutionStatus) {
         :data="scriptRows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-language="{ row }">
-          <FaTag variant="secondary">{{ row.original.language }}</FaTag>
+          <YdTag variant="secondary">{{ row.original.language }}</YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
         </template>
         <template #cell-updateTime="{ row }">
           {{ dateText(row.original.updateTime) }}
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
-            <FaButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openExecute(row.original)">
+            <YdButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openExecute(row.original)">
               执行
-            </FaButton>
-            <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row.original)">
+            </YdButton>
+            <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row.original)">
               编辑
-            </FaButton>
-            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row.original)">
+            </YdButton>
+            <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row.original)">
               停用
-            </FaButton>
-            <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row.original)">
+            </YdButton>
+            <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row.original)">
               启用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -717,27 +717,27 @@ function executionVariant(status: ExecutionStatus) {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openExecute(row)">
+                <YdButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openExecute(row)">
                   执行
-                </FaButton>
-                <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row)">
                   编辑
-                </FaButton>
-                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row)">
                   停用
-                </FaButton>
-                <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row)">
+                </YdButton>
+                <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row)">
                   启用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaResponsiveTable
-        v-else
-        v-loading="loading"
+      <YdLoadingOverlay v-else :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -748,24 +748,24 @@ function executionVariant(status: ExecutionStatus) {
         :data="runtimeLogRows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-language="{ row }">
-          <FaTag variant="secondary">{{ row.original.language }}</FaTag>
+          <YdTag variant="secondary">{{ row.original.language }}</YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</FaTag>
+          <YdTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</YdTag>
         </template>
         <template #cell-executedAt="{ row }">
           {{ dateText(row.original.executedAt) }}
@@ -777,11 +777,11 @@ function executionVariant(status: ExecutionStatus) {
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.scriptCode }}</span>
-                <FaTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</FaTag>
+                <YdTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -810,11 +810,11 @@ function executionVariant(status: ExecutionStatus) {
                 </div>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -822,108 +822,108 @@ function executionVariant(status: ExecutionStatus) {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="connectorVisible" :title="connectorEditing ? '编辑 HTTP 连接器' : '新增 HTTP 连接器'" show-cancel-button class="sm:max-w-4xl" @confirm="saveConnector">
-      <a-form :model="connectorForm" layout="vertical">
+    <YdModal v-model="connectorVisible" :title="connectorEditing ? '编辑 HTTP 连接器' : '新增 HTTP 连接器'" show-cancel-button class="sm:max-w-4xl" @confirm="saveConnector">
+      <YdForm :model="connectorForm" layout="vertical">
         <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <a-form-item label="名称" required>
-            <FaInput v-model="connectorForm.name" />
-          </a-form-item>
-          <a-form-item label="编码" required>
-            <FaInput v-model="connectorForm.code" :disabled="!!connectorEditing" />
+          <YdFormItem label="名称" required>
+            <YdInput v-model="connectorForm.name" />
+          </YdFormItem>
+          <YdFormItem label="编码" required>
+            <YdInput v-model="connectorForm.code" :disabled="!!connectorEditing" />
             <div v-if="connectorEditing" class="field-tip">编码用于日志和调用关联，创建后不可修改。</div>
-          </a-form-item>
-          <a-form-item label="请求地址" required class="md:col-span-2">
-            <FaInput v-model="connectorForm.url" placeholder="https://api.example.com/resource" />
-          </a-form-item>
-          <a-form-item label="请求方法">
-            <FaSelect v-model="connectorForm.method" :options="methodOptions" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="connectorForm.status" :options="statusOptions" />
-          </a-form-item>
-          <a-form-item label="超时毫秒">
-            <FaInput v-model.number="connectorForm.timeoutMillis" type="number" />
-          </a-form-item>
-          <a-form-item label="重试次数">
-            <FaInput v-model.number="connectorForm.retryTimes" type="number" />
-          </a-form-item>
-          <a-form-item label="请求头 JSON">
-            <FaTextarea v-model="connectorJson.headers" rows="6" input-class="font-mono" />
-          </a-form-item>
-          <a-form-item label="查询参数 JSON">
-            <FaTextarea v-model="connectorJson.queryParams" rows="6" input-class="font-mono" />
-          </a-form-item>
-          <a-form-item label="请求体模板" class="md:col-span-2">
-            <FaTextarea v-model="connectorForm.bodyTemplate" rows="6" input-class="font-mono" />
-          </a-form-item>
+          </YdFormItem>
+          <YdFormItem label="请求地址" required class="md:col-span-2">
+            <YdInput v-model="connectorForm.url" placeholder="https://api.example.com/resource" />
+          </YdFormItem>
+          <YdFormItem label="请求方法">
+            <YdSelect v-model="connectorForm.method" :options="methodOptions" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="connectorForm.status" :options="statusOptions" />
+          </YdFormItem>
+          <YdFormItem label="超时毫秒">
+            <YdInput v-model.number="connectorForm.timeoutMillis" type="number" />
+          </YdFormItem>
+          <YdFormItem label="重试次数">
+            <YdInput v-model.number="connectorForm.retryTimes" type="number" />
+          </YdFormItem>
+          <YdFormItem label="请求头 JSON">
+            <YdTextarea v-model="connectorJson.headers" rows="6" input-class="font-mono" />
+          </YdFormItem>
+          <YdFormItem label="查询参数 JSON">
+            <YdTextarea v-model="connectorJson.queryParams" rows="6" input-class="font-mono" />
+          </YdFormItem>
+          <YdFormItem label="请求体模板" class="md:col-span-2">
+            <YdTextarea v-model="connectorForm.bodyTemplate" rows="6" input-class="font-mono" />
+          </YdFormItem>
         </div>
-      </a-form>
-    </FaModal>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="invokeVisible" title="执行 HTTP 调用" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'invoke'" @confirm="invokeConnector">
+    <YdModal v-model="invokeVisible" title="执行 HTTP 调用" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'invoke'" @confirm="invokeConnector">
       <div class="modal-grid">
-        <a-form :model="{}" layout="vertical">
-          <a-form-item label="请求头 JSON">
-            <FaTextarea v-model="invokeForm.headers" rows="5" input-class="font-mono" />
-          </a-form-item>
-          <a-form-item label="查询参数 JSON">
-            <FaTextarea v-model="invokeForm.queryParams" rows="5" input-class="font-mono" />
-          </a-form-item>
-          <a-form-item label="请求体">
-            <FaTextarea v-model="invokeForm.body" rows="7" input-class="font-mono" />
-          </a-form-item>
-        </a-form>
+        <YdForm :model="{}" layout="vertical">
+          <YdFormItem label="请求头 JSON">
+            <YdTextarea v-model="invokeForm.headers" rows="5" input-class="font-mono" />
+          </YdFormItem>
+          <YdFormItem label="查询参数 JSON">
+            <YdTextarea v-model="invokeForm.queryParams" rows="5" input-class="font-mono" />
+          </YdFormItem>
+          <YdFormItem label="请求体">
+            <YdTextarea v-model="invokeForm.body" rows="7" input-class="font-mono" />
+          </YdFormItem>
+        </YdForm>
         <section class="result-panel">
           <div class="section-title">最近结果</div>
           <pre>{{ lastHttpLog ? JSON.stringify(lastHttpLog, null, 2) : '尚未执行' }}</pre>
         </section>
       </div>
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="scriptVisible" :title="scriptEditing ? '编辑运行脚本' : '新增运行脚本'" show-cancel-button class="sm:max-w-4xl" @confirm="saveScript">
-      <a-form :model="scriptForm" layout="vertical">
+    <YdModal v-model="scriptVisible" :title="scriptEditing ? '编辑运行脚本' : '新增运行脚本'" show-cancel-button class="sm:max-w-4xl" @confirm="saveScript">
+      <YdForm :model="scriptForm" layout="vertical">
         <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <a-form-item label="名称" required>
-            <FaInput v-model="scriptForm.name" />
-          </a-form-item>
-          <a-form-item label="编码" required>
-            <FaInput v-model="scriptForm.code" :disabled="!!scriptEditing" />
+          <YdFormItem label="名称" required>
+            <YdInput v-model="scriptForm.name" />
+          </YdFormItem>
+          <YdFormItem label="编码" required>
+            <YdInput v-model="scriptForm.code" :disabled="!!scriptEditing" />
             <div v-if="scriptEditing" class="field-tip">编码用于执行记录关联，创建后不可修改。</div>
-          </a-form-item>
-          <a-form-item label="语言">
-            <FaSelect v-model="scriptForm.language" :options="languageOptions" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="scriptForm.status" :options="statusOptions" />
-          </a-form-item>
-          <a-form-item label="超时毫秒">
-            <FaInput v-model.number="scriptForm.timeoutMillis" type="number" />
-          </a-form-item>
-          <a-form-item label="环境变量 JSON">
-            <FaTextarea v-model="scriptEnvJson" rows="5" input-class="font-mono" />
-          </a-form-item>
-          <a-form-item label="脚本内容" required class="md:col-span-2">
-            <FaTextarea v-model="scriptForm.scriptContent" rows="14" input-class="font-mono" />
-          </a-form-item>
+          </YdFormItem>
+          <YdFormItem label="语言">
+            <YdSelect v-model="scriptForm.language" :options="languageOptions" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="scriptForm.status" :options="statusOptions" />
+          </YdFormItem>
+          <YdFormItem label="超时毫秒">
+            <YdInput v-model.number="scriptForm.timeoutMillis" type="number" />
+          </YdFormItem>
+          <YdFormItem label="环境变量 JSON">
+            <YdTextarea v-model="scriptEnvJson" rows="5" input-class="font-mono" />
+          </YdFormItem>
+          <YdFormItem label="脚本内容" required class="md:col-span-2">
+            <YdTextarea v-model="scriptForm.scriptContent" rows="14" input-class="font-mono" />
+          </YdFormItem>
         </div>
-      </a-form>
-    </FaModal>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="executeVisible" title="执行运行脚本" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'execute'" @confirm="executeScript">
+    <YdModal v-model="executeVisible" title="执行运行脚本" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'execute'" @confirm="executeScript">
       <div class="modal-grid">
-        <a-form :model="{}" layout="vertical">
-          <a-form-item label="标准输入">
-            <FaTextarea v-model="executeStdin" rows="8" input-class="font-mono" />
-          </a-form-item>
-        </a-form>
+        <YdForm :model="{}" layout="vertical">
+          <YdFormItem label="标准输入">
+            <YdTextarea v-model="executeStdin" rows="8" input-class="font-mono" />
+          </YdFormItem>
+        </YdForm>
         <section class="result-panel">
           <div class="section-title">最近结果</div>
           <pre>{{ lastRuntimeLog ? JSON.stringify(lastRuntimeLog, null, 2) : '尚未执行' }}</pre>
         </section>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -949,8 +949,8 @@ function executionVariant(status: ExecutionStatus) {
 
 .integration-tabs button.active,
 .integration-tabs button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
 }
 
 .table-actions {

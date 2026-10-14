@@ -23,7 +23,7 @@ const { generateTitle, switchTo } = useAppMenu()
         <Component :is="useSlots('header-start')" />
         <Logo class="title" />
         <Component :is="useSlots('header-after-logo')" />
-        <FaScrollArea :scrollbar="false" mask horizontal class="menu-container overscroll-contain flex-1 h-full">
+        <YdScrollArea :scrollbar="false" mask horizontal class="menu-container overscroll-contain flex-1 h-full">
           <!-- 顶部模式 -->
           <div
             v-if="appSettingsStore.settings.menu.mode === 'head'" class="menu flex h-full transition-all of-hidden"
@@ -34,24 +34,25 @@ const { generateTitle, switchTo } = useAppMenu()
                   active: index === appMenuStore.actived,
                 }"
               >
-                <FaTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="bottom">
-                  <div
+                <YdTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="bottom">
+                  <YdAction
+                    type="button"
                     class="group menu-item-container text-[var(--g-header-menu-color)] px-3 rounded-lg flex gap-1 h-full w-full cursor-pointer transition-colors items-center justify-between relative hover-(text-[var(--g-header-menu-hover-color)] bg-[var(--g-header-menu-hover-bg)])" :class="{
                       'text-[var(--g-header-menu-active-color)]! bg-[var(--g-header-menu-active-bg)]!': index === appMenuStore.actived,
                     }" @click="switchTo(index)"
                   >
                     <div class="inline-flex flex-1 gap-1 items-center justify-center">
-                      <FaIcon v-if="item.meta?.icon" :name="item.meta.icon" class="menu-item-container-icon transition-transform group-hover-scale-120" />
+                      <YdIcon v-if="item.meta?.icon" :name="item.meta.icon" class="menu-item-container-icon transition-transform group-hover-scale-120" />
                       <span class="text-sm flex-1 w-full truncate transition-height transition-opacity transition-width empty:hidden">
                         {{ generateTitle(item.meta?.title) }}
                       </span>
                     </div>
-                  </div>
-                </FaTooltip>
+                  </YdAction>
+                </YdTooltip>
               </div>
             </template>
           </div>
-        </FaScrollArea>
+        </YdScrollArea>
         <Component :is="useSlots('header-after-menu')" />
         <div class="flex-center">
           <AppAccountButton only-avatar dropdown-side="bottom" class="p-2 size-12" />

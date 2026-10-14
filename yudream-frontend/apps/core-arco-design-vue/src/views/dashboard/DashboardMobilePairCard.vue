@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CapabilityItem } from '@/api/modules/platform-capability'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
-import { FaButton, FaIcon } from '@yudream/components'
+import { YdButton, YdIcon } from '@yudream/components'
 import QRCode from 'qrcode'
 import { nextTick, onMounted, ref } from 'vue'
 import apiCapability from '@/api/modules/platform-capability'
@@ -68,7 +68,7 @@ async function renderQr() {
         <div class="pair-text">
           <strong>工作台，随身带走</strong>
           <p class="pair-url">
-            <FaIcon name="morph:globe" />
+            <YdIcon name="morph:globe" />
             {{ pairUrl }}
           </p>
           <p class="pair-hint">
@@ -81,16 +81,16 @@ async function renderQr() {
       </div>
     </template>
     <div v-else class="pair-empty">
-      <FaIcon name="morph:qr-code" class="pair-empty__icon" />
+      <YdIcon name="morph:qr-code" class="pair-empty__icon" />
       <p>{{ loading ? '正在检查移动应用能力…' : (message || 'mobile-app 能力未启用：请先在「平台 → 能力管理」启用后再扫码配对。') }}</p>
     </div>
 
     <div class="pair-footer">
       <span>扫码添加站点</span>
-      <FaButton v-if="card.actionPath" size="sm" variant="ghost" @click="props.onOpen?.(card)">
+      <YdButton v-if="card.actionPath" size="sm" variant="ghost" @click="props.onOpen?.(card)">
         移动端配置
-        <FaIcon name="morph:arrow-up-right" />
-      </FaButton>
+        <YdIcon name="morph:arrow-up-right" />
+      </YdButton>
     </div>
   </div>
 </template>

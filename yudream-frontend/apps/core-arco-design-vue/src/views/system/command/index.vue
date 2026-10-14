@@ -3,7 +3,7 @@ import type { TableColumn } from '@yudream/components'
 import type { MessagingBindingCode, MessagingBindingTarget, QqBindingPolicy, SystemCommand } from '@/api/modules/system-command'
 import apiCommands from '@/api/modules/system-command'
 
-const toast = useFaToast()
+const toast = useYdToast()
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref<SystemCommand[]>([])
@@ -45,7 +45,10 @@ async function load() {
     Object.assign(policy, bindingPolicy.data)
   } finally { loading.value = false }
 }
-async function savePolicy(value: boolean) {
+async function savePolicy(value: boolean | undefined) {
+  if (typeof value !== 'boolean') {
+    return
+  }
   saving.value = true
   try { Object.assign(policy, (await apiCommands.updatePolicy(value)).data); toast.success('消息绑定策略已保存') }
   finally { saving.value = false }
@@ -82,18 +85,18 @@ onMounted(load)
 
 <template>
   <div>
-    <FaPageHeader title="指令管理" class="mb-0" />
-    <FaPageMain>
+    <YdPageHeader title="指令管理" class="mb-0" />
+    <YdPageMain>
       <div class="mb-4 flex items-center justify-between border border-[var(--color-border-2)] p-4">
         <div><div class="font-medium">要求绑定消息身份</div><div class="text-sm text-muted-foreground">开启后，未绑定 Milky QQ 或官方机器人身份的用户仅可使用绑定指令。官方绑定写入协议身份，不会覆盖 QQ 号。</div></div>
-        <a-switch :model-value="policy.requireBoundQq" :loading="saving" @change="savePolicy(Boolean($event))" />
+        <YdSwitch :model-value="policy.requireBoundQq" :disabled="saving" @update:model-value="savePolicy" />
       </div>
       <div class="mb-4 border border-[var(--color-border-2)] p-4">
         <div class="mb-3 font-medium">按机器人连接生成绑定码</div>
         <div class="mb-3 text-sm text-muted-foreground">先选择系统用户，再按已启用连接分别生成绑定码。用户需向对应机器人发送 `/绑定 绑定码`。</div>
         <div class="flex flex-wrap items-center gap-3">
-          <FaInput v-model="bindingUserId" class="w-72" placeholder="输入系统用户 ID" />
-          <FaButton :loading="loadingTargets" @click="loadBindingTargets"><FaIcon name="morph:bot" />加载连接</FaButton>
+          <YdInput v-model="bindingUserId" class="w-72" placeholder="输入系统用户 ID" />
+          <YdButton :loading="loadingTargets" @click="loadBindingTargets"><YdIcon name="morph:bot" />加载连接</YdButton>
         </div>
         <div v-if="bindingCode" class="mt-3 flex flex-wrap items-center gap-3">
           <code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ bindingCode.code }}</code>
@@ -106,29 +109,29 @@ onMounted(load)
               <div class="text-sm text-muted-foreground">{{ protocolLabel(target.protocol) }}{{ target.botName && target.name && target.botName !== target.name ? ` · ${target.name}` : '' }}</div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <FaTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</FaTag>
-              <FaButton size="sm" :loading="issuingCode && issuingConnectionId === target.connectionId" @click="issueBindingCode(target.connectionId)">
-                <FaIcon name="morph:key-round" />生成绑定码
-              </FaButton>
+              <YdTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</YdTag>
+              <YdButton size="sm" :loading="issuingCode && issuingConnectionId === target.connectionId" @click="issueBindingCode(target.connectionId)">
+                <YdIcon name="morph:key-round" />生成绑定码
+              </YdButton>
             </div>
           </div>
         </div>
       </div>
-      <FaResponsiveTable :columns="columns" :data="rows" :loading="loading" row-key="code" border stripe>
+      <YdResponsiveTable :columns="columns" :data="rows" :loading="loading" row-key="code" border stripe>
         <template #cell-command="{ row }"><code>/{{ row.original.command }}</code></template>
         <template #cell-permission="{ row }">{{ row.original.permission || '无需权限' }}</template>
-        <template #cell-anonymous="{ row }"><FaTag :variant="row.original.allowAnonymous ? 'default' : 'secondary'">{{ row.original.allowAnonymous ? '允许' : '不允许' }}</FaTag></template>
+        <template #cell-anonymous="{ row }"><YdTag :variant="row.original.allowAnonymous ? 'default' : 'secondary'">{{ row.original.allowAnonymous ? '允许' : '不允许' }}</YdTag></template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-start justify-between gap-2">
                 <div class="flex min-w-0 flex-col gap-1">
                   <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                   <code class="text-sm text-secondary-foreground/70">/{{ row.command }}</code>
                 </div>
-                <FaTag :variant="row.allowAnonymous ? 'default' : 'secondary'">
+                <YdTag :variant="row.allowAnonymous ? 'default' : 'secondary'">
                   {{ row.allowAnonymous ? '允许' : '不允许' }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -144,9 +147,9 @@ onMounted(load)
                 {{ row.description }}
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
-    </FaPageMain>
+      </YdResponsiveTable>
+    </YdPageMain>
   </div>
 </template>

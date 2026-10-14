@@ -5,7 +5,7 @@ import { executeWikiReview, fetchWikiReviews } from '@/api/modules/platform-wiki
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
+const toast = useYdToast()
 
 const reviews = ref<WikiReviewItem[]>([])
 const loading = ref(false)
@@ -95,78 +95,79 @@ watch(filter, () => {
 
 <template>
   <div class="rev-panel">
-    <FaScrollArea class="rev-scroll">
+    <YdScrollArea class="rev-scroll">
       <div class="rev-inner">
         <div class="rev-head">
           <div class="rev-head__tabs">
-            <button type="button" :class="{ active: filter === 'PENDING' }" @click="filter = 'PENDING'">
-              待处理 <FaTag v-if="pendingCount" variant="secondary">{{ pendingCount }}</FaTag>
-            </button>
-            <button type="button" :class="{ active: filter === 'DONE' }" @click="filter = 'DONE'">
+            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'PENDING'" :class="{ active: filter === 'PENDING' }" @click="filter = 'PENDING'">
+              待处理 <YdTag v-if="pendingCount" variant="secondary">{{ pendingCount }}</YdTag>
+            </YdButton>
+            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'DONE'" :class="{ active: filter === 'DONE' }" @click="filter = 'DONE'">
               已处理
-            </button>
-            <button type="button" :class="{ active: filter === 'ALL' }" @click="filter = 'ALL'">
+            </YdButton>
+            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'ALL'" :class="{ active: filter === 'ALL' }" @click="filter = 'ALL'">
               全部
-            </button>
+            </YdButton>
           </div>
-          <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-            <FaIcon name="morph:refresh-cw" /> 刷新
-          </FaButton>
+          <YdButton size="sm" variant="outline" :loading="loading" @click="load">
+            <YdIcon name="morph:refresh-cw" /> 刷新
+          </YdButton>
         </div>
 
         <div v-if="!filtered.length && !loading" class="rev-empty">
-          <FaIcon name="morph:list-checks" />
+          <YdIcon name="morph:list-checks" />
           <strong>{{ filter === 'PENDING' ? '没有待处理的审阅项' : '暂无审阅项' }}</strong>
           <p>摄入或 Lint 后发现的问题会出现在这里</p>
         </div>
 
         <div v-else class="rev-list">
-          <FaCard v-for="item in pagedReviews" :key="item.id" class="rev-card">
+          <YdCard v-for="item in pagedReviews" :key="item.id" class="rev-card">
             <div class="rev-card__head">
               <span class="rev-card__type" :style="{ color: typeMeta(item.itemType).color, background: `${typeMeta(item.itemType).color}1a` }">
                 {{ typeMeta(item.itemType).label }}
               </span>
               <strong>{{ item.title }}</strong>
-              <FaTag variant="outline" class="rev-card__status">{{ statusLabel(item.status) }}</FaTag>
+              <YdTag variant="outline" class="rev-card__status">{{ statusLabel(item.status) }}</YdTag>
             </div>
             <p class="rev-card__desc">{{ item.description }}</p>
             <div v-if="item.pageTitles?.length" class="rev-card__pages">
-              <button
+              <YdButton
                 v-for="title in item.pageTitles"
                 :key="title"
+                variant="ghost"
                 type="button"
                 class="rev-card__page"
                 @click="store.openPage({ title })"
               >
-                <FaIcon name="morph:file-text" /> {{ title }}
-              </button>
+                <YdIcon name="morph:file-text" /> {{ title }}
+              </YdButton>
             </div>
             <div class="rev-card__footer">
               <span v-if="item.suggestedAction" class="rev-card__suggest">
-                <FaIcon name="morph:lightbulb" /> {{ item.suggestedAction }}
+                <YdIcon name="morph:lightbulb" /> {{ item.suggestedAction }}
               </span>
               <span class="rev-card__time">{{ new Date(item.createTime).toLocaleString('zh-CN') }}</span>
               <div v-if="!['RESOLVED', 'DISMISSED', 'DONE'].includes(item.status)" class="rev-card__actions">
-                <FaButton size="sm" :loading="acting === item.id" @click="act(item, 'done')">
-                  <FaIcon name="morph:check" /> 完成
-                </FaButton>
-                <FaButton size="sm" variant="outline" :disabled="acting === item.id" @click="act(item, 'dismiss')">
-                  <FaIcon name="morph:x" /> 忽略
-                </FaButton>
-                <FaButton
+                <YdButton size="sm" :loading="acting === item.id" @click="act(item, 'done')">
+                  <YdIcon name="morph:check" /> 完成
+                </YdButton>
+                <YdButton size="sm" variant="outline" :disabled="acting === item.id" @click="act(item, 'dismiss')">
+                  <YdIcon name="morph:x" /> 忽略
+                </YdButton>
+                <YdButton
                   v-if="item.searchQueries?.length"
                   size="sm"
                   variant="secondary"
                   :disabled="acting === item.id"
                   @click="act(item, 'deep_research')"
                 >
-                  <FaIcon name="morph:flask-conical" /> 发起研究
-                </FaButton>
+                  <YdIcon name="morph:flask-conical" /> 发起研究
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </div>
-        <FaPagination
+        <YdPagination
           v-if="filtered.length > pageSize"
           v-model:page="page"
           v-model:size="pageSize"
@@ -174,7 +175,7 @@ watch(filter, () => {
           class="rev-pagination"
         />
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </div>
 </template>
 
@@ -227,7 +228,7 @@ watch(filter, () => {
 
 .rev-head__tabs button.active {
   background: var(--color-bg-1);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-2);
   font-weight: 600;
   box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
@@ -241,7 +242,7 @@ watch(filter, () => {
 }
 
 .rev-empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-2);
   font-size: 36px;
 }
 
@@ -303,15 +304,15 @@ watch(filter, () => {
   border: 1px solid var(--color-border-2);
   border-radius: 999px;
   background: transparent;
-  color: rgb(var(--primary-6));
+  color: var(--color-text-2);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
 }
 
 .rev-card__page:hover {
-  border-color: rgba(var(--primary-6), 0.4);
-  background: rgba(var(--primary-6), 0.06);
+  border-color: var(--color-border-2);
+  background: var(--color-fill-2);
 }
 
 .rev-card__footer {

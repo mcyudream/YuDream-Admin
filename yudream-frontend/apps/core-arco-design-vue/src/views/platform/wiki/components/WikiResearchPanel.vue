@@ -5,7 +5,7 @@ import { planWikiResearch, startWikiResearch } from '@/api/modules/platform-wiki
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
+const toast = useYdToast()
 
 const seed = ref('')
 const plan = ref<WikiResearchPlan | null>(null)
@@ -55,29 +55,29 @@ async function start() {
 
 <template>
   <div class="res-panel">
-    <FaScrollArea class="res-scroll">
+    <YdScrollArea class="res-scroll">
       <div class="res-inner">
-        <FaCard class="res-hero">
+        <YdCard class="res-hero">
           <div class="res-hero__icon">
-            <FaIcon name="morph:flask-conical" />
+            <YdIcon name="morph:flask-conical" />
           </div>
           <strong>深度研究</strong>
           <p>给一个研究起点，系统会规划检索查询、执行检索与网络调研，并把结果写成 Wiki 页面</p>
           <div class="res-hero__bar">
-            <FaInput v-model="seed" clearable placeholder="研究起点 / 主题，例如：支付渠道的费率对比" @keydown.enter="makePlan">
+            <YdInput v-model="seed" clearable placeholder="研究起点 / 主题，例如：支付渠道的费率对比" @keydown.enter="makePlan">
               <template #start>
-                <FaIcon name="morph:compass" />
+                <YdIcon name="morph:compass" />
               </template>
-            </FaInput>
-            <FaButton :loading="planning" @click="makePlan">
-              <FaIcon name="morph:wand-sparkles" /> 生成研究计划
-            </FaButton>
+            </YdInput>
+            <YdButton :loading="planning" @click="makePlan">
+              <YdIcon name="morph:wand-sparkles" /> 生成研究计划
+            </YdButton>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard v-if="plan" class="res-plan">
+        <YdCard v-if="plan" class="res-plan">
           <div class="res-plan__head">
-            <FaIcon name="morph:file-text" class="res-plan__icon" />
+            <YdIcon name="morph:file-text" class="res-plan__icon" />
             <div>
               <strong>{{ plan.topic }}</strong>
               <p>{{ plan.rationale }}</p>
@@ -86,21 +86,21 @@ async function start() {
           <div class="res-plan__queries">
             <span class="res-plan__queries-label">检索查询（{{ plan.queries.length }}）</span>
             <span v-for="(query, index) in plan.queries" :key="query" class="res-query">
-              <FaIcon name="morph:search" /> {{ query }}
-              <FaIcon name="morph:x" class="res-query__remove" @click="removeQuery(index)" />
+              <YdIcon name="morph:search" /> {{ query }}
+              <YdIcon name="morph:x" class="res-query__remove" @click="removeQuery(index)" />
             </span>
           </div>
           <div class="res-plan__actions">
-            <FaButton :loading="starting" :disabled="!plan.queries.length" @click="start">
-              <FaIcon name="morph:rocket" /> 启动研究
-            </FaButton>
-            <FaButton variant="outline" @click="plan = null">
+            <YdButton :loading="starting" :disabled="!plan.queries.length" @click="start">
+              <YdIcon name="morph:rocket" /> 启动研究
+            </YdButton>
+            <YdButton variant="outline" @click="plan = null">
               放弃计划
-            </FaButton>
+            </YdButton>
           </div>
-        </FaCard>
+        </YdCard>
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </div>
 </template>
 
@@ -134,8 +134,8 @@ async function start() {
   margin: 6px auto 12px;
   place-items: center;
   border-radius: 14px;
-  background: rgba(var(--primary-6), 0.1);
-  color: rgb(var(--primary-6));
+  background: rgba(var(--color-text-2), 0.1);
+  color: rgb(var(--color-text-2));
   font-size: 26px;
 }
 
@@ -166,7 +166,7 @@ async function start() {
 
 .res-plan__icon {
   margin-top: 2px;
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 20px;
 }
 
@@ -200,8 +200,8 @@ async function start() {
   gap: 6px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(var(--primary-6), 0.08);
-  color: rgb(var(--primary-6));
+  background: rgba(var(--color-text-2), 0.08);
+  color: rgb(var(--color-text-2));
   font-size: 12px;
 }
 
@@ -211,7 +211,7 @@ async function start() {
 }
 
 .res-query__remove:hover {
-  color: #ef4444;
+  color: var(--color-text-2);
   opacity: 1;
 }
 

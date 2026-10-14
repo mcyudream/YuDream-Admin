@@ -2,7 +2,7 @@
 import type { IntegrationConfigSetting } from '@/api/modules/settings'
 import apiSettings from '@/api/modules/settings'
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -36,7 +36,7 @@ const mailTestTo = ref('')
 const mailTestResult = ref<{ ok: boolean, message: string } | null>(null)
 const storageTestResult = ref<{ ok: boolean, message: string } | null>(null)
 
-/** FaSelect 取值为字符串，SSL/STARTTLS 与布尔字段互相映射 */
+/** YdSelect 取值为字符串，SSL/STARTTLS 与布尔字段互相映射 */
 const mailEncryptionOption = computed({
   get: () => mail.ssl ? 'ssl' : 'starttls',
   set: (value: string) => {
@@ -183,11 +183,11 @@ async function save() {
 </script>
 
 <template>
-  <div v-loading="loading" class="mt-6 space-y-6">
+  <YdLoadingOverlay :loading="loading"><div  class="mt-6 space-y-6">
     <div>
-      <FaDivider>
+      <YdDivider>
         集成配置
-      </FaDivider>
+      </YdDivider>
       <p class="text-xs text-muted-foreground">
         邮件与对象存储运行时配置：保存后立即生效，密码与密钥加密存储且永不回显。
       </p>
@@ -197,96 +197,96 @@ async function save() {
       <div>
         <div class="mb-2 flex items-center font-medium">
           邮件服务（SMTP）
-          <FaTag :variant="mail.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
+          <YdTag :variant="mail.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
             {{ mail.source === 'custom' ? '已入库' : '环境变量兜底' }}
-          </FaTag>
+          </YdTag>
         </div>
-        <a-form :model="mail" layout="vertical" class="space-y-0">
+        <YdForm :model="mail" layout="vertical" class="space-y-0">
         <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <a-form-item label="SMTP 主机" required>
-            <FaInput v-model="mail.host" class="w-full" placeholder="smtp.example.com" />
-          </a-form-item>
-          <a-form-item label="端口">
-            <FaInput v-model="mail.port" type="number" class="w-full" placeholder="465" />
-          </a-form-item>
-          <a-form-item label="账号">
-            <FaInput v-model="mail.username" class="w-full" placeholder="发件邮箱账号" />
-          </a-form-item>
-          <a-form-item label="密码" :extra="mail.passwordSet ? '已设置；留空保持不变' : '未设置'">
-            <FaInput v-model="mail.password" type="password" class="w-full" placeholder="留空保持不变" />
-          </a-form-item>
-          <a-form-item label="发件人">
-            <FaInput v-model="mail.from" class="w-full" placeholder="留空默认使用账号" />
-          </a-form-item>
-          <a-form-item label="加密方式">
-            <FaSelect
+          <YdFormItem label="SMTP 主机" required>
+            <YdInput v-model="mail.host" class="w-full" placeholder="smtp.example.com" />
+          </YdFormItem>
+          <YdFormItem label="端口">
+            <YdInput v-model="mail.port" type="number" class="w-full" placeholder="465" />
+          </YdFormItem>
+          <YdFormItem label="账号">
+            <YdInput v-model="mail.username" class="w-full" placeholder="发件邮箱账号" />
+          </YdFormItem>
+          <YdFormItem label="密码" :extra="mail.passwordSet ? '已设置；留空保持不变' : '未设置'">
+            <YdInput v-model="mail.password" type="password" class="w-full" placeholder="留空保持不变" />
+          </YdFormItem>
+          <YdFormItem label="发件人">
+            <YdInput v-model="mail.from" class="w-full" placeholder="留空默认使用账号" />
+          </YdFormItem>
+          <YdFormItem label="加密方式">
+            <YdSelect
               v-model="mailEncryptionOption"
               :options="[{ label: 'SSL（465 常用）', value: 'ssl' }, { label: 'STARTTLS（587 常用）', value: 'starttls' }]"
               class="w-full"
             />
-          </a-form-item>
+          </YdFormItem>
         </div>
-        <a-form-item label="测试收件地址">
+        <YdFormItem label="测试收件地址">
           <div class="flex w-full items-center gap-2">
-            <FaInput v-model="mailTestTo" class="min-w-0 flex-1" placeholder="接收测试邮件的地址" />
-            <FaButton variant="outline" :loading="testingMail" @click="testMail">
-              <FaIcon name="morph:send" />
+            <YdInput v-model="mailTestTo" class="min-w-0 flex-1" placeholder="接收测试邮件的地址" />
+            <YdButton variant="outline" :loading="testingMail" @click="testMail">
+              <YdIcon name="morph:send" />
               发送测试邮件
-            </FaButton>
+            </YdButton>
           </div>
-        </a-form-item>
+        </YdFormItem>
         <p v-if="mailTestResult" class="text-xs" :class="mailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
           {{ mailTestResult.message }}
         </p>
-        </a-form>
+        </YdForm>
       </div>
 
       <div>
         <div class="mb-2 flex items-center font-medium">
           对象存储（S3 兼容）
-          <FaTag :variant="storage.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
+          <YdTag :variant="storage.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
             {{ storage.source === 'custom' ? '已入库' : '环境变量兜底' }}
-          </FaTag>
+          </YdTag>
         </div>
-        <a-form :model="storage" layout="vertical" class="space-y-0">
+        <YdForm :model="storage" layout="vertical" class="space-y-0">
         <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <a-form-item label="Endpoint" required class="md:col-span-2">
-            <FaInput v-model="storage.endpoint" class="w-full" placeholder="http://localhost:9000" />
-          </a-form-item>
-          <a-form-item label="AccessKey">
-            <FaInput v-model="storage.accessKey" class="w-full" />
-          </a-form-item>
-          <a-form-item label="SecretKey" :extra="storage.secretKeySet ? '已设置；留空保持不变' : '未设置'">
-            <FaInput v-model="storage.secretKey" type="password" class="w-full" placeholder="留空保持不变" />
-          </a-form-item>
-          <a-form-item label="Bucket">
-            <FaInput v-model="storage.bucket" class="w-full" placeholder="yudream-admin" />
-          </a-form-item>
-          <a-form-item label="Region">
-            <FaInput v-model="storage.region" class="w-full" placeholder="us-east-1" />
-          </a-form-item>
+          <YdFormItem label="Endpoint" required class="md:col-span-2">
+            <YdInput v-model="storage.endpoint" class="w-full" placeholder="http://localhost:9000" />
+          </YdFormItem>
+          <YdFormItem label="AccessKey">
+            <YdInput v-model="storage.accessKey" class="w-full" />
+          </YdFormItem>
+          <YdFormItem label="SecretKey" :extra="storage.secretKeySet ? '已设置；留空保持不变' : '未设置'">
+            <YdInput v-model="storage.secretKey" type="password" class="w-full" placeholder="留空保持不变" />
+          </YdFormItem>
+          <YdFormItem label="Bucket">
+            <YdInput v-model="storage.bucket" class="w-full" placeholder="yudream-admin" />
+          </YdFormItem>
+          <YdFormItem label="Region">
+            <YdInput v-model="storage.region" class="w-full" placeholder="us-east-1" />
+          </YdFormItem>
         </div>
-        <a-form-item label="Path-Style 访问">
+        <YdFormItem label="Path-Style 访问">
           <div class="flex w-full items-center justify-between gap-2">
-            <FaSwitch v-model="storage.pathStyle" />
-            <FaButton variant="outline" :loading="testingStorage" @click="testStorage">
-              <FaIcon name="morph:plug" />
+            <YdSwitch v-model="storage.pathStyle" />
+            <YdButton variant="outline" :loading="testingStorage" @click="testStorage">
+              <YdIcon name="morph:plug" />
               测试连接
-            </FaButton>
+            </YdButton>
           </div>
-        </a-form-item>
+        </YdFormItem>
         <p v-if="storageTestResult" class="text-xs" :class="storageTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
           {{ storageTestResult.message }}
         </p>
-        </a-form>
+        </YdForm>
       </div>
     </div>
 
     <div class="flex justify-end">
-      <FaButton v-auth="'system:setting:edit'" :loading="saving" @click="save">
-        <FaIcon name="morph:save" />
+      <YdButton v-auth="'system:setting:edit'" :loading="saving" @click="save">
+        <YdIcon name="morph:save" />
         保存集成配置
-      </FaButton>
+      </YdButton>
     </div>
-  </div>
+  </div></YdLoadingOverlay>
 </template>

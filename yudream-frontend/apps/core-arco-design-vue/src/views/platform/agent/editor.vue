@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import type { Connection, Edge } from '@vue-flow/core'
+import type { YdTablePickerQuery, YdTablePickerResult, YdWorkflowCanvasInstance, YdWorkflowConnection, YdWorkflowEdge, YdWorkflowNode } from '@yudream/components'
 import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
 import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
-import type { YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
-import { Background } from '@vue-flow/background'
-import { Controls } from '@vue-flow/controls'
-import { MarkerType, useVueFlow, VueFlow } from '@vue-flow/core'
-import { MiniMap } from '@vue-flow/minimap'
 import apiAgent from '@/api/modules/platform-agent'
 import AgentApplicationInspector from './components/AgentApplicationInspector.vue'
 import AgentDebugPanel from './components/AgentDebugPanel.vue'
@@ -20,15 +15,11 @@ import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './c
 import { buildAgentRunInput } from './config/agent-run-input'
 import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './config/agent-workflow-tools'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
-import '@vue-flow/core/dist/style.css'
-import '@vue-flow/core/dist/theme-default.css'
-import '@vue-flow/controls/dist/style.css'
-import '@vue-flow/minimap/dist/style.css'
 
 const route = useRoute()
 const router = useRouter()
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const id = computed(() => typeof route.query.id === 'string' ? route.query.id : '')
 const runtimeCode = computed(() => typeof route.query.runtimeCode === 'string' ? route.query.runtimeCode : '')
 const runtimeReadonly = computed(() => Boolean(runtimeCode.value))
@@ -59,9 +50,13 @@ const form = reactive<AgentApplicationPayload>({
   status: 'DRAFT',
 })
 
-const nodes = ref<AgentFlowNode[]>([])
-const edges = ref<Edge[]>([])
-const selectedNode = computed<AgentFlowNode | undefined>(() => nodes.value.find(node => node.id === selectedNodeId.value))
+const canvas = ref<YdWorkflowCanvasInstance<AgentNodeData, Record<string, unknown>> | null>(null)
+const nodes = ref<YdWorkflowNode<AgentNodeData>[]>([])
+const edges = ref<YdWorkflowEdge<Record<string, unknown>>[]>([])
+const selectedNode = computed<AgentFlowNode | undefined>(() => {
+  const node = nodes.value.find(node => node.id === selectedNodeId.value)
+  return node ? { ...node, type: node.type || 'agent' } : undefined
+})
 const selectedEdge = computed<AgentFlowEdgeView | undefined>(() => {
   const views = edges.value as unknown as AgentFlowEdgeView[]
   return views.find(edge => edge.id === selectedEdgeId.value)
@@ -79,7 +74,6 @@ const debugAllowsTextFiles = computed(() => Boolean(
   debugModelNodes.value.some(node => ['llm', 'extract', 'classify', 'vision'].includes(node.data.kind) && node.data.acceptFiles)
   || nodes.value.some(node => node.data.kind === 'document'),
 ))
-const { addNodes, addEdges, screenToFlowCoordinate, fitView, setCenter, updateNodeData } = useVueFlow()
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
@@ -109,7 +103,6 @@ async function loadTools() {
     toast.error('加载 Agent 工具失败')
   }
 }
-
 
 async function loadCatalog() {
   try {
@@ -187,7 +180,7 @@ function normalizeNode(raw: AgentFlowNode): AgentFlowNode {
   }
 }
 
-function normalizeEdge(raw: Edge): Edge {
+function normalizeEdge(raw: YdWorkflowEdge<Record<string, unknown>>): YdWorkflowEdge<Record<string, unknown>> {
   const connectionStyle = raw.data?.connectionStyle === 'line' ? 'line' : 'arrow'
   const sourceKind = nodes.value.find(node => node.id === raw.source)?.data.kind
   const sourceHandle = migrateConditionSourceHandle(sourceKind, raw.sourceHandle, raw.label, raw.data)
@@ -195,7 +188,7 @@ function normalizeEdge(raw: Edge): Edge {
     ...raw,
     sourceHandle,
     type: raw.type || 'smoothstep',
-    markerEnd: connectionStyle === 'arrow' ? MarkerType.ArrowClosed : undefined,
+    markerEnd: connectionStyle === 'arrow' ? 'arrowclosed' : undefined,
     data: { ...raw.data, connectionStyle },
   }
 }
@@ -218,13 +211,13 @@ function defaultAgentModel(kind = 'chat') {
     || models.find(model => model.configured)
 }
 
-function makeEdge(source: string, target: string, style = defaultConnectionStyle.value): Edge {
+function makeEdge(source: string, target: string, style = defaultConnectionStyle.value): YdWorkflowEdge<Record<string, unknown>> {
   return {
     id: `edge-${source}-${target}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     source,
     target,
     type: 'smoothstep',
-    markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined,
+    markerEnd: style === 'arrow' ? 'arrowclosed' : undefined,
     data: { connectionStyle: style },
   }
 }
@@ -244,7 +237,7 @@ function addNode(template: AgentNodeTemplate) {
   }
   const offset = (nodes.value.length % 5) * 34
   const node = makeNode(template, { x: 250 + offset, y: 150 + offset })
-  addNodes(node)
+  canvas.value?.addNodes(node)
   selectNode(node.id)
 }
 
@@ -260,9 +253,12 @@ function onDrop(event: DragEvent) {
       toast.error('兼容节点不能从节点面板新建')
       return
     }
-    const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
+    const point = canvas.value?.screenToCanvasCoordinate({ x: event.clientX, y: event.clientY })
+    if (!point) {
+      return
+    }
     const node = makeNode(template, { x: point.x - 115, y: point.y - 70 })
-    addNodes(node)
+    canvas.value?.addNodes(node)
     selectNode(node.id)
   }
   catch {
@@ -270,11 +266,11 @@ function onDrop(event: DragEvent) {
   }
 }
 
-function onConnect(connection: Connection) {
+function onConnect(connection: YdWorkflowConnection) {
   if (!connection.source || !connection.target || connection.source === connection.target) {
     return
   }
-  addEdges({
+  canvas.value?.addEdges({
     ...makeEdge(connection.source, connection.target),
     sourceHandle: connection.sourceHandle,
     targetHandle: connection.targetHandle,
@@ -302,7 +298,7 @@ function updateSelectedNode(data: Partial<AgentNodeData>) {
   if (!selectedNodeId.value) {
     return
   }
-  updateNodeData(selectedNodeId.value, data)
+  canvas.value?.updateNodeData(selectedNodeId.value, data)
 }
 
 function changeEdgeStyle(style: AgentConnectionStyle) {
@@ -318,29 +314,32 @@ function changeEdgeStyle(style: AgentConnectionStyle) {
     const data = currentData && typeof currentData === 'object' && !Array.isArray(currentData)
       ? { ...(currentData as Record<string, unknown>), connectionStyle: style }
       : { connectionStyle: style }
-    return { ...edge, markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined, data }
-  }) as unknown as Edge[]
+    return { ...edge, markerEnd: style === 'arrow' ? 'arrowclosed' : undefined, data }
+  }) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
 }
 
 function changeEdgeLabel(label: string) {
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
-  edges.value = edgeRecords.map(edge => edge.id === selectedEdgeId.value ? { ...edge, label } : edge) as unknown as Edge[]
+  edges.value = edgeRecords.map(edge => edge.id === selectedEdgeId.value ? { ...edge, label } : edge) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
 }
 
 function deleteNode(nodeId: string) {
+  if (runtimeReadonly.value) return
   nodes.value = nodes.value.filter(node => node.id !== nodeId)
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
-  edges.value = edgeRecords.filter(edge => edge.source !== nodeId && edge.target !== nodeId) as unknown as Edge[]
+  edges.value = edgeRecords.filter(edge => edge.source !== nodeId && edge.target !== nodeId) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
   clearSelection()
 }
 
 function deleteEdge(edgeId: string) {
+  if (runtimeReadonly.value) return
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
-  edges.value = edgeRecords.filter(edge => edge.id !== edgeId) as unknown as Edge[]
+  edges.value = edgeRecords.filter(edge => edge.id !== edgeId) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
   clearSelection()
 }
 
 function deleteSelection() {
+  if (runtimeReadonly.value) return
   if (selectedNodeId.value) {
     deleteNode(selectedNodeId.value)
   }
@@ -350,6 +349,7 @@ function deleteSelection() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (runtimeReadonly.value) return
   if (event.key !== 'Delete' && event.key !== 'Backspace') {
     return
   }
@@ -383,7 +383,7 @@ function migrateLegacyTools() {
         return
       }
       nodes.value = migrated.nodes.map(node => normalizeNode(node as AgentFlowNode))
-      edges.value = migrated.edges.map(edge => normalizeEdge(edge as Edge))
+      edges.value = migrated.edges.map(edge => normalizeEdge(edge as YdWorkflowEdge<Record<string, unknown>>))
       clearSelection()
       toast.success(`已将 ${migratedCount} 个工具节点迁移到模型节点`)
     },
@@ -391,7 +391,9 @@ function migrateLegacyTools() {
 }
 
 function fitCanvas() {
-  nextTick(() => fitView({ padding: 0.22, duration: 260 }))
+  nextTick(() => {
+    void canvas.value?.fitView({ padding: 0.22, duration: 260 })
+  })
 }
 
 function resetWorkflow() {
@@ -445,7 +447,7 @@ function activeDebugMessage() {
 function resetDebugCanvas() {
   Object.keys(nodeDebugStatus).forEach(key => delete nodeDebugStatus[key])
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
-  edges.value = edgeRecords.map(edge => ({ ...edge, class: undefined })) as unknown as Edge[]
+  edges.value = edgeRecords.map(edge => ({ ...edge, class: undefined })) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
 }
 
 function refreshDebugEdges() {
@@ -466,7 +468,7 @@ function refreshDebugEdges() {
       debugClass = 'debug-completed'
     }
     return { ...item, class: debugClass }
-  }) as unknown as Edge[]
+  }) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
 }
 
 function focusDebugNode(nodeId: string) {
@@ -474,7 +476,7 @@ function focusDebugNode(nodeId: string) {
   if (!node) {
     return
   }
-  setCenter(node.position.x + 115, node.position.y + 70, { zoom: 1, duration: 260 })
+  void canvas.value?.setCenter(node.position.x + 115, node.position.y + 70, { zoom: 1, duration: 260 })
 }
 
 function handleDebugEvent(event: AgentDebugStreamEvent) {
@@ -702,105 +704,103 @@ function validateCurrentWorkflow() {
 </script>
 
 <template>
-  <div v-loading="loading" class="agent-editor-page">
-    <FaPageHeader :title="runtimeReadonly ? '查看插件 Agent 编排' : id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
-      <div class="header-actions">
-        <FaButton variant="outline" @click="router.push('/platform/agent')">
-          <FaIcon name="morph:arrow-left" /> 返回
-        </FaButton>
-        <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
-          <FaIcon name="morph:download" /> 导出
-        </FaButton>
-        <FaButton v-if="runtimeReadonly" :loading="saving" @click="importRuntimeApplication">
-          <FaIcon name="morph:cloud-download" /> 导入并编辑
-        </FaButton>
-        <FaButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
-          <FaIcon name="morph:bug" /> 调试
-        </FaButton>
-        <FaButton v-if="!runtimeReadonly" variant="outline" :loading="saving" @click="save(false)">
-          <FaIcon name="morph:save" /> 保存
-        </FaButton>
-        <FaButton v-if="!runtimeReadonly" :loading="saving" @click="save(true)">
-          <FaIcon name="morph:send" /> 发布
-        </FaButton>
-      </div>
-    </FaPageHeader>
-
-    <section class="agent-editor" :class="{ 'is-runtime-readonly': runtimeReadonly }">
-      <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="agentNodePaletteGroups" @add="addNode" />
-
-      <main
-        class="flow-canvas"
-        :class="{ 'is-drag-over': isDragOver }"
-        @dragenter.prevent="isDragOver = true"
-        @dragleave.self="isDragOver = false"
-        @dragover.prevent
-        @drop.prevent="onDrop"
-      >
-        <div class="canvas-toolbar">
-          <span>{{ runtimeReadonly ? '插件运行时编排' : '新建连线' }}</span>
-          <div v-if="!runtimeReadonly" class="connection-switch" aria-label="连线样式">
-            <button type="button" :class="{ active: defaultConnectionStyle === 'arrow' }" title="箭头连线" @click="defaultConnectionStyle = 'arrow'">
-              <FaIcon name="morph:arrow-right" /> 箭头
-            </button>
-            <button type="button" :class="{ active: defaultConnectionStyle === 'line' }" title="普通线段" @click="defaultConnectionStyle = 'line'">
-              <FaIcon name="morph:minus" /> 线段
-            </button>
-          </div>
-          <i v-if="!runtimeReadonly" />
-          <button type="button" class="toolbar-icon" title="适应画布" aria-label="适应画布" @click="fitCanvas">
-            <FaIcon name="morph:maximize" />
-          </button>
-          <button v-if="!runtimeReadonly" type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
-            <FaIcon name="morph:rotate-cw" />
-          </button>
-          <button v-if="!runtimeReadonly && legacyToolNodeCount" type="button" class="toolbar-icon" title="迁移兼容工具节点" aria-label="迁移兼容工具节点" @click="migrateLegacyTools">
-            <FaIcon name="morph:git-merge" />
-          </button>
-          <button v-if="!runtimeReadonly" type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
-            <FaIcon name="morph:trash-2" />
-          </button>
+  <YdLoadingOverlay :loading="loading">
+    <div class="agent-editor-page">
+      <YdPageHeader :title="runtimeReadonly ? '查看插件 Agent 编排' : id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
+        <div class="header-actions">
+          <YdButton variant="outline" @click="router.push('/platform/agent')">
+            <YdIcon name="morph:arrow-left" /> 返回
+          </YdButton>
+          <YdButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
+            <YdIcon name="morph:download" /> 导出
+          </YdButton>
+          <YdButton v-if="runtimeReadonly" :loading="saving" @click="importRuntimeApplication">
+            <YdIcon name="morph:cloud-download" /> 导入并编辑
+          </YdButton>
+          <YdButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
+            <YdIcon name="morph:bug" /> 调试
+          </YdButton>
+          <YdButton v-if="!runtimeReadonly" variant="outline" :loading="saving" @click="save(false)">
+            <YdIcon name="morph:save" /> 保存
+          </YdButton>
+          <YdButton v-if="!runtimeReadonly" :loading="saving" @click="save(true)">
+            <YdIcon name="morph:send" /> 发布
+          </YdButton>
         </div>
+      </YdPageHeader>
 
-        <div v-if="isDragOver" class="drop-overlay">
-          <FaIcon name="i-ri:drag-drop-line" />
-          <strong>释放以添加节点</strong>
-        </div>
+      <section class="agent-editor" :class="{ 'is-runtime-readonly': runtimeReadonly }">
+        <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="agentNodePaletteGroups" @add="addNode" />
 
-        <VueFlow
-          v-model:nodes="nodes"
-          v-model:edges="edges"
-          class="agent-flow"
-          :snap-to-grid="true"
-          :snap-grid="[16, 16]"
-          :min-zoom="0.25"
-          :max-zoom="1.8"
-          :delete-key-code="null"
-          :nodes-draggable="!runtimeReadonly"
-          :nodes-connectable="!runtimeReadonly"
-          @connect="onConnect"
-          @node-click="selectNode($event.node.id)"
-          @edge-click="selectEdge($event.edge.id)"
-          @pane-click="clearSelection"
-          @init="fitCanvas"
+        <main
+          class="flow-canvas"
+          :class="{ 'is-drag-over': isDragOver }"
+          @dragenter.prevent="isDragOver = true"
+          @dragleave.self="isDragOver = false"
+          @dragover.prevent
+          @drop.prevent="onDrop"
         >
-          <Background pattern-color="var(--color-border-3)" :gap="18" :size="1" />
-          <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" :pannable="true" :zoomable="true" />
-          <template #node-agent="nodeProps">
-            <AgentWorkflowNode v-bind="nodeProps" :debug-status="nodeDebugStatus[nodeProps.id]" :readonly="runtimeReadonly" @delete="deleteNode" />
-          </template>
-        </VueFlow>
+          <div class="canvas-toolbar">
+            <span>{{ runtimeReadonly ? '插件运行时编排' : '新建连线' }}</span>
+            <div v-if="!runtimeReadonly" class="connection-switch" aria-label="连线样式">
+              <YdButton type="button" variant="ghost" :aria-pressed="defaultConnectionStyle === 'arrow'" :class="{ active: defaultConnectionStyle === 'arrow' }" title="箭头连线" @click="defaultConnectionStyle = 'arrow'">
+                <YdIcon name="morph:arrow-right" /> 箭头
+              </YdButton>
+              <YdButton type="button" variant="ghost" :aria-pressed="defaultConnectionStyle === 'line'" :class="{ active: defaultConnectionStyle === 'line' }" title="普通线段" @click="defaultConnectionStyle = 'line'">
+                <YdIcon name="morph:minus" /> 线段
+              </YdButton>
+            </div>
+            <i v-if="!runtimeReadonly" />
+            <YdButton type="button" variant="ghost" size="icon-sm" class="toolbar-icon" title="适应画布" aria-label="适应画布" @click="fitCanvas">
+              <YdIcon name="morph:maximize" />
+            </YdButton>
+            <YdButton v-if="!runtimeReadonly" type="button" variant="ghost" size="icon-sm" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
+              <YdIcon name="morph:rotate-cw" />
+            </YdButton>
+            <YdButton v-if="!runtimeReadonly && legacyToolNodeCount" type="button" variant="ghost" size="icon-sm" class="toolbar-icon" title="迁移兼容工具节点" aria-label="迁移兼容工具节点" @click="migrateLegacyTools">
+              <YdIcon name="morph:git-merge" />
+            </YdButton>
+            <YdButton v-if="!runtimeReadonly" type="button" variant="ghost" size="icon-sm" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
+              <YdIcon name="morph:trash-2" />
+            </YdButton>
+          </div>
 
-        <div class="canvas-status">
-          <span>{{ nodes.length }} 个节点</span>
-          <i />
-          <span>{{ edges.length }} 条连线</span>
-          <span>{{ debugRunning ? '正在实时调试' : '拖动节点两侧圆点建立连接' }}</span>
-        </div>
-      </main>
+          <div v-if="isDragOver" class="drop-overlay">
+            <YdIcon name="i-ri:drag-drop-line" />
+            <strong>释放以添加节点</strong>
+          </div>
 
-      <AgentDebugPanel
+          <YdWorkflowCanvas
+            ref="canvas"
+            v-model:nodes="nodes"
+            v-model:edges="edges"
+            class="agent-flow"
+            :readonly="runtimeReadonly"
+            :snap-to-grid="true"
+            :snap-grid="[16, 16]"
+            :min-zoom="0.25"
+            :max-zoom="1.8"
+            :delete-key-code="null"
+            @connect="onConnect"
+            @node-click="selectNode($event.id)"
+            @edge-click="selectEdge($event.id)"
+            @pane-click="clearSelection"
+            @init="fitCanvas"
+          >
+            <template #node-agent="nodeProps">
+              <AgentWorkflowNode v-bind="nodeProps" :debug-status="nodeDebugStatus[nodeProps.id]" :readonly="runtimeReadonly" @delete="deleteNode" />
+            </template>
+          </YdWorkflowCanvas>
+
+          <div class="canvas-status">
+            <span>{{ nodes.length }} 个节点</span>
+            <i />
+            <span>{{ edges.length }} 条连线</span>
+            <span>{{ debugRunning ? '正在实时调试' : '拖动节点两侧圆点建立连接' }}</span>
+          </div>
+        </main>
+
+        <AgentDebugPanel
         v-if="rightMode === 'debug'"
         class="inspector-panel"
         :messages="debugMessages"
@@ -814,41 +814,42 @@ function validateCurrentWorkflow() {
         @close="rightMode = 'config'"
       />
       <AgentNodeInspector
-        v-else-if="selectedNode"
-        class="inspector-panel"
-        :node="selectedNode"
-        :system-tools="systemTools"
-        :custom-tools="customTools"
-        :tool-fetcher="fetchToolCandidates"
-        :models="agentModels"
-        :knowledge-spaces="knowledgeSpaces"
-        @update="updateSelectedNode"
-        @delete="deleteNode(selectedNode.id)"
-        @close="clearSelection"
-      />
-      <AgentEdgeInspector
-        v-else-if="selectedEdge"
-        class="inspector-panel"
-        :edge="selectedEdge"
-        :source-name="selectedSourceName"
-        :target-name="selectedTargetName"
-        @change-style="changeEdgeStyle"
-        @change-label="changeEdgeLabel"
-        @delete="deleteEdge(selectedEdge.id)"
-        @close="clearSelection"
-      />
-      <AgentApplicationInspector
-        v-else
-        class="inspector-panel"
-        :form="form"
-        :tool-codes="applicationToolCodes"
-        :system-tools="systemTools"
-        :custom-tools="customTools"
-        :code-disabled="Boolean(id)"
-        @update-field="updateApplicationField"
-      />
-    </section>
-  </div>
+          v-else-if="selectedNode"
+          class="inspector-panel"
+          :node="selectedNode"
+          :system-tools="systemTools"
+          :custom-tools="customTools"
+          :tool-fetcher="fetchToolCandidates"
+          :models="agentModels"
+          :knowledge-spaces="knowledgeSpaces"
+          @update="updateSelectedNode"
+          @delete="deleteNode(selectedNode.id)"
+          @close="clearSelection"
+        />
+        <AgentEdgeInspector
+          v-else-if="selectedEdge"
+          class="inspector-panel"
+          :edge="selectedEdge"
+          :source-name="selectedSourceName"
+          :target-name="selectedTargetName"
+          @change-style="changeEdgeStyle"
+          @change-label="changeEdgeLabel"
+          @delete="deleteEdge(selectedEdge.id)"
+          @close="clearSelection"
+        />
+        <AgentApplicationInspector
+          v-else
+          class="inspector-panel"
+          :form="form"
+          :tool-codes="applicationToolCodes"
+          :system-tools="systemTools"
+          :custom-tools="customTools"
+          :code-disabled="Boolean(id)"
+          @update-field="updateApplicationField"
+        />
+      </section>
+    </div>
+  </YdLoadingOverlay>
 </template>
 
 <style scoped>
@@ -864,20 +865,20 @@ function validateCurrentWorkflow() {
 .canvas-toolbar > i { width: 1px; height: 24px; background: var(--color-border-2); }
 .connection-switch { display: flex; gap: 2px; padding: 3px; border-radius: 6px; background: var(--color-fill-2); }
 .connection-switch button { display: flex; height: 26px; align-items: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 4px; color: var(--color-text-3); background: transparent; font-size: 10px; cursor: pointer; }
-.connection-switch button.active { color: rgb(var(--primary-6)); background: var(--color-bg-1); box-shadow: 0 2px 6px rgb(15 23 42 / 9%); }
+.connection-switch button.active { color: var(--color-text-1); background: var(--color-bg-1); box-shadow: 0 2px 6px rgb(15 23 42 / 9%); }
 .toolbar-icon { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 5px; color: var(--color-text-2); background: transparent; cursor: pointer; }
 .toolbar-icon:hover { background: var(--color-fill-2); }
 .toolbar-icon.danger { color: rgb(var(--danger-6)); }
 .toolbar-icon:disabled { color: var(--color-text-4); cursor: not-allowed; }
-.drop-overlay { position: absolute; z-index: 20; display: grid; inset: 10px; place-items: center; align-content: center; gap: 9px; border: 2px dashed rgb(var(--primary-5)); border-radius: 8px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1) / 86%); pointer-events: none; }
+.drop-overlay { position: absolute; z-index: 20; display: grid; inset: 10px; place-items: center; align-content: center; gap: 9px; border: 2px dashed var(--color-text-2); border-radius: 8px; color: var(--color-text-1); background: color-mix(in srgb, var(--color-fill-2) 86%, transparent); pointer-events: none; }
 .drop-overlay > :first-child { font-size: 30px; }
 .drop-overlay strong { font-size: 13px; }
 .canvas-status { position: absolute; bottom: 15px; left: 76px; z-index: 8; display: flex; min-height: 28px; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--color-border-2); border-radius: 6px; color: var(--color-text-3); background: color-mix(in srgb, var(--color-bg-1), transparent 4%); box-shadow: 0 3px 12px rgb(15 23 42 / 7%); font-size: 9px; }
 .canvas-status i { width: 1px; height: 12px; background: var(--color-border-2); }
 .canvas-status span:last-child { margin-left: 3px; }
 .agent-flow :deep(.vue-flow__edge-path) { stroke: var(--color-text-4); stroke-width: 1.6; }
-.agent-flow :deep(.vue-flow__edge.selected .vue-flow__edge-path), .agent-flow :deep(.vue-flow__edge:hover .vue-flow__edge-path) { stroke: rgb(var(--primary-6)); stroke-width: 2.2; }
-.agent-flow :deep(.vue-flow__edge.debug-active .vue-flow__edge-path) { stroke: rgb(var(--primary-6)); stroke-width: 2.6; stroke-dasharray: 8 5; animation: edge-flow 0.8s linear infinite; }
+.agent-flow :deep(.vue-flow__edge.selected .vue-flow__edge-path), .agent-flow :deep(.vue-flow__edge:hover .vue-flow__edge-path) { stroke: var(--color-text-1); stroke-width: 2.2; }
+.agent-flow :deep(.vue-flow__edge.debug-active .vue-flow__edge-path) { stroke: var(--color-text-1); stroke-width: 2.6; stroke-dasharray: 8 5; animation: edge-flow 0.8s linear infinite; }
 .agent-flow :deep(.vue-flow__edge.debug-completed .vue-flow__edge-path) { stroke: rgb(var(--success-6)); stroke-width: 2.2; }
 .agent-flow :deep(.vue-flow__edge.debug-failed .vue-flow__edge-path) { stroke: rgb(var(--danger-6)); stroke-width: 2.4; }
 .agent-flow :deep(.vue-flow__edge-textbg) { fill: var(--color-bg-1); }

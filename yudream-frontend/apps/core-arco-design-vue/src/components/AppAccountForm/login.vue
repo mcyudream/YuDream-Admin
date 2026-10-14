@@ -42,7 +42,7 @@ export interface ExternalLoginEntry {
 
 const appAccountStore = useAppAccountStore()
 const appFeatureStore = useAppFeatureStore()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const passkeyLoading = ref(false)
@@ -202,7 +202,7 @@ function rememberAccount(account: string, remember?: boolean) {
       </p>
     </div>
     <div class="mb-4">
-      <FaTabs
+      <YdTabs
         v-model="type" :list="loginTabs" class="inline-flex"
       />
     </div>
@@ -213,11 +213,11 @@ function rememberAccount(account: string, remember?: boolean) {
         <FormField v-slot="{ componentField, errors }" name="account">
           <FormItem class="pb-6 relative space-y-0">
             <FormControl>
-              <FaInput type="text" placeholder="用户名或邮箱" aria-label="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+              <YdInput type="text" placeholder="用户名或邮箱" aria-label="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                 <template #start>
-                  <FaIcon name="i-lucide:user" />
+                  <YdIcon name="i-lucide:user" />
                 </template>
-              </FaInput>
+              </YdInput>
             </FormControl>
             <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
               <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -229,11 +229,11 @@ function rememberAccount(account: string, remember?: boolean) {
         <FormField v-slot="{ componentField, errors }" name="password">
           <FormItem class="pb-6 relative space-y-0">
             <FormControl>
-              <FaInput type="password" placeholder="密码" aria-label="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+              <YdInput type="password" placeholder="密码" aria-label="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
                 <template #start>
-                  <FaIcon name="i-lucide:lock" />
+                  <YdIcon name="i-lucide:lock" />
                 </template>
-              </FaInput>
+              </YdInput>
             </FormControl>
             <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
               <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -246,36 +246,36 @@ function rememberAccount(account: string, remember?: boolean) {
           <FormField v-slot="{ componentField }" type="checkbox" name="remember">
             <FormItem>
               <FormControl>
-                <FaCheckbox :model-value="componentField.modelValue" @update:model-value="componentField['onUpdate:modelValue']?.($event)">
+                <YdCheckbox :model-value="componentField.modelValue" @update:model-value="componentField['onUpdate:modelValue']?.($event)">
                   记住账号
-                </FaCheckbox>
+                </YdCheckbox>
               </FormControl>
             </FormItem>
           </FormField>
         </div>
-        <FaButton v-if="type === 'password'" variant="link" class="p-0 h-auto" type="button" @click="emits('onResetPassword', form.values.account)">
+        <YdButton v-if="type === 'password'" variant="link" class="p-0 h-auto" type="button" @click="emits('onResetPassword', form.values.account)">
           忘记密码了？
-        </FaButton>
+        </YdButton>
       </div>
-      <FaButton v-if="type === 'password'" :loading="loading" size="lg" class="w-full" type="submit">
+      <YdButton v-if="type === 'password'" :loading="loading" size="lg" class="w-full" type="submit">
         登录
-      </FaButton>
-      <FaButton v-else-if="type === 'passkey'" :loading="passkeyLoading" size="lg" class="w-full" type="button" @click="loginWithPasskey">
-        <FaIcon name="morph:fingerprint" />
+      </YdButton>
+      <YdButton v-else-if="type === 'passkey'" :loading="passkeyLoading" size="lg" class="w-full" type="button" @click="loginWithPasskey">
+        <YdIcon name="morph:fingerprint" />
         使用 Passkey 登录
-      </FaButton>
-      <FaButton v-else-if="activeExternalEntry" :loading="props.externalLoading" size="lg" class="w-full" type="button" @click="loginWithExternalTab">
-        <FaIcon :name="activeExternalIcon" />
+      </YdButton>
+      <YdButton v-else-if="activeExternalEntry" :loading="props.externalLoading" size="lg" class="w-full" type="button" @click="loginWithExternalTab">
+        <YdIcon :name="activeExternalIcon" />
         使用 {{ activeExternalLabel }}
-      </FaButton>
+      </YdButton>
       <div class="text-sm mt-4 flex-center gap-2">
         <span class="text-secondary-foreground op-50">还没有账号？</span>
-        <FaButton variant="link" class="p-0 h-auto" type="button" @click="emits('onRegister', form.values.account)">
+        <YdButton variant="link" class="p-0 h-auto" type="button" @click="emits('onRegister', form.values.account)">
           注册新账号
-        </FaButton>
+        </YdButton>
       </div>
       <div v-if="externalIconEntries.length" class="qq-login-entry">
-        <FaButton
+        <YdButton
           v-for="entry in externalIconEntries"
           :key="`${entry.providerCode}:${entry.type}`"
           variant="outline"
@@ -286,8 +286,8 @@ function rememberAccount(account: string, remember?: boolean) {
           :disabled="props.externalLoading"
           @click="emits('onExternalLogin', entry)"
         >
-          <FaIcon :name="entry.icon" />
-        </FaButton>
+          <YdIcon :name="entry.icon" />
+        </YdButton>
       </div>
     </form>
   </div>

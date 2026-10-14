@@ -7,8 +7,8 @@ import { computed, shallowRef } from 'vue'
 import AgentJsonCodeEditor from './components/AgentJsonCodeEditor.vue'
 import { defaultAgentToolInputSchema, defaultAgentToolOutputExample, isJsonObject } from './config/agent-json'
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const loading = ref(false)
 const visible = ref(false)
 const editing = ref<AgentTool | null>(null)
@@ -116,53 +116,53 @@ function remove(row: AgentTool) {
 
 <template>
   <div>
-    <FaPageHeader title="Agent 工具" class="mb-0">
-      <FaButton v-auth="'platform:agent:tool:edit'" @click="create">
-        <FaIcon name="morph:plus" /> 新建 Python 工具
-      </FaButton>
-    </FaPageHeader>
-    <FaPageMain>
+    <YdPageHeader title="Agent 工具" class="mb-0">
+      <YdButton v-auth="'platform:agent:tool:edit'" @click="create">
+        <YdIcon name="morph:plus" /> 新建 Python 工具
+      </YdButton>
+    </YdPageHeader>
+    <YdPageMain>
       <section class="system-tools">
         <div class="section-head">
           <div><h3>系统工具</h3><p>由平台能力注册，可在 Agent 应用中按权限使用。</p></div>
         </div><div class="system-tool-grid">
           <article v-for="tool in systemTools" :key="tool.code">
-            <FaIcon name="morph:flashlight" /><div><strong>{{ tool.name }}</strong><code>{{ tool.code }}</code><p>{{ tool.description || '系统提供的能力' }}</p></div>
-          </article><FaEmpty v-if="!systemTools.length" description="暂无已启用的系统工具" />
+            <YdIcon name="morph:flashlight" /><div><strong>{{ tool.name }}</strong><code>{{ tool.code }}</code><p>{{ tool.description || '系统提供的能力' }}</p></div>
+          </article><YdEmpty v-if="!systemTools.length" description="暂无已启用的系统工具" />
         </div>
       </section>
       <section class="custom-tools">
         <div class="section-head">
-          <div><h3>Python 工具</h3><p>通过 <code>run(params: dict) -&gt; dict</code> 接收参数并返回结构化结果。</p></div><FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
+          <div><h3>Python 工具</h3><p>通过 <code>run(params: dict) -&gt; dict</code> 接收参数并返回结构化结果。</p></div><YdInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
         </div>
         <div v-if="selectedRows.length" class="batch-bar">
           <span>已选 {{ selectedRows.length }} 项</span>
-          <FaButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="batchRemove">
+          <YdButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="batchRemove">
             批量删除
-          </FaButton>
+          </YdButton>
         </div>
-        <FaResponsiveTable v-loading="loading" row-key="id" :data="rows" :columns="toolColumns" selectable multiple @selection-change="onSelectionChange">
+        <YdLoadingOverlay :loading="loading"><YdResponsiveTable  row-key="id" :data="rows" :columns="toolColumns" selectable multiple @selection-change="onSelectionChange">
           <template #cell-enabled="{ row }">
-            <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
+            <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
               {{ row.original.enabled ? '启用' : '停用' }}
-            </FaTag>
+            </YdTag>
           </template><template #cell-operation="{ row }">
             <div class="flex gap-2 justify-center">
-              <FaButton v-auth="'platform:agent:tool:edit'" size="sm" variant="outline" @click="edit(row.original)">
+              <YdButton v-auth="'platform:agent:tool:edit'" size="sm" variant="outline" @click="edit(row.original)">
                 编辑
-              </FaButton><FaButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="remove(row.original)">
+              </YdButton><YdButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="remove(row.original)">
                 删除
-              </FaButton>
+              </YdButton>
             </div>
           </template>
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                  <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                  <YdTag :variant="row.enabled ? 'default' : 'secondary'">
                     {{ row.enabled ? '启用' : '停用' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div class="flex gap-2">
@@ -183,31 +183,31 @@ function remove(row: AgentTool) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'platform:agent:tool:edit'" size="sm" variant="outline" @click="edit(row)">
+                  <YdButton v-auth="'platform:agent:tool:edit'" size="sm" variant="outline" @click="edit(row)">
                     编辑
-                  </FaButton>
-                  <FaButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="remove(row)">
+                  </YdButton>
+                  <YdButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="remove(row)">
                     删除
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable><FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="toolsPaginationLayout" class="mt-3" @page-change="load" @size-change="load" />
+        </YdResponsiveTable></YdLoadingOverlay><YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="toolsPaginationLayout" class="mt-3" @page-change="load" @size-change="load" />
       </section>
-    </FaPageMain>
-    <FaModal v-model="visible" :title="editing ? '编辑 Python 工具' : '新建 Python 工具'" class="sm:max-w-4xl">
+    </YdPageMain>
+    <YdModal v-model="visible" :title="editing ? '编辑 Python 工具' : '新建 Python 工具'" class="sm:max-w-4xl">
       <div class="tool-form">
         <div class="gap-4 grid sm:grid-cols-2">
-          <label class="form-field required"><span>工具名称</span><FaInput v-model="form.name" class="w-full" maxlength="60" placeholder="例如：订单风险查询" /></label>
-          <label class="form-field required"><span>工具编码</span><FaInput v-model="form.code" class="w-full" :disabled="Boolean(editing)" maxlength="60" placeholder="例如：order.risk.query" /></label>
+          <label class="form-field required"><span>工具名称</span><YdInput v-model="form.name" class="w-full" maxlength="60" placeholder="例如：订单风险查询" /></label>
+          <label class="form-field required"><span>工具编码</span><YdInput v-model="form.code" class="w-full" :disabled="Boolean(editing)" maxlength="60" placeholder="例如：order.risk.query" /></label>
         </div>
-        <label class="form-field"><span>工具描述</span><FaTextarea v-model="form.description" class="w-full" :autosize="{ minRows: 3, maxRows: 5 }" placeholder="说明工具用途，模型会根据这段描述决定何时调用" /></label>
+        <label class="form-field"><span>工具描述</span><YdTextarea v-model="form.description" class="w-full" :autosize="{ minRows: 3, maxRows: 5 }" placeholder="说明工具用途，模型会根据这段描述决定何时调用" /></label>
         <div class="gap-4 grid sm:grid-cols-2">
-          <label class="form-field required"><span>超时时间（毫秒）</span><FaInput v-model.number="form.timeoutMillis" class="w-full" type="number" min="100" placeholder="10000" /></label>
-          <label class="form-field"><span>权限编码</span><FaInput v-model="form.permissionCode" class="w-full" placeholder="可选，例如：order:risk:query" /></label>
+          <label class="form-field required"><span>超时时间（毫秒）</span><YdInput v-model.number="form.timeoutMillis" class="w-full" type="number" min="100" placeholder="10000" /></label>
+          <label class="form-field"><span>权限编码</span><YdInput v-model="form.permissionCode" class="w-full" placeholder="可选，例如：order:risk:query" /></label>
         </div>
-        <label class="check-line"><input v-model="form.enabled" type="checkbox"> <span><b>启用工具</b><small>停用后 Agent 无法再调用此工具</small></span></label>
+        <YdCheckbox v-model="form.enabled" class="check-line"><span><b>启用工具</b><small>停用后 Agent 无法再调用此工具</small></span></YdCheckbox>
         <div class="form-field required">
           <span>输入 JSON Schema</span>
           <AgentJsonCodeEditor v-model="form.inputSchemaJson" :default-value="defaultAgentToolInputSchema" />
@@ -220,24 +220,24 @@ function remove(row: AgentTool) {
         </div>
         <label class="form-field required">
           <span>Python 代码</span>
-          <FaTextarea v-model="form.pythonCode" class="w-full" input-class="font-mono" :autosize="{ minRows: 13, maxRows: 22 }" placeholder="def run(params: dict) -> dict: ..." />
+          <YdTextarea v-model="form.pythonCode" class="w-full" input-class="font-mono" :autosize="{ minRows: 13, maxRows: 22 }" placeholder="def run(params: dict) -> dict: ..." />
           <small>必须定义 run(params: dict) -&gt; dict；不要读取 stdin、写 stdout 或返回字符串</small>
         </label>
       </div>
       <template #footer>
-        <FaButton variant="outline" @click="visible = false">
+        <YdButton variant="outline" @click="visible = false">
           取消
-        </FaButton><FaButton @click="save">
+        </YdButton><YdButton @click="save">
           保存工具
-        </FaButton>
+        </YdButton>
       </template>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
 <style scoped>
 .system-tools, .custom-tools { display: grid; gap: 16px; }.custom-tools { margin-top: 24px; }
-.batch-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; color: var(--color-text-3); }section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }.section-head h3, .section-head p { margin: 0; }.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }.system-tool-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }.system-tool-grid article { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }.system-tool-grid article > :first-child { color: rgb(var(--primary-6)); }.system-tool-grid div { display: grid; gap: 5px; }.system-tool-grid p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.5; }.system-tool-grid code { color: var(--color-text-3); font-size: 11px; }.tool-form { display: grid; gap: 16px; }.form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }.form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }.form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }.check-line { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }.check-line input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }.check-line span { display: grid; gap: 2px; }.check-line b { color: var(--color-text-1); font-weight: 500; }.check-line small { color: var(--color-text-3); font-size: 10px; }
+.batch-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; color: var(--color-text-3); }section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }.section-head h3, .section-head p { margin: 0; }.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }.system-tool-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }.system-tool-grid article { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }.system-tool-grid article > :first-child { color: var(--color-text-1); }.system-tool-grid div { display: grid; gap: 5px; }.system-tool-grid p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.5; }.system-tool-grid code { color: var(--color-text-3); font-size: 11px; }.tool-form { display: grid; gap: 16px; }.form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }.form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }.form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }.check-line { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }.check-line span { display: grid; gap: 2px; }.check-line b { color: var(--color-text-1); font-weight: 500; }.check-line small { color: var(--color-text-3); font-size: 10px; }
 @media (max-width: 640px) {
   .section-head { flex-direction: column; align-items: stretch; }
   .section-head > .w-72 { width: 100%; }

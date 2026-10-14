@@ -7,7 +7,7 @@ defineOptions({
 })
 
 const appAccountStore = useAppAccountStore()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const depts = ref<DeptItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -112,11 +112,11 @@ function sameId(left?: IdValue | null, right?: IdValue | null) {
     <div v-else class="space-y-4">
       <div>
         <label class="mb-1 block text-sm">当前部门</label>
-        <FaSelect v-model="selectedDeptId" :options="deptOptions" :disabled="switching" placeholder="请选择部门" class="w-full" />
+        <YdSelect v-model="selectedDeptId" :options="deptOptions" :disabled="switching" placeholder="请选择部门" class="w-full" />
       </div>
       <div>
         <label class="mb-1 block text-sm">当前角色</label>
-        <FaSelect
+        <YdSelect
           v-model="selectedRoleId"
           :options="roleOptions"
           :disabled="switching || roleOptions.length === 0"

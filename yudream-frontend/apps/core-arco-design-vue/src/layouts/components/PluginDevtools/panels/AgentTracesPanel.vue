@@ -8,7 +8,7 @@ import apiDevtools from '@/api/modules/platform-devtools'
 import AssetSection from './AssetSection.vue'
 
 const store = usePluginDevtoolsStore()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const sourceOptions = [
   { label: '全部来源', value: '' },
@@ -154,22 +154,22 @@ function exportTrace() {
     <!-- 详情视图 -->
     <template v-if="selectedTraceId">
       <div class="trace-detail__header">
-        <FaButton variant="outline" size="sm" @click="backToList">
-          <FaIcon name="morph:arrow-left" />
+        <YdButton variant="outline" size="sm" @click="backToList">
+          <YdIcon name="morph:arrow-left" />
           返回列表
-        </FaButton>
+        </YdButton>
         <div class="trace-detail__meta">
-          <FaTag :variant="statusVariant(selectedLive?.status || detail?.status)" class="text-xs">
+          <YdTag :variant="statusVariant(selectedLive?.status || detail?.status)" class="text-xs">
             {{ statusText(selectedLive?.status || detail?.status) }}
-          </FaTag>
+          </YdTag>
           <span class="text-xs">{{ selectedLive?.agentName || detail?.agentName || '-' }}</span>
           <span class="text-xs text-secondary-foreground/60">{{ sourceText(selectedLive?.source || detail?.source) }}</span>
           <span class="text-xs text-secondary-foreground/60">{{ formatDuration(selectedLive?.durationMs ?? detail?.durationMs) }}</span>
         </div>
-        <FaButton variant="outline" size="sm" :disabled="!detail && !selectedLive" @click="exportTrace">
-          <FaIcon name="morph:download" />
+        <YdButton variant="outline" size="sm" :disabled="!detail && !selectedLive" @click="exportTrace">
+          <YdIcon name="morph:download" />
           导出 JSON
-        </FaButton>
+        </YdButton>
       </div>
 
       <div v-if="detailLoading" class="panel-empty">
@@ -199,18 +199,18 @@ function exportTrace() {
         </div>
 
         <div class="trace-steps">
-          <FaCollapsible v-for="step in detailSteps" :key="step.seq" class="trace-step">
+          <YdCollapsible v-for="step in detailSteps" :key="step.seq" class="trace-step">
             <template #trigger="{ open }">
               <div class="trace-step__trigger">
-                <FaTag :variant="statusVariant(step.status)" class="text-xs shrink-0">
+                <YdTag :variant="statusVariant(step.status)" class="text-xs shrink-0">
                   {{ statusText(step.status) }}
-                </FaTag>
+                </YdTag>
                 <span class="trace-step__title">#{{ step.seq }} {{ step.nodeTitle || step.nodeId || '步骤' }}</span>
-                <FaTag v-if="step.toolName" variant="outline" class="text-xs shrink-0">
+                <YdTag v-if="step.toolName" variant="outline" class="text-xs shrink-0">
                   {{ step.toolName }}
-                </FaTag>
+                </YdTag>
                 <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(step.durationMs) }}</span>
-                <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
+                <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
               </div>
             </template>
             <div class="trace-step__body">
@@ -242,7 +242,7 @@ function exportTrace() {
                 <pre>{{ step.message }}</pre>
               </div>
             </div>
-          </FaCollapsible>
+          </YdCollapsible>
           <div v-if="!detailSteps.length" class="panel-empty">
             {{ selectedLive ? '等待步骤事件…' : '无步骤记录' }}
           </div>
@@ -253,18 +253,18 @@ function exportTrace() {
     <!-- 列表视图 -->
     <template v-else>
       <div class="traces-filters">
-        <FaSelect v-model="filterSource" :options="sourceOptions" class="shrink-0 w-28" />
-        <FaSelect v-model="filterStatus" :options="statusOptions" class="shrink-0 w-28" />
-        <FaButton variant="outline" size="icon" :loading="pageLoading" title="刷新" @click="loadPage">
-          <FaIcon name="morph:refresh-cw" />
-        </FaButton>
+        <YdSelect v-model="filterSource" :options="sourceOptions" class="shrink-0 w-28" />
+        <YdSelect v-model="filterStatus" :options="statusOptions" class="shrink-0 w-28" />
+        <YdButton variant="outline" size="icon" :loading="pageLoading" title="刷新" @click="loadPage">
+          <YdIcon name="morph:refresh-cw" />
+        </YdButton>
       </div>
 
       <AssetSection title="实时执行" icon="morph:activity" :count="store.liveTraces.filter(t => t.status === 'RUNNING').length" default-open>
-        <div v-for="trace in store.liveTraces" :key="trace.traceId" class="trace-row" @click="openTrace(trace.traceId, true)">
-          <FaTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
+        <YdAction v-for="trace in store.liveTraces" :key="trace.traceId" type="button" class="trace-row" @click="openTrace(trace.traceId, true)">
+          <YdTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
             {{ statusText(trace.status) }}
-          </FaTag>
+          </YdTag>
           <div class="trace-row__main">
             <div class="trace-row__title">
               {{ trace.agentName || trace.agentCode || trace.traceId }}
@@ -276,17 +276,17 @@ function exportTrace() {
             </div>
           </div>
           <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(trace.durationMs) }}</span>
-        </div>
+        </YdAction>
         <div v-if="!store.liveTraces.length" class="asset-empty">
           暂无实时执行，触发任意 Agent 调用后此处实时显示
         </div>
       </AssetSection>
 
       <AssetSection title="历史记录" icon="morph:history" :count="page?.total ?? 0" default-open>
-        <div v-for="trace in page?.list || []" :key="trace.traceId" class="trace-row" @click="openTrace(trace.traceId, false)">
-          <FaTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
+        <YdAction v-for="trace in page?.list || []" :key="trace.traceId" type="button" class="trace-row" @click="openTrace(trace.traceId, false)">
+          <YdTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
             {{ statusText(trace.status) }}
-          </FaTag>
+          </YdTag>
           <div class="trace-row__main">
             <div class="trace-row__title">
               {{ trace.agentName || trace.agentCode || trace.traceId }}
@@ -298,11 +298,11 @@ function exportTrace() {
             </div>
           </div>
           <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(trace.durationMs) }}</span>
-        </div>
+        </YdAction>
         <div v-if="!pageLoading && !(page?.list?.length)" class="asset-empty">
           暂无历史追踪
         </div>
-        <FaPagination
+        <YdPagination
           v-if="(page?.total ?? 0) > pageSize"
           v-model:page="pageNum"
           v-model:size="pageSize"
@@ -331,6 +331,8 @@ function exportTrace() {
 
 .trace-row {
   display: flex;
+  width: 100%;
+  text-align: left;
   gap: 8px;
   align-items: center;
   min-width: 0;

@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
   <div ref="surface" class="system-metric-chart" role="group" tabindex="0" :aria-label="label" :aria-describedby="helpId" @keydown="onKeydown" @blur="clearSelection">
     <div ref="canvas" class="system-metric-chart__canvas" aria-hidden="true" />
     <div v-if="allZero && zeroMessage" class="system-metric-chart__zero">
-      <FaIcon name="morph:chart-no-axes-combined" />
+      <YdIcon name="morph:chart-no-axes-combined" />
       <span>{{ zeroMessage }}</span>
     </div>
     <div class="sr-only">

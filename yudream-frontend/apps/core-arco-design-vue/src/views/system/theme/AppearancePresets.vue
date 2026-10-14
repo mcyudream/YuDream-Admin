@@ -33,9 +33,9 @@ function selectPreset(preset: AdminStylePreset) {
           点击预设即刻预览，保存设置后持续生效。主色与明暗模式自由搭配。
         </p>
       </div>
-      <FaTag variant="outline">
+      <YdTag variant="outline">
         管理后台
-      </FaTag>
+      </YdTag>
     </div>
 
     <div class="gap-4 grid grid-cols-1 md:grid-cols-3">
@@ -70,21 +70,21 @@ function selectPreset(preset: AdminStylePreset) {
         </div>
         <div class="appearance-card__body">
           <div class="text-sm font-semibold flex gap-2 items-center">
-            <FaIcon :name="preset.icon" />
+            <YdIcon :name="preset.icon" />
             <span>{{ preset.description }}</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed m-0">
             {{ preset.detail }}
           </p>
-          <FaButton
+          <YdButton
             :variant="modelValue.preset === preset.value ? 'default' : 'outline'"
             :aria-pressed="modelValue.preset === preset.value"
             class="mt-auto w-full"
             @click="selectPreset(preset.value)"
           >
-            <FaIcon v-if="modelValue.preset === preset.value" name="morph:check" />
+            <YdIcon v-if="modelValue.preset === preset.value" name="morph:check" />
             {{ modelValue.preset === preset.value ? `已选择${preset.name}` : `选择${preset.name}` }}
-          </FaButton>
+          </YdButton>
         </div>
       </article>
     </div>
@@ -96,11 +96,11 @@ function selectPreset(preset: AdminStylePreset) {
           降低位移与弹性反馈；关闭时也会尊重系统的减少动态效果偏好。
         </p>
       </div>
-      <FaSwitch id="admin-reduced-motion" v-model="reducedMotion" aria-describedby="admin-motion-description" />
+      <YdSwitch id="admin-reduced-motion" v-model="reducedMotion" aria-describedby="admin-motion-description" />
     </div>
 
     <div v-if="adminTheme" class="appearance-plugin-note" role="status">
-      <FaIcon name="morph:puzzle" class="mt-0.5 shrink-0" />
+      <YdIcon name="morph:puzzle" class="mt-0.5 shrink-0" />
       <p class="text-sm leading-relaxed m-0">
         当前管理后台使用「{{ adminTheme.name }}」主题。插件定义的风格优先生效，内置预设保留为回落样式。
       </p>

@@ -2,22 +2,22 @@ import type { InjectionKey, Ref } from 'vue'
 import type { ComputedRef } from 'vue'
 import type { WikiNode, WikiSpace } from '@/api/modules/platform-wiki'
 
-// 页面类型中文展示与配色（同时用于 FaTag 与图谱着色）
+// 页面类型中文展示与配色（同时用于 YdTag 与图谱着色）
 export interface PageTypeMeta {
   label: string
   color: string
 }
 
 export const pageTypeMeta: Record<string, PageTypeMeta> = {
-  source_summary: { label: '资料摘要', color: 'rgb(var(--primary-3))' },
-  source_document: { label: '原文档', color: 'rgb(var(--primary-3))' },
-  entity: { label: '实体', color: 'rgb(var(--primary-4))' },
-  concept: { label: '概念', color: 'rgb(var(--primary-6))' },
-  synthesis: { label: '综合分析', color: 'rgb(var(--primary-7))' },
-  comparison: { label: '对比', color: 'rgb(var(--primary-5))' },
-  query: { label: '查询归档', color: 'rgb(var(--primary-8))' },
-  research: { label: '深度研究', color: 'rgb(var(--primary-9))' },
-  overview: { label: '全局概要', color: 'rgb(var(--primary-2))' },
+  source_summary: { label: '资料摘要', color: 'var(--color-text-2)' },
+  source_document: { label: '原文档', color: 'var(--color-text-2)' },
+  entity: { label: '实体', color: 'var(--color-text-2)' },
+  concept: { label: '概念', color: 'var(--color-text-2)' },
+  synthesis: { label: '综合分析', color: 'var(--color-text-2)' },
+  comparison: { label: '对比', color: 'var(--color-text-2)' },
+  query: { label: '查询归档', color: 'var(--color-text-2)' },
+  research: { label: '深度研究', color: 'var(--color-text-2)' },
+  overview: { label: '全局概要', color: 'var(--color-text-2)' },
   toc: { label: '内容目录', color: 'var(--color-text-2)' },
   log: { label: '操作日志', color: 'var(--color-text-3)' },
 }
@@ -43,7 +43,7 @@ export interface StatusMeta {
 
 export const ingestStatusMeta: Record<string, StatusMeta> = {
   QUEUED: { label: '排队中', color: 'var(--color-text-3)' },
-  RUNNING: { label: '运行中', color: 'rgb(var(--primary-6))' },
+  RUNNING: { label: '运行中', color: 'var(--color-text-2)' },
   COMPLETED: { label: '已完成', color: 'rgb(var(--success-6))' },
   FAILED: { label: '失败', color: 'rgb(var(--danger-6))' },
   CANCELLED: { label: '已取消', color: 'var(--color-text-2)' },
@@ -59,7 +59,7 @@ export function ingestStatusLabel(status?: string): StatusMeta {
 export function extractionStatusLabel(status?: string): StatusMeta {
   const map: Record<string, StatusMeta> = {
     PENDING: { label: '待抽取', color: 'var(--color-text-3)' },
-    RUNNING: { label: '抽取中', color: 'rgb(var(--primary-6))' },
+    RUNNING: { label: '抽取中', color: 'var(--color-text-2)' },
     COMPLETED: { label: '已抽取', color: 'rgb(var(--success-6))' },
     SUCCESS: { label: '已抽取', color: 'rgb(var(--success-6))' },
     FAILED: { label: '抽取失败', color: 'rgb(var(--danger-6))' },

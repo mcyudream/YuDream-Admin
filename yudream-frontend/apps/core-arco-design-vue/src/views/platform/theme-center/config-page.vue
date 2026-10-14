@@ -7,7 +7,7 @@ defineOptions({ name: 'ThemeCenterConfigPage' })
 
 const route = useRoute()
 const router = useRouter()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const themeCode = computed(() => String(route.params.theme ?? ''))
 const loading = ref(false)
@@ -65,18 +65,18 @@ onMounted(load)
 
 <template>
   <div>
-    <FaPageHeader :title="themeName ? `主题配置：${themeName}` : '主题配置'" class="theme-config-header">
-      <FaButton variant="outline" @click="back">
-        <FaIcon name="morph:arrow-left" />
+    <YdPageHeader :title="themeName ? `主题配置：${themeName}` : '主题配置'" class="theme-config-header">
+      <YdButton variant="outline" @click="back">
+        <YdIcon name="morph:arrow-left" />
         返回主题中心
-      </FaButton>
-      <FaButton v-auth="'platform:theme-center:config'" :loading="saving" :disabled="loading || !config" @click="save">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton v-auth="'platform:theme-center:config'" :loading="saving" :disabled="loading || !config" @click="save">
+        <YdIcon name="morph:save" />
         保存配置
-      </FaButton>
-    </FaPageHeader>
-    <FaPageMain>
-      <div v-loading="loading" class="theme-config-page">
+      </YdButton>
+    </YdPageHeader>
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><div  class="theme-config-page">
         <ThemeConfigForm
           v-if="config && config.schema.sections?.length"
           v-model:values="values"
@@ -87,8 +87,8 @@ onMounted(load)
         <div v-else-if="!loading" class="theme-config-page__empty">
           该主题未声明可配置项。
         </div>
-      </div>
-    </FaPageMain>
+      </div></YdLoadingOverlay>
+    </YdPageMain>
   </div>
 </template>
 

@@ -3,7 +3,7 @@ import type { TableColumn } from '@yudream/components'
 import type { RedisKeySample, RedisMonitor } from '@/api/modules/system-monitor'
 import apiMonitor from '@/api/modules/system-monitor'
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const pattern = ref('*')
@@ -75,13 +75,13 @@ function ttlText(ttl?: number) {
 
 <template>
   <div>
-    <FaPageHeader title="Redis &#30417;&#25511;" class="mb-0" />
+    <YdPageHeader title="Redis &#30417;&#25511;" class="mb-0" />
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="monitor-summary">
         <div v-for="item in stats" :key="item.label" class="summary-item">
           <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
           </div>
           <div class="summary-body">
             <span>{{ item.label }}</span>
@@ -94,9 +94,9 @@ function ttlText(ttl?: number) {
         <section class="monitor-panel">
           <div class="panel-title">
             <span>Keyspace</span>
-            <FaTag variant="secondary">{{ keyspaceRows.length }}</FaTag>
+            <YdTag variant="secondary">{{ keyspaceRows.length }}</YdTag>
           </div>
-          <FaResponsiveTable
+          <YdResponsiveTable
             row-key="db"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[420px]"
@@ -106,22 +106,22 @@ function ttlText(ttl?: number) {
             :data="keyspaceRows"
           >
             <template #card="{ row }">
-              <FaCard class="w-full">
+              <YdCard class="w-full">
                 <div class="flex items-center justify-between gap-2">
                   <span class="min-w-0 break-words text-base font-semibold">{{ row.db }}</span>
                   <span class="text-sm text-secondary-foreground/80">{{ row.value }}</span>
                 </div>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable>
         </section>
 
         <section class="monitor-panel">
           <div class="panel-title">
             <span>&#32531;&#23384; Key &#25277;&#26679;</span>
-            <FaTag variant="secondary">{{ data.keys.length }}</FaTag>
+            <YdTag variant="secondary">{{ data.keys.length }}</YdTag>
           </div>
-          <FaResponsiveTable
+          <YdResponsiveTable
             row-key="key"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[720px]"
@@ -132,17 +132,17 @@ function ttlText(ttl?: number) {
             :data="data.keys"
           >
             <template #toolbar>
-              <FaSearchBar class="w-full">
+              <YdSearchBar class="w-full">
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,420px)_auto] md:items-center">
-                  <FaInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
+                  <YdInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
                   <div class="flex gap-2 md:justify-end">
-                    <FaButton :loading="loading" @click="load">
-                      <FaIcon name="morph:search" />
+                    <YdButton :loading="loading" @click="load">
+                      <YdIcon name="morph:search" />
                       &#31579;&#36873;
-                    </FaButton>
+                    </YdButton>
                   </div>
                 </div>
-              </FaSearchBar>
+              </YdSearchBar>
             </template>
             <template #cell-key="{ row }">
               <code>{{ row.original.key }}</code>
@@ -151,23 +151,23 @@ function ttlText(ttl?: number) {
               {{ ttlText(row.original.ttl) }}
             </template>
             <template #card="{ row }">
-              <FaCard class="w-full">
+              <YdCard class="w-full">
                 <div class="flex flex-col gap-3">
                   <div class="flex items-start justify-between gap-2">
                     <code class="break-all text-sm font-semibold">{{ row.key }}</code>
-                    <FaTag variant="secondary">{{ row.type }}</FaTag>
+                    <YdTag variant="secondary">{{ row.type }}</YdTag>
                   </div>
                   <div class="flex items-center gap-2 text-sm">
                     <span class="shrink-0 text-secondary-foreground/60">过期时间</span>
                     <span>{{ ttlText(row.ttl) }}</span>
                   </div>
                 </div>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable>
         </section>
       </div>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 

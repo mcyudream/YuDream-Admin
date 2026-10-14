@@ -98,27 +98,27 @@ function levelClass(entryLevel: string) {
 <template>
   <div class="logs-panel">
     <div class="logs-toolbar">
-      <FaSelect
+      <YdSelect
         v-model="pluginCode" :options="pluginOptions" placeholder="选择插件"
         :loading="pluginsLoading" class="logs-toolbar__plugin"
       />
-      <FaSelect v-model="level" :options="levelOptions" class="logs-toolbar__level" />
-      <FaInput v-model="keyword" placeholder="关键字过滤" class="logs-toolbar__keyword" clearable />
-      <FaTooltip :text="paused ? '继续接收' : '暂停追加'" side="bottom">
-        <FaButton variant="ghost" size="icon-sm" :aria-label="paused ? '继续' : '暂停'" @click="togglePause">
-          <FaIcon :name="paused ? 'morph:play' : 'morph:pause'" class="size-4" />
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip text="清空列表" side="bottom">
-        <FaButton variant="ghost" size="icon-sm" aria-label="清空" @click="clear">
-          <FaIcon name="morph:trash-2" class="size-4" />
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip text="重新加载" side="bottom">
-        <FaButton variant="ghost" size="icon-sm" aria-label="刷新" :loading="loading" @click="reload">
-          <FaIcon name="morph:refresh-cw" class="size-4" />
-        </FaButton>
-      </FaTooltip>
+      <YdSelect v-model="level" :options="levelOptions" class="logs-toolbar__level" />
+      <YdInput v-model="keyword" placeholder="关键字过滤" class="logs-toolbar__keyword" clearable />
+      <YdTooltip :text="paused ? '继续接收' : '暂停追加'" side="bottom">
+        <YdButton variant="ghost" size="icon-sm" :aria-label="paused ? '继续' : '暂停'" @click="togglePause">
+          <YdIcon :name="paused ? 'morph:play' : 'morph:pause'" class="size-4" />
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip text="清空列表" side="bottom">
+        <YdButton variant="ghost" size="icon-sm" aria-label="清空" @click="clear">
+          <YdIcon name="morph:trash-2" class="size-4" />
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip text="重新加载" side="bottom">
+        <YdButton variant="ghost" size="icon-sm" aria-label="刷新" :loading="loading" @click="reload">
+          <YdIcon name="morph:refresh-cw" class="size-4" />
+        </YdButton>
+      </YdTooltip>
     </div>
 
     <div class="logs-status">
@@ -130,7 +130,7 @@ function levelClass(entryLevel: string) {
     </div>
 
     <div v-if="!pluginCode" class="logs-empty">
-      <FaIcon name="morph:file-text" class="size-8" />
+      <YdIcon name="morph:file-text" class="size-8" />
       <p>选择一个插件查看其运行日志</p>
       <p class="logs-empty__hint">
         日志按插件包名前缀（online.yudream.base.plugin.*）过滤，覆盖宿主环形缓冲中的近期日志
@@ -141,7 +141,9 @@ function levelClass(entryLevel: string) {
       <div v-if="!entries.length && !loading" class="logs-empty">
         <p>暂无日志</p>
       </div>
-      <div
+      <YdAction
+        type="button"
+        :disabled="!entry.throwable"
         v-for="entry in entries" :key="entry.sequence" class="log-entry"
         :class="{ 'log-entry--expandable': !!entry.throwable }"
         @click="entry.throwable && toggleExpand(entry)"
@@ -151,14 +153,14 @@ function levelClass(entryLevel: string) {
           <span :class="levelClass(entry.level)">{{ entry.level }}</span>
           <span class="log-entry__logger" :title="entry.logger">{{ shortLogger(entry.logger) }}</span>
           <span class="log-entry__message">{{ entry.message }}</span>
-          <FaIcon
+          <YdIcon
             v-if="entry.throwable"
             :name="expandedSequences.has(entry.sequence) ? 'morph:chevron-down' : 'morph:chevron-right'"
             class="shrink-0 size-3.5"
           />
         </div>
         <pre v-if="entry.throwable && expandedSequences.has(entry.sequence)" class="log-entry__stack">{{ entry.throwable }}</pre>
-      </div>
+      </YdAction>
     </div>
   </div>
 </template>
@@ -229,7 +231,10 @@ function levelClass(entryLevel: string) {
 }
 
 .log-entry {
+  display: block;
+  width: 100%;
   padding: 4px 8px;
+  text-align: left;
   border-bottom: 1px solid var(--color-border-1, var(--color-border-2));
 }
 

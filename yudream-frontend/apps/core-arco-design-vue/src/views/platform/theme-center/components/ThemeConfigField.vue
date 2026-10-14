@@ -36,8 +36,9 @@ function updateNumber(raw: any) {
   update(Number.isNaN(num) ? undefined : num)
 }
 
-function updateColor(event: Event) {
-  update((event.target as HTMLInputElement).value)
+function updateColor(value: string | number | undefined) {
+  if (value === undefined) return
+  update(String(value))
 }
 
 function createItem() {
@@ -70,7 +71,7 @@ function updateItemField(index: number, key: string, value: any) {
   listItems.value = next
 }
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const imageUrls = ref<string[]>(toDisplayUrls(props.modelValue))
 
@@ -129,22 +130,22 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
   <div class="theme-config-field">
     <div class="theme-config-field__head">
       <span class="theme-config-field__label">{{ field.label }}</span>
-      <FaTag v-if="field.secret" variant="secondary">
+      <YdTag v-if="field.secret" variant="secondary">
         敏感
-      </FaTag>
+      </YdTag>
     </div>
     <p v-if="field.description" class="theme-config-field__desc">
       {{ field.description }}
     </p>
 
-    <FaInput
+    <YdInput
       v-if="field.type === 'text'"
       :model-value="modelValue ?? ''"
       :placeholder="field.placeholder"
       class="w-full"
       @update:model-value="update"
     />
-    <FaTextarea
+    <YdTextarea
       v-else-if="field.type === 'textarea'"
       :model-value="modelValue ?? ''"
       :placeholder="field.placeholder"
@@ -152,7 +153,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
       class="w-full"
       @update:model-value="update"
     />
-    <FaInput
+    <YdInput
       v-else-if="field.type === 'number'"
       :model-value="modelValue ?? ''"
       type="number"
@@ -160,12 +161,12 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
       class="w-full"
       @update:model-value="updateNumber"
     />
-    <FaSwitch
+    <YdSwitch
       v-else-if="field.type === 'switch'"
       :model-value="!!modelValue"
       @update:model-value="update"
     />
-    <FaSelect
+    <YdSelect
       v-else-if="field.type === 'select'"
       :model-value="modelValue ?? ''"
       :options="field.options ?? []"
@@ -174,13 +175,15 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
       @update:model-value="update"
     />
     <div v-else-if="field.type === 'color'" class="theme-config-field__color">
-      <input
+      <YdInput
         type="color"
-        class="theme-config-field__color-swatch"
-        :value="typeof modelValue === 'string' && /^#[0-9a-fA-F]{6}$/.test(modelValue) ? modelValue : '#ffffff'"
-        @input="updateColor"
-      >
-      <FaInput
+        class="theme-config-field__color-swatch border-0 rounded-none bg-transparent shadow-none"
+        input-class="theme-config-field__color-control"
+        aria-label="选择主题颜色"
+        :model-value="typeof modelValue === 'string' && /^#[0-9a-fA-F]{6}$/.test(modelValue) ? modelValue : '#ffffff'"
+        @update:model-value="updateColor"
+      />
+      <YdInput
         :model-value="modelValue ?? ''"
         :placeholder="field.placeholder || '#ffffff'"
         class="w-full"
@@ -188,7 +191,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
       />
     </div>
     <template v-else-if="field.type === 'image'">
-      <FaImageUpload
+      <YdImageUpload
         v-model="imageUrls"
         :max="1"
         :width="160"
@@ -200,7 +203,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         点击上传或删除图片后记得保存；删除会去掉该图，不再自动填回主题自带图。
       </p>
     </template>
-    <FaInput
+    <YdInput
       v-else-if="field.secret"
       :model-value="modelValue ?? ''"
       type="password"
@@ -213,15 +216,15 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         <div class="theme-config-field__list-item-head">
           <span>#{{ index + 1 }}</span>
           <div class="theme-config-field__list-item-actions">
-            <FaButton size="sm" variant="ghost" :disabled="index === 0" @click="moveItem(index, -1)">
-              <FaIcon name="morph:arrow-up" />
-            </FaButton>
-            <FaButton size="sm" variant="ghost" :disabled="index === listItems.length - 1" @click="moveItem(index, 1)">
-              <FaIcon name="morph:arrow-down" />
-            </FaButton>
-            <FaButton size="sm" variant="ghost" @click="removeItem(index)">
-              <FaIcon name="morph:trash-2" />
-            </FaButton>
+            <YdButton size="sm" variant="ghost" :disabled="index === 0" @click="moveItem(index, -1)">
+              <YdIcon name="morph:arrow-up" />
+            </YdButton>
+            <YdButton size="sm" variant="ghost" :disabled="index === listItems.length - 1" @click="moveItem(index, 1)">
+              <YdIcon name="morph:arrow-down" />
+            </YdButton>
+            <YdButton size="sm" variant="ghost" @click="removeItem(index)">
+              <YdIcon name="morph:trash-2" />
+            </YdButton>
           </div>
         </div>
         <div class="theme-config-field__list-item-body">
@@ -235,12 +238,12 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
           />
         </div>
       </div>
-      <FaButton variant="outline" size="sm" @click="createItem">
-        <FaIcon name="morph:plus" />
+      <YdButton variant="outline" size="sm" @click="createItem">
+        <YdIcon name="morph:plus" />
         添加一项
-      </FaButton>
+      </YdButton>
     </div>
-    <FaInput
+    <YdInput
       v-else
       :model-value="modelValue ?? ''"
       :placeholder="field.placeholder"
@@ -290,6 +293,11 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
 }
 
 .theme-config-field__color-swatch {
+  width: 36px;
+  height: 32px;
+}
+
+.theme-config-field__color-control {
   width: 36px;
   height: 32px;
   padding: 0;

@@ -26,7 +26,7 @@ const router = useRouter()
 const siteLogo = computed(() => toBackendAssetUrl(appSettingsStore.logo))
 const accountAvatar = computed(() => toBackendAssetUrl(appAccountStore.avatar))
 
-const profileModal = useFaModal().create({
+const profileModal = useYdModal().create({
   alignCenter: true,
   header: false,
   footer: false,
@@ -269,12 +269,13 @@ onBeforeUnmount(() => {
             </summary>
             <div>
               <a href="/" @click="navigate($event, '/')">控制台</a>
-              <button type="button" @click="openProfile">个人资料</button>
-              <button type="button" class="danger" @click="logout">退出登录</button>
+              <YdButton type="button" variant="ghost" @click="openProfile">个人资料</YdButton>
+              <YdButton type="button" variant="ghost" class="danger" @click="logout">退出登录</YdButton>
             </div>
           </details>
         </div>
-        <button
+        <YdButton
+          variant="ghost"
           type="button"
           class="site-layout-header__menu-toggle"
           :class="{ 'is-open': mobileNavOpen }"
@@ -285,7 +286,7 @@ onBeforeUnmount(() => {
           <span class="site-layout-header__menu-toggle-line" />
           <span class="site-layout-header__menu-toggle-line" />
           <span class="site-layout-header__menu-toggle-line" />
-        </button>
+        </YdButton>
       </div>
     </header>
     <Teleport to="body">
@@ -315,8 +316,8 @@ onBeforeUnmount(() => {
                 <span>{{ appAccountStore.account }}</span>
               </div>
               <a href="/" @click="navigate($event, '/')">控制台</a>
-              <button type="button" @click="openProfile">个人资料</button>
-              <button type="button" class="danger" @click="logout">退出登录</button>
+              <YdButton type="button" variant="ghost" @click="openProfile">个人资料</YdButton>
+              <YdButton type="button" variant="ghost" class="danger" @click="logout">退出登录</YdButton>
             </template>
           </div>
         </div>

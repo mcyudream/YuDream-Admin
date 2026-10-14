@@ -46,7 +46,7 @@ interface AiProviderDraft {
   models: AiModelDraft[]
 }
 
-const toast = useFaToast()
+const toast = useYdToast()
 const router = useRouter()
 const appFeatureStore = useAppFeatureStore()
 
@@ -794,21 +794,21 @@ function splitModelList(value: string) {
 
 <template>
   <div>
-    <FaPageHeader title="平台能力" class="mb-0">
+    <YdPageHeader title="平台能力" class="mb-0">
       <template #description>
         管理 SSE、WebSocket、RabbitMQ、API 文档、集成运行等可选能力的启停、配置、健康状态与测试消息。
       </template>
-    </FaPageHeader>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="capability-toolbar">
-        <FaInput v-model="testMessage" placeholder="测试消息内容" class="min-w-0 flex-1" />
+        <YdInput v-model="testMessage" placeholder="测试消息内容" class="min-w-0 flex-1" />
       </div>
 
       <div class="summary-grid">
         <div v-for="item in summary" :key="item.label" class="summary-item">
           <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
           </div>
           <div class="summary-body">
             <span>{{ item.label }}</span>
@@ -821,21 +821,23 @@ function splitModelList(value: string) {
         <section class="capability-list">
           <template v-for="group in groups" :key="group.type">
             <div v-if="itemsByType(group.type).length" class="section-title">
-              <span><FaIcon :name="group.icon" /> {{ group.title }}</span>
-              <FaTag variant="secondary">{{ itemsByType(group.type).length }}</FaTag>
+              <span><YdIcon :name="group.icon" /> {{ group.title }}</span>
+              <YdTag variant="secondary">{{ itemsByType(group.type).length }}</YdTag>
             </div>
-            <button
+            <YdButton
               v-for="item in itemsByType(group.type)"
               :key="item.code"
+              variant="ghost"
               class="capability-item"
               :class="{ active: selected?.code === item.code }"
               type="button"
+              :aria-pressed="selected?.code === item.code"
               @click="selectedCode = item.code"
             >
-              <FaIcon :name="item.icon || 'morph:puzzle'" />
+              <YdIcon :name="item.icon || 'morph:puzzle'" />
               <span>{{ item.name }}</span>
-              <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
-            </button>
+              <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
+            </YdButton>
           </template>
         </section>
 
@@ -843,7 +845,7 @@ function splitModelList(value: string) {
           <div class="detail-header">
             <div class="detail-title">
               <div class="detail-icon">
-                <FaIcon :name="selected.icon || 'morph:puzzle'" />
+                <YdIcon :name="selected.icon || 'morph:puzzle'" />
               </div>
               <div>
                 <h2>{{ selected.name }}</h2>
@@ -851,30 +853,30 @@ function splitModelList(value: string) {
               </div>
             </div>
             <div class="detail-actions">
-              <FaButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
-                <FaIcon name="morph:settings-2" />
+              <YdButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
+                <YdIcon name="morph:settings-2" />
                 配置
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-auth="'platform:capability:test'"
                 variant="outline"
                 :disabled="!selected.enabled"
                 :loading="actionLoading === `${selected.code}:test`"
                 @click="testCapability(selected)"
               >
-                <FaIcon name="morph:send" />
+                <YdIcon name="morph:send" />
                 测试
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
                 :variant="selected.enabled ? 'destructive' : 'default'"
                 :disabled="!selected.enabled && !canEnableSelected"
                 :loading="actionLoading === `${selected.code}:toggle`"
                 @click="toggleCapability(selected)"
               >
-                <FaIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
+                <YdIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
                 {{ selected.enabled ? '禁用' : '启用' }}
-              </FaButton>
+              </YdButton>
             </div>
           </div>
 
@@ -883,13 +885,13 @@ function splitModelList(value: string) {
             <div class="inline-config__head">
               <span class="inline-config__title">编辑配置</span>
               <div class="inline-config__actions">
-                <FaButton size="sm" variant="ghost" @click="cancelConfig">
+                <YdButton size="sm" variant="ghost" @click="cancelConfig">
                   取消
-                </FaButton>
-                <FaButton size="sm" @click="saveConfig">
-                  <FaIcon name="morph:check" />
+                </YdButton>
+                <YdButton size="sm" @click="saveConfig">
+                  <YdIcon name="morph:check" />
                   保存配置
-                </FaButton>
+                </YdButton>
               </div>
             </div>
 
@@ -898,33 +900,35 @@ function splitModelList(value: string) {
               <div class="ai-inline__topbar">
                 <label class="config-field">
                   <span>默认供应商</span>
-                  <FaSelect v-model="configDraft.defaultProvider" :options="aiProviderOptions" placeholder="选择默认供应商" class="w-full" />
+                  <YdSelect v-model="configDraft.defaultProvider" :options="aiProviderOptions" placeholder="选择默认供应商" class="w-full" />
                 </label>
                 <label class="config-field">
                   <span>默认模型</span>
-                  <FaSelect v-model="configDraft.defaultModel" :options="aiDefaultModelOptions" placeholder="选择默认模型" class="w-full" />
+                  <YdSelect v-model="configDraft.defaultModel" :options="aiDefaultModelOptions" placeholder="选择默认模型" class="w-full" />
                 </label>
               </div>
 
               <div class="ai-inline__body">
                 <!-- 供应商列表 -->
                 <aside class="ai-provider-nav">
-                  <button
+                  <YdButton
                     v-for="(provider, providerIndex) in aiProviders"
                     :key="providerIndex"
+                    variant="ghost"
                     type="button"
                     class="ai-provider-nav__item"
                     :class="{ 'is-active': providerIndex === activeProviderIndex }"
+                    :aria-pressed="providerIndex === activeProviderIndex"
                     @click="selectAiProvider(providerIndex)"
                   >
-                    <FaIcon name="morph:cloud" class="ai-provider-nav__icon" />
+                    <YdIcon name="morph:cloud" class="ai-provider-nav__icon" />
                     <span class="ai-provider-nav__name">{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</span>
                     <span class="ai-provider-nav__badge" :class="{ off: !provider.enabled }">{{ provider.enabled ? '启用' : '停用' }}</span>
-                  </button>
-                  <FaButton variant="outline" size="sm" class="ai-provider-nav__add" @click="addAiProvider">
-                    <FaIcon name="morph:plus" />
+                  </YdButton>
+                  <YdButton variant="outline" size="sm" class="ai-provider-nav__add" @click="addAiProvider">
+                    <YdIcon name="morph:plus" />
                     添加供应商
-                  </FaButton>
+                  </YdButton>
                 </aside>
 
                 <!-- 选中供应商编辑 -->
@@ -933,49 +937,49 @@ function splitModelList(value: string) {
                     <strong>{{ activeProvider.name || activeProvider.code }}</strong>
                     <div class="ai-provider-edit__tools">
                       <span class="ai-switch-label">启用</span>
-                      <FaSwitch v-model="activeProvider.enabled" />
-                      <FaButton size="sm" variant="ghost" :disabled="aiProviders.length <= 1" title="删除供应商" @click="removeAiProvider(activeProviderIndex)">
-                        <FaIcon name="morph:trash-2" />
-                      </FaButton>
+                      <YdSwitch v-model="activeProvider.enabled" />
+                      <YdButton size="sm" variant="ghost" :disabled="aiProviders.length <= 1" title="删除供应商" @click="removeAiProvider(activeProviderIndex)">
+                        <YdIcon name="morph:trash-2" />
+                      </YdButton>
                     </div>
                   </div>
 
                   <div class="ai-provider-form">
                     <label class="config-field">
                       <span>供应商编码</span>
-                      <FaInput v-model="activeProvider.code" placeholder="openai" @blur="syncAiDefaults" />
+                      <YdInput v-model="activeProvider.code" placeholder="openai" @blur="syncAiDefaults" />
                     </label>
                     <label class="config-field">
                       <span>显示名称</span>
-                      <FaInput v-model="activeProvider.name" placeholder="OpenAI" />
+                      <YdInput v-model="activeProvider.name" placeholder="OpenAI" />
                     </label>
                     <label class="config-field">
                       <span>供应商类型</span>
-                      <FaSelect v-model="activeProvider.type" :options="aiProviderTypeOptions" class="w-full" />
+                      <YdSelect v-model="activeProvider.type" :options="aiProviderTypeOptions" class="w-full" />
                     </label>
                     <label class="config-field">
                       <span>默认模型</span>
-                      <FaSelect v-model="activeProvider.defaultModel" :options="modelOptions(activeProvider)" class="w-full" />
+                      <YdSelect v-model="activeProvider.defaultModel" :options="modelOptions(activeProvider)" class="w-full" />
                     </label>
                     <label class="config-field ai-span-2">
                       <span>API 地址</span>
-                      <FaInput v-model="activeProvider.baseUrl" placeholder="https://api.openai.com/v1" />
+                      <YdInput v-model="activeProvider.baseUrl" placeholder="https://api.openai.com/v1" />
                     </label>
                     <label class="config-field">
                       <span>补全路径</span>
-                      <FaInput v-model="activeProvider.completionsPath" placeholder="/chat/completions" />
+                      <YdInput v-model="activeProvider.completionsPath" placeholder="/chat/completions" />
                     </label>
                     <label class="config-field">
                       <span>温度</span>
-                      <FaInput v-model="activeProvider.temperature" type="number" placeholder="0.4" />
+                      <YdInput v-model="activeProvider.temperature" type="number" placeholder="0.4" />
                     </label>
                     <label class="config-field ai-span-2">
                       <span>API Key</span>
-                      <FaInput v-model="activeProvider.apiKey" type="password" placeholder="sk-..." />
+                      <YdInput v-model="activeProvider.apiKey" type="password" placeholder="sk-..." />
                     </label>
                     <label class="config-field ai-span-2">
                       <span>代理地址</span>
-                      <FaInput v-model="activeProvider.proxyUrl" placeholder="http://127.0.0.1:7890" />
+                      <YdInput v-model="activeProvider.proxyUrl" placeholder="http://127.0.0.1:7890" />
                     </label>
                   </div>
 
@@ -983,10 +987,10 @@ function splitModelList(value: string) {
                   <div class="ai-model-table-wrap">
                     <div class="ai-model-table__head">
                       <span>模型（{{ activeProvider.models.length }}）</span>
-                      <FaButton size="sm" variant="outline" @click="addAiModel(activeProvider)">
-                        <FaIcon name="morph:plus" />
+                      <YdButton size="sm" variant="outline" @click="addAiModel(activeProvider)">
+                        <YdIcon name="morph:plus" />
                         添加模型
-                      </FaButton>
+                      </YdButton>
                     </div>
                     <table class="ai-model-table">
                       <thead>
@@ -1002,16 +1006,16 @@ function splitModelList(value: string) {
                       </thead>
                       <tbody>
                         <tr v-for="(model, modelIndex) in activeProvider.models" :key="modelIndex">
-                          <td class="ai-model-table__wide" data-label="名称"><FaInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
-                          <td class="ai-model-table__wide" data-label="模型名"><FaInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
-                          <td data-label="类型"><FaSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
-                          <td class="ai-model-table__num" data-label="温度"><FaInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
-                          <td class="ai-model-table__switch" data-label="思考"><FaSwitch v-model="model.thinkingEnabled" /></td>
-                          <td class="ai-model-table__switch" data-label="视觉"><FaSwitch v-model="model.vision" /></td>
+                          <td class="ai-model-table__wide" data-label="名称"><YdInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
+                          <td class="ai-model-table__wide" data-label="模型名"><YdInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
+                          <td data-label="类型"><YdSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
+                          <td class="ai-model-table__num" data-label="温度"><YdInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
+                          <td class="ai-model-table__switch" data-label="思考"><YdSwitch v-model="model.thinkingEnabled" /></td>
+                          <td class="ai-model-table__switch" data-label="视觉"><YdSwitch v-model="model.vision" /></td>
                           <td class="ai-model-table__op">
-                            <FaButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
-                              <FaIcon name="morph:trash-2" />
-                            </FaButton>
+                            <YdButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
+                              <YdIcon name="morph:trash-2" />
+                            </YdButton>
                           </td>
                         </tr>
                       </tbody>
@@ -1026,7 +1030,7 @@ function splitModelList(value: string) {
                     <div class="ai-provider-form ai-advanced__body">
                       <label class="config-field ai-span-4">
                         <span>供应商额外请求体</span>
-                        <FaTextarea v-model="activeProvider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
+                        <YdTextarea v-model="activeProvider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
                       </label>
                     </div>
                   </details>
@@ -1041,14 +1045,14 @@ function splitModelList(value: string) {
                 <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">
                   已配置，留空不修改
                 </small>
-                <FaTextarea
+                <YdTextarea
                   v-if="field.type === 'textarea'"
                   v-model="configDraft[field.key]"
                   rows="5"
                   input-class="font-mono"
                   :placeholder="field.placeholder"
                 />
-                <FaInput
+                <YdInput
                   v-else
                   v-model="configDraft[field.key]"
                   :type="field.type || 'text'"
@@ -1056,7 +1060,7 @@ function splitModelList(value: string) {
                 />
               </label>
             </div>
-            <FaTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
+            <YdTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
           </div>
 
           <div class="detail-grid">
@@ -1066,7 +1070,7 @@ function splitModelList(value: string) {
             </div>
             <div class="info-cell">
               <span>状态</span>
-              <FaTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</FaTag>
+              <YdTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</YdTag>
             </div>
             <div class="info-cell">
               <span>编码</span>
@@ -1081,9 +1085,9 @@ function splitModelList(value: string) {
           <div v-if="dependencyRows.length" class="dependency-panel">
             <div class="section-title">
               <span>依赖能力</span>
-              <FaTag :variant="missingDependencies.length ? 'destructive' : 'default'">
+              <YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
                 {{ missingDependencies.length ? '未满足' : '已满足' }}
-              </FaTag>
+              </YdTag>
             </div>
             <div class="dependency-list">
               <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
@@ -1091,9 +1095,9 @@ function splitModelList(value: string) {
                   <strong>{{ dependency.name }}</strong>
                   <code>{{ dependency.code }}</code>
                 </div>
-                <FaTag :variant="dependency.enabled ? 'default' : 'secondary'">
+                <YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
                   {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
-                </FaTag>
+                </YdTag>
               </div>
             </div>
             <p v-if="missingDependencies.length" class="dependency-tip">
@@ -1104,7 +1108,7 @@ function splitModelList(value: string) {
           <div class="health-panel">
             <div class="section-title">
               <span>健康信息</span>
-              <FaTag :variant="statusVariant(selected.status)">{{ selected.healthMessage || '-' }}</FaTag>
+              <YdTag :variant="statusVariant(selected.status)">{{ selected.healthMessage || '-' }}</YdTag>
             </div>
             <div v-if="metricEntries(selected).length" class="metric-grid">
               <div v-for="[key, value] in metricEntries(selected)" :key="key" class="metric-item">
@@ -1123,18 +1127,18 @@ function splitModelList(value: string) {
             </div>
             <div v-if="selected.code === 'sse'" class="debug-row">
               <span>SSE：{{ sseStatus }}</span>
-              <FaButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">连接</FaButton>
-              <FaButton size="sm" variant="ghost" @click="closeSse">断开</FaButton>
+              <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">连接</YdButton>
+              <YdButton size="sm" variant="ghost" @click="closeSse">断开</YdButton>
             </div>
             <div v-if="selected.code === 'websocket'" class="debug-row">
               <span>WebSocket：{{ wsStatus }}</span>
-              <FaButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">连接</FaButton>
-              <FaButton size="sm" variant="ghost" @click="closeWs">断开</FaButton>
+              <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">连接</YdButton>
+              <YdButton size="sm" variant="ghost" @click="closeWs">断开</YdButton>
             </div>
           </div>
         </section>
       </div>
-    </FaPageMain>
+    </YdPageMain>
 
   </div>
 </template>

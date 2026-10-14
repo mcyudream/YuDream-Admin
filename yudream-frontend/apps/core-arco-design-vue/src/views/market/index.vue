@@ -8,7 +8,7 @@ import MarketChrome from './market-chrome.vue'
 
 const router = useRouter()
 const route = useRoute()
-const toast = useFaToast()
+const toast = useYdToast()
 const auth = useAppAuth()
 const accountStore = useAppAccountStore()
 const featureStore = useAppFeatureStore()
@@ -250,25 +250,23 @@ async function copyPublicUrl() {
 
         <form class="discover-search" @submit.prevent="onSearch">
           <label class="discover-search__field discover-control">
-            <FaIcon name="morph:search" />
-            <input v-model="search" type="search" placeholder="搜索名称、编码或描述">
+            <YdIcon name="morph:search" />
+            <YdInput v-model="search" type="search" placeholder="搜索名称、编码或描述" />
           </label>
           <label class="discover-sort discover-control">
-            <select v-model="sort" @change="onSortChange">
-              <option v-for="option in sortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
+            <YdSelect v-model="sort" :options="sortOptions" @update:model-value="onSortChange" />
           </label>
-          <button type="submit" class="discover-action">搜索</button>
-          <button v-if="canManageOwnPlugins" type="button" class="discover-action discover-action--ghost" @click="goAuthorWorkspace">
+          <YdAction type="submit" class="discover-action">搜索</YdAction>
+          <YdAction v-if="canManageOwnPlugins" type="button" class="discover-action discover-action--ghost" @click="goAuthorWorkspace">
             管理我的插件
-          </button>
+          </YdAction>
         </form>
 
         <div class="discover-layout">
           <aside class="discover-filters">
             <section>
               <h2>分类</h2>
-              <button
+              <YdAction
                 v-for="item in categories"
                 :key="item.code"
                 type="button"
@@ -278,12 +276,12 @@ async function copyPublicUrl() {
               >
                 <span>{{ item.name }}</span>
                 <em>{{ item.count }}</em>
-              </button>
+              </YdAction>
             </section>
             <section v-if="tags.length">
               <h2>标签</h2>
               <div class="discover-tags">
-                <button
+                <YdAction
                   v-for="item in tags"
                   :key="item.tag"
                   type="button"
@@ -292,26 +290,26 @@ async function copyPublicUrl() {
                   @click="toggleTag(item.tag)"
                 >
                   {{ item.tag }}
-                </button>
+                </YdAction>
               </div>
             </section>
             <section>
               <h2>发布时间</h2>
               <div class="discover-range">
-                <input v-model="publishedAfter" type="date" @change="onTimeFilterChange">
-                <input v-model="publishedBefore" type="date" @change="onTimeFilterChange">
+                <YdDatePicker v-model="publishedAfter" aria-label="发布时间起始日期" @change="onTimeFilterChange" />
+                <YdDatePicker v-model="publishedBefore" aria-label="发布时间结束日期" @change="onTimeFilterChange" />
               </div>
             </section>
             <section v-if="authorId">
               <h2>作者</h2>
               <div class="discover-author-chip">
                 <span>{{ authorName || authorId }}</span>
-                <button type="button" @click="applyAuthor('', '')">清除</button>
+                <YdAction type="button" @click="applyAuthor('', '')">清除</YdAction>
               </div>
             </section>
-            <button v-if="hasFilters" type="button" class="discover-clear" @click="clearFilters">
+            <YdAction v-if="hasFilters" type="button" class="discover-clear" @click="clearFilters">
               清除筛选
-            </button>
+            </YdAction>
           </aside>
 
           <section class="discover-results">
@@ -330,7 +328,7 @@ async function copyPublicUrl() {
               >
                 <div class="discover-card__icon">
                   <img v-if="isImageIcon(item.icon)" :src="iconUrl(item.icon)" :alt="item.displayName || item.code">
-                  <FaIcon v-else :name="item.icon || 'morph:puzzle'" />
+                  <YdIcon v-else :name="item.icon || 'morph:puzzle'" />
                 </div>
                 <div class="discover-card__body">
                   <div class="discover-card__title">
@@ -343,7 +341,7 @@ async function copyPublicUrl() {
                     <span v-for="tag in (item.tags || []).slice(0, 3)" :key="tag">{{ tag }}</span>
                   </div>
                   <div class="discover-card__foot">
-                    <span
+              <YdAction
                       class="discover-card__author"
                       role="button"
                       tabindex="0"
@@ -351,7 +349,7 @@ async function copyPublicUrl() {
                       @keydown.enter.prevent.stop="applyAuthor(item.authorId, item.authorName)"
                     >
                       {{ item.authorName || '未知作者' }}
-                    </span>
+              </YdAction>
                     <span>{{ formatDownloads(item.downloads) }} 下载</span>
                     <span>{{ formatTime(item.updatedAt || item.publishedAt) }}</span>
                   </div>
@@ -361,16 +359,12 @@ async function copyPublicUrl() {
             <div class="discover-pagination">
               <span class="discover-pagination__total">共 {{ total }} 条</span>
               <label class="discover-pagination__sizes">
-                <select :value="size" @change="onSizeChange(Number(($event.target as HTMLSelectElement).value))">
-                  <option :value="12">12 条/页</option>
-                  <option :value="24">24 条/页</option>
-                  <option :value="48">48 条/页</option>
-                </select>
+                <YdSelect :model-value="size" :options="[{ label: '12 条/页', value: 12 }, { label: '24 条/页', value: 24 }, { label: '48 条/页', value: 48 }]" @update:model-value="value => onSizeChange(Number(value))" />
               </label>
               <div class="discover-pagination__pager">
-                <button type="button" :disabled="page <= 1" @click="onPageChange(page - 1)">‹</button>
+                <YdAction type="button" :disabled="page <= 1" @click="onPageChange(page - 1)">‹</YdAction>
                 <strong>{{ page }}</strong>
-                <button type="button" :disabled="page >= Math.max(1, Math.ceil(total / size))" @click="onPageChange(page + 1)">›</button>
+                <YdAction type="button" :disabled="page >= Math.max(1, Math.ceil(total / size))" @click="onPageChange(page + 1)">›</YdAction>
               </div>
             </div>
           </section>
@@ -383,7 +377,7 @@ async function copyPublicUrl() {
           </div>
           <div class="discover-source__url">
             <code>{{ publicV2Url }}</code>
-            <button type="button" class="discover-action discover-action--ghost" @click="copyPublicUrl">复制</button>
+            <YdButton type="button" variant="ghost" size="sm" class="discover-action discover-action--ghost" @click="copyPublicUrl">复制</YdButton>
           </div>
         </footer>
       </div>

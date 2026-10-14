@@ -7,9 +7,9 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
 
 <template>
   <div>
-    <FaPageHeader :title="String(route.meta.title || '插件页面')" class="mb-0" />
+    <YdPageHeader :title="String(route.meta.title || '插件页面')" class="mb-0" />
 
-    <FaPageMain>
+    <YdPageMain>
       <div v-if="remoteComponent" :data-yudream-plugin="plugin.pluginCode">
         <component
           :is="remoteComponent"
@@ -19,14 +19,14 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
       </div>
       <div v-else class="plugin-runtime-empty">
         <div class="runtime-icon">
-          <FaIcon name="morph:puzzle" />
+          <YdIcon name="morph:puzzle" />
         </div>
         <div>
           <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>
           <p>{{ remoteLoading ? '正在获取远程入口并解析页面组件。' : remoteError }}</p>
         </div>
       </div>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 
@@ -49,7 +49,7 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
   place-items: center;
   border-radius: 6px;
   background: var(--color-fill-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   font-size: 22px;
 }
 

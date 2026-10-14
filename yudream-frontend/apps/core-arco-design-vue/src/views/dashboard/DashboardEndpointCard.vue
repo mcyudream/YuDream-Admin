@@ -27,7 +27,7 @@ function handleDragStart(event: DragEvent) {
       {{ card.description }}
     </p>
 
-    <button
+    <YdAction
       type="button"
       class="dashboard-endpoint__address"
       title="复制 API 地址，也可拖拽到启动器"
@@ -37,12 +37,12 @@ function handleDragStart(event: DragEvent) {
     >
       <code>{{ endpointUrl }}</code>
       <span class="dashboard-endpoint__copy" :class="toneTextClass(card.tone)">
-        <FaIcon name="morph:copy" />
+        <YdIcon name="morph:copy" />
       </span>
-    </button>
+    </YdAction>
 
     <div class="dashboard-endpoint__hint">
-      <FaIcon name="morph:info" />
+      <YdIcon name="morph:info" />
       <span>点击可复制地址，也可以把地址卡片拖拽到支持拖入配置的客户端。</span>
     </div>
   </div>

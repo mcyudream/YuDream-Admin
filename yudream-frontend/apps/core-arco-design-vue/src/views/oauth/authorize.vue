@@ -76,12 +76,12 @@ onMounted(async () => {
     <section class="oauth-authorize-card">
       <h1>启动器授权</h1>
       <p>{{ message }}</p>
-      <FaButton v-if="status === 'error'" class="mt-4" @click="authorize">
+      <YdButton v-if="status === 'error'" class="mt-4" @click="authorize">
         重试
-      </FaButton>
-      <FaButton v-if="status === 'error'" variant="outline" class="mt-4 ml-2" @click="router.replace({ name: 'login' })">
+      </YdButton>
+      <YdButton v-if="status === 'error'" variant="outline" class="mt-4 ml-2" @click="router.replace({ name: 'login' })">
         返回登录
-      </FaButton>
+      </YdButton>
     </section>
   </main>
 </template>

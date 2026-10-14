@@ -115,15 +115,15 @@ function formatValue(value: unknown) {
         <span>{{ pagination.total }} 份提交</span>
       </div>
       <div class="panel-actions">
-        <FaButton v-auth="'platform:form:submission:export'" variant="outline" :disabled="!formId" :loading="exporting" @click="exportExcel">
-          <FaIcon name="morph:file-spreadsheet" />
+        <YdButton v-auth="'platform:form:submission:export'" variant="outline" :disabled="!formId" :loading="exporting" @click="exportExcel">
+          <YdIcon name="morph:file-spreadsheet" />
           导出
-        </FaButton>
+        </YdButton>
       </div>
     </div>
 
-    <FaResponsiveTable
-      v-loading="loading"
+    <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
       row-key="id"
       table-root-class="rounded-lg overflow-hidden"
       table-class="min-w-[1200px]"
@@ -146,11 +146,11 @@ function formatValue(value: unknown) {
         {{ dateText(row.original.submittedAt) }}
       </template>
       <template #cell-operation="{ row }">
-        <FaButton v-if="form" size="sm" variant="outline" @click="openDetail(row.original)">查看</FaButton>
+        <YdButton v-if="form" size="sm" variant="outline" @click="openDetail(row.original)">查看</YdButton>
       </template>
 
       <template #card="{ row }">
-        <FaCard class="w-full">
+        <YdCard class="w-full">
           <div class="flex flex-col gap-3">
             <div class="flex items-start justify-between gap-2">
               <span class="text-sm text-secondary-foreground/60">提交 ID</span>
@@ -177,16 +177,16 @@ function formatValue(value: unknown) {
               </span>
             </div>
             <div v-if="form" class="flex flex-wrap gap-2 border-t pt-3">
-              <FaButton size="sm" variant="outline" @click="openDetail(row)">
+              <YdButton size="sm" variant="outline" @click="openDetail(row)">
                 查看
-              </FaButton>
+              </YdButton>
             </div>
           </div>
-        </FaCard>
+        </YdCard>
       </template>
-    </FaResponsiveTable>
+    </YdResponsiveTable></YdLoadingOverlay>
 
-    <FaPagination
+    <YdPagination
       v-model:page="pagination.page"
       v-model:size="pagination.size"
       :total="pagination.total"
@@ -195,11 +195,11 @@ function formatValue(value: unknown) {
       @size-change="onSizeChange"
     />
 
-    <FaModal v-model="detailVisible" :title="form ? `${form.name} / 提交详情` : '提交详情'" class="sm:max-w-4xl">
+    <YdModal v-model="detailVisible" :title="form ? `${form.name} / 提交详情` : '提交详情'" class="sm:max-w-4xl">
       <section v-if="form && detailRow" class="submission-detail">
         <DynamicFormRenderer :form="form" :model-value="detailRow.data" readonly />
       </section>
-    </FaModal>
+    </YdModal>
   </section>
 </template>
 

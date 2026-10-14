@@ -41,7 +41,7 @@ onMounted(() => {
   <div class="h-screen w-screen flex-col-center">
     <div class="w-100 rounded-lg bg-background p-8 shadow-md">
       <div class="mb-6 text-center">
-        <FaIcon :name="success ? 'i-lucide:circle-check' : loading ? 'i-lucide:loader' : 'i-lucide:circle-x'" class="size-12" :class="success ? 'text-green-500' : loading ? 'text-primary animate-spin' : 'text-destructive'" />
+        <YdIcon :name="success ? 'i-lucide:circle-check' : loading ? 'i-lucide:loader' : 'i-lucide:circle-x'" class="size-12" :class="success ? 'text-green-500' : loading ? 'text-primary animate-spin' : 'text-destructive'" />
       </div>
       <h3 class="mb-2 text-center text-xl font-bold">
         {{ success ? '验证成功' : loading ? '验证中' : '验证失败' }}
@@ -50,9 +50,9 @@ onMounted(() => {
         {{ message }}
       </p>
       <div v-if="!loading" class="mt-6 flex justify-center">
-        <FaButton @click="router.push({ name: 'login' })">
+        <YdButton @click="router.push({ name: 'login' })">
           去登录
-        </FaButton>
+        </YdButton>
       </div>
     </div>
   </div>

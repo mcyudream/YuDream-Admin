@@ -149,26 +149,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <FaDropdown :align="'end'" :side="'bottom'" :items="dropdownItems()" class="flex-center" @open-change="(open: boolean) => open && refresh()">
+  <YdDropdown :align="'end'" :side="'bottom'" :items="dropdownItems()" class="flex-center" @open-change="(open: boolean) => open && refresh()">
     <template #header>
       <div class="flex-center-between gap-4 px-1">
         <span class="text-sm font-700">通知中心</span>
-        <button
-          v-if="unread > 0" class="text-xs cursor-pointer border-0 bg-transparent text-primary font-500"
+        <YdButton
+          v-if="unread > 0" type="button" variant="link" size="sm" class="text-xs font-500"
           :disabled="loading" @click.stop="markAll"
         >
           全部已读
-        </button>
+        </YdButton>
       </div>
     </template>
-    <button class="relative flex-center size-10 cursor-pointer border-0 rounded-lg bg-transparent" title="通知中心">
-      <FaIcon name="morph:bell" class="text-lg" />
+    <YdButton type="button" variant="ghost" size="icon" class="relative flex-center size-10 rounded-lg" title="通知中心" aria-label="通知中心">
+      <YdIcon name="morph:bell" class="text-lg" />
       <span
         v-if="unread > 0"
         class="absolute top-1 right-0.5 flex-center min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-700 leading-none"
       >
         {{ unread > 99 ? '99+' : unread }}
       </span>
-    </button>
-  </FaDropdown>
+    </YdButton>
+  </YdDropdown>
 </template>

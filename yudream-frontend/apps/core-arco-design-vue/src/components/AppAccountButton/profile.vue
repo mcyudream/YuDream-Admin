@@ -13,8 +13,8 @@ import { createPasskeyRegistrationResponse } from '@/utils/webauthn'
 
 type ProfileTab = 'profile' | 'security' | 'external' | 'apiKey'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const router = useRouter()
 const appAccountStore = useAppAccountStore()
 const appFeatureStore = useAppFeatureStore()
@@ -27,7 +27,7 @@ const bindingPasskey = ref(false)
 const loadingApiKeys = ref(false)
 const loadingPermissions = ref(false)
 const creatingApiKey = ref(false)
-const avatarInput = ref<HTMLInputElement>()
+const avatarInput = ref<InstanceType<typeof YdFilePicker>>()
 const passkeys = ref<PasskeyCredential[]>([])
 const apiKeys = ref<ApiKeyCredential[]>([])
 const availablePermissions = ref<PermissionItem[]>([])
@@ -114,6 +114,11 @@ const permissionSelectOptions = computed(() => Object.entries(permissionGroups.v
     value: item.code,
   })),
 })))
+const permissionMultiSelectOptions = computed(() => permissionSelectOptions.value.flatMap(group => group.options.map(option => ({
+  label: `${group.label} · ${option.label}`,
+  value: option.value,
+}))))
+
 
 const permissionNameMap = computed(() => new Map(availablePermissions.value.map(item => [item.code, item.name])))
 
@@ -362,13 +367,12 @@ async function useExternalAvatar(row: ExternalAccount) {
 }
 
 function pickAvatar() {
-  avatarInput.value?.click()
+  avatarInput.value?.open()
 }
 
-async function uploadAvatar(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function uploadAvatar(files: File[]) {
+  const file = files[0]
+  avatarInput.value?.reset()
   if (!file) {
     return
   }
@@ -512,11 +516,11 @@ function dateText(value?: string) {
     <aside class="profile-aside">
       <div class="profile-card">
         <div class="avatar-wrap">
-          <FaAvatar :src="profile.avatar" :fallback="profile.username.slice(0, 2)" class="size-18" />
-          <button type="button" class="avatar-edit" @click="pickAvatar">
-            <FaIcon name="morph:camera" />
-          </button>
-          <input ref="avatarInput" type="file" accept="image/*" hidden @change="uploadAvatar">
+          <YdAvatar :src="profile.avatar" :fallback="profile.username.slice(0, 2)" class="size-18" />
+          <YdAction type="button" class="avatar-edit" @click="pickAvatar">
+            <YdIcon name="morph:camera" />
+          </YdAction>
+          <YdFilePicker ref="avatarInput" accept="image/*" label="选择头像" class="hidden" @select="uploadAvatar"><template #default /></YdFilePicker>
         </div>
         <div class="profile-card__identity">
           <strong>{{ profile.username || '当前用户' }}</strong>
@@ -525,13 +529,13 @@ function dateText(value?: string) {
       </div>
 
       <nav class="profile-nav">
-        <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: active === tab.key }" @click="active = tab.key">
-          <FaIcon :name="tab.icon" />
+        <YdAction v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: active === tab.key }" @click="active = tab.key">
+          <YdIcon :name="tab.icon" />
           <span>
             <strong>{{ tab.title }}</strong>
             <small>{{ tab.description }}</small>
           </span>
-        </button>
+        </YdAction>
       </nav>
     </aside>
 
@@ -544,23 +548,23 @@ function dateText(value?: string) {
           </div>
         </div>
 
-        <a-form :model="form" layout="vertical" class="form-grid">
-          <a-form-item label="用户名" required>
-            <FaInput v-model="form.username" placeholder="请输入用户名" />
-          </a-form-item>
-          <a-form-item label="昵称">
-            <FaInput v-model="form.nickname" placeholder="请输入昵称" />
-          </a-form-item>
-          <a-form-item label="邮箱">
-            <FaInput v-model="form.email" placeholder="请输入邮箱" />
-          </a-form-item>
-          <a-form-item label="手机号">
-            <FaInput v-model="form.phone" placeholder="请输入手机号" />
-          </a-form-item>
-          <a-form-item label="QQ 号">
-            <FaInput v-model="form.qq" placeholder="仅 Milky 协议使用真实 QQ 号" />
-          </a-form-item>
-        </a-form>
+        <YdForm :model="form" layout="vertical" class="form-grid">
+          <YdFormItem label="用户名" required>
+            <YdInput v-model="form.username" placeholder="请输入用户名" />
+          </YdFormItem>
+          <YdFormItem label="昵称">
+            <YdInput v-model="form.nickname" placeholder="请输入昵称" />
+          </YdFormItem>
+          <YdFormItem label="邮箱">
+            <YdInput v-model="form.email" placeholder="请输入邮箱" />
+          </YdFormItem>
+          <YdFormItem label="手机号">
+            <YdInput v-model="form.phone" placeholder="请输入手机号" />
+          </YdFormItem>
+          <YdFormItem label="QQ 号">
+            <YdInput v-model="form.qq" placeholder="仅 Milky 协议使用真实 QQ 号" />
+          </YdFormItem>
+        </YdForm>
         <div class="inner-panel mt-4">
           <div class="panel-head">
             <div>
@@ -580,10 +584,10 @@ function dateText(value?: string) {
                 <strong>{{ bindingTargetLabel(target) }}</strong>
                 <span>{{ protocolLabel(target.protocol) }}{{ target.botName && target.name && target.botName !== target.name ? ` · ${target.name}` : '' }}</span>
               </div>
-              <FaTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</FaTag>
-              <FaButton size="sm" :loading="issuingQqBindingCode && issuingConnectionId === target.connectionId" @click="issueQqBindingCode(target.connectionId)">
-                <FaIcon name="morph:key-round" />生成绑定码
-              </FaButton>
+              <YdTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</YdTag>
+              <YdButton size="sm" :loading="issuingQqBindingCode && issuingConnectionId === target.connectionId" @click="issueQqBindingCode(target.connectionId)">
+                <YdIcon name="morph:key-round" />生成绑定码
+              </YdButton>
             </article>
             <div v-if="!loadingBindingTargets && !bindingTargets.length" class="text-sm text-muted-foreground">暂无已启用的机器人连接。</div>
           </div>
@@ -616,10 +620,10 @@ function dateText(value?: string) {
                 <p>管理已经绑定到当前账号的设备凭据。</p>
               </div>
               <div class="panel-actions">
-                <FaButton :loading="bindingPasskey" @click="bindPasskey">
-                  <FaIcon name="morph:fingerprint" />
+                <YdButton :loading="bindingPasskey" @click="bindPasskey">
+                  <YdIcon name="morph:fingerprint" />
                   绑定
-                </FaButton>
+                </YdButton>
               </div>
             </div>
 
@@ -629,19 +633,19 @@ function dateText(value?: string) {
               </div>
               <article v-for="item in passkeys" :key="item.id" class="credential-item">
                 <div class="credential-icon">
-                  <FaIcon name="morph:fingerprint" />
+                  <YdIcon name="morph:fingerprint" />
                 </div>
                 <div class="credential-info">
                   <strong>{{ item.deviceName || '未命名设备' }}</strong>
                   <span>{{ shortCredential(item.credentialId) }}</span>
                   <small>创建：{{ dateText(item.createTime) }} · 最后使用：{{ dateText(item.lastUsedTime) }}</small>
                 </div>
-                <FaTag :variant="statusVariant(item.status)">
+                <YdTag :variant="statusVariant(item.status)">
                   {{ statusText(item.status) }}
-                </FaTag>
-                <FaButton variant="destructive" size="sm" :disabled="item.status !== 'ACTIVE'" @click="confirmRevokePasskey(item)">
+                </YdTag>
+                <YdButton variant="destructive" size="sm" :disabled="item.status !== 'ACTIVE'" @click="confirmRevokePasskey(item)">
                   吊销
-                </FaButton>
+                </YdButton>
               </article>
             </div>
           </section>
@@ -653,15 +657,15 @@ function dateText(value?: string) {
         <section class="inner-panel">
           <div class="panel-head"><div><h3>添加绑定</h3><p>入口来自当前已启用的提供方，不再写死 Wwoyun。插件提供方在对应插件设置页启用后会出现在这里。</p></div></div>
           <div v-if="bindableEntries.length" class="panel-actions">
-            <FaButton v-for="entry in bindableEntries" :key="`${entry.providerCode}:${entry.type}`" variant="outline" @click="bindExternal(entry.providerCode, entry.type)">
-              <FaIcon :name="entry.icon" />
+            <YdButton v-for="entry in bindableEntries" :key="`${entry.providerCode}:${entry.type}`" variant="outline" @click="bindExternal(entry.providerCode, entry.type)">
+              <YdIcon :name="entry.icon" />
               {{ entry.label }}
-            </FaButton>
+            </YdButton>
           </div>
           <div v-else class="empty-state">暂无已启用的第三方登录提供方</div>
         </section>
-        <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><FaButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><FaIcon name="morph:refresh-cw" /></FaButton></div>
-          <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><FaAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.providerCode }} · {{ item.platformType }} · {{ item.socialUid }}</span></div><FaButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</FaButton><FaButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</FaButton></article></div>
+        <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><YdButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><YdIcon name="morph:refresh-cw" /></YdButton></div>
+          <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><YdAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.providerCode }} · {{ item.platformType }} · {{ item.socialUid }}</span></div><YdButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</YdButton><YdButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</YdButton></article></div>
         </section>
       </section>
 
@@ -679,10 +683,10 @@ function dateText(value?: string) {
             <p>这段明文只显示一次，关闭后无法再次查看。</p>
             <code>{{ createdApiKeyPlaintext }}</code>
           </div>
-          <FaButton @click="copyPlaintext">
-            <FaIcon name="morph:copy" />
+          <YdButton @click="copyPlaintext">
+            <YdIcon name="morph:copy" />
             复制
-          </FaButton>
+          </YdButton>
         </div>
 
         <section class="inner-panel">
@@ -692,46 +696,44 @@ function dateText(value?: string) {
               <p>从你当前拥有的权限中选择 API Key 可访问的范围。</p>
             </div>
           </div>
-          <a-form :model="apiKeyForm" layout="vertical" class="api-key-form">
-            <a-form-item label="名称">
-              <FaInput v-model="apiKeyForm.name" placeholder="例如：文档集成、自动化脚本" />
-            </a-form-item>
-            <a-form-item label="过期时间">
-              <FaInput v-model="apiKeyForm.expireTime" type="datetime-local" />
-            </a-form-item>
-            <a-form-item label="权限范围" class="md:col-span-2" required>
+          <YdForm :model="apiKeyForm" layout="vertical" class="api-key-form">
+            <YdFormItem label="名称">
+              <YdInput v-model="apiKeyForm.name" placeholder="例如：文档集成、自动化脚本" />
+            </YdFormItem>
+            <YdFormItem label="过期时间">
+              <YdInput v-model="apiKeyForm.expireTime" type="datetime-local" />
+            </YdFormItem>
+            <YdFormItem label="权限范围" class="md:col-span-2" required>
               <div class="permission-picker" :class="{ loading: loadingPermissions }" :aria-busy="loadingPermissions">
                 <div class="permission-toolbar">
                   <span>已选择 {{ apiKeyForm.permissions.length }} 项</span>
                   <div>
-                    <FaButton variant="ghost" size="sm" :disabled="!selectablePermissionCodes.length" @click="selectAllApiKeyPermissions">
+                    <YdButton variant="ghost" size="sm" :disabled="!selectablePermissionCodes.length" @click="selectAllApiKeyPermissions">
                       全选可用
-                    </FaButton>
-                    <FaButton variant="ghost" size="sm" :disabled="!apiKeyForm.permissions.length" @click="clearApiKeyPermissions">
+                    </YdButton>
+                    <YdButton variant="ghost" size="sm" :disabled="!apiKeyForm.permissions.length" @click="clearApiKeyPermissions">
                       清空
-                    </FaButton>
+                    </YdButton>
                   </div>
                 </div>
-                <FaSelect
+                <YdMultiSelect
                   v-if="permissionSelectOptions.length"
                   v-model="apiKeyForm.permissions"
-                  multiple
-                  :options="permissionSelectOptions"
-                  class="w-full"
+                  :options="permissionMultiSelectOptions"
                   placeholder="请选择 API Key 可访问权限"
                 />
                 <div v-else class="empty-state">
                   暂无可选择权限
                 </div>
               </div>
-            </a-form-item>
+            </YdFormItem>
             <div class="md:col-span-2 flex justify-end">
-              <FaButton :loading="creatingApiKey" @click="createApiKey">
-                <FaIcon name="morph:key-round" />
+              <YdButton :loading="creatingApiKey" @click="createApiKey">
+                <YdIcon name="morph:key-round" />
                 创建 API Key
-              </FaButton>
+              </YdButton>
             </div>
-          </a-form>
+          </YdForm>
         </section>
 
         <section class="inner-panel">
@@ -740,7 +742,7 @@ function dateText(value?: string) {
               <h3>我的密钥</h3>
               <p>仅展示由当前用户创建的 API Key。</p>
             </div>
-            <FaInput v-model="apiKeySearch.keyword" clearable placeholder="搜索名称 / 前缀" class="w-56" @keydown.enter="loadApiKeys" @clear="loadApiKeys" />
+            <YdInput v-model="apiKeySearch.keyword" clearable placeholder="搜索名称 / 前缀" class="w-56" @keydown.enter="loadApiKeys" @clear="loadApiKeys" />
           </div>
           <div class="credential-list" :class="{ loading: loadingApiKeys }" :aria-busy="loadingApiKeys">
             <div v-if="!apiKeys.length" class="empty-state">
@@ -748,32 +750,32 @@ function dateText(value?: string) {
             </div>
             <article v-for="item in apiKeys" :key="item.id" class="credential-item">
               <div class="credential-icon">
-                <FaIcon name="morph:key-round" />
+                <YdIcon name="morph:key-round" />
               </div>
               <div class="credential-info">
                 <strong>{{ item.name }}</strong>
                 <span>{{ item.maskedValue || item.keyPrefix }}</span>
                 <small>过期：{{ dateText(item.expireTime) }} · 最后使用：{{ dateText(item.lastUsedTime) }}</small>
                 <div class="permission-line">
-                  <FaTag v-for="permission in item.permissions.slice(0, 4)" :key="permission" variant="secondary">
+                  <YdTag v-for="permission in item.permissions.slice(0, 4)" :key="permission" variant="secondary">
                     {{ permissionText(permission) }}
-                  </FaTag>
+                  </YdTag>
                   <span v-if="item.permissions.length > 4">+{{ item.permissions.length - 4 }}</span>
                 </div>
               </div>
-              <FaTag :variant="statusVariant(item.status)">
+              <YdTag :variant="statusVariant(item.status)">
                 {{ statusText(item.status) }}
-              </FaTag>
-              <FaButton variant="destructive" size="sm" :disabled="item.status !== 'ACTIVE'" @click="confirmRevokeApiKey(item)">
+              </YdTag>
+              <YdButton variant="destructive" size="sm" :disabled="item.status !== 'ACTIVE'" @click="confirmRevokeApiKey(item)">
                 吊销
-              </FaButton>
+              </YdButton>
             </article>
           </div>
         </section>
       </section>
 
       <footer v-if="active === 'profile'" class="profile-footer">
-        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="morph:save" />保存资料</FaButton>
+        <YdButton :loading="saving" @click="saveProfile"><YdIcon name="morph:save" />保存资料</YdButton>
       </footer>
     </main>
   </div>
@@ -840,7 +842,7 @@ function dateText(value?: string) {
   border: 1px solid var(--color-border-2);
   border-radius: 999px;
   background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .profile-nav {
@@ -865,7 +867,7 @@ function dateText(value?: string) {
 .profile-nav button:hover {
   border-color: var(--color-border-2);
   background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .profile-nav button > span {
@@ -999,7 +1001,7 @@ function dateText(value?: string) {
   place-items: center;
   border-radius: 8px;
   background: var(--color-fill-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .credential-info {
@@ -1099,8 +1101,8 @@ function dateText(value?: string) {
 .secret-once {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-color: rgb(var(--primary-6));
-  background: rgba(var(--primary-6), 0.08);
+  border-color: var(--color-text-1);
+  background: var(--color-fill-2);
 }
 
 .secret-once p {

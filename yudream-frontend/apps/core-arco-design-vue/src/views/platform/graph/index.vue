@@ -4,8 +4,8 @@ import type { PluginModule } from '@/api/modules/platform-plugin'
 import type { GraphTable, GraphTablePayload, GraphTableStatus } from '@/api/modules/platform-graph'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiGraph from '@/api/modules/platform-graph'
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const loading = ref(false)
 const rows = ref<GraphTable[]>([])
 const plugins = ref<PluginModule[]>([])
@@ -35,16 +35,16 @@ function statusText(status: GraphTableStatus) { return status === 'ACTIVE' ? '�
 function pluginStatusText(status: PluginModule['status']) { return { INSTALLED: '已安装', LOADED: '已加载', ENABLED: '运行中', DISABLED: '已禁用', ERROR: '异常' }[status] }
 </script>
 <template>
-  <div><FaPageHeader title="逻辑图表"><FaButton v-auth="'platform:graph:edit'" @click="openCreate"><FaIcon name="morph:plus" />新增图表</FaButton></FaPageHeader>
-    <FaPageMain><FaCard class="mb-3" title="Neo4j 逻辑隔离"><p class="text-sm text-secondary-foreground/70">Community Edition 使用部署配置提供的单一物理 Neo4j 库。逻辑图表按编码隔离 Wiki 与插件数据，页面不保存 URI、账号或密码。</p></FaCard>
-      <FaResponsiveTable v-loading="loading" :columns="columns" :data="rows" row-key="id" border stripe><template #toolbar><FaSearchBar><div class="flex gap-2"><FaInput v-model="keyword" clearable placeholder="名称 / 编码 / 描述" @keydown.enter="load" /><FaButton @click="load">筛选</FaButton></div></FaSearchBar></template>
-        <template #cell-plugins="{ row }"><span>{{ row.original.authorizedPluginCodes?.join('、') || '-' }}</span></template><template #cell-status="{ row }"><FaTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">{{ statusText(row.original.status) }}</FaTag></template><template #cell-operation="{ row }"><div class="flex justify-center gap-2"><FaButton size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="test(row.original)">诊断</FaButton><FaButton size="sm" variant="ghost" @click="openEdit(row.original)">编辑</FaButton><FaButton size="sm" variant="ghost" @click="toggle(row.original)">{{ row.original.status === 'ACTIVE' ? '停用' : '启用' }}</FaButton></div></template>
+  <div><YdPageHeader title="逻辑图表"><YdButton v-auth="'platform:graph:edit'" @click="openCreate"><YdIcon name="morph:plus" />新增图表</YdButton></YdPageHeader>
+    <YdPageMain><YdCard class="mb-3" title="Neo4j 逻辑隔离"><p class="text-sm text-secondary-foreground/70">Community Edition 使用部署配置提供的单一物理 Neo4j 库。逻辑图表按编码隔离 Wiki 与插件数据，页面不保存 URI、账号或密码。</p></YdCard>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable  :columns="columns" :data="rows" row-key="id" border stripe><template #toolbar><YdSearchBar><div class="flex gap-2"><YdInput v-model="keyword" clearable placeholder="名称 / 编码 / 描述" @keydown.enter="load" /><YdButton @click="load">筛选</YdButton></div></YdSearchBar></template>
+        <template #cell-plugins="{ row }"><span>{{ row.original.authorizedPluginCodes?.join('、') || '-' }}</span></template><template #cell-status="{ row }"><YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">{{ statusText(row.original.status) }}</YdTag></template><template #cell-operation="{ row }"><div class="flex justify-center gap-2"><YdButton size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="test(row.original)">诊断</YdButton><YdButton size="sm" variant="ghost" @click="openEdit(row.original)">编辑</YdButton><YdButton size="sm" variant="ghost" @click="toggle(row.original)">{{ row.original.status === 'ACTIVE' ? '停用' : '启用' }}</YdButton></div></template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">{{ statusText(row.status) }}</FaTag>
+                <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">{{ statusText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -61,14 +61,14 @@ function pluginStatusText(status: PluginModule['status']) { return { INSTALLED: 
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="test(row)">诊断</FaButton>
-                <FaButton size="sm" variant="ghost" @click="openEdit(row)">编辑</FaButton>
-                <FaButton size="sm" variant="ghost" @click="toggle(row)">{{ row.status === 'ACTIVE' ? '停用' : '启用' }}</FaButton>
+                <YdButton size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="test(row)">诊断</YdButton>
+                <YdButton size="sm" variant="ghost" @click="openEdit(row)">编辑</YdButton>
+                <YdButton size="sm" variant="ghost" @click="toggle(row)">{{ row.status === 'ACTIVE' ? '停用' : '启用' }}</YdButton>
               </div>
             </div>
-          </FaCard>
-        </template></FaResponsiveTable>
-      <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
-    </FaPageMain><FaModal v-model="formVisible" :title="editing ? '编辑逻辑图表' : '新增逻辑图表'" show-cancel-button @confirm="save"><a-form :model="form" layout="vertical"><a-form-item label="名称" required><FaInput v-model="form.name" /></a-form-item><a-form-item label="编码" required><FaInput v-model="form.code" :disabled="!!editing" /></a-form-item><a-form-item label="描述"><FaTextarea v-model="form.description" :rows="3" /></a-form-item><a-form-item label="授权插件"><FaSelect v-model="form.authorizedPluginCodes" :options="pluginOptions" multiple allow-search placeholder="请选择授权插件" /></a-form-item><a-form-item label="状态"><FaSelect v-model="form.status" :options="[{ label: '启用', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' }]" /></a-form-item></a-form></FaModal>
+          </YdCard>
+        </template></YdResponsiveTable></YdLoadingOverlay>
+      <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
+    </YdPageMain><YdModal v-model="formVisible" :title="editing ? '编辑逻辑图表' : '新增逻辑图表'" show-cancel-button @confirm="save"><YdForm :model="form" layout="vertical"><YdFormItem label="名称" required><YdInput v-model="form.name" /></YdFormItem><YdFormItem label="编码" required><YdInput v-model="form.code" :disabled="!!editing" /></YdFormItem><YdFormItem label="描述"><YdTextarea v-model="form.description" :rows="3" /></YdFormItem><YdFormItem label="授权插件"><YdMultiSelect v-model="form.authorizedPluginCodes" :options="pluginOptions" placeholder="请选择授权插件" /></YdFormItem><YdFormItem label="状态"><YdSelect v-model="form.status" :options="[{ label: '启用', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' }]" /></YdFormItem></YdForm></YdModal>
   </div>
 </template>

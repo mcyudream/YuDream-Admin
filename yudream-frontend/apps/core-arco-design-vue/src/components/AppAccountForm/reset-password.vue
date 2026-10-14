@@ -19,7 +19,7 @@ const emits = defineEmits<{
   onResetPassword: [account?: string]
 }>()
 
-const toast = useFaToast()
+const toast = useYdToast()
 const loading = ref(false)
 const isResetMode = computed(() => !!props.token?.trim())
 
@@ -107,24 +107,24 @@ const onResetSubmit = resetForm.handleSubmit(async (values) => {
       <FormField v-slot="{ componentField, errors }" name="account">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="text" placeholder="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="text" placeholder="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:user" />
+                <YdIcon name="i-lucide:user" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
           </Transition>
         </FormItem>
       </FormField>
-      <FaButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
+      <YdButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
         发送重置邮件
-      </FaButton>
+      </YdButton>
       <div class="text-sm mt-4 flex-center gap-2">
-        <FaButton variant="link" class="p-0 h-auto" type="button" @click="emits('onLogin', sendForm.values.account)">
+        <YdButton variant="link" class="p-0 h-auto" type="button" @click="emits('onLogin', sendForm.values.account)">
           去登录
-        </FaButton>
+        </YdButton>
       </div>
     </form>
 
@@ -140,14 +140,14 @@ const onResetSubmit = resetForm.handleSubmit(async (values) => {
       <FormField v-slot="{ componentField, value, errors }" name="password">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <FormDescription class="m-0">
-            <FaPasswordStrength :password="value" />
+            <YdPasswordStrength :password="value" />
           </FormDescription>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -157,24 +157,24 @@ const onResetSubmit = resetForm.handleSubmit(async (values) => {
       <FormField v-slot="{ componentField, errors }" name="checkPassword">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="确认新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="确认新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
           </Transition>
         </FormItem>
       </FormField>
-      <FaButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
+      <YdButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
         确认重置
-      </FaButton>
+      </YdButton>
       <div class="text-sm mt-4 flex-center gap-2">
-        <FaButton variant="link" class="p-0 h-auto" type="button" @click="emits('onLogin')">
+        <YdButton variant="link" class="p-0 h-auto" type="button" @click="emits('onLogin')">
           去登录
-        </FaButton>
+        </YdButton>
       </div>
     </form>
   </div>

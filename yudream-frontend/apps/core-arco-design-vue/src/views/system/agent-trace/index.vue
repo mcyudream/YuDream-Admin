@@ -20,8 +20,8 @@ const rows = ref<AgentTraceSummary[]>([])
 const stats = ref<AgentTraceStats | null>(null)
 const detail = ref<AgentTraceDetail | null>(null)
 const detailVisible = ref(false)
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive({
   keyword: '',
@@ -261,62 +261,62 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
 
 <template>
   <div>
-    <FaPageHeader title="Agent 执行流" class="mb-0">
-      <FaButton variant="outline" :loading="loading || statsLoading" @click="refresh">
-        <FaIcon name="morph:refresh-cw" />
+    <YdPageHeader title="Agent 执行流" class="mb-0">
+      <YdButton variant="outline" :loading="loading || statsLoading" @click="refresh">
+        <YdIcon name="morph:refresh-cw" />
         刷新
-      </FaButton>
-      <FaButton v-auth="'system:monitor:agent-trace:export'" variant="outline" @click="exportExcel">
-        <FaIcon name="morph:file-spreadsheet" />
+      </YdButton>
+      <YdButton v-auth="'system:monitor:agent-trace:export'" variant="outline" @click="exportExcel">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-      <FaButton v-auth="'system:monitor:agent-trace:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
-        <FaIcon name="morph:trash-2" />
+      </YdButton>
+      <YdButton v-auth="'system:monitor:agent-trace:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
+        <YdIcon name="morph:trash-2" />
         清空
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="stats-grid mb-4">
-        <FaCard>
+        <YdCard>
           <div class="stat-label">总次数</div>
           <div class="stat-value">{{ stats?.total ?? 0 }}</div>
-        </FaCard>
-        <FaCard>
+        </YdCard>
+        <YdCard>
           <div class="stat-label">成功 / 失败 / 执行中</div>
           <div class="stat-value">{{ stats?.succeeded ?? 0 }} / {{ stats?.failed ?? 0 }} / {{ stats?.running ?? 0 }}</div>
-        </FaCard>
-        <FaCard>
+        </YdCard>
+        <YdCard>
           <div class="stat-label">成功率</div>
           <div class="stat-value">{{ successRate() }}</div>
-        </FaCard>
-        <FaCard>
+        </YdCard>
+        <YdCard>
           <div class="stat-label">平均 / 最长耗时</div>
           <div class="stat-value">{{ formatDuration(stats?.avgDurationMs) }} / {{ formatDuration(stats?.maxDurationMs) }}</div>
-        </FaCard>
-        <FaCard>
+        </YdCard>
+        <YdCard>
           <div class="stat-label">Token（prompt / completion / 合计）</div>
           <div class="stat-value">{{ stats?.promptTokens ?? 0 }} / {{ stats?.completionTokens ?? 0 }} / {{ stats?.totalTokens ?? 0 }}</div>
-        </FaCard>
+        </YdCard>
       </div>
 
       <div v-if="stats?.sources?.length || stats?.agents?.length" class="bucket-row mb-4">
         <div v-if="stats?.sources?.length" class="bucket-group">
           <span class="bucket-label">来源分布</span>
-          <FaTag v-for="item in stats.sources" :key="`source-${item.key}`" variant="outline">
+          <YdTag v-for="item in stats.sources" :key="`source-${item.key}`" variant="outline">
             {{ item.label }} {{ item.count }}
-          </FaTag>
+          </YdTag>
         </div>
         <div v-if="stats?.agents?.length" class="bucket-group">
           <span class="bucket-label">Agent 分布</span>
-          <FaTag v-for="item in stats.agents" :key="`agent-${item.key}`" variant="outline">
+          <YdTag v-for="item in stats.agents" :key="`agent-${item.key}`" variant="outline">
             {{ item.label || item.key || '未标注' }} {{ item.count }}
-          </FaTag>
+          </YdTag>
         </div>
       </div>
 
-      <FaResponsiveTable
-        v-loading="loading"
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="traceId"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1500px]"
@@ -327,31 +327,31 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="search-grid">
-              <FaInput v-model="search.keyword" clearable placeholder="Agent / 插件 / 追踪ID / 输入 / 错误" @keydown.enter="refresh" @clear="refresh" />
-              <FaSelect v-model="search.source" :options="sourceOptions" placeholder="来源" />
-              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
-              <FaInput v-model="search.agentCode" clearable placeholder="Agent 编码" @keydown.enter="refresh" />
-              <FaInput v-model="search.pluginCode" clearable placeholder="插件编码" @keydown.enter="refresh" />
-              <FaInput v-model="search.startTime" type="datetime-local" />
-              <FaInput v-model="search.endTime" type="datetime-local" />
+              <YdInput v-model="search.keyword" clearable placeholder="Agent / 插件 / 追踪ID / 输入 / 错误" @keydown.enter="refresh" @clear="refresh" />
+              <YdSelect v-model="search.source" :options="sourceOptions" placeholder="来源" />
+              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
+              <YdInput v-model="search.agentCode" clearable placeholder="Agent 编码" @keydown.enter="refresh" />
+              <YdInput v-model="search.pluginCode" clearable placeholder="插件编码" @keydown.enter="refresh" />
+              <YdInput v-model="search.startTime" type="datetime-local" />
+              <YdInput v-model="search.endTime" type="datetime-local" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton :loading="loading" @click="refresh">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton :loading="loading" @click="refresh">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">
+          <YdTag :variant="statusVariant(row.original.status)">
             {{ statusText(row.original.status) }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-source="{ row }">
           {{ sourceText(row.original.source) }}
@@ -376,25 +376,25 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
         </template>
         <template #cell-actions="{ row }">
           <div class="flex justify-center gap-1">
-            <FaButton size="sm" variant="outline" @click="openDetail(row.original)">
+            <YdButton size="sm" variant="outline" @click="openDetail(row.original)">
               详情
-            </FaButton>
-            <FaButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" :loading="deleting" @click="confirmDelete(row.original)">
+            </YdButton>
+            <YdButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" :loading="deleting" @click="confirmDelete(row.original)">
               删除
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-start justify-between gap-2">
                 <div class="flex min-w-0 flex-col gap-1">
                   <span class="break-all text-base font-semibold">{{ agentText(row) }}</span>
                   <span class="text-sm text-secondary-foreground/70">{{ sourceText(row.source) }} · {{ row.stepCount ?? 0 }} 步 · {{ formatDuration(row.durationMs) }}</span>
                 </div>
-                <FaTag :variant="statusVariant(row.status)">
+                <YdTag :variant="statusVariant(row.status)">
                   {{ statusText(row.status) }}
-                </FaTag>
+                </YdTag>
               </div>
               <div v-if="row.input" class="line-clamp-2 text-sm">
                 {{ row.input }}
@@ -407,19 +407,19 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
                 错误：{{ row.error }}
               </div>
               <div class="flex gap-2">
-                <FaButton size="sm" variant="outline" @click="openDetail(row)">
+                <YdButton size="sm" variant="outline" @click="openDetail(row)">
                   详情
-                </FaButton>
-                <FaButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
+                </YdButton>
+                <YdButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
                   删除
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -427,24 +427,24 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="detailVisible" :title="detail ? `${detail.agentName || detail.agentCode || '执行流'} / 详情` : '执行流详情'" class="sm:max-w-5xl">
+    <YdModal v-model="detailVisible" :title="detail ? `${detail.agentName || detail.agentCode || '执行流'} / 详情` : '执行流详情'" class="sm:max-w-5xl">
       <div v-if="detailLoading" class="panel-empty">
         正在加载追踪详情…
       </div>
       <template v-else-if="detail">
         <div class="detail-meta">
-          <FaTag :variant="statusVariant(detail.status)">
+          <YdTag :variant="statusVariant(detail.status)">
             {{ statusText(detail.status) }}
-          </FaTag>
+          </YdTag>
           <span>{{ sourceText(detail.source) }}</span>
           <span v-if="detail.ownerPluginCode">{{ detail.ownerPluginCode }}</span>
           <span>{{ formatDuration(detail.durationMs) }}</span>
           <span>{{ dateText(detail.startTime) }}</span>
-          <FaButton size="sm" variant="outline" @click="exportJson(detail)">
+          <YdButton size="sm" variant="outline" @click="exportJson(detail)">
             导出 JSON
-          </FaButton>
+          </YdButton>
         </div>
         <div v-if="detail.input" class="trace-io">
           <div class="trace-io__label">输入</div>
@@ -466,18 +466,18 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
           Token：prompt {{ detail.usage.promptTokens }} / completion {{ detail.usage.completionTokens }} / 共 {{ detail.usage.totalTokens }}
         </div>
         <div class="trace-steps">
-          <FaCollapsible v-for="step in detailSteps" :key="step.seq" class="trace-step">
+          <YdCollapsible v-for="step in detailSteps" :key="step.seq" class="trace-step">
             <template #trigger="{ open }">
               <div class="trace-step__trigger">
-                <FaTag :variant="statusVariant(step.status)" class="text-xs shrink-0">
+                <YdTag :variant="statusVariant(step.status)" class="text-xs shrink-0">
                   {{ statusText(step.status) }}
-                </FaTag>
+                </YdTag>
                 <span class="trace-step__title">#{{ step.seq }} {{ step.nodeTitle || step.nodeId || '步骤' }}</span>
-                <FaTag v-if="step.toolName" variant="outline" class="text-xs shrink-0">
+                <YdTag v-if="step.toolName" variant="outline" class="text-xs shrink-0">
                   {{ step.toolName }}
-                </FaTag>
+                </YdTag>
                 <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(step.durationMs) }}</span>
-                <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
+                <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
               </div>
             </template>
             <div class="trace-step__body">
@@ -501,13 +501,13 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
                 <pre>{{ step.message }}</pre>
               </div>
             </div>
-          </FaCollapsible>
+          </YdCollapsible>
           <div v-if="!detailSteps.length" class="panel-empty">
             无步骤记录
           </div>
         </div>
       </template>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
