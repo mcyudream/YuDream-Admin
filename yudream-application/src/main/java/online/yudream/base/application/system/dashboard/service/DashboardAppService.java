@@ -51,7 +51,7 @@ public class DashboardAppService {
         DashboardLayout defaultLayout = defaultLayout(cards);
         DashboardLayout userLayout = dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, userId).orElse(null);
         DashboardLayout effectiveDefaultLayout = applyFirstVisitGuideCondition(defaultLayout, cards, userLayout == null);
-        DashboardLayout effectiveLayout = mergeLayout(userId, effectiveDefaultLayout, userLayout, cards, DashboardLayoutOwnerType.USER);
+        DashboardLayout effectiveLayout = mergeLayout(effectiveDefaultLayout, userLayout, cards);
         return DashboardWorkspaceDTO.builder()
                 .cards(cards.stream().map(DashboardAssembler::toDTO).toList())
                 .defaultLayout(DashboardAssembler.toDTO(defaultLayout))
@@ -135,8 +135,8 @@ public class DashboardAppService {
         return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, filteredItems);
     }
 
-    private DashboardLayout mergeLayout(Long ownerId, DashboardLayout defaultLayout, DashboardLayout overrideLayout,
-                                        List<DashboardCardDefinition> cards, DashboardLayoutOwnerType ownerType) {
+    private DashboardLayout mergeLayout(DashboardLayout defaultLayout, DashboardLayout overrideLayout,
+                                        List<DashboardCardDefinition> cards) {
         Map<String, DashboardCardDefinition> cardMap = cards.stream()
                 .collect(Collectors.toMap(DashboardCardDefinition::code, Function.identity(), (left, right) -> left, LinkedHashMap::new));
         Map<String, DashboardLayoutItem> defaults = defaultLayout.getItems().stream()
@@ -154,7 +154,10 @@ public class DashboardAppService {
             overrideLayout.replaceItems(normalizeSubmittedItems(merged, cards));
             return overrideLayout;
         }
-        return DashboardLayout.create(ownerType, ownerType == DashboardLayoutOwnerType.USER ? ownerId : null, normalizeSubmittedItems(merged, cards));
+        // 无个人布局时有效布局即默认布局：同样要保留已保存默认布局的 id，
+        // 否则管理员保存的默认尺寸/位置会被前端当作生成布局重排
+        defaultLayout.replaceItems(normalizeSubmittedItems(merged, cards));
+        return defaultLayout;
     }
 
     private List<DashboardLayoutItem> normalizeSubmittedItems(List<DashboardLayoutItem> items, List<DashboardCardDefinition> cards) {

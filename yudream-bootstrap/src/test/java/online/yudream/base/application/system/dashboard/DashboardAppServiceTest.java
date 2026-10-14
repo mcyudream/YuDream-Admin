@@ -73,7 +73,7 @@ class DashboardAppServiceTest {
     }
 
     @Test
-    void workspaceIgnoresLegacySingleColumnUserLayoutOnLargeBreakpoint() {
+    void workspaceKeepsSingleColumnUserLayoutAsSaved() {
         DashboardCardDefinition profile = systemCard("system.profile", 4, 3, 10);
         DashboardCardDefinition quickActions = systemCard("system.quick-actions", 8, 3, 20);
         DashboardCardDefinition monitor = systemCard("system.monitor", 4, 3, 30);
@@ -81,16 +81,55 @@ class DashboardAppServiceTest {
         when(permissionAppService.getUserPermissions(USER_ID)).thenReturn(List.of());
         when(dashboardCardRegistry.allCards()).thenReturn(cards);
         when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.DEFAULT, null)).thenReturn(Optional.empty());
-        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, USER_ID)).thenReturn(Optional.of(
-                DashboardLayout.create(DashboardLayoutOwnerType.USER, USER_ID, List.of(
-                        item("system.profile", true, placement(0, 0, 4, 3), placement(0, 0, 4, 3), placement(0, 0, 4, 3)),
-                        item("system.quick-actions", true, placement(0, 3, 8, 3), placement(0, 3, 8, 3), placement(0, 3, 4, 3)),
-                        item("system.monitor", true, placement(0, 6, 4, 3), placement(0, 6, 4, 3), placement(0, 6, 4, 3))
-                ))));
+        DashboardLayout userLayout = DashboardLayout.create(DashboardLayoutOwnerType.USER, USER_ID, List.of(
+                item("system.profile", true, placement(0, 0, 4, 3), placement(0, 0, 4, 3), placement(0, 0, 4, 3)),
+                item("system.quick-actions", true, placement(0, 3, 8, 3), placement(0, 3, 8, 3), placement(0, 3, 4, 3)),
+                item("system.monitor", true, placement(0, 6, 4, 3), placement(0, 6, 4, 3), placement(0, 6, 4, 3))
+        ));
+        userLayout.setId(24680L);
+        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, USER_ID)).thenReturn(Optional.of(userLayout));
 
         DashboardWorkspaceDTO workspace = service.workspace(USER_ID);
 
-        assertThat(workspace.getEffectiveLayout().getItems().get(1).placements().get("lg").x()).isNotZero();
+        assertThat(workspace.getEffectiveLayout().getId()).isEqualTo(24680L);
+        assertThat(workspace.getEffectiveLayout().getItems().get(1).placements().get("lg"))
+                .isEqualTo(placement(0, 3, 8, 3));
+    }
+
+    @Test
+    void workspaceCarriesSavedDefaultLayoutIdForUserWithoutPersonalLayout() {
+        DashboardCardDefinition profile = systemCard("system.profile", 4, 3, 10);
+        DashboardCardDefinition quickActions = systemCard("system.quick-actions", 8, 3, 20);
+        List<DashboardCardDefinition> cards = List.of(profile, quickActions);
+        when(permissionAppService.getUserPermissions(USER_ID)).thenReturn(List.of());
+        when(dashboardCardRegistry.allCards()).thenReturn(cards);
+        DashboardLayout storedDefault = DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, List.of(
+                item("system.profile", true, placement(2, 4, 6, 7), placement(0, 0, 4, 3), placement(0, 0, 4, 3)),
+                item("system.quick-actions", true, placement(0, 0, 6, 2), placement(0, 3, 8, 3), placement(0, 3, 4, 3))
+        ));
+        storedDefault.setId(918273645L);
+        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.DEFAULT, null)).thenReturn(Optional.of(storedDefault));
+        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, USER_ID)).thenReturn(Optional.empty());
+
+        DashboardWorkspaceDTO workspace = service.workspace(USER_ID);
+
+        assertThat(workspace.getEffectiveLayout().getId()).isEqualTo(918273645L);
+        assertThat(workspace.getEffectiveLayout().getItems())
+                .anySatisfy(item -> assertThat(item.placements().get("lg")).isEqualTo(placement(2, 4, 6, 7)));
+    }
+
+    @Test
+    void workspaceWithoutAnySavedLayoutStaysIdLessForRecommendation() {
+        DashboardCardDefinition profile = systemCard("system.profile", 4, 3, 10);
+        when(permissionAppService.getUserPermissions(USER_ID)).thenReturn(List.of());
+        when(dashboardCardRegistry.allCards()).thenReturn(List.of(profile));
+        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.DEFAULT, null)).thenReturn(Optional.empty());
+        when(dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, USER_ID)).thenReturn(Optional.empty());
+
+        DashboardWorkspaceDTO workspace = service.workspace(USER_ID);
+
+        assertThat(workspace.getEffectiveLayout().getId()).isNull();
+        assertThat(workspace.getUserLayout()).isNull();
     }
 
     private DashboardCardDefinition systemCard(String code, int defaultW, int defaultH, int sort) {
