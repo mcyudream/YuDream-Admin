@@ -1,3 +1,5 @@
+
+@layer yudream-base {
 .yd-form {
   font-size: var(--yd-control-font-size);
   color: var(--color-text-1);
@@ -139,4 +141,5 @@
 
 .yd-rate-star:disabled {
   cursor: default;
+}
 }

@@ -1,3 +1,5 @@
+
+@layer yudream-base {
 /* Fa 风格的日期/时间选择器外观，基于主题 token 覆盖 Arco 默认样式 */
 /* 由 date-picker / range-picker / time-picker 通过 <style src>（非 scoped）共用。
    不能用 scoped：class 透传进 Arco 组件内部渲染链后根元素不会带 data-v 属性，
@@ -91,4 +93,5 @@
   color: oklch(var(--primary-foreground));
   background-color: oklch(var(--primary));
   border-radius: calc(var(--radius) - 4px);
+}
 }

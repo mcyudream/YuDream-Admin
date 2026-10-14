@@ -1,3 +1,5 @@
+
+@layer yudream-base {
 /* 仅 YD 自身的控件与传送弹层；不影响宿主的其他 Arco 组件。 */
 .yd-collection-control {
   display: flex;
@@ -560,4 +562,5 @@
 .yd-cascader-popup .arco-radio-disabled.arco-radio-checked:hover .arco-radio-icon {
   background: oklch(var(--muted));
   border-color: oklch(var(--border));
+}
 }

@@ -1,6 +1,8 @@
 @import "../theme/appearance.css";
 @import "./collection.css";
 
+
+@layer yudream-base {
 /* 只消费根部令牌：插件可覆盖变量，不在组件内重复声明默认主题。 */
 .yd-surface {
   color: oklch(var(--card-foreground));
@@ -180,4 +182,5 @@
     height: 32px;
     padding-inline: 4px;
   }
+}
 }

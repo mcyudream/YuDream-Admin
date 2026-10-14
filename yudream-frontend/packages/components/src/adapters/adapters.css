@@ -1,5 +1,7 @@
 @import "../theme/appearance.css";
 
+
+@layer yudream-base {
 /* 外观仅属于 YD 入口。Fa 的功能和调用方式保持同一套契约。 */
 .yd-button,
 .yd-input,
@@ -128,4 +130,5 @@
   :root:is([data-admin-style="calm"], [data-admin-style="compact"]) .yd-base * {
     transition-timing-function: var(--yd-motion-ease);
   }
+}
 }
