@@ -63,7 +63,7 @@ export interface AiAssistantRunRequest extends ChatSendPayload {
 const runPath = (id: string, scope: 'personal' | 'system' = 'personal') => `api/platform/ai/${scope === 'system' ? 'system-runs' : 'runs'}/${encodeURIComponent(id)}`
 
 export const startAiAssistantRun = (sessionId: string, data: AiAssistantRunRequest) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/chat/sessions/${encodeURIComponent(sessionId)}/runs`, data)
-export const listAiRuns = (sessionId?: string) => systemClient.get<unknown, ApiResponse<AiRunSnapshot[]>>('api/platform/ai/runs', { params: sessionId ? { sessionId } : {} })
+export const listAiRuns = (sessionId?: string) => systemClient.get<unknown, ApiResponse<AiRunSnapshot[]>>('api/platform/ai/runs', { params: sessionId ? { sessionId } : {}, skipGlobalToast: true })
 export const getAiRun = (id: string) => systemClient.get<unknown, ApiResponse<AiRunSnapshot>>(runPath(id))
 export const cancelAiRun = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id)}/cancel`)
 export const resumeAiRun = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id)}/resume`)
