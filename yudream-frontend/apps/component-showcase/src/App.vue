@@ -9,14 +9,20 @@ import AiSection from '@/sections/AiSection.vue'
 import BasicSection from '@/sections/BasicSection.vue'
 import CalendarSection from '@/sections/CalendarSection.vue'
 import CollectionControlsSection from '@/sections/CollectionControlsSection.vue'
+import ComboboxCreateSection from '@/sections/ComboboxCreateSection.vue'
 import DataSection from '@/sections/DataSection.vue'
+import DomActionSection from '@/sections/DomActionSection.vue'
 import EffectsSection from '@/sections/EffectsSection.vue'
 import ExtendedSection from '@/sections/ExtendedSection.vue'
 import FeedbackSection from '@/sections/FeedbackSection.vue'
 import FormSection from '@/sections/FormSection.vue'
+import LoadingSelectionSection from '@/sections/LoadingSelectionSection.vue'
 import MigrationSection from '@/sections/MigrationSection.vue'
+import PageBuilderSection from '@/sections/PageBuilderSection.vue'
+import SortableTreeSection from '@/sections/SortableTreeSection.vue'
 import TechnicalEditorsSection from '@/sections/TechnicalEditorsSection.vue'
 import ToolsSection from '@/sections/ToolsSection.vue'
+import WorkflowCanvasSection from '@/sections/WorkflowCanvasSection.vue'
 
 interface Category {
   key: string
@@ -38,6 +44,12 @@ const categories: Category[] = [
   { key: 'migration', label: '表单与动作契约', en: 'Form Contract', icon: 'morph:list-checks', group: '数据录入', description: '统一字段校验、禁用继承、标签输入、键盘评分与自定布局动作。', section: MigrationSection },
   { key: 'collection-controls', label: '集合与文件选择', en: 'Selection', icon: 'morph:list-filter', group: '数据录入', description: '搜索多选、已选内容回显与本地文件选择，保持统一的键盘和表单行为。', section: CollectionControlsSection },
   { key: 'technical-editors', label: '内容与代码编辑', en: 'Editors', icon: 'morph:code-xml', group: '数据录入', description: '主题化 Markdown 与代码编辑，支持受控内容、只读和禁用状态。', section: TechnicalEditorsSection },
+  { key: 'sortable-tree', label: '拖拽与层级重排', en: 'Sortable Tree', icon: 'morph:git-fork', group: '数据录入', description: '受控拖拽、键盘重排与延迟加载，保留字符串标识和层级元数据。', section: SortableTreeSection },
+  { key: 'workflow-canvas', label: '工作流画布', en: 'Workflow Canvas', icon: 'morph:workflow', group: '数据录入', description: '可缩放流程画布、受控节点连线、自定义节点与连接点。', section: WorkflowCanvasSection },
+  { key: 'creatable-selection', label: '可创建搜索选择', en: 'Creatable Selection', icon: 'morph:list-plus', group: '数据录入', description: '搜索候选不存在时由调用方明确接受新编码。', section: ComboboxCreateSection },
+  { key: 'loading-selection', label: '加载与列表选择', en: 'Loading & Selection', icon: 'morph:list-checks', group: '数据展示', description: '局部遮罩、函数式文件选择与跨断点保留的表格选择。', section: LoadingSelectionSection },
+  { key: 'page-builder', label: '页面可视化构建', en: 'Page Builder', icon: 'morph:panels-top-left', group: '数据录入', description: '受控 HTML、CSS 和构建项目数据，支持主题、上传与实例生命周期。', section: PageBuilderSection },
+  { key: 'dom-action', label: '动态挂载动作', en: 'DOM Actions', icon: 'morph:mouse-pointer-2', group: '反馈', description: '向画布和主题容器挂载真正的 YD 动作，支持状态更新与完整销毁。', section: DomActionSection },
   { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:layout-grid', group: '数据展示', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
   { key: 'feedback', label: '反馈', en: 'Feedback', icon: 'morph:bell', group: '反馈', description: '气泡提示、弹窗、图片预览等交互反馈组件。', section: FeedbackSection },
   { key: 'ai', label: 'AI 助手', en: 'Agent Studio', icon: 'morph:bot', group: 'AI 助手', description: '从对话到交付：Harness、Skills、MCP、工作区与可检查的代码变更。', section: AiSection },
