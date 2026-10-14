@@ -5,7 +5,7 @@ import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 defineOptions({ name: 'PluginMarketplaceAddSource' })
 
 const router = useRouter()
-const toast = useFaToast()
+const toast = useYdToast()
 
 const saving = ref(false)
 const testing = ref(false)
@@ -78,61 +78,61 @@ async function save() {
 
 <template>
   <div>
-    <FaPageHeader title="添加市场源" class="mb-0">
+    <YdPageHeader title="添加市场源" class="mb-0">
       <template #description>
         订阅远程插件市场。不需要启用「插件市场源」能力；该能力只提供本机源与公开社区。
       </template>
-      <FaButton variant="outline" @click="back">
-        <FaIcon name="morph:arrow-left" />
+      <YdButton variant="outline" @click="back">
+        <YdIcon name="morph:arrow-left" />
         返回插件市场
-      </FaButton>
-      <FaButton :loading="saving" @click="save">
-        <FaIcon name="morph:save" />
+      </YdButton>
+      <YdButton :loading="saving" @click="save">
+        <YdIcon name="morph:save" />
         保存
-      </FaButton>
-    </FaPageHeader>
-    <FaPageMain>
-      <FaCard class="max-w-3xl">
-        <a-form :model="form" layout="vertical">
+      </YdButton>
+    </YdPageHeader>
+    <YdPageMain>
+      <YdCard class="max-w-3xl">
+        <YdForm :model="form" layout="vertical">
           <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <a-form-item label="市场源标识" required>
-              <FaInput v-model="form.code" placeholder="小写字母、数字或连字符，如 company-mirror" />
-            </a-form-item>
-            <a-form-item label="名称" required>
-              <FaInput v-model="form.name" placeholder="市场源显示名称" />
-            </a-form-item>
+            <YdFormItem label="市场源标识" required>
+              <YdInput v-model="form.code" placeholder="小写字母、数字或连字符，如 company-mirror" />
+            </YdFormItem>
+            <YdFormItem label="名称" required>
+              <YdInput v-model="form.name" placeholder="市场源显示名称" />
+            </YdFormItem>
           </div>
-          <a-form-item label="源类型">
-            <FaSelect v-model="form.type" :options="sourceTypeOptions" />
-          </a-form-item>
-          <a-form-item :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'" required>
+          <YdFormItem label="源类型">
+            <YdSelect v-model="form.type" :options="sourceTypeOptions" />
+          </YdFormItem>
+          <YdFormItem :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'" required>
             <div class="flex gap-2">
-              <FaInput
+              <YdInput
                 v-model="form.rootUrl"
                 :placeholder="form.type === 'V2_API' ? 'https://example.com/api/public/plugin-market' : 'https://example.com/market/index.json'"
                 class="flex-1"
               />
-              <FaButton variant="outline" :loading="testing" @click="testForm">
+              <YdButton variant="outline" :loading="testing" @click="testForm">
                 测试连接
-              </FaButton>
+              </YdButton>
             </div>
             <div v-if="testMessage" class="mt-1 flex items-center gap-1">
-              <FaTag :variant="testOk ? 'default' : 'destructive'">
+              <YdTag :variant="testOk ? 'default' : 'destructive'">
                 {{ testOk ? '成功' : '失败' }}
-              </FaTag>
+              </YdTag>
               <span class="text-xs text-secondary-foreground/60">{{ testMessage }}</span>
             </div>
-          </a-form-item>
+          </YdFormItem>
           <div class="grid grid-cols-1 gap-x-4 md:grid-cols-[1fr_140px]">
-            <a-form-item label="访问令牌（可选）">
-              <FaInput v-model="form.token" type="password" placeholder="私有源的 Bearer 令牌" />
-            </a-form-item>
-            <a-form-item label="排序">
-              <a-input-number v-model="form.sortOrder" :min="0" class="w-full" />
-            </a-form-item>
+            <YdFormItem label="访问令牌（可选）">
+              <YdInput v-model="form.token" type="password" placeholder="私有源的 Bearer 令牌" />
+            </YdFormItem>
+            <YdFormItem label="排序">
+              <YdNumberField :model-value="form.sortOrder ?? 100" @update:model-value="form.sortOrder = $event" :min="0" class="w-full" />
+            </YdFormItem>
           </div>
-        </a-form>
-      </FaCard>
-    </FaPageMain>
+        </YdForm>
+      </YdCard>
+    </YdPageMain>
   </div>
 </template>

@@ -10,8 +10,8 @@ import apiRole from '@/api/modules/system-role'
 import apiUser from '@/api/modules/system-user'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const { auth } = useAppAuth()
 const route = useRoute()
 const router = useRouter()
@@ -503,28 +503,28 @@ function importUsers() {
 
 <template>
   <div>
-    <FaPageHeader title="用户管理" class="mb-0">
-      <FaButton v-auth="'system:user:export'" variant="outline" @click="exportUsers">
-        <FaIcon name="morph:file-spreadsheet" />
+    <YdPageHeader title="用户管理" class="mb-0">
+      <YdButton v-auth="'system:user:export'" variant="outline" @click="exportUsers">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-      <FaButton v-auth="'system:user:import'" variant="outline" @click="downloadUserTemplate">
-        <FaIcon name="morph:download" />
+      </YdButton>
+      <YdButton v-auth="'system:user:import'" variant="outline" @click="downloadUserTemplate">
+        <YdIcon name="morph:download" />
         模板
-      </FaButton>
-      <FaButton v-auth="'system:user:import'" variant="outline" @click="importUsers">
-        <FaIcon name="morph:upload" />
+      </YdButton>
+      <YdButton v-auth="'system:user:import'" variant="outline" @click="importUsers">
+        <YdIcon name="morph:upload" />
         导入
-      </FaButton>
-      <FaButton v-auth="'system:user:create'" @click="openCreate">
-        <FaIcon name="morph:user-plus" />
+      </YdButton>
+      <YdButton v-auth="'system:user:create'" @click="openCreate">
+        <YdIcon name="morph:user-plus" />
         新增用户
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -535,24 +535,24 @@ function importUsers() {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
-              <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-              <FaSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
-              <FaSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
-              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <YdInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
+              <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+              <YdSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
+              <YdSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
+              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
               <div class="flex gap-2 col-end--1 justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton @click="loadUsers">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton @click="loadUsers">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-identities="{ row }">
           <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="flex flex-col gap-1 text-sm">
@@ -578,17 +578,17 @@ function importUsers() {
         </template>
         <template #cell-tags="{ row }">
           <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
-            <FaTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+            <YdTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
               {{ tag.label }}
-            </FaTag>
+            </YdTag>
           </div>
           <span v-else>-</span>
         </template>
         <template #cell-deptNames="{ row }">
           <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
-            <FaTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
+            <YdTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
               {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
-            </FaTag>
+            </YdTag>
           </div>
           <span v-else>-</span>
         </template>
@@ -596,50 +596,50 @@ function importUsers() {
           {{ row.original.roleNames?.join('、') || '-' }}
         </template>
         <template #cell-emailVerified="{ row }">
-          <FaTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
             {{ row.original.emailVerified ? '已验证' : '未验证' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
             {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-operation="{ row }">
           <div class="flex-center gap-2">
-            <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
+            <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
               编辑
-            </FaButton>
-            <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
+            </YdButton>
+            <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
               改密
-            </FaButton>
-            <FaButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
+            </YdButton>
+            <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
               部门角色
-            </FaButton>
-            <FaButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
+            </YdButton>
+            <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
               伪装
-            </FaButton>
-            <FaButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
+            </YdButton>
+            <YdButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
               启用
-            </FaButton>
-            <FaButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row.original)">
+            </YdButton>
+            <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row.original)">
               停用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
 
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.username }}</span>
                 <div class="flex gap-1">
-                  <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
                     {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </FaTag>
-                  <FaTag :variant="row.emailVerified ? 'default' : 'secondary'">
+                  </YdTag>
+                  <YdTag :variant="row.emailVerified ? 'default' : 'secondary'">
                     {{ row.emailVerified ? '已验证' : '未验证' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
               </div>
               <div v-if="row.nickname" class="text-sm text-secondary-foreground/70">
@@ -660,44 +660,44 @@ function importUsers() {
                 </div>
               </div>
               <div v-if="row.tags?.length" class="flex flex-wrap gap-1">
-                <FaTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+                <YdTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
                   {{ tag.label }}
-                </FaTag>
+                </YdTag>
               </div>
               <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
-                <FaTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
+                <YdTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
                   {{ row.deptNames?.[index] || deptId }}{{ sameId(deptId, row.defaultDeptId) ? '（默认）' : '' }}
-                </FaTag>
+                </YdTag>
               </div>
               <div v-if="row.roleNames?.length" class="text-sm text-secondary-foreground/80">
                 角色：{{ row.roleNames.join('、') }}
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
+                </YdButton>
+                <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
                   改密
-                </FaButton>
-                <FaButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
+                </YdButton>
+                <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
                   部门角色
-                </FaButton>
-                <FaButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
+                </YdButton>
+                <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
                   伪装
-                </FaButton>
-                <FaButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
                   启用
-                </FaButton>
-                <FaButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
+                </YdButton>
+                <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
                   停用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -705,64 +705,64 @@ function importUsers() {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑用户' : '新增用户'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
-      <a-form :model="form" layout="vertical">
-        <a-grid :cols="2" :col-gap="16">
-          <a-grid-item>
-            <a-form-item label="用户名" required>
-              <FaInput v-model="form.username" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="昵称">
-              <FaInput v-model="form.nickname" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="邮箱" required>
-              <FaInput v-model="form.email" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="手机号">
-              <FaInput v-model="form.phone" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="QQ 号">
-              <FaInput v-model="form.qq" class="w-full" placeholder="仅 Milky 协议使用真实 QQ 号" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="!editing">
-            <a-form-item label="密码" required>
-              <FaInput v-model="form.password" type="password" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="邮箱状态">
+    <YdModal v-model="formVisible" :title="editing ? '编辑用户' : '新增用户'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
+      <YdForm :model="form" layout="vertical">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <YdFormItem label="用户名" required>
+              <YdInput v-model="form.username" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="昵称">
+              <YdInput v-model="form.nickname" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="邮箱" required>
+              <YdInput v-model="form.email" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="手机号">
+              <YdInput v-model="form.phone" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="QQ 号">
+              <YdInput v-model="form.qq" class="w-full" placeholder="仅 Milky 协议使用真实 QQ 号" />
+            </YdFormItem>
+          </div>
+          <div v-if="!editing">
+            <YdFormItem label="密码" required>
+              <YdInput v-model="form.password" type="password" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="邮箱状态">
               <div class="h-9 flex items-center gap-3">
-                <FaSwitch v-model="form.emailVerified" />
+                <YdSwitch v-model="form.emailVerified" />
                 <span class="text-sm text-muted-foreground">{{ form.emailVerified ? '已验证' : '未验证' }}</span>
               </div>
-            </a-form-item>
-          </a-grid-item>
-        </a-grid>
-        <a-form-item v-auth="'system:user:assign-dept'" label="所属部门">
-          <FaSelect v-model="selectedDeptIds" multiple :options="deptOptions" class="w-full" />
-        </a-form-item>
-        <a-form-item v-auth="'system:user:assign-dept'" label="默认部门">
-          <FaSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
-        </a-form-item>
-        <a-form-item v-auth="'system:user:assign-role'" label="部门角色">
+            </YdFormItem>
+          </div>
+        </div>
+        <YdFormItem v-auth="'system:user:assign-dept'" label="所属部门">
+          <YdSelect v-model="selectedDeptIds" multiple :options="deptOptions" class="w-full" />
+        </YdFormItem>
+        <YdFormItem v-auth="'system:user:assign-dept'" label="默认部门">
+          <YdSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
+        </YdFormItem>
+        <YdFormItem v-auth="'system:user:assign-role'" label="部门角色">
           <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
             <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
               <div class="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FaIcon name="morph:network" />
+                <YdIcon name="morph:network" />
                 {{ section.deptName }}
               </div>
-              <FaSelect
+              <YdSelect
                 v-if="section.roleOptions.length"
                 :model-value="getDeptRoleIds(section.deptId)"
                 multiple
@@ -778,40 +778,40 @@ function importUsers() {
           <div v-else class="text-sm text-muted-foreground">
             请先选择所属部门
           </div>
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="passwordVisible" title="修改密码" show-cancel-button class="sm:max-w-lg" @confirm="savePassword">
-      <a-form :model="passwordForm" layout="vertical">
-        <a-form-item label="新密码" required>
-          <FaInput v-model="passwordForm.password" type="password" class="w-full" />
-        </a-form-item>
-        <a-form-item>
-          <FaPasswordStrength :password="passwordForm.password" />
-        </a-form-item>
-        <a-form-item label="确认密码" required>
-          <FaInput v-model="passwordForm.confirmPassword" type="password" class="w-full" />
-        </a-form-item>
-      </a-form>
-    </FaModal>
+    <YdModal v-model="passwordVisible" title="修改密码" show-cancel-button class="sm:max-w-lg" @confirm="savePassword">
+      <YdForm :model="passwordForm" layout="vertical">
+        <YdFormItem label="新密码" required>
+          <YdInput v-model="passwordForm.password" type="password" class="w-full" />
+        </YdFormItem>
+        <YdFormItem>
+          <YdPasswordStrength :password="passwordForm.password" />
+        </YdFormItem>
+        <YdFormItem label="确认密码" required>
+          <YdInput v-model="passwordForm.confirmPassword" type="password" class="w-full" />
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="assignVisible" title="分配部门角色" show-cancel-button class="sm:max-w-2xl" @confirm="saveAssign">
-      <a-form :model="{ selectedDeptIds, defaultDeptId }" layout="vertical">
-        <a-form-item v-auth="'system:user:assign-dept'" label="部门">
-          <FaSelect v-model="selectedDeptIds" multiple :options="deptOptions" class="w-full" />
-        </a-form-item>
-        <a-form-item v-auth="'system:user:assign-dept'" label="默认部门">
-          <FaSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
-        </a-form-item>
-        <a-form-item v-auth="'system:user:assign-role'" label="部门角色">
+    <YdModal v-model="assignVisible" title="分配部门角色" show-cancel-button class="sm:max-w-2xl" @confirm="saveAssign">
+      <YdForm :model="{ selectedDeptIds, defaultDeptId }" layout="vertical">
+        <YdFormItem v-auth="'system:user:assign-dept'" label="部门">
+          <YdSelect v-model="selectedDeptIds" multiple :options="deptOptions" class="w-full" />
+        </YdFormItem>
+        <YdFormItem v-auth="'system:user:assign-dept'" label="默认部门">
+          <YdSelect v-model="defaultDeptId" :disabled="!selectedDeptIds.length" :options="defaultDeptOptions" class="w-full" />
+        </YdFormItem>
+        <YdFormItem v-auth="'system:user:assign-role'" label="部门角色">
           <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
             <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
               <div class="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FaIcon name="morph:network" />
+                <YdIcon name="morph:network" />
                 {{ section.deptName }}
               </div>
-              <FaSelect
+              <YdSelect
                 v-if="section.roleOptions.length"
                 :model-value="getDeptRoleIds(section.deptId)"
                 multiple
@@ -827,8 +827,8 @@ function importUsers() {
           <div v-else class="text-sm text-muted-foreground">
             请先选择所属部门
           </div>
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
   </div>
 </template>

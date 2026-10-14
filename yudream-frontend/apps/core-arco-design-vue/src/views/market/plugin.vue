@@ -86,17 +86,17 @@ function browseAuthor() {
   <MarketChrome>
     <main class="plugin">
       <div class="plugin__inner">
-        <button type="button" class="plugin-back" @click="router.push({ name: 'publicMarketHome' })">
-          <FaIcon name="morph:arrow-left" />
+        <YdButton type="button" variant="ghost" class="plugin-back" @click="router.push({ name: 'publicMarketHome' })">
+          <YdIcon name="morph:arrow-left" />
           返回市场
-        </button>
+        </YdButton>
         <div v-if="loading" class="plugin-empty">加载中…</div>
         <div v-else-if="missing || !detail" class="plugin-empty">未找到该插件。</div>
         <template v-else>
           <header class="plugin-hero">
             <div class="plugin-hero__icon">
               <img v-if="isImageIcon(detail.icon)" :src="iconUrl(detail.icon)" :alt="detail.displayName || detail.code">
-              <FaIcon v-else :name="detail.icon || 'morph:puzzle'" />
+              <YdIcon v-else :name="detail.icon || 'morph:puzzle'" />
             </div>
             <div class="plugin-hero__copy">
               <p class="plugin-code">{{ detail.code }}</p>
@@ -108,9 +108,9 @@ function browseAuthor() {
               </div>
             </div>
             <div class="plugin-cta">
-              <button v-if="latest" type="button" class="plugin-action" @click="download(latest.version)">
+              <YdButton v-if="latest" type="button" variant="outline" class="plugin-action" @click="download(latest.version)">
                 下载 {{ latest.version }}
-              </button>
+              </YdButton>
               <p>{{ detail.downloads }} 次下载 · {{ formatTime(detail.updatedAt || detail.publishedAt) }} 更新</p>
             </div>
           </header>
@@ -124,10 +124,10 @@ function browseAuthor() {
               <dt>{{ detail.downloads }}</dt>
               <dd>下载</dd>
             </div>
-            <button type="button" @click="browseAuthor">
+            <YdButton type="button" variant="ghost" :aria-label="`浏览作者 ${detail.authorName || '未知'}`" @click="browseAuthor">
               <dt>{{ detail.authorName || '未知' }}</dt>
               <dd>作者</dd>
-            </button>
+            </YdButton>
             <div>
               <dt>{{ detail.license || '—' }}</dt>
               <dd>许可证</dd>
@@ -143,7 +143,7 @@ function browseAuthor() {
                   <p>{{ version.releaseNotes || '无发布说明' }}</p>
                   <span>{{ formatTime(version.publishedAt) }} · {{ formatSize(version.sizeBytes) }} · {{ version.downloads }} 下载<template v-if="version.license"> · {{ version.license }}</template></span>
                 </div>
-                <button type="button" class="plugin-action plugin-action--ghost" @click="download(version.version)">下载</button>
+                <YdButton type="button" variant="ghost" size="sm" class="plugin-action plugin-action--ghost" @click="download(version.version)">下载</YdButton>
               </article>
             </div>
           </section>

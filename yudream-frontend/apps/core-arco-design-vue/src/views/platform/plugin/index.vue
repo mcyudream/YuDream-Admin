@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
+import type { YdFilePickerInstance } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import { refreshPluginThemes } from '@/plugins/theme-runtime'
@@ -11,8 +12,8 @@ import EnableDependencyDialog from './enable-dependency-dialog.vue'
 
 type PluginFilterStatus = 'all' | PluginStatus | 'update'
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const loading = ref(false)
 const uploading = ref(false)
 const checkingUpdates = ref(false)
@@ -23,7 +24,7 @@ const selectedCode = ref('')
 const keyword = ref('')
 const filterStatus = ref<PluginFilterStatus>('all')
 const pagination = reactive({ page: 1, size: 12, total: 0 })
-const uploadInput = ref<HTMLInputElement>()
+const uploadInput = ref<YdFilePickerInstance | null>(null)
 const enableDialogOpen = ref(false)
 const enableDependencyStatus = ref<PluginDependencyStatus | null>(null)
 const enableLoading = ref(false)
@@ -211,10 +212,9 @@ async function refresh() {
   }
 }
 
-async function uploadJar(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function uploadJar(files: File[]) {
+  const file = files[0]
+  uploadInput.value?.reset()
   if (!file) {
     return
   }
@@ -513,40 +513,40 @@ function actionText(action: string) {
 
 <template>
   <div>
-    <FaPageHeader title="插件管理" class="mb-0">
+    <YdPageHeader title="插件管理" class="mb-0">
       <template #description>
         管理插件 JAR 的发现、加载、启用、禁用、卸载和记录删除。插件启用后会动态注册接口、权限和前端页面。
       </template>
-    </FaPageHeader>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="plugin-toolbar">
         <div class="plugin-toolbar-actions">
-          <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
-            <FaIcon name="morph:cloud-upload" />
+          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.open()">
+            <YdIcon name="morph:cloud-upload" />
             上传 JAR
-          </FaButton>
-          <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
-          <FaButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
-            <FaIcon name="morph:circle-arrow-up" />
+          </YdButton>
+          <YdFilePicker ref="uploadInput" accept=".jar,application/java-archive" label="选择插件 JAR" @select="uploadJar"><template #default /></YdFilePicker>
+          <YdButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
+            <YdIcon name="morph:circle-arrow-up" />
             检查更新
-          </FaButton>
-          <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
-            <FaIcon name="morph:folder-open" />
+          </YdButton>
+          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
+            <YdIcon name="morph:folder-open" />
             扫描目录
-          </FaButton>
+          </YdButton>
         </div>
         <div class="plugin-filters">
-          <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
-          <FaSelect v-model="filterStatus" :options="filterOptions" class="plugin-status-filter" />
-          <FaButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</FaButton>
+          <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
+          <YdSelect v-model="filterStatus" :options="filterOptions" class="plugin-status-filter" />
+          <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</YdButton>
         </div>
       </div>
 
       <div class="summary-grid">
         <div v-for="item in summary" :key="item.label" class="summary-item">
           <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
           </div>
           <div class="summary-body">
             <span>{{ item.label }}</span>
@@ -560,33 +560,35 @@ function actionText(action: string) {
           <span class="plugin-result-count">共 {{ pagination.total }} 个插件</span>
         </div>
         <div v-if="pagedRows.length" class="plugin-grid">
-          <button
+          <YdButton
             v-for="item in pagedRows"
             :key="item.code"
+            variant="ghost"
             class="plugin-item"
             :class="{ active: selected?.code === item.code }"
             type="button"
+            :aria-pressed="selected?.code === item.code"
             @click="selectedCode = item.code"
           >
-            <FaIcon :name="pluginIcon(item)" class="plugin-item-icon" />
+            <YdIcon :name="pluginIcon(item)" class="plugin-item-icon" />
             <div class="plugin-item-body">
               <div class="plugin-item-title">
                 <strong>{{ item.name }}</strong>
-                <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
+                <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
               </div>
               <span class="plugin-item-code">{{ item.code }} · {{ item.version || '未知版本' }}</span>
               <p>{{ item.description || '暂无插件简介。' }}</p>
             </div>
-            <FaTag v-if="updatePlanFor(item.code)" variant="default" class="update-tag">
+            <YdTag v-if="updatePlanFor(item.code)" variant="default" class="update-tag">
               可更新至 {{ updatePlanFor(item.code)?.toVersion }}
-            </FaTag>
-          </button>
+            </YdTag>
+          </YdButton>
         </div>
         <div v-else-if="!loading" class="empty-state">
-          <template v-if="rows.length">暂无符合当前筛选条件的插件。<FaButton variant="link" @click="resetFilters">重置筛选</FaButton></template>
+          <template v-if="rows.length">暂无符合当前筛选条件的插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
           <template v-else>暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。</template>
         </div>
-        <FaPagination
+        <YdPagination
           v-if="pagination.total > pagination.size"
           v-model:page="pagination.page"
           v-model:size="pagination.size"
@@ -598,13 +600,13 @@ function actionText(action: string) {
       <section v-if="selected" class="plugin-detail">
           <div class="detail-header">
             <div class="plugin-detail-title">
-              <FaIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
+              <YdIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
               <div>
                 <h2>{{ selected.name }}</h2>
                 <p>{{ selected.description || '-' }}</p>
               </div>
             </div>
-            <FaTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</FaTag>
+            <YdTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</YdTag>
           </div>
 
           <div class="detail-grid">
@@ -619,10 +621,10 @@ function actionText(action: string) {
             <div v-if="selected.gitUrl">
               <span>源码仓库</span>
               <strong>
-                <FaButton variant="link" class="detail-git-link" @click="openGitUrl(selected.gitUrl)">
-                  <FaIcon name="i-ri:github-line" />
+                <YdButton variant="link" class="detail-git-link" @click="openGitUrl(selected.gitUrl)">
+                  <YdIcon name="i-ri:github-line" />
                   {{ selected.gitUrl }}
-                </FaButton>
+                </YdButton>
               </strong>
             </div>
           </div>
@@ -637,25 +639,25 @@ function actionText(action: string) {
             <div v-if="updatePlanFor(selected.code)?.requiredDependencies?.length" class="plan-section">
               <strong>必需依赖</strong>
               <div class="dependency-list">
-                <FaTag v-for="dependency in updatePlanFor(selected.code)?.requiredDependencies" :key="`required-${dependency.code}`" variant="secondary">
+                <YdTag v-for="dependency in updatePlanFor(selected.code)?.requiredDependencies" :key="`required-${dependency.code}`" variant="secondary">
                   {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }}{{ dependency.warning ? `：${dependency.warningReason || '存在告警'}` : '' }}
-                </FaTag>
+                </YdTag>
               </div>
             </div>
 
             <div v-if="updatePlanFor(selected.code)?.optionalDependencies?.length" class="plan-section">
               <strong>可选依赖</strong>
               <div class="dependency-list">
-                <FaTag v-for="dependency in updatePlanFor(selected.code)?.optionalDependencies" :key="`optional-${dependency.code}`" variant="secondary">
+                <YdTag v-for="dependency in updatePlanFor(selected.code)?.optionalDependencies" :key="`optional-${dependency.code}`" variant="secondary">
                   {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }}{{ dependency.warning ? `：${dependency.warningReason || '存在告警'}` : '' }}
-                </FaTag>
+                </YdTag>
               </div>
             </div>
 
             <div v-if="updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-section">
               <strong>受影响的已启用插件</strong>
               <div class="dependency-list">
-                <FaTag v-for="code in updatePlanFor(selected.code)?.affectedEnabledPlugins" :key="code" variant="secondary">{{ code }}</FaTag>
+                <YdTag v-for="code in updatePlanFor(selected.code)?.affectedEnabledPlugins" :key="code" variant="secondary">{{ code }}</YdTag>
               </div>
             </div>
 
@@ -667,25 +669,25 @@ function actionText(action: string) {
             </div>
 
             <div class="detail-actions">
-              <FaButton
+              <YdButton
                 v-auth="'platform:plugin:manage'"
                 :disabled="!canConfirmUpdate(selected, updatePlanFor(selected.code))"
                 :loading="actionLoading === `${selected.code}:update`"
                 @click="confirmUpdate(selected)"
               >
-                <FaIcon name="morph:circle-arrow-up" />
+                <YdIcon name="morph:circle-arrow-up" />
                 确认更新
-              </FaButton>
-              <FaButton
+              </YdButton>
+              <YdButton
                 v-auth="'platform:plugin:manage'"
                 variant="outline"
                 :disabled="!selected.rollbackAvailable || Boolean(actionLoading)"
                 :loading="actionLoading === `${selected.code}:rollback`"
                 @click="confirmRollback(selected)"
               >
-                <FaIcon name="morph:history" />
+                <YdIcon name="morph:history" />
                 回滚到 {{ selected.rollbackVersion || '备份版本' }}
-              </FaButton>
+              </YdButton>
             </div>
             <p v-if="selected.enabled || updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-warning">确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。</p>
           </div>
@@ -693,9 +695,9 @@ function actionText(action: string) {
           <div v-if="selected.dependencies?.length" class="dependency-panel">
             <div class="section-title">插件依赖</div>
             <div class="dependency-list">
-              <FaTag v-for="dependency in selected.dependencies" :key="dependency" variant="secondary">
+              <YdTag v-for="dependency in selected.dependencies" :key="dependency" variant="secondary">
                 {{ dependency }}
-              </FaTag>
+              </YdTag>
             </div>
           </div>
 
@@ -704,62 +706,62 @@ function actionText(action: string) {
           </div>
 
           <div class="detail-actions">
-            <FaButton
+            <YdButton
               variant="outline"
               :loading="actionLoading === `${selected.code}:open`"
               @click="openPluginPage(selected.code)"
             >
-              <FaIcon name="morph:external-link" />
+              <YdIcon name="morph:external-link" />
               打开插件页面
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-auth="'platform:plugin:manage'"
               variant="outline"
               :disabled="selected.loaded"
               :loading="actionLoading === `${selected.code}:load`"
               @click="runAction(selected.code, 'load')"
             >
-              <FaIcon name="morph:cloud-download" />
+              <YdIcon name="morph:cloud-download" />
               加载
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-auth="'platform:plugin:manage'"
               :disabled="selected.enabled"
               :loading="actionLoading === `${selected.code}:enable`"
               @click="runAction(selected.code, 'enable')"
             >
-              <FaIcon name="morph:circle-play" />
+              <YdIcon name="morph:circle-play" />
               启用
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-auth="'platform:plugin:manage'"
               variant="outline"
               :disabled="!selected.enabled"
               :loading="actionLoading === `${selected.code}:disable`"
               @click="runAction(selected.code, 'disable')"
             >
-              <FaIcon name="morph:circle-pause" />
+              <YdIcon name="morph:circle-pause" />
               禁用
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-auth="'platform:plugin:manage'"
               variant="outline"
               :disabled="selected.enabled || !selected.loaded"
               :loading="actionLoading === `${selected.code}:unload`"
               @click="runAction(selected.code, 'unload')"
             >
-              <FaIcon name="i-ri:eject-line" />
+              <YdIcon name="i-ri:eject-line" />
               卸载
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-auth="'platform:plugin:manage'"
               variant="destructive"
               :loading="actionLoading === `${selected.code}:remove`"
               @click="confirmRemove(selected)"
             >
-              <FaIcon name="morph:trash-2" />
+              <YdIcon name="morph:trash-2" />
               删除记录
-            </FaButton>
+            </YdButton>
           </div>
       </section>
 
@@ -776,7 +778,7 @@ function actionText(action: string) {
         :loading="Boolean(actionLoading)"
         @confirm="handleDependentsConfirm"
       />
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 

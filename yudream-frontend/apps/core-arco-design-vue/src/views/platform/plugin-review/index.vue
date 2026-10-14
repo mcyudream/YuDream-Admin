@@ -4,8 +4,8 @@ import type { PluginMarketPublication, PluginPublicationChannel, PluginPublicati
 import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const loading = ref(false)
 const publications = ref<PluginMarketPublication[]>([])
@@ -144,12 +144,12 @@ function formatTime(value?: string) {
 
 <template>
   <div>
-    <FaPageHeader title="发布审核" class="mb-0">
+    <YdPageHeader title="发布审核" class="mb-0">
       <template #description>
         审核本机市场源的待发布插件。通过后对外可见；拒绝与下架后同版本不可覆盖。
       </template>
-    </FaPageHeader>
-    <FaPageMain>
+    </YdPageHeader>
+    <YdPageMain>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
         <div class="text-sm">
           <div class="font-medium">发布需审核</div>
@@ -159,7 +159,7 @@ function formatTime(value?: string) {
         </div>
         <div class="flex items-center gap-2">
           <span class="text-sm text-secondary-foreground/60">{{ reviewRequired ? '已开启' : '已关闭' }}</span>
-          <FaSwitch
+          <YdSwitch
             v-auth="'platform:plugin-market-source:edit'"
             :model-value="reviewRequired"
             :disabled="reviewSaving"
@@ -169,11 +169,11 @@ function formatTime(value?: string) {
       </div>
 
       <div class="mb-3 flex items-center gap-2">
-        <FaSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
+        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
       </div>
 
-      <a-spin :loading="loading" class="block w-full">
-        <FaResponsiveTable
+      <YdLoadingOverlay :loading="loading"><div  class="block w-full">
+        <YdResponsiveTable
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
           table-class="min-w-[980px]"
@@ -189,12 +189,12 @@ function formatTime(value?: string) {
             </div>
           </template>
           <template #cell-channel="{ row }">
-            <FaTag variant="secondary">{{ channelText(row.original.channel) }}</FaTag>
+            <YdTag variant="secondary">{{ channelText(row.original.channel) }}</YdTag>
           </template>
           <template #cell-pubStatus="{ row }">
-            <FaTag :variant="publicationStatusVariant(row.original.status)">
+            <YdTag :variant="publicationStatusVariant(row.original.status)">
               {{ publicationStatusText(row.original.status) }}
-            </FaTag>
+            </YdTag>
             <div v-if="row.original.reviewNote" class="mt-1 max-w-[160px] truncate text-xs text-secondary-foreground/60" :title="row.original.reviewNote">
               {{ row.original.reviewNote }}
             </div>
@@ -202,14 +202,14 @@ function formatTime(value?: string) {
           <template #cell-pubOperation="{ row }">
             <div class="flex justify-center gap-2">
               <template v-if="row.original.status === 'PENDING'">
-                <FaButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmAccept(row.original)">
+                <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmAccept(row.original)">
                   通过
-                </FaButton>
-                <FaButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmReject(row.original)">
+                </YdButton>
+                <YdButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmReject(row.original)">
                   拒绝
-                </FaButton>
+                </YdButton>
               </template>
-              <FaButton
+              <YdButton
                 v-if="row.original.status === 'PUBLISHED'"
                 v-auth="'platform:plugin-market-source:delete'"
                 variant="destructive"
@@ -218,21 +218,21 @@ function formatTime(value?: string) {
                 @click="confirmUnpublish(row.original)"
               >
                 下架
-              </FaButton>
-              <FaButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmDelete(row.original)">
+              </YdButton>
+              <YdButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmDelete(row.original)">
                 删除
-              </FaButton>
+              </YdButton>
             </div>
           </template>
 
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-base font-semibold break-all">{{ row.displayName || row.code }} {{ row.pluginVersion }}</span>
-                  <FaTag :variant="publicationStatusVariant(row.status)">
+                  <YdTag :variant="publicationStatusVariant(row.status)">
                     {{ publicationStatusText(row.status) }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div class="flex gap-2">
@@ -254,14 +254,14 @@ function formatTime(value?: string) {
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
                   <template v-if="row.status === 'PENDING'">
-                    <FaButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.id" @click="confirmAccept(row)">
+                    <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.id" @click="confirmAccept(row)">
                       通过
-                    </FaButton>
-                    <FaButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmReject(row)">
+                    </YdButton>
+                    <YdButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmReject(row)">
                       拒绝
-                    </FaButton>
+                    </YdButton>
                   </template>
-                  <FaButton
+                  <YdButton
                     v-if="row.status === 'PUBLISHED'"
                     v-auth="'platform:plugin-market-source:delete'"
                     variant="destructive"
@@ -270,18 +270,18 @@ function formatTime(value?: string) {
                     @click="confirmUnpublish(row)"
                   >
                     下架
-                  </FaButton>
-                  <FaButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
+                  </YdButton>
+                  <YdButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
                     删除
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
-      </a-spin>
+        </YdResponsiveTable>
+      </div></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -290,6 +290,6 @@ function formatTime(value?: string) {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>

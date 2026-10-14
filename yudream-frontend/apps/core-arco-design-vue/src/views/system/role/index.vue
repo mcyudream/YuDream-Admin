@@ -444,8 +444,8 @@ function importRoles() {
     </YdPageHeader>
 
     <YdPageMain v-if="activeView === 'list'">
-      <YdResponsiveTable
-        v-loading="loading"
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1040px]"
@@ -556,7 +556,7 @@ function importRoles() {
             </div>
           </YdCard>
         </template>
-      </YdResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
       <YdPagination
         v-model:page="pagination.page"

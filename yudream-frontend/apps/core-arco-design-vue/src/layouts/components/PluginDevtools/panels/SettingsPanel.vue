@@ -4,7 +4,7 @@ import apiPlugin from '@/api/modules/platform-plugin'
 import DevProjectDirectoryBrowser from './DevProjectDirectoryBrowser.vue'
 
 const store = usePluginDevtoolsStore()
-const toast = useFaToast()
+const toast = useYdToast()
 
 // 悬浮按钮/浮窗位置重置由外层 index.vue 注入（位置状态在 useDevtoolsFab / useDevtoolsPanel 内）
 const resetFab = inject<(() => Promise<void>) | undefined>('pluginDevtoolsFabReset', undefined)
@@ -261,25 +261,25 @@ function handleResetPanel() {
     <div class="settings-section">
       <div class="settings-section__header">
         <span class="settings-section__title">开发项目</span>
-        <FaTag variant="secondary" class="text-xs">
+        <YdTag variant="secondary" class="text-xs">
           {{ store.devProjects.length }}
-        </FaTag>
+        </YdTag>
         <div class="flex-1" />
-        <FaButton variant="outline" size="icon" :loading="store.devProjectsLoading" title="刷新" @click="store.loadDevProjects()">
-          <FaIcon name="morph:refresh-cw" />
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="openScaffold">
-          <FaIcon name="morph:wand-sparkles" />
+        <YdButton variant="outline" size="icon" :loading="store.devProjectsLoading" title="刷新" @click="store.loadDevProjects()">
+          <YdIcon name="morph:refresh-cw" />
+        </YdButton>
+        <YdButton variant="outline" size="sm" @click="openScaffold">
+          <YdIcon name="morph:wand-sparkles" />
           新建插件
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="openBatch">
-          <FaIcon name="morph:folder-plus" />
+        </YdButton>
+        <YdButton variant="outline" size="sm" @click="openBatch">
+          <YdIcon name="morph:folder-plus" />
           批量登记
-        </FaButton>
-        <FaButton size="sm" @click="openAdd">
-          <FaIcon name="morph:plus" />
+        </YdButton>
+        <YdButton size="sm" @click="openAdd">
+          <YdIcon name="morph:plus" />
           登记目录
-        </FaButton>
+        </YdButton>
       </div>
       <div v-if="store.status?.devProjectStoreFile" class="settings-section__hint">
         面板登记的项目持久化在 <span class="font-mono">{{ store.status.devProjectStoreFile }}</span>，此文件可被 coding agent 读取以定位插件源码。
@@ -289,44 +289,44 @@ function handleResetPanel() {
         <div class="project-row__main">
           <div class="project-row__title">
             <span class="font-medium font-mono">{{ project.code }}</span>
-            <FaTag :variant="project.source === 'CONFIG' ? 'secondary' : 'outline'" class="text-xs">
+            <YdTag :variant="project.source === 'CONFIG' ? 'secondary' : 'outline'" class="text-xs">
               {{ project.source === 'CONFIG' ? '配置文件' : '面板登记' }}
-            </FaTag>
-            <FaTag v-if="!project.autoCompile" variant="secondary" class="text-xs">
+            </YdTag>
+            <YdTag v-if="!project.autoCompile" variant="secondary" class="text-xs">
               手动编译
-            </FaTag>
+            </YdTag>
           </div>
-          <FaTooltip :text="project.path" side="top">
+          <YdTooltip :text="project.path" side="top">
             <div class="project-row__path">
               {{ project.path }}
             </div>
-          </FaTooltip>
+          </YdTooltip>
         </div>
         <div class="project-row__dots">
-          <FaTooltip v-for="dot in statusDots(project)" :key="dot.label" :text="dot.label" side="top">
+          <YdTooltip v-for="dot in statusDots(project)" :key="dot.label" :text="dot.label" side="top">
             <span class="status-dot" :class="dot.ok ? 'status-dot--ok' : 'status-dot--bad'" />
-          </FaTooltip>
+          </YdTooltip>
         </div>
-        <FaTooltip text="加载并启用该插件" side="top">
-          <FaButton variant="ghost" size="icon" :loading="enablingCode === project.code" @click="enable(project)">
-            <FaIcon name="morph:play" />
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="重挂载该插件前端远程模块" side="top">
-          <FaButton variant="ghost" size="icon" :loading="frontendReloadingCode === project.code" @click="reloadFrontend(project)">
-            <FaIcon name="morph:refresh-cw" />
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="立即 Java 重载该插件" side="top">
-          <FaButton variant="ghost" size="icon" :loading="reloadingCode === project.code" @click="reload(project)">
-            <FaIcon name="morph:rotate-cw" />
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip v-if="project.source === 'FILE'" text="从清单文件移除" side="top">
-          <FaButton variant="ghost" size="icon" :loading="removingCode === project.code" @click="remove(project)">
-            <FaIcon name="morph:trash-2" />
-          </FaButton>
-        </FaTooltip>
+        <YdTooltip text="加载并启用该插件" side="top">
+          <YdButton variant="ghost" size="icon" :loading="enablingCode === project.code" @click="enable(project)">
+            <YdIcon name="morph:play" />
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="重挂载该插件前端远程模块" side="top">
+          <YdButton variant="ghost" size="icon" :loading="frontendReloadingCode === project.code" @click="reloadFrontend(project)">
+            <YdIcon name="morph:refresh-cw" />
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="立即 Java 重载该插件" side="top">
+          <YdButton variant="ghost" size="icon" :loading="reloadingCode === project.code" @click="reload(project)">
+            <YdIcon name="morph:rotate-cw" />
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip v-if="project.source === 'FILE'" text="从清单文件移除" side="top">
+          <YdButton variant="ghost" size="icon" :loading="removingCode === project.code" @click="remove(project)">
+            <YdIcon name="morph:trash-2" />
+          </YdButton>
+        </YdTooltip>
       </div>
       <div v-if="!store.devProjects.length && !store.devProjectsLoading" class="settings-empty">
         暂无开发项目；点击「批量登记」选择插件仓根目录一键扫描子模块，或「登记目录」登记单个插件，也可在 yml 的 yudream.platform.plugin.dev-mode.projects 中配置
@@ -346,9 +346,9 @@ function handleResetPanel() {
             按钮可拖拽换位，拖到屏幕边缘（24px 内）收成半隐边缘条；重置可恢复默认位置
           </div>
         </div>
-        <FaButton variant="outline" size="sm" :disabled="!resetFab" @click="handleResetFab">
+        <YdButton variant="outline" size="sm" :disabled="!resetFab" @click="handleResetFab">
           重置位置
-        </FaButton>
+        </YdButton>
       </div>
       <div class="pref-row">
         <div class="pref-row__main">
@@ -359,66 +359,66 @@ function handleResetPanel() {
             拖动标题栏移动浮窗，拖右下角缩放；重置可恢复默认居中位置与尺寸
           </div>
         </div>
-        <FaButton variant="outline" size="sm" :disabled="!resetPanel" @click="handleResetPanel">
+        <YdButton variant="outline" size="sm" :disabled="!resetPanel" @click="handleResetPanel">
           重置浮窗
-        </FaButton>
+        </YdButton>
       </div>
     </div>
 
     <!-- 登记开发项目 -->
-    <FaModal v-model="addOpen" title="登记开发项目" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+    <YdModal v-model="addOpen" title="登记开发项目" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
       <div class="add-form">
         <div class="add-form__field">
           <span class="add-form__label">插件模块根目录（必填，宿主机绝对路径）</span>
           <div class="add-form__path">
-            <FaInput v-model="addForm.path" class="flex-1" placeholder="D:/code/yudream-admin-plugins/yudream-plugin-xxx" />
-            <FaButton variant="outline" @click="browseOpen = true">
-              <FaIcon name="morph:folder-open" />
+            <YdInput v-model="addForm.path" class="flex-1" placeholder="D:/code/yudream-admin-plugins/yudream-plugin-xxx" />
+            <YdButton variant="outline" @click="browseOpen = true">
+              <YdIcon name="morph:folder-open" />
               浏览
-            </FaButton>
+            </YdButton>
           </div>
         </div>
         <div class="add-form__field">
           <span class="add-form__label">插件编码（留空则从 plugin.yml 自动推断）</span>
-          <FaInput v-model="addForm.code" placeholder="与 plugin.yml 的 name 一致" />
+          <YdInput v-model="addForm.code" placeholder="与 plugin.yml 的 name 一致" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">前端产物目录（可选，相对模块根目录）</span>
-          <FaInput v-model="addForm.frontendDist" placeholder="默认前端 build 输出目录" />
+          <YdInput v-model="addForm.frontendDist" placeholder="默认前端 build 输出目录" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">编译命令（可选，留空默认 mvn -q compile -DskipTests -P dev-export）</span>
-          <FaInput v-model="addForm.compileCommand" placeholder="mvn -q compile -DskipTests -P dev-export" />
+          <YdInput v-model="addForm.compileCommand" placeholder="mvn -q compile -DskipTests -P dev-export" />
         </div>
         <div class="add-form__switch">
-          <FaSwitch v-model="addForm.autoCompile" />
+          <YdSwitch v-model="addForm.autoCompile" />
           <span class="add-form__label">源码变化时自动编译</span>
         </div>
         <div class="add-form__actions">
-          <FaButton variant="outline" @click="addOpen = false">
+          <YdButton variant="outline" @click="addOpen = false">
             取消
-          </FaButton>
-          <FaButton :loading="addSaving" @click="submitAdd">
+          </YdButton>
+          <YdButton :loading="addSaving" @click="submitAdd">
             登记
-          </FaButton>
+          </YdButton>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
 
     <!-- 宿主机目录浏览（嵌套于登记表单之上） -->
     <DevProjectDirectoryBrowser v-model="browseOpen" @select="handleBrowseSelect" />
 
     <!-- 批量登记子目录 -->
-    <FaModal v-model="batchOpen" title="批量登记子目录" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+    <YdModal v-model="batchOpen" title="批量登记子目录" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
       <div class="add-form">
         <div class="add-form__field">
           <span class="add-form__label">父目录（必填，扫描其中的插件模块并去重登记）</span>
           <div class="add-form__path">
-            <FaInput v-model="batchPath" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
-            <FaButton variant="outline" @click="batchBrowseOpen = true">
-              <FaIcon name="morph:folder-open" />
+            <YdInput v-model="batchPath" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
+            <YdButton variant="outline" @click="batchBrowseOpen = true">
+              <YdIcon name="morph:folder-open" />
               浏览
-            </FaButton>
+            </YdButton>
           </div>
         </div>
         <div class="settings-section__hint">
@@ -442,68 +442,68 @@ function handleResetPanel() {
           </div>
         </div>
         <div class="add-form__actions">
-          <FaButton variant="outline" @click="batchOpen = false">
+          <YdButton variant="outline" @click="batchOpen = false">
             {{ batchResult ? '关闭' : '取消' }}
-          </FaButton>
-          <FaButton :loading="batchSaving" @click="submitBatch">
+          </YdButton>
+          <YdButton :loading="batchSaving" @click="submitBatch">
             {{ batchResult ? '再次扫描' : '扫描并登记' }}
-          </FaButton>
+          </YdButton>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
     <DevProjectDirectoryBrowser v-model="batchBrowseOpen" @select="handleBatchBrowseSelect" />
 
     <!-- 新建插件骨架 -->
-    <FaModal v-model="scaffoldOpen" title="新建插件骨架" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+    <YdModal v-model="scaffoldOpen" title="新建插件骨架" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
       <div class="add-form">
         <div class="add-form__field">
           <span class="add-form__label">父目录（必填，模块生成到 父目录/yudream-plugin-{编码}）</span>
           <div class="add-form__path">
-            <FaInput v-model="scaffoldForm.parentDir" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
-            <FaButton variant="outline" @click="scaffoldBrowseOpen = true">
-              <FaIcon name="morph:folder-open" />
+            <YdInput v-model="scaffoldForm.parentDir" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
+            <YdButton variant="outline" @click="scaffoldBrowseOpen = true">
+              <YdIcon name="morph:folder-open" />
               浏览
-            </FaButton>
+            </YdButton>
           </div>
         </div>
         <div class="add-form__field">
           <span class="add-form__label">插件编码（必填，kebab-case，如 demo-tool）</span>
-          <FaInput v-model="scaffoldForm.code" placeholder="小写字母开头，仅小写字母/数字/连字符" />
+          <YdInput v-model="scaffoldForm.code" placeholder="小写字母开头，仅小写字母/数字/连字符" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">显示名称（可选，默认用编码）</span>
-          <FaInput v-model="scaffoldForm.displayName" placeholder="演示工具" />
+          <YdInput v-model="scaffoldForm.displayName" placeholder="演示工具" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">版本（可选，默认 1.0.0）</span>
-          <FaInput v-model="scaffoldForm.version" placeholder="1.0.0" />
+          <YdInput v-model="scaffoldForm.version" placeholder="1.0.0" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">描述（可选）</span>
-          <FaInput v-model="scaffoldForm.description" placeholder="插件用途一句话说明" />
+          <YdInput v-model="scaffoldForm.description" placeholder="插件用途一句话说明" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">硬依赖（可选，逗号分隔的插件编码）</span>
-          <FaInput v-model="scaffoldForm.depend" placeholder="如 minecraft-utils" />
+          <YdInput v-model="scaffoldForm.depend" placeholder="如 minecraft-utils" />
         </div>
         <div class="add-form__field">
           <span class="add-form__label">软依赖（可选，逗号分隔；缺失时不阻塞启用）</span>
-          <FaInput v-model="scaffoldForm.softdepend" placeholder="如 qq-binding" />
+          <YdInput v-model="scaffoldForm.softdepend" placeholder="如 qq-binding" />
         </div>
         <div class="add-form__switch">
-          <FaSwitch v-model="scaffoldForm.register" />
+          <YdSwitch v-model="scaffoldForm.register" />
           <span class="add-form__label">生成后登记为开发模式项目</span>
         </div>
         <div class="add-form__actions">
-          <FaButton variant="outline" @click="scaffoldOpen = false">
+          <YdButton variant="outline" @click="scaffoldOpen = false">
             取消
-          </FaButton>
-          <FaButton :loading="scaffoldSaving" @click="submitScaffold">
+          </YdButton>
+          <YdButton :loading="scaffoldSaving" @click="submitScaffold">
             生成
-          </FaButton>
+          </YdButton>
         </div>
       </div>
-    </FaModal>
+    </YdModal>
 
     <!-- 宿主机目录浏览（脚手架选父目录，嵌套于脚手架表单之上） -->
     <DevProjectDirectoryBrowser v-model="scaffoldBrowseOpen" @select="handleScaffoldBrowseSelect" />

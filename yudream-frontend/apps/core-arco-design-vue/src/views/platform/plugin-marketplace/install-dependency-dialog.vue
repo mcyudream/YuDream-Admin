@@ -68,7 +68,7 @@ function entryStatusText(entry: PluginMarketplaceInstallPlanEntry) {
 </script>
 
 <template>
-  <FaModal
+  <YdModal
     v-model="visible"
     title="安装前置依赖"
     description="勾选需要一并下载的依赖；硬依赖必须安装，软依赖可选。"
@@ -87,36 +87,36 @@ function entryStatusText(entry: PluginMarketplaceInstallPlanEntry) {
       <ul v-else class="dep-dialog__list">
         <li v-for="entry in plan.entries" :key="entry.code" class="dep-dialog__item">
           <span class="dep-dialog__check">
-            <FaCheckbox
+            <YdCheckbox
               v-if="actionable(entry)"
               v-model="selections[entry.code]"
               :disabled="locked(entry) || loading"
             >
               <strong>{{ entry.displayName || entry.code }}</strong>
-              <FaTag variant="secondary">{{ entry.required ? '硬依赖' : '软依赖' }}</FaTag>
-            </FaCheckbox>
+              <YdTag variant="secondary">{{ entry.required ? '硬依赖' : '软依赖' }}</YdTag>
+            </YdCheckbox>
             <template v-else>
               <strong>{{ entry.displayName || entry.code }}</strong>
-              <FaTag variant="secondary">{{ entry.required ? '硬依赖' : '软依赖' }}</FaTag>
+              <YdTag variant="secondary">{{ entry.required ? '硬依赖' : '软依赖' }}</YdTag>
             </template>
           </span>
           <span class="dep-dialog__meta">{{ entryStatusText(entry) }}<template v-if="entry.storeSourceName"> · {{ entry.storeSourceName }}</template></span>
         </li>
       </ul>
       <div class="dep-dialog__footer">
-        <FaButton variant="outline" :disabled="loading" @click="visible = false">
+        <YdButton variant="outline" :disabled="loading" @click="visible = false">
           取消
-        </FaButton>
-        <FaButton
+        </YdButton>
+        <YdButton
           :disabled="Boolean(blockedEntries.length) || loading"
           :loading="loading"
           @click="emit('confirm', selectedItems)"
         >
           安装所选（{{ selectedItems.length }} 项依赖）
-        </FaButton>
+        </YdButton>
       </div>
     </div>
-  </FaModal>
+  </YdModal>
 </template>
 
 <style scoped>

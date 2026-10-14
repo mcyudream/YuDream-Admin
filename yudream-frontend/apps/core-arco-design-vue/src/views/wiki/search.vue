@@ -101,21 +101,21 @@ function applySearchSeo() {
     <section class="wiki-search-page__shell wiki-search-page__content">
       <div class="wiki-search-page__heading"><p>公开文档</p><h1>{{ searchTitle }}</h1></div>
       <form class="wiki-search-page__form" @submit.prevent="submitSearch">
-        <FaInput v-model="query" clearable placeholder="输入问题或关键词"><template #start><FaIcon name="morph:search" /></template></FaInput>
-        <FaSelect v-model="selectedSpace" clearable placeholder="全部知识库" :options="spaces.map(space => ({ label: space.name, value: space.slug }))" />
-        <FaButton html-type="submit" :loading="loading"><FaIcon name="morph:search" /> 搜索</FaButton>
+        <YdInput v-model="query" clearable placeholder="输入问题或关键词"><template #start><YdIcon name="morph:search" /></template></YdInput>
+        <YdSelect v-model="selectedSpace" clearable placeholder="全部知识库" :options="spaces.map(space => ({ label: space.name, value: space.slug }))" />
+        <YdButton html-type="submit" :loading="loading"><YdIcon name="morph:search" /> 搜索</YdButton>
       </form>
 
       <p v-if="searched && !loading && !error" class="wiki-search-page__count">找到 {{ hits.length }} 条相关页面</p>
-      <section v-if="loading" class="wiki-search-page__empty"><FaIcon name="morph:loader-circle" class="wiki-search-page__loading-icon" /><strong>正在搜索</strong></section>
-      <section v-else-if="error" class="wiki-search-page__empty"><FaIcon name="morph:triangle-alert" /><strong>无法完成搜索</strong><p>{{ error }}</p></section>
-      <section v-else-if="searched && !hits.length" class="wiki-search-page__empty"><FaIcon name="morph:file-search" /><strong>没有找到相关页面</strong><p>换一个关键词，或尝试在全部知识库中搜索。</p></section>
+      <section v-if="loading" class="wiki-search-page__empty"><YdIcon name="morph:loader-circle" class="wiki-search-page__loading-icon" /><strong>正在搜索</strong></section>
+      <section v-else-if="error" class="wiki-search-page__empty"><YdIcon name="morph:triangle-alert" /><strong>无法完成搜索</strong><p>{{ error }}</p></section>
+      <section v-else-if="searched && !hits.length" class="wiki-search-page__empty"><YdIcon name="morph:file-search" /><strong>没有找到相关页面</strong><p>换一个关键词，或尝试在全部知识库中搜索。</p></section>
       <section v-else class="wiki-search-page__results">
-        <FaCard v-for="hit in hits" :key="`${hit.spaceSlug}-${hit.nodeId || hit.path}`" class="wiki-search-result" @click="router.push(hitLink(hit))">
-          <div class="wiki-search-result__heading"><strong>{{ hit.title }}</strong><FaIcon name="morph:arrow-up-right" /></div>
-          <div class="wiki-search-result__location"><FaIcon name="morph:book-open" /> {{ hit.spaceName || '知识库' }}<span>/</span>{{ hit.path }}</div>
+        <YdCard v-for="hit in hits" :key="`${hit.spaceSlug}-${hit.nodeId || hit.path}`" class="wiki-search-result" @click="router.push(hitLink(hit))">
+          <div class="wiki-search-result__heading"><strong>{{ hit.title }}</strong><YdIcon name="morph:arrow-up-right" /></div>
+          <div class="wiki-search-result__location"><YdIcon name="morph:book-open" /> {{ hit.spaceName || '知识库' }}<span>/</span>{{ hit.path }}</div>
           <p>{{ hit.content }}</p>
-        </FaCard>
+        </YdCard>
       </section>
     </section>
   </main>

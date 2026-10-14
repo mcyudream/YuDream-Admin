@@ -3,7 +3,7 @@ import type { TableColumn } from '@yudream/components'
 import type { InboundMailDetail, InboundMailSummary } from '@/api/modules/platform-inbound-mail'
 import apiInboundMail from '@/api/modules/platform-inbound-mail'
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -113,11 +113,11 @@ const htmlSrcdoc = computed(() => {
 
 <template>
   <div>
-    <FaPageHeader title="入站邮箱" class="mb-0" />
+    <YdPageHeader title="入站邮箱" class="mb-0" />
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="uid"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1180px]"
@@ -128,25 +128,25 @@ const htmlSrcdoc = computed(() => {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="主题 / 发件人 / 正文关键词" @keydown.enter="applySearch" @clear="applySearch" />
+              <YdInput v-model="search.keyword" clearable placeholder="主题 / 发件人 / 正文关键词" @keydown.enter="applySearch" @clear="applySearch" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton :loading="loading" @click="applySearch">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton :loading="loading" @click="applySearch">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-seen="{ row }">
-          <FaTag :variant="row.original.seen ? 'secondary' : 'default'">
+          <YdTag :variant="row.original.seen ? 'secondary' : 'default'">
             {{ row.original.seen ? '已读' : '未读' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-hasAttachment="{ row }">
           {{ row.original.hasAttachment ? '有' : '-' }}
@@ -156,19 +156,19 @@ const htmlSrcdoc = computed(() => {
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
-            <FaButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row.original)">
+            <YdButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row.original)">
               详情
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.subject }}</span>
-                <FaTag :variant="row.seen ? 'secondary' : 'default'">
+                <YdTag :variant="row.seen ? 'secondary' : 'default'">
                   {{ row.seen ? '已读' : '未读' }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -189,16 +189,16 @@ const htmlSrcdoc = computed(() => {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row)">
+                <YdButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row)">
                   详情
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -207,10 +207,10 @@ const htmlSrcdoc = computed(() => {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="detailVisible" :title="selected ? selected.subject : '邮件详情'" class="sm:max-w-5xl">
-      <section v-loading="detailLoading" class="detail-panel">
+    <YdModal v-model="detailVisible" :title="selected ? selected.subject : '邮件详情'" class="sm:max-w-5xl">
+      <YdLoadingOverlay :loading="detailLoading"><section  class="detail-panel">
         <template v-if="selected">
           <div class="meta-grid">
             <div>
@@ -249,8 +249,8 @@ const htmlSrcdoc = computed(() => {
             </ul>
           </div>
         </template>
-      </section>
-    </FaModal>
+      </section></YdLoadingOverlay>
+    </YdModal>
   </div>
 </template>
 

@@ -70,7 +70,7 @@ function statusText(item: PluginDependencyStatusItem) {
 </script>
 
 <template>
-  <FaModal
+  <YdModal
     v-model="visible"
     title="启用前置依赖"
     description="硬依赖会自动先于本插件启用；软依赖可选一并启用或下载。"
@@ -91,14 +91,14 @@ function statusText(item: PluginDependencyStatusItem) {
           <li v-for="item in hardDependencies" :key="`hard-${item.code}`" class="dep-dialog__item">
             <span class="dep-dialog__check">
               <template v-if="!item.installed && item.storeAvailable && item.storeVersion">
-                <FaCheckbox v-model="installMissing[item.code]" disabled>
+                <YdCheckbox v-model="installMissing[item.code]" disabled>
                   <strong>{{ item.name || item.code }}</strong>
-                  <FaTag variant="secondary">硬依赖</FaTag>
-                </FaCheckbox>
+                  <YdTag variant="secondary">硬依赖</YdTag>
+                </YdCheckbox>
               </template>
               <template v-else>
                 <strong>{{ item.name || item.code }}</strong>
-                <FaTag variant="secondary">硬依赖</FaTag>
+                <YdTag variant="secondary">硬依赖</YdTag>
               </template>
             </span>
             <span class="dep-dialog__meta">{{ statusText(item) }}</span>
@@ -110,25 +110,25 @@ function statusText(item: PluginDependencyStatusItem) {
         <ul class="dep-dialog__list">
           <li v-for="item in softDependencies" :key="`soft-${item.code}`" class="dep-dialog__item">
             <span class="dep-dialog__check">
-              <FaCheckbox
+              <YdCheckbox
                 v-if="item.installed && !item.enabled"
                 v-model="enableSoft[item.code]"
                 :disabled="loading"
               >
                 <strong>{{ item.name || item.code }}</strong>
-                <FaTag variant="secondary">软依赖</FaTag>
-              </FaCheckbox>
-              <FaCheckbox
+                <YdTag variant="secondary">软依赖</YdTag>
+              </YdCheckbox>
+              <YdCheckbox
                 v-else-if="!item.installed && item.storeAvailable && Boolean(item.storeVersion)"
                 v-model="installMissing[item.code]"
                 :disabled="loading"
               >
                 <strong>{{ item.name || item.code }}</strong>
-                <FaTag variant="secondary">软依赖</FaTag>
-              </FaCheckbox>
+                <YdTag variant="secondary">软依赖</YdTag>
+              </YdCheckbox>
               <template v-else>
                 <strong>{{ item.name || item.code }}</strong>
-                <FaTag variant="secondary">软依赖</FaTag>
+                <YdTag variant="secondary">软依赖</YdTag>
               </template>
             </span>
             <span class="dep-dialog__meta">{{ statusText(item) }}</span>
@@ -136,19 +136,19 @@ function statusText(item: PluginDependencyStatusItem) {
         </ul>
       </template>
       <div class="dep-dialog__footer">
-        <FaButton variant="outline" :disabled="loading" @click="visible = false">
+        <YdButton variant="outline" :disabled="loading" @click="visible = false">
           取消
-        </FaButton>
-        <FaButton
+        </YdButton>
+        <YdButton
           :disabled="Boolean(blockedHard.length) || loading"
           :loading="loading"
           @click="emit('confirm', { includeSoft: includeSoft, installItems })"
         >
           安装 {{ installItems.length }} 项 · 启用所选（{{ 1 + includeSoft.length }} 个插件）
-        </FaButton>
+        </YdButton>
       </div>
     </div>
-  </FaModal>
+  </YdModal>
 </template>
 
 <style scoped>

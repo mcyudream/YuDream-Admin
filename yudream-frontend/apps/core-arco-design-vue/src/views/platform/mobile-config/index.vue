@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { FaAlert, FaButton, FaCard, FaIcon, FaInput, FaPageHeader, FaPageMain, FaSwitch, useFaToast } from '@yudream/components'
-import { FaImageUpload } from '@yudream/components'
+import { YdAlert, YdButton, YdCard, YdIcon, YdInput, YdPageHeader, YdPageMain, YdSwitch, useYdToast } from '@yudream/components'
+import { YdImageUpload } from '@yudream/components'
 import apiCapability from '@/api/modules/platform-capability'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
 import apiFiles from '@/api/modules/files'
@@ -13,7 +13,7 @@ interface BannerDraft {
 }
 
 const MOBILE_CODE = 'mobile-app'
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -146,30 +146,30 @@ onMounted(load)
 
 <template>
   <div>
-    <FaPageHeader title="移动端配置" class="mb-0">
+    <YdPageHeader title="移动端配置" class="mb-0">
       <template #description>
         YDAM App 的站点品牌（登录页主视觉）、首页轮播图与 iOS 通道开关。保存后 App 重新拉取站点信息即生效。
       </template>
-    </FaPageHeader>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaAlert v-if="!capabilityReady" type="warning">
+    <YdPageMain>
+      <YdAlert v-if="!capabilityReady" type="warning">
         mobile-app 能力未注册：当前服务端未包含该能力（需部署合并后的服务端并重启）。配置编辑已禁用。
-      </FaAlert>
-      <FaAlert v-else-if="!enabled" type="warning">
+      </YdAlert>
+      <YdAlert v-else-if="!enabled" type="warning">
         mobile-app 能力已停用：移动端清单、设备注册与推送通道已全部关闭（App 端接口返回「能力未启用」）。
         如需修改配置，请先到「平台 → 能力管理」启用 mobile-app。
-      </FaAlert>
+      </YdAlert>
 
       <div class="mobile-config-grid" :class="{ 'ar-readonly': !editable }" :inert="!editable">
-        <FaCard class="section">
+        <YdCard class="section">
           <template #header>
             <span class="section-title">登录页品牌</span>
           </template>
           <div class="section-body">
             <div class="config-field">
               <span>登录页主视觉图（留空用内置样式）</span>
-              <FaImageUpload
+              <YdImageUpload
                 v-model="loginHeroImage"
                 :max="1"
                 :width="240"
@@ -180,13 +180,15 @@ onMounted(load)
             <div class="config-field">
               <span>登录页 hero 底色（CSS 颜色值，留空用主题 accent）</span>
               <div class="color-row">
-                <input
+                <YdInput
                   type="color"
+                  :model-value="loginHeroBackground || '#101728'"
                   class="color-picker"
-                  :value="loginHeroBackground || '#101728'"
-                  @input="loginHeroBackground = ($event.target as HTMLInputElement).value"
-                >
-                <FaInput
+                  input-class="color-picker__control"
+                  aria-label="选择登录页 hero 底色"
+                  @update:model-value="loginHeroBackground = String($event ?? '')"
+                />
+                <YdInput
                   :model-value="loginHeroBackground"
                   placeholder="如 #101728"
                   class="flex-1"
@@ -195,16 +197,16 @@ onMounted(load)
               </div>
             </div>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard class="section">
+        <YdCard class="section">
           <template #header>
             <div class="section-title-row">
               <span class="section-title">首页轮播图（{{ bannerCount }}）</span>
-              <FaButton size="sm" @click="addBanner">
-                <FaIcon name="morph:plus" />
+              <YdButton size="sm" @click="addBanner">
+                <YdIcon name="morph:plus" />
                 添加轮播
-              </FaButton>
+              </YdButton>
             </div>
           </template>
           <div class="section-body">
@@ -218,7 +220,7 @@ onMounted(load)
               <div class="banner-row__fields">
                 <div class="config-field">
                   <span>图片（点击上传，App 内 4:3 裁切展示）</span>
-                  <FaImageUpload
+                  <YdImageUpload
                     :model-value="banner.imageUrl ? [banner.imageUrl] : []"
                     :max="1"
                     :width="120"
@@ -230,29 +232,29 @@ onMounted(load)
                 </div>
                 <label class="config-field">
                   <span>标题（可空，展示在图上）</span>
-                  <FaInput v-model="banner.title" placeholder="站点公告：欢迎来到 YuDream" />
+                  <YdInput v-model="banner.title" placeholder="站点公告：欢迎来到 YuDream" />
                 </label>
                 <label class="config-field">
                   <span>点击跳转的应用内路由（可空）</span>
-                  <FaInput v-model="banner.route" placeholder="/posts/latest" />
+                  <YdInput v-model="banner.route" placeholder="/posts/latest" />
                 </label>
               </div>
               <div class="banner-row__ops">
-                <FaButton size="sm" variant="ghost" :disabled="index === 0" title="上移" @click="moveBanner(index, -1)">
-                  <FaIcon name="morph:arrow-up" />
-                </FaButton>
-                <FaButton size="sm" variant="ghost" :disabled="index === banners.length - 1" title="下移" @click="moveBanner(index, 1)">
-                  <FaIcon name="morph:arrow-down" />
-                </FaButton>
-                <FaButton size="sm" variant="ghost" title="删除" @click="removeBanner(index)">
-                  <FaIcon name="morph:trash-2" />
-                </FaButton>
+                <YdButton size="sm" variant="ghost" :disabled="index === 0" title="上移" @click="moveBanner(index, -1)">
+                  <YdIcon name="morph:arrow-up" />
+                </YdButton>
+                <YdButton size="sm" variant="ghost" :disabled="index === banners.length - 1" title="下移" @click="moveBanner(index, 1)">
+                  <YdIcon name="morph:arrow-down" />
+                </YdButton>
+                <YdButton size="sm" variant="ghost" title="删除" @click="removeBanner(index)">
+                  <YdIcon name="morph:trash-2" />
+                </YdButton>
               </div>
             </div>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard class="section">
+        <YdCard class="section">
           <template #header>
             <span class="section-title">通道</span>
           </template>
@@ -262,19 +264,19 @@ onMounted(load)
                 <strong>iOS 通道开关</strong>
                 <p>iOS 构建参与 App 分发与能力探测；Android 不受影响。</p>
               </div>
-              <FaSwitch v-model="iosEnabled" />
+              <YdSwitch v-model="iosEnabled" />
             </div>
           </div>
-        </FaCard>
+        </YdCard>
 
         <div class="save-row">
-          <FaButton :loading="saving" :disabled="!editable" @click="save">
-            <FaIcon name="morph:save" />
+          <YdButton :loading="saving" :disabled="!editable" @click="save">
+            <YdIcon name="morph:save" />
             保存移动端配置
-          </FaButton>
+          </YdButton>
         </div>
       </div>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 
@@ -367,6 +369,11 @@ onMounted(load)
 }
 
 .color-picker {
+  width: 44px;
+  height: 32px;
+}
+
+.color-picker__control {
   width: 44px;
   height: 32px;
   padding: 2px;

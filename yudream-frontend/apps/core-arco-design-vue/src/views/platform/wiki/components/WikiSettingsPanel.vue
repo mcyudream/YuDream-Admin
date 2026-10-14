@@ -10,8 +10,8 @@ import { deleteWikiSpace, saveWikiSpace } from '@/api/modules/platform-wiki'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 
 const form = ref<Partial<WikiSpace>>({})
 const saving = ref(false)
@@ -188,117 +188,117 @@ onMounted(loadGraphTables)
 
 <template>
   <div class="set-panel">
-    <FaScrollArea class="set-scroll">
+    <YdScrollArea class="set-scroll">
       <div v-if="form.id" class="set-inner">
-        <FaCard title="基本信息" class="set-card">
+        <YdCard title="基本信息" class="set-card">
           <div class="set-grid">
             <label class="set-field">
               <span>名称</span>
-              <FaInput v-model="form.name" />
+              <YdInput v-model="form.name" />
             </label>
             <label class="set-field">
               <span>路径 slug</span>
-              <FaInput v-model="form.slug" />
+              <YdInput v-model="form.slug" />
             </label>
             <label class="set-field set-field--full">
               <span>描述</span>
-              <FaInput v-model="form.description" />
+              <YdInput v-model="form.description" />
             </label>
             <label class="set-field set-field--full">
               <span>Purpose（方向意图，指导自动生成页面）</span>
-              <FaTextarea v-model="form.purpose" :rows="3" />
+              <YdTextarea v-model="form.purpose" :rows="3" />
             </label>
             <label class="set-field set-field--full">
               <span>Schema（结构规则）</span>
-              <FaTextarea v-model="form.schemaContent" :rows="3" />
+              <YdTextarea v-model="form.schemaContent" :rows="3" />
             </label>
             <label class="set-field">
               <span>语言</span>
-              <FaSelect v-model="form.language" :options="languageOptions" placeholder="默认中文" />
+              <YdSelect v-model="form.language" :options="languageOptions" placeholder="默认中文" />
             </label>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="AI 模型" description="供应商与模型均从平台模型目录中选择" class="set-card">
+        <YdCard title="AI 模型" description="供应商与模型均从平台模型目录中选择" class="set-card">
           <div class="set-grid">
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="morph:message-circle" /> 问答模型（chat）</span>
-              <FaSelect
+              <span class="set-model__label"><YdIcon name="morph:message-circle" /> 问答模型（chat）</span>
+              <YdSelect
                 :model-value="form.chatProviderCode"
                 :options="providerOptions"
                 placeholder="选择供应商"
                 @change="(value: unknown) => onProviderChange('chat', value)"
               />
-              <FaSelect v-model="form.chatModelCode" :options="chatModelOptions" placeholder="选择模型" />
+              <YdSelect v-model="form.chatModelCode" :options="chatModelOptions" placeholder="选择模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="morph:feather" /> 摄入写作模型（ingest）</span>
-              <FaSelect
+              <span class="set-model__label"><YdIcon name="morph:feather" /> 摄入写作模型（ingest）</span>
+              <YdSelect
                 :model-value="form.ingestProviderCode"
                 :options="providerOptions"
                 placeholder="选择供应商"
                 @change="(value: unknown) => onProviderChange('ingest', value)"
               />
-              <FaSelect v-model="form.ingestModelCode" :options="ingestModelOptions" placeholder="选择模型" />
+              <YdSelect v-model="form.ingestModelCode" :options="ingestModelOptions" placeholder="选择模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="morph:eye" /> 视觉模型（图片 caption）</span>
-              <FaSelect
+              <span class="set-model__label"><YdIcon name="morph:eye" /> 视觉模型（图片 caption）</span>
+              <YdSelect
                 :model-value="form.visionProviderCode"
                 :options="providerOptions"
                 placeholder="选择供应商"
                 @change="(value: unknown) => onProviderChange('vision', value)"
               />
-              <FaSelect v-model="form.visionModelCode" :options="visionModelOptions" placeholder="选择支持视觉的模型" />
+              <YdSelect v-model="form.visionModelCode" :options="visionModelOptions" placeholder="选择支持视觉的模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="morph:feather" /> 向量模型（embedding）</span>
-              <FaSelect
+              <span class="set-model__label"><YdIcon name="morph:feather" /> 向量模型（embedding）</span>
+              <YdSelect
                 :model-value="form.embeddingProviderCode"
                 :options="providerOptions"
                 placeholder="选择供应商"
                 @change="(value: unknown) => onProviderChange('embedding', value)"
               />
-              <FaSelect v-model="form.embeddingModelCode" :options="embeddingModelOptions" placeholder="选择向量模型" />
+              <YdSelect v-model="form.embeddingModelCode" :options="embeddingModelOptions" placeholder="选择向量模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="morph:waypoints" /> 图谱模型（graph）</span>
-              <FaSelect
+              <span class="set-model__label"><YdIcon name="morph:waypoints" /> 图谱模型（graph）</span>
+              <YdSelect
                 :model-value="form.graphProviderCode"
                 :options="providerOptions"
                 placeholder="选择供应商"
                 @change="(value: unknown) => onProviderChange('graph', value)"
               />
-              <FaSelect v-model="form.graphModelCode" :options="graphModelOptions" placeholder="选择模型" />
+              <YdSelect v-model="form.graphModelCode" :options="graphModelOptions" placeholder="选择模型" />
             </div>
-            <p v-if="catalogLoading" class="set-hint"><FaIcon name="morph:loader-circle" /> 正在加载模型目录…</p>
+            <p v-if="catalogLoading" class="set-hint"><YdIcon name="morph:loader-circle" /> 正在加载模型目录…</p>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="检索与切分" class="set-card">
+        <YdCard title="检索与切分" class="set-card">
           <div class="set-grid">
             <label class="set-switch">
-              <FaSwitch v-model="form.publicReadEnabled" />
+              <YdSwitch v-model="form.publicReadEnabled" />
               <span>公开访问<small>允许未登录访问 /wiki/{{ form.slug }}</small></span>
             </label>
             <label class="set-switch">
-              <FaSwitch v-model="form.externalSearchEnabled" />
+              <YdSwitch v-model="form.externalSearchEnabled" />
               <span>外部检索<small>允许公开检索接口</small></span>
             </label>
             <label class="set-switch">
-              <FaSwitch v-model="form.sourceGroundedDefault" />
+              <YdSwitch v-model="form.sourceGroundedDefault" />
               <span>默认只读原文<small>检索默认命中资料原文</small></span>
             </label>
             <label class="set-switch">
-              <FaSwitch v-model="form.graphEnabled" />
+              <YdSwitch v-model="form.graphEnabled" />
               <span>启用图谱<small>构建知识图谱用于扩展召回</small></span>
             </label>
             <label class="set-switch">
-              <FaSwitch v-model="form.queryExpansionEnabled" />
+              <YdSwitch v-model="form.queryExpansionEnabled" />
               <span>查询扩展<small>检索时改写/扩展查询</small></span>
             </label>
             <label class="set-switch">
-              <FaSwitch v-model="form.rerankEnabled" />
+              <YdSwitch v-model="form.rerankEnabled" />
               <span>重排序<small>检索结果 rerank</small></span>
             </label>
             <label class="set-field set-field--full">
@@ -318,86 +318,86 @@ onMounted(loadGraphTables)
             </label>
             <label class="set-field">
               <span>命中图片上限（hitImageLimit）</span>
-              <FaNumberField :model-value="form.hitImageLimit ?? 4" :min="0" :max="12" @update:model-value="(value: number) => form.hitImageLimit = value" />
+              <YdNumberField :model-value="form.hitImageLimit ?? 4" :min="0" :max="12" @update:model-value="(value: number) => form.hitImageLimit = value" />
               <small class="set-hint">检索/问答每条命中最多随带的相关图片数，0 表示不带图片</small>
             </label>
             <label class="set-field">
               <span>Top K</span>
-              <FaNumberField :model-value="form.topK ?? 8" :min="1" :max="50" @update:model-value="(value: number) => form.topK = value" />
+              <YdNumberField :model-value="form.topK ?? 8" :min="1" :max="50" @update:model-value="(value: number) => form.topK = value" />
             </label>
             <label class="set-field">
               <span>切分大小（chunkSize）</span>
-              <FaNumberField :model-value="form.chunkSize ?? 800" :min="200" :max="4000" :step="100" @update:model-value="(value: number) => form.chunkSize = value" />
+              <YdNumberField :model-value="form.chunkSize ?? 800" :min="200" :max="4000" :step="100" @update:model-value="(value: number) => form.chunkSize = value" />
             </label>
             <label class="set-field">
               <span>切分重叠（chunkOverlap）</span>
-              <FaNumberField :model-value="form.chunkOverlap ?? 120" :min="0" :max="1000" :step="20" @update:model-value="(value: number) => form.chunkOverlap = value" />
+              <YdNumberField :model-value="form.chunkOverlap ?? 120" :min="0" :max="1000" :step="20" @update:model-value="(value: number) => form.chunkOverlap = value" />
             </label>
             <label class="set-field">
               <span>上下文窗口 tokens</span>
-              <FaNumberField :model-value="form.contextWindowTokens ?? 64000" :min="4096" :step="4096" @update:model-value="(value: number) => form.contextWindowTokens = value" />
+              <YdNumberField :model-value="form.contextWindowTokens ?? 64000" :min="4096" :step="4096" @update:model-value="(value: number) => form.contextWindowTokens = value" />
             </label>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="网络搜索（深度研究用）" class="set-card">
+        <YdCard title="网络搜索（深度研究用）" class="set-card">
           <div class="set-grid">
             <label class="set-field">
               <span>供应商</span>
-              <FaSelect v-model="form.webSearchProviderCode" :options="webSearchProviderOptions" placeholder="不启用" />
+              <YdSelect v-model="form.webSearchProviderCode" :options="webSearchProviderOptions" placeholder="不启用" />
             </label>
             <label class="set-field">
               <span>搜索引擎（SearXNG）</span>
-              <FaInput v-model="form.webSearchEngine" placeholder="google / bing…" />
+              <YdInput v-model="form.webSearchEngine" placeholder="google / bing…" />
             </label>
             <label class="set-field set-field--full">
               <span>实例地址（SearXNG）</span>
-              <FaInput v-model="form.webSearchInstanceUrl" placeholder="https://searx.example.com" />
+              <YdInput v-model="form.webSearchInstanceUrl" placeholder="https://searx.example.com" />
             </label>
             <label class="set-field set-field--full">
               <span>API Key（Tavily / SerpApi）</span>
-              <FaInput v-model="form.webSearchApiKey" type="password" placeholder="留空则不修改" />
+              <YdInput v-model="form.webSearchApiKey" type="password" placeholder="留空则不修改" />
             </label>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="目录监听" class="set-card">
+        <YdCard title="目录监听" class="set-card">
           <div class="set-grid">
             <label class="set-switch">
-              <FaSwitch v-model="form.watchEnabled" />
+              <YdSwitch v-model="form.watchEnabled" />
               <span>监听文件夹<small>服务器本地目录变更自动导入</small></span>
             </label>
             <label class="set-field">
               <span>监听路径</span>
-              <FaInput v-model="form.watchFolderPath" placeholder="/data/wiki-watch" :disabled="!form.watchEnabled" />
+              <YdInput v-model="form.watchFolderPath" placeholder="/data/wiki-watch" :disabled="!form.watchEnabled" />
             </label>
           </div>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="危险操作" class="set-card">
+        <YdCard title="危险操作" class="set-card">
           <div class="set-danger">
             <div>
               <strong>删除知识库</strong>
               <p>目录、页面、资料源、摄入任务与审核项将被一并删除，不可恢复。</p>
             </div>
-            <FaButton variant="destructive" :loading="deleting" @click="removeSpace">
-              <FaIcon name="morph:trash-2" /> 删除知识库
-            </FaButton>
+            <YdButton variant="destructive" :loading="deleting" @click="removeSpace">
+              <YdIcon name="morph:trash-2" /> 删除知识库
+            </YdButton>
           </div>
-        </FaCard>
+        </YdCard>
 
         <div class="set-actions">
-          <FaButton :loading="saving" @click="save">
-            <FaIcon name="morph:save" /> 保存设置
-          </FaButton>
+          <YdButton :loading="saving" @click="save">
+            <YdIcon name="morph:save" /> 保存设置
+          </YdButton>
         </div>
       </div>
 
       <div v-else class="set-empty">
-        <FaIcon name="morph:settings" />
+        <YdIcon name="morph:settings" />
         <strong>请先选择知识库</strong>
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </div>
 </template>
 

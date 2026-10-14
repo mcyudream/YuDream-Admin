@@ -8,7 +8,7 @@ import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { resolveWikiLink, wikilinksToMarkdown, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
+const toast = useYdToast()
 const router = useRouter()
 
 const spaceName = computed(() => store.space.value?.name || '')
@@ -68,24 +68,24 @@ function openInChatPage() {
   <div class="chat-panel">
     <header class="chat-head">
       <div class="chat-head__title">
-        <FaIcon name="morph:message-circle-more" />
+        <YdIcon name="morph:message-circle-more" />
         <strong>智能问答</strong>
         <span v-if="spaceName">基于「{{ spaceName }}」检索回答</span>
       </div>
       <div class="chat-head__side">
         <span v-if="streaming && toolHint" class="chat-head__tool">
-          <FaIcon name="morph:loader-circle" class="chat-head__spin" /> {{ toolHint }}
+          <YdIcon name="morph:loader-circle" class="chat-head__spin" /> {{ toolHint }}
         </span>
-        <FaTooltip text="在 AI 助手中打开">
-          <FaButton size="icon-sm" variant="ghost" @click="openInChatPage">
-            <FaIcon name="morph:external-link" />
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="清空对话">
-          <FaButton size="icon-sm" variant="ghost" :disabled="!messages.length" @click="clear">
-            <FaIcon name="morph:trash-2" />
-          </FaButton>
-        </FaTooltip>
+        <YdTooltip text="在 AI 助手中打开">
+          <YdButton size="icon-sm" variant="ghost" @click="openInChatPage">
+            <YdIcon name="morph:external-link" />
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="清空对话">
+          <YdButton size="icon-sm" variant="ghost" :disabled="!messages.length" @click="clear">
+            <YdIcon name="morph:trash-2" />
+          </YdButton>
+        </YdTooltip>
       </div>
     </header>
 
@@ -100,7 +100,7 @@ function openInChatPage() {
     >
       <template #empty>
         <div class="chat-empty">
-          <div class="chat-empty__icon"><FaIcon name="morph:message-circle-more" /></div>
+          <div class="chat-empty__icon"><YdIcon name="morph:message-circle-more" /></div>
           <strong>向知识库提问</strong>
           <p>回答会实时流式输出，自动检索 Wiki 页面并附带来源引用，引用可点击跳转</p>
         </div>
@@ -144,7 +144,7 @@ function openInChatPage() {
 }
 
 .chat-head__title :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
 }
 
 .chat-head__title span {
@@ -166,7 +166,7 @@ function openInChatPage() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 12px;
 }
 
@@ -190,8 +190,8 @@ function openInChatPage() {
   height: 56px;
   place-items: center;
   border-radius: 16px;
-  background: rgba(var(--primary-6), 0.1);
-  color: rgb(var(--primary-6));
+  background: rgba(var(--color-text-2), 0.1);
+  color: rgb(var(--color-text-2));
   font-size: 28px;
 }
 

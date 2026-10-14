@@ -14,8 +14,8 @@ import WikiSettingsPanel from './components/WikiSettingsPanel.vue'
 import WikiSourcesPanel from './components/WikiSourcesPanel.vue'
 import {flattenTree, wikiWorkbenchKey} from './wiki-utils'
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const route = useRoute()
 const router = useRouter()
 const workbenchPath = route.path
@@ -241,33 +241,33 @@ onMounted(loadSpaces)
 
 <template>
   <div class="wiki-workbench">
-    <FaPageHeader
+    <YdPageHeader
         title="LLM Wiki 工作台"
         class="mb-0"
         :description="space ? `${space.name} · /wiki/${space.slug}` : '资料源 → 摄入 → 自动维护的知识库'"
     >
-      <FaButton variant="outline" :disabled="!space" @click="rebuild">
-        <FaIcon name="morph:refresh-cw"/>
+      <YdButton variant="outline" :disabled="!space" @click="rebuild">
+        <YdIcon name="morph:refresh-cw"/>
         重建索引
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
     <div class="wiki-toolbar">
       <label class="wiki-space-picker">
         <span>当前知识库</span>
-        <FaSelect v-model="selectedSpaceId" :options="spaceOptions" :disabled="!spaces.length" placeholder="暂无知识库" class="w-full" />
+        <YdSelect v-model="selectedSpaceId" :options="spaceOptions" :disabled="!spaces.length" placeholder="暂无知识库" class="w-full" />
       </label>
       <div class="wiki-toolbar__actions">
-        <FaButton variant="outline" @click="createVisible = true">
-          <FaIcon name="morph:plus" />新建知识库
-        </FaButton>
-        <FaButton variant="ghost" :disabled="!space" :loading="!!deletingSpaceId" @click="space && removeSpace(space)">
-          <FaIcon name="morph:trash-2" />删除知识库
-        </FaButton>
+        <YdButton variant="outline" @click="createVisible = true">
+          <YdIcon name="morph:plus" />新建知识库
+        </YdButton>
+        <YdButton variant="ghost" :disabled="!space" :loading="!!deletingSpaceId" @click="space && removeSpace(space)">
+          <YdIcon name="morph:trash-2" />删除知识库
+        </YdButton>
       </div>
       <label class="wiki-mobile-nav">
         <span>工作台功能</span>
-        <FaSelect v-model="activePanel" :options="panelOptions" class="w-full" />
+        <YdSelect v-model="activePanel" :options="panelOptions" class="w-full" />
       </label>
     </div>
 
@@ -275,7 +275,7 @@ onMounted(loadSpaces)
       <nav class="wiki-nav" aria-label="Wiki 分组导航">
         <section v-for="group in panelGroups" :key="group.label" class="wiki-nav__group" :aria-label="group.label">
           <h2>{{ group.label }}</h2>
-          <FaButton
+          <YdButton
             v-for="item in group.items"
             :key="item.key"
             :variant="activePanel === item.key ? 'secondary' : 'ghost'"
@@ -283,22 +283,22 @@ onMounted(loadSpaces)
             :aria-current="activePanel === item.key ? 'page' : undefined"
             @click="openPanel(item.key)"
           >
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
             {{ item.label }}
-          </FaButton>
+          </YdButton>
         </section>
       </nav>
       <main class="wiki-main" :aria-label="activeItem.label">
         <div class="wiki-main__heading">
           <span>{{ activeGroup.label }}</span>
-          <FaIcon name="morph:chevron-right" />
+          <YdIcon name="morph:chevron-right" />
           <h2>{{ activeItem.label }}</h2>
         </div>
         <div v-if="!spacesLoaded" class="wiki-empty" role="status">正在加载知识库…</div>
         <div v-else-if="!space" class="wiki-empty">
-          <FaIcon name="morph:library" class="text-3xl" />
+          <YdIcon name="morph:library" class="text-3xl" />
           <p>暂无知识库，新建后即可管理资料与页面。</p>
-          <FaButton @click="createVisible = true">新建知识库</FaButton>
+          <YdButton @click="createVisible = true">新建知识库</YdButton>
         </div>
         <div v-else class="wiki-main__panel">
           <KeepAlive>
@@ -308,7 +308,7 @@ onMounted(loadSpaces)
       </main>
     </div>
 
-    <FaModal
+    <YdModal
         v-model="createVisible"
         title="新建知识库"
         show-cancel-button
@@ -318,18 +318,18 @@ onMounted(loadSpaces)
       <div class="wiki-create-form">
         <label class="wiki-field">
           <span>名称</span>
-          <FaInput v-model="createForm.name" placeholder="例如：产品知识库"/>
+          <YdInput v-model="createForm.name" placeholder="例如：产品知识库"/>
         </label>
         <label class="wiki-field">
           <span>路径 slug</span>
-          <FaInput v-model="createForm.slug" placeholder="例如：product"/>
+          <YdInput v-model="createForm.slug" placeholder="例如：product"/>
         </label>
         <label class="wiki-field">
           <span>描述</span>
-          <FaTextarea v-model="createForm.description" placeholder="这个知识库用来做什么？" :rows="3"/>
+          <YdTextarea v-model="createForm.description" placeholder="这个知识库用来做什么？" :rows="3"/>
         </label>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 

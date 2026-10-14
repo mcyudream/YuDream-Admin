@@ -8,8 +8,8 @@ import { saveExcelResponse } from '@/utils/excel'
 const loading = ref(false)
 const clearing = ref(false)
 const rows = ref<LoginLog[]>([])
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive<{ keyword: string; success: string }>({
   keyword: '',
@@ -116,20 +116,20 @@ async function clearLoginLogs() {
 
 <template>
   <div>
-    <FaPageHeader title="&#30331;&#24405;&#26085;&#24535;" class="mb-0">
-      <FaButton v-auth="'system:monitor:login-log:export'" variant="outline" @click="exportLoginLogs">
-        <FaIcon name="morph:file-spreadsheet" />
+    <YdPageHeader title="&#30331;&#24405;&#26085;&#24535;" class="mb-0">
+      <YdButton v-auth="'system:monitor:login-log:export'" variant="outline" @click="exportLoginLogs">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-      <FaButton v-auth="'system:monitor:login-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearLoginLogs">
-        <FaIcon name="morph:trash-2" />
+      </YdButton>
+      <YdButton v-auth="'system:monitor:login-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearLoginLogs">
+        <YdIcon name="morph:trash-2" />
         清空日志
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -140,26 +140,26 @@ async function clearLoginLogs() {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="&#29992;&#25143;&#21517; / IP / &#32467;&#26524;" @keydown.enter="load" @clear="load" />
-              <FaSelect v-model="search.success" :options="successOptions" placeholder="&#29366;&#24577;" />
+              <YdInput v-model="search.keyword" clearable placeholder="&#29992;&#25143;&#21517; / IP / &#32467;&#26524;" @keydown.enter="load" @clear="load" />
+              <YdSelect v-model="search.success" :options="successOptions" placeholder="&#29366;&#24577;" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   &#37325;&#32622;
-                </FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   &#31579;&#36873;
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-success="{ row }">
-          <FaTag :variant="row.original.success ? 'default' : 'destructive'">
+          <YdTag :variant="row.original.success ? 'default' : 'destructive'">
             {{ row.original.success ? successText : failText }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-message="{ row }">
           <span class="line-clamp-1">{{ row.original.message || '-' }}</span>
@@ -171,13 +171,13 @@ async function clearLoginLogs() {
           <span class="line-clamp-1">{{ row.original.userAgent || '-' }}</span>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.username }}</span>
-                <FaTag :variant="row.success ? 'default' : 'destructive'">
+                <YdTag :variant="row.success ? 'default' : 'destructive'">
                   {{ row.success ? successText : failText }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <span v-if="row.userId">用户ID：{{ row.userId }}</span>
@@ -191,11 +191,11 @@ async function clearLoginLogs() {
                 客户端：{{ row.userAgent }}
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -203,6 +203,6 @@ async function clearLoginLogs() {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>

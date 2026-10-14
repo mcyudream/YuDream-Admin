@@ -86,7 +86,7 @@ onMounted(async () => {
 <template>
   <div class="login-page">
     <div v-if="appSettingsStore.mode === 'pc' || appSettingsStore.settings.toolbar.colorScheme" class="login-toolbar">
-      <FaDropdown
+      <YdDropdown
         v-if="appSettingsStore.mode === 'pc'"
         :items="[[
           { label: '左侧布局', disabled: layoutAlign === 'left', handle: () => { layoutAlign = 'left' } },
@@ -94,16 +94,16 @@ onMounted(async () => {
           { label: '右侧布局', disabled: layoutAlign === 'right', handle: () => { layoutAlign = 'right' } },
         ]]"
       >
-        <FaButton variant="ghost" size="icon-sm" aria-label="切换登录页布局">
-          <FaIcon
+        <YdButton variant="ghost" size="icon-sm" aria-label="切换登录页布局">
+          <YdIcon
             :name="{
               left: 'morph:panel-left',
               center: 'morph:square',
               right: 'morph:panel-right',
             }[layoutAlign]" class="size-4"
           />
-        </FaButton>
-      </FaDropdown>
+        </YdButton>
+      </YdDropdown>
       <ColorScheme v-if="appSettingsStore.settings.toolbar.colorScheme" />
     </div>
     <div class="login-box" :class="layoutAlign">
@@ -129,12 +129,12 @@ onMounted(async () => {
                   请选择要绑定的账号类型
                 </p>
               </div>
-              <FaButton size="lg" class="w-full" @click="formType = 'login'">
+              <YdButton size="lg" class="w-full" @click="formType = 'login'">
                 登录已有账号
-              </FaButton>
-              <FaButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
+              </YdButton>
+              <YdButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
                 注册新账号
-              </FaButton>
+              </YdButton>
             </div>
           </template>
           <div v-if="bindingToken && formType !== 'binding'" class="binding-notice" role="status">

@@ -2,16 +2,17 @@
 import type { WorkspaceEntry } from '@/api/modules/platform-cms-workspace'
 import { cmsWorkspaceChatEndpoint } from '@/api/modules/platform-cms-workspace'
 import apiWorkspace from '@/api/modules/platform-cms-workspace'
+import type { YdFilePickerInstance } from '@yudream/components'
 import { useYdChatStream, YdChatMessageList, YdChatSender } from '@yudream/components'
 import CmsGrapesEditor from '@/views/platform/theme-center/components/CmsGrapesEditor.vue'
 import { computed, ref, watch } from 'vue'
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const loading = ref(false)
 const entries = ref<WorkspaceEntry[]>([])
 const selectedPath = ref('')
-const uploadInput = ref<HTMLInputElement>()
+const uploadInput = ref<YdFilePickerInstance | null>(null)
 const previewKey = ref(0)
 const targetKey = 'home'
 
@@ -84,12 +85,11 @@ function createPage() {
   })
 }
 function pickUpload() {
-  uploadInput.value?.click()
+  uploadInput.value?.open()
 }
-async function onUploadChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function onUploadChange(files: File[]) {
+  const file = files[0]
+  uploadInput.value?.reset()
   if (!file) return
   const path = `assets/${file.name}`
   await apiWorkspace.upload(path, file)
@@ -231,27 +231,27 @@ function fileName(path: string) {
 
 <template>
   <div>
-    <FaPageHeader title="CMS 站点工作区" class="mb-0">
+    <YdPageHeader title="CMS 站点工作区" class="mb-0">
       <template #right>
-        <FaButton size="sm" variant="outline" @click="createPage">新建页面</FaButton>
-        <FaButton size="sm" variant="outline" @click="pickUpload">上传资产</FaButton>
-        <FaButton size="sm" variant="outline" @click="openChat">AI 构建</FaButton>
-        <FaButton size="sm" @click="confirmPublish">发布站点</FaButton>
+        <YdButton size="sm" variant="outline" @click="createPage">新建页面</YdButton>
+        <YdButton size="sm" variant="outline" @click="pickUpload">上传资产</YdButton>
+        <YdButton size="sm" variant="outline" @click="openChat">AI 构建</YdButton>
+        <YdButton size="sm" @click="confirmPublish">发布站点</YdButton>
       </template>
-    </FaPageHeader>
-    <FaPageMain>
+    </YdPageHeader>
+    <YdPageMain>
       <div class="ws-section">
         <div class="ws-section__head">
           <div>
             <h3>站点文件</h3>
             <p>pages/ 下每页一个 HTML；assets/ 存放样式、脚本与图片视频。页面通过 data-yb-* 与模板变量接入站点数据，发布前会自动做完整性校验。</p>
           </div>
-          <FaButton size="sm" variant="ghost" @click="refresh">
-            <FaIcon name="morph:refresh-cw" /> 刷新
-          </FaButton>
+          <YdButton size="sm" variant="ghost" @click="refresh">
+            <YdIcon name="morph:refresh-cw" /> 刷新
+          </YdButton>
         </div>
-        <FaResponsiveTable
-          v-loading="loading"
+        <YdLoadingOverlay :loading="loading">
+        <YdResponsiveTable
           row-key="path"
           :data="entries"
           :columns="[
@@ -268,45 +268,46 @@ function fileName(path: string) {
           <template #cell-operation="{ row }">
             <div class="flex gap-2 justify-center">
               <template v-if="isHtmlPath(row.original.path)">
-                <FaButton size="sm" variant="outline" @click="openEdit(row.original.path)">编辑</FaButton>
-                <FaButton size="sm" variant="outline" @click="openCanvas(row.original)">画布</FaButton>
+                <YdButton size="sm" variant="outline" @click="openEdit(row.original.path)">编辑</YdButton>
+                <YdButton size="sm" variant="outline" @click="openCanvas(row.original)">画布</YdButton>
               </template>
-              <FaButton size="sm" variant="outline" @click="openPreview(row.original)">预览</FaButton>
-              <FaButton size="sm" variant="destructive" @click="deleteEntry(row.original)">删除</FaButton>
+              <YdButton size="sm" variant="outline" @click="openPreview(row.original)">预览</YdButton>
+              <YdButton size="sm" variant="destructive" @click="deleteEntry(row.original)">删除</YdButton>
             </div>
           </template>
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <span class="min-w-0 break-all text-sm font-medium">{{ row.path }}</span>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
                   <template v-if="isHtmlPath(row.path)">
-                    <FaButton size="sm" variant="outline" @click="openEdit(row.path)">编辑</FaButton>
-                    <FaButton size="sm" variant="outline" @click="openCanvas(row)">画布</FaButton>
+                    <YdButton size="sm" variant="outline" @click="openEdit(row.path)">编辑</YdButton>
+                    <YdButton size="sm" variant="outline" @click="openCanvas(row)">画布</YdButton>
                   </template>
-                  <FaButton size="sm" variant="outline" @click="openPreview(row)">预览</FaButton>
-                  <FaButton size="sm" variant="destructive" @click="deleteEntry(row)">删除</FaButton>
+                  <YdButton size="sm" variant="outline" @click="openPreview(row)">预览</YdButton>
+                  <YdButton size="sm" variant="destructive" @click="deleteEntry(row)">删除</YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
+        </YdResponsiveTable>
+        </YdLoadingOverlay>
       </div>
-    </FaPageMain>
+    </YdPageMain>
 
-    <input ref="uploadInput" type="file" class="hidden" @change="onUploadChange">
+    <YdFilePicker ref="uploadInput" label="选择资产文件" @select="onUploadChange"><template #default /></YdFilePicker>
 
-    <FaModal v-model="editVisible" :title="`编辑：${editPath}`" class="sm:max-w-5xl">
-      <FaTextarea v-model="editContent" class="w-full" input-class="font-mono" :autosize="false" :rows="22" />
+    <YdModal v-model="editVisible" :title="`编辑：${editPath}`" class="sm:max-w-5xl">
+      <YdTextarea v-model="editContent" class="w-full" input-class="font-mono" :autosize="false" :rows="22" />
       <template #footer>
-        <FaButton variant="outline" @click="editVisible = false">取消</FaButton>
-        <FaButton @click="saveEdit">保存</FaButton>
+        <YdButton variant="outline" @click="editVisible = false">取消</YdButton>
+        <YdButton @click="saveEdit">保存</YdButton>
       </template>
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="previewVisible" title="页面预览" class="sm:max-w-6xl">
+    <YdModal v-model="previewVisible" title="页面预览" class="sm:max-w-6xl">
       <iframe :srcdoc="previewDoc" class="preview-frame" title="页面预览" />
-    </FaModal>
+    </YdModal>
 
     <div v-if="canvasVisible" class="canvas-overlay">
       <CmsGrapesEditor
@@ -330,7 +331,7 @@ function fileName(path: string) {
           <strong>AI 构建助手</strong>
           <span>描述要改的页面与区块，助手会读写工作区文件</span>
         </div>
-        <button class="chat-drawer__close" @click="chatOpen = false; clear()">×</button>
+        <YdAction class="chat-drawer__close" @click="chatOpen = false; clear()">×</YdAction>
       </div>
       <div class="chat-drawer__body">
         <YdChatMessageList :messages="messages">
@@ -358,7 +359,7 @@ function fileName(path: string) {
 .ws-section__head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
 .ws-section__head h3, .ws-section__head p { margin: 0; }
 .ws-section__head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }
-.preview-frame { width: 100%; height: 68vh; border: 1px solid var(--color-border-2); background: #fff; }
+.preview-frame { width: 100%; height: 68vh; border: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .canvas-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--color-bg-1); }
 .chat-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 1100; display: flex; width: 460px; max-width: 100vw; flex-direction: column; border-left: 1px solid var(--color-border-2); background: var(--color-bg-1); box-shadow: -8px 0 24px rgb(0 0 0 / 12%); }
 .chat-drawer__head { position: relative; display: grid; gap: 2px; padding: 14px 40px 14px 16px; border-bottom: 1px solid var(--color-border-2); }

@@ -52,13 +52,13 @@ async function load() {
 <template>
   <div class="dashboard-card__content dashboard-chart-stats" :class="{ 'dashboard-chart-stats--category': isCategory }" :aria-busy="loading">
     <div v-if="loading" class="trend-state">
-      <FaIcon name="morph:loader-circle" class="animate-spin" />正在读取数据
+      <YdIcon name="morph:loader-circle" class="animate-spin" />正在读取数据
     </div>
     <div v-else-if="error" class="trend-state">
-      <FaIcon name="morph:cloud-off" /><span>{{ error }}</span>
-      <FaButton variant="ghost" size="sm" @click="load">
+      <YdIcon name="morph:cloud-off" /><span>{{ error }}</span>
+      <YdButton variant="ghost" size="sm" @click="load">
         重试
-      </FaButton>
+      </YdButton>
     </div>
     <template v-else>
       <div class="trend-summary">
@@ -78,7 +78,7 @@ async function load() {
         </div>
       </dl>
       <div v-if="!rows.length" class="trend-state">
-        <FaIcon name="morph:chart-no-axes-combined" />暂无统计记录
+        <YdIcon name="morph:chart-no-axes-combined" />暂无统计记录
       </div>
       <div class="trend-footer">
         <div class="trend-caption" aria-live="polite" aria-atomic="true">
@@ -93,9 +93,9 @@ async function load() {
           </template>
           <span v-else>按能力分类统计</span>
         </div>
-        <FaButton v-if="card.actionPath" variant="ghost" size="sm" @click="onOpen?.(card)">
-          {{ config.action }}<FaIcon name="morph:arrow-up-right" />
-        </FaButton>
+        <YdButton v-if="card.actionPath" variant="ghost" size="sm" @click="onOpen?.(card)">
+          {{ config.action }}<YdIcon name="morph:arrow-up-right" />
+        </YdButton>
       </div>
     </template>
   </div>

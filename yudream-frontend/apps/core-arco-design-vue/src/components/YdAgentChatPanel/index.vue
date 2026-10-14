@@ -351,17 +351,17 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
 <template>
   <div class="yd-agent-chat">
     <header v-if="sessionStore" class="yd-agent-chat__head">
-      <FaTooltip text="会话记录">
-        <button type="button" class="yd-agent-chat__head-btn" aria-label="会话记录" @click="sessionDrawerOpen = !sessionDrawerOpen">
-          <FaIcon name="morph:menu" />
-        </button>
-      </FaTooltip>
+      <YdTooltip text="会话记录">
+        <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="会话记录" @click="sessionDrawerOpen = !sessionDrawerOpen">
+          <YdIcon name="morph:menu" />
+        </YdAction>
+      </YdTooltip>
       <span class="yd-agent-chat__title" :title="activeTitle">{{ activeTitle }}</span>
-      <FaTooltip text="新建会话">
-        <button type="button" class="yd-agent-chat__head-btn" aria-label="新建会话" @click="createSession">
-          <FaIcon name="morph:plus" />
-        </button>
-      </FaTooltip>
+      <YdTooltip text="新建会话">
+        <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="新建会话" @click="createSession">
+          <YdIcon name="morph:plus" />
+        </YdAction>
+      </YdTooltip>
     </header>
 
     <div class="yd-agent-chat__body">
@@ -385,9 +385,9 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
         <div v-if="sessionStore && sessionDrawerOpen" class="yd-agent-chat__drawer">
           <div class="yd-agent-chat__drawer-head">
             <strong>会话记录</strong>
-            <button type="button" class="yd-agent-chat__head-btn" aria-label="关闭" @click="sessionDrawerOpen = false">
-              <FaIcon name="morph:x" />
-            </button>
+            <YdAction type="button" class="yd-agent-chat__head-btn" aria-label="关闭" @click="sessionDrawerOpen = false">
+              <YdIcon name="morph:x" />
+            </YdAction>
           </div>
           <YdChatSessionList
             :sessions="sessionItems"

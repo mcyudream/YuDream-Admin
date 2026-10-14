@@ -73,15 +73,15 @@ const operationTitle = computed(() => {
       <div class="version-head-main">
         <div class="version-title">
           <h3>{{ item.releaseVersion }}</h3>
-          <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
-          <FaTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</FaTag>
+          <YdTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</YdTag>
+          <YdTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</YdTag>
         </div>
         <p class="version-description">
           {{ descriptor.description || '暂无插件简介。' }}
         </p>
       </div>
       <div class="version-actions">
-        <FaButton
+        <YdButton
           v-if="operation === 'install'"
           v-auth="'platform:plugin:manage'"
           size="sm"
@@ -91,8 +91,8 @@ const operationTitle = computed(() => {
           @click="emit('install', item.releaseVersion)"
         >
           安装
-        </FaButton>
-        <FaButton
+        </YdButton>
+        <YdButton
           v-else-if="operation === 'update'"
           v-auth="'platform:plugin:manage'"
           size="sm"
@@ -102,7 +102,7 @@ const operationTitle = computed(() => {
           @click="emit('update', item.releaseVersion)"
         >
           更新
-        </FaButton>
+        </YdButton>
       </div>
     </div>
     <VersionBody :item="item" />
@@ -110,12 +110,12 @@ const operationTitle = computed(() => {
 
   <details v-else class="version-card version-card--compact">
     <summary class="version-summary">
-      <FaIcon name="morph:chevron-right" class="version-caret" />
+      <YdIcon name="morph:chevron-right" class="version-caret" />
       <h3>{{ item.releaseVersion }}</h3>
-      <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
-      <FaTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</FaTag>
+      <YdTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</YdTag>
+      <YdTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</YdTag>
       <span class="version-actions" @click.stop.prevent>
-        <FaButton
+        <YdButton
           v-if="operation === 'install'"
           v-auth="'platform:plugin:manage'"
           size="sm"
@@ -125,8 +125,8 @@ const operationTitle = computed(() => {
           @click="emit('install', item.releaseVersion)"
         >
           安装
-        </FaButton>
-        <FaButton
+        </YdButton>
+        <YdButton
           v-else-if="operation === 'update'"
           v-auth="'platform:plugin:manage'"
           size="sm"
@@ -136,7 +136,7 @@ const operationTitle = computed(() => {
           @click="emit('update', item.releaseVersion)"
         >
           更新
-        </FaButton>
+        </YdButton>
       </span>
     </summary>
     <div class="version-compact-body">

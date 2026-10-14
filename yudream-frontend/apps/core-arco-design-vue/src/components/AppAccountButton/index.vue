@@ -26,7 +26,7 @@ const appSettingsStore = useAppSettingsStore()
 const appAccountStore = useAppAccountStore()
 const { generateTitle } = useAppMenu()
 
-const profileModal = useFaModal().create({
+const profileModal = useYdModal().create({
   alignCenter: true,
   header: false,
   footer: false,
@@ -37,7 +37,7 @@ const profileModal = useFaModal().create({
   content: () => h(Profile),
 })
 
-const deptRoleSwitchModal = useFaModal().create({
+const deptRoleSwitchModal = useYdModal().create({
   alignCenter: true,
   header: false,
   footer: false,
@@ -77,10 +77,10 @@ const dropdownItems = computed(() => [
 </script>
 
 <template>
-  <FaDropdown :align="dropdownAlign" :side="dropdownSide" :items="dropdownItems" class="flex-center">
+  <YdDropdown :align="dropdownAlign" :side="dropdownSide" :items="dropdownItems" class="flex-center">
     <template #header>
       <div class="flex-center-start gap-2">
-        <FaAvatar :src="appAccountStore.avatar" :fallback="appAccountStore.account.slice(0, 2)" shape="square" />
+        <YdAvatar :src="appAccountStore.avatar" :fallback="appAccountStore.account.slice(0, 2)" shape="square" />
         <div class="min-w-0 space-y-1">
           <div class="text-base lh-none truncate">
             {{ appAccountStore.account }}
@@ -94,22 +94,22 @@ const dropdownItems = computed(() => [
         </div>
       </div>
     </template>
-    <FaButton
+    <YdButton
       :variant="buttonVariant" size="icon-sm" :class="cn('flex-center gap-1 p-2', {
         'p-1': onlyAvatar,
       }, props.class)"
     >
-      <FaAvatar :src="appAccountStore.avatar" :class="cn('size-6', { 'size-full': onlyAvatar })">
-        <FaIcon name="morph:circle-user-round" class="text-secondary-foreground/50 size-6" />
-      </FaAvatar>
+      <YdAvatar :src="appAccountStore.avatar" :class="cn('size-6', { 'size-full': onlyAvatar })">
+        <YdIcon name="morph:circle-user-round" class="text-secondary-foreground/50 size-6" />
+      </YdAvatar>
       <div v-if="!onlyAvatar" class="flex-center-between flex-1 gap-2 min-w-0">
         <div class="text-start flex-1 truncate">
           {{ appAccountStore.account }}
         </div>
-        <FaIcon name="morph:unfold-vertical" />
+        <YdIcon name="morph:unfold-vertical" />
       </div>
-    </FaButton>
-  </FaDropdown>
+    </YdButton>
+  </YdDropdown>
 </template>
 
 <style scoped>

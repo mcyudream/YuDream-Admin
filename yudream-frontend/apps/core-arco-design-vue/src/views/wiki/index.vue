@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
+import type { YdMarkdownLinkClick } from '@yudream/components'
 import { fetchPublicWikiDocument, fetchPublicWikiDocuments, fetchPublicWikiTree, type WikiNode, type WikiPublicDocument, type WikiPublicDocumentDetail } from '@/api/modules/platform-wiki'
 import { pageTypeLabel, resolveWikiLink, wikilinksToMarkdown } from '../platform/wiki/wiki-utils'
 import { rewriteApiFileUrls } from '@/utils/api-file-url'
@@ -130,7 +129,7 @@ async function loadDocument(id: string) {
   }
 }
 
-function onContentClick(event: MouseEvent) {
+function onPreviewLinkClick({ event }: YdMarkdownLinkClick) {
   const title = resolveWikiLink(event)
   if (!title) return
   const target = pages.value.find(node => node.title === title)
@@ -189,14 +188,14 @@ onBeforeUnmount(() => {
         :class="{ 'is-open': mobileNavOpen }"
         :aria-hidden="isMobileNav && !mobileNavOpen"
       >
-        <div class="wiki-public-sidebar__title"><FaIcon name="morph:folder" /> 文档目录</div>
-        <nav class="wiki-public-nav" aria-label="文档目录"><FaButton v-for="node in pages" :key="node.id" :class="{ active: !documentId && node.id === active?.id }" @click="open(node)">{{ node.title }}</FaButton></nav>
+        <div class="wiki-public-sidebar__title"><YdIcon name="morph:folder" /> 文档目录</div>
+        <nav class="wiki-public-nav" aria-label="文档目录"><YdButton v-for="node in pages" :key="node.id" :class="{ active: !documentId && node.id === active?.id }" @click="open(node)">{{ node.title }}</YdButton></nav>
         <template v-if="documents.length">
-          <div class="wiki-public-sidebar__title wiki-public-sidebar__title--documents"><FaIcon name="morph:file-text" /> 原文档</div>
+          <div class="wiki-public-sidebar__title wiki-public-sidebar__title--documents"><YdIcon name="morph:file-text" /> 原文档</div>
           <nav class="wiki-public-nav" aria-label="原文档目录">
             <template v-for="group in documentGroups" :key="group.folder">
               <div v-if="group.folder !== '/'" class="wiki-public-nav__folder">{{ group.folder }}</div>
-              <FaButton v-for="doc in group.items" :key="doc.id" :class="{ active: doc.id === documentId }" @click="openDocument(doc)">{{ doc.title }}</FaButton>
+              <YdButton v-for="doc in group.items" :key="doc.id" :class="{ active: doc.id === documentId }" @click="openDocument(doc)">{{ doc.title }}</YdButton>
             </template>
           </nav>
         </template>
@@ -208,26 +207,27 @@ onBeforeUnmount(() => {
           <p v-if="documentLoading" class="wiki-public-error">原文档加载中...</p>
           <p v-else-if="documentError" class="wiki-public-error">{{ documentError }}</p>
           <template v-else-if="documentDetail">
-            <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="morph:chevron-right" /><span>原文档</span><FaIcon name="morph:chevron-right" /><span>{{ documentDetail.title }}</span></div>
+            <div class="wiki-public-crumb"><a href="/wiki">知识库</a><YdIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><YdIcon name="morph:chevron-right" /><span>原文档</span><YdIcon name="morph:chevron-right" /><span>{{ documentDetail.title }}</span></div>
             <h1>{{ documentDetail.title }}</h1>
             <div class="wiki-public-meta"><span class="wiki-public-meta__type">原文档</span><span v-if="documentDetail.folderPath && documentDetail.folderPath !== '/'" class="wiki-public-meta__tag">{{ documentDetail.folderPath }}</span><span v-if="documentDetail.kind" class="wiki-public-meta__tag">{{ documentDetail.kind }}</span></div>
-            <div class="wiki-public-article"><MdPreview :model-value="documentMarkdown" language="zh-CN" preview-theme="default" code-theme="github" class="wiki-public-markdown" /></div>
+            <div class="wiki-public-article"><YdMarkdownEditor :model-value="documentMarkdown" readonly height="auto" preview-theme="default" code-theme="github" aria-label="原文档内容" class="wiki-public-markdown" @link-click="onPreviewLinkClick" /></div>
           </template>
         </template>
         <template v-else-if="active">
-          <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="morph:chevron-right" /><span>{{ active.title }}</span></div>
+          <div class="wiki-public-crumb"><a href="/wiki">知识库</a><YdIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><YdIcon name="morph:chevron-right" /><span>{{ active.title }}</span></div>
           <h1>{{ active.title }}</h1>
           <div v-if="active.pageType || active.tags?.length" class="wiki-public-meta"><span v-if="active.pageType" class="wiki-public-meta__type">{{ pageTypeLabel(active.pageType) }}</span><span v-for="tag in active.tags || []" :key="tag" class="wiki-public-meta__tag"># {{ tag }}</span></div>
           <p v-if="active.summary" class="wiki-public-summary">{{ active.summary }}</p>
-          <div class="wiki-public-article" @click="onContentClick"><MdPreview :model-value="activeMarkdown" language="zh-CN" preview-theme="default" code-theme="github" class="wiki-public-markdown" /></div>
-          <section v-if="relatedPages.length" class="wiki-public-related"><div class="wiki-public-related__title"><FaIcon name="morph:link" /> 相关页面</div><FaButton v-for="node in relatedPages" :key="node.id" type="button" @click="open(node)"><FaIcon name="morph:file-text" /> {{ node.title }}</FaButton></section>
+          <div class="wiki-public-article"><YdMarkdownEditor :model-value="activeMarkdown" readonly height="auto" preview-theme="default" code-theme="github" aria-label="知识库页面内容" class="wiki-public-markdown" @link-click="onPreviewLinkClick" /></div>
+          <section v-if="relatedPages.length" class="wiki-public-related"><div class="wiki-public-related__title"><YdIcon name="morph:link" /> 相关页面</div><YdButton v-for="node in relatedPages" :key="node.id" type="button" @click="open(node)"><YdIcon name="morph:file-text" /> {{ node.title }}</YdButton></section>
         </template>
-        <section v-else class="wiki-public-empty"><FaIcon name="morph:book-open" /><strong>暂无已发布页面</strong><a href="/wiki">返回知识库列表</a></section>
+        <section v-else class="wiki-public-empty"><YdIcon name="morph:book-open" /><strong>暂无已发布页面</strong><a href="/wiki">返回知识库列表</a></section>
       </main>
     </div>
 
-    <div class="wiki-public-overlay" :class="{ 'is-open': mobileNavOpen }" aria-hidden="true" @click="closeMobileNav" />
-    <button
+    <YdAction class="wiki-public-overlay" :class="{ 'is-open': mobileNavOpen }" :tabindex="mobileNavOpen ? 0 : -1" :aria-hidden="!mobileNavOpen" :aria-label="mobileNavOpen ? '关闭文档目录' : undefined" @click="closeMobileNav" />
+    <YdButton
+      variant="ghost"
       type="button"
       class="wiki-public-fab"
       :class="{ 'is-open': mobileNavOpen }"
@@ -239,7 +239,7 @@ onBeforeUnmount(() => {
       <span class="wiki-public-fab__line" />
       <span class="wiki-public-fab__line" />
       <span class="wiki-public-fab__line" />
-    </button>
+    </YdButton>
   </div>
   </WikiPublicChrome>
 </template>
@@ -358,10 +358,13 @@ onBeforeUnmount(() => {
   }
   .wiki-public-overlay {
     display: block;
+    padding: 0;
     position: fixed;
     inset: 0;
     z-index: 1100;
     background: rgb(0 0 0 / 45%);
+    border: 0;
+    border-radius: 0;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.22s ease;

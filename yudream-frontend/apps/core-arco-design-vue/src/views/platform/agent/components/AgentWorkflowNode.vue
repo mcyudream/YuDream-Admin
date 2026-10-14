@@ -1,14 +1,13 @@
 <script setup lang="ts">
+import type { YdWorkflowHandleConnectable } from '@yudream/components'
 import type { AgentDebugStatus, AgentNodeData } from './types'
-import type { HandleConnectable } from '@vue-flow/core'
-import { Handle, Position } from '@vue-flow/core'
 import { agentModelKind, agentSourceHandles, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   id: string
   data: AgentNodeData
   selected?: boolean
-  connectable?: HandleConnectable
+  connectable?: YdWorkflowHandleConnectable<AgentNodeData>
   debugStatus?: AgentDebugStatus
   readonly?: boolean
 }>()
@@ -39,40 +38,40 @@ function handleStyle(handle: string) {
 
 <template>
   <div class="workflow-node" :class="[{ 'is-selected': selected }, debugStatus ? `debug-${debugStatus.toLowerCase()}` : '']" :style="nodeStyle">
-    <Handle v-if="data.kind !== 'start' && data.kind !== 'input'" id="target" type="target" :position="Position.Left" :connectable="connectable" />
+    <YdWorkflowHandle v-if="data.kind !== 'start' && data.kind !== 'input'" id="target" type="target" position="left" :connectable="connectable" />
 
-    <button v-if="!readonly" class="node-delete nodrag nowheel" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
-      <FaIcon name="morph:x" />
-    </button>
+    <YdButton v-if="!readonly" class="node-delete nodrag nowheel" variant="ghost" size="icon-sm" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
+      <YdIcon name="morph:x" />
+    </YdButton>
 
     <span v-if="debugStatus" class="node-debug-status">
-      <FaIcon :name="debugStatus === 'RUNNING' ? 'morph:loader-circle' : debugStatus === 'COMPLETED' ? 'morph:check' : debugStatus === 'FAILED' ? 'morph:x' : 'morph:skip-forward'" />
+      <YdIcon :name="debugStatus === 'RUNNING' ? 'morph:loader-circle' : debugStatus === 'COMPLETED' ? 'morph:check' : debugStatus === 'FAILED' ? 'morph:x' : 'morph:skip-forward'" />
       {{ debugStatus === 'RUNNING' ? '运行中' : debugStatus === 'COMPLETED' ? '已完成' : debugStatus === 'FAILED' ? '失败' : '已跳过' }}
     </span>
 
     <div class="node-heading">
-      <span class="node-icon"><FaIcon :name="data.icon" /></span>
+      <span class="node-icon"><YdIcon :name="data.icon" /></span>
       <span class="node-title">
         <strong>{{ data.title || '未命名节点' }}</strong>
         <small>{{ data.label }}</small>
       </span>
-      <FaIcon class="node-more" name="morph:ellipsis" />
+      <YdIcon class="node-more" name="morph:ellipsis" />
     </div>
 
     <p>{{ data.description || '选择节点后在右侧完善配置' }}</p>
 
     <div v-if="data.kind === 'tool'" class="node-tool legacy-tool">
-      <FaIcon name="morph:wrench" />
+      <YdIcon name="morph:wrench" />
       <span>兼容节点 · {{ data.toolCode || '尚未选择工具' }}</span>
     </div>
     <div v-else-if="isModelNode" class="node-model">
-      <FaIcon :name="data.vision ? 'i-ri:image-circle-line' : 'morph:message-circle'" />
+      <YdIcon :name="data.vision ? 'i-ri:image-circle-line' : 'morph:message-circle'" />
       <span>{{ data.modelCode ? `${data.providerCode} / ${data.modelCode}` : '尚未选择模型' }}</span>
     </div>
     <div v-if="isToolEnabledModel" class="node-badges">
-      <span><FaIcon name="morph:wrench" /> 工具 {{ data.toolCodes.length }} · {{ toolModeLabel }}</span>
-      <span v-if="data.kind === 'vision'"><FaIcon name="morph:image" /> 图片变量</span>
-      <span v-else-if="data.vision"><FaIcon name="morph:eye" /> Vision 可用</span>
+      <span><YdIcon name="morph:wrench" /> 工具 {{ data.toolCodes.length }} · {{ toolModeLabel }}</span>
+      <span v-if="data.kind === 'vision'"><YdIcon name="morph:image" /> 图片变量</span>
+      <span v-else-if="data.vision"><YdIcon name="morph:eye" /> Vision 可用</span>
     </div>
 
     <div class="node-io">
@@ -84,7 +83,7 @@ function handleStyle(handle: string) {
       <span v-if="data.kind === 'condition'" class="branch-label" :class="handle" :style="handleStyle(handle)">
         {{ handle === 'true' ? '真' : '假' }}
       </span>
-      <Handle :id="handle" type="source" :position="Position.Right" :connectable="connectable" :style="handleStyle(handle)" />
+      <YdWorkflowHandle :id="handle" type="source" position="right" :connectable="connectable" :style="handleStyle(handle)" />
     </template>
   </div>
 </template>
@@ -93,12 +92,12 @@ function handleStyle(handle: string) {
 .workflow-node { position: relative; width: 230px; overflow: visible; border: 1px solid var(--color-border-2); border-top: 3px solid var(--node-color); border-radius: 7px; background: var(--color-bg-1); box-shadow: 0 6px 20px rgb(15 23 42 / 10%); transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
 .workflow-node:hover { box-shadow: 0 9px 24px rgb(15 23 42 / 14%); transform: translateY(-1px); }
 .workflow-node.is-selected { border-color: var(--node-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--node-color), transparent 78%), 0 9px 24px rgb(15 23 42 / 14%); }
-.workflow-node.debug-running { border-color: rgb(var(--primary-6)); box-shadow: 0 0 0 4px rgb(var(--primary-2)), 0 10px 28px rgb(var(--primary-6) / 24%); animation: debug-pulse 1.4s ease-in-out infinite; }
+.workflow-node.debug-running { border-color: var(--color-text-1); box-shadow: 0 0 0 4px var(--color-border-2), 0 10px 28px color-mix(in srgb, var(--color-text-1) 24%, transparent); animation: debug-pulse 1.4s ease-in-out infinite; }
 .workflow-node.debug-completed { border-color: rgb(var(--success-6)); box-shadow: 0 0 0 3px rgb(var(--success-2)), 0 7px 20px rgb(15 23 42 / 10%); }
 .workflow-node.debug-failed { border-color: rgb(var(--danger-6)); box-shadow: 0 0 0 3px rgb(var(--danger-2)), 0 7px 20px rgb(var(--danger-6) / 18%); }
 .workflow-node.debug-skipped { opacity: 0.68; }
 .node-debug-status { position: absolute; top: -26px; left: 0; display: flex; height: 20px; align-items: center; gap: 4px; padding: 0 6px; border-radius: 4px; color: var(--color-text-2); background: var(--color-bg-1); box-shadow: 0 3px 10px rgb(15 23 42 / 12%); font-size: 8px; white-space: nowrap; }
-.debug-running .node-debug-status { color: rgb(var(--primary-6)); }
+.debug-running .node-debug-status { color: var(--color-text-1); }
 .debug-completed .node-debug-status { color: rgb(var(--success-6)); }
 .debug-failed .node-debug-status { color: rgb(var(--danger-6)); }
 .debug-running .node-debug-status > :first-child { animation: debug-spin 1s linear infinite; }
@@ -127,6 +126,6 @@ function handleStyle(handle: string) {
 .branch-label { position: absolute; right: 10px; z-index: 2; padding: 1px 4px; border-radius: 3px; font-size: 8px; line-height: 14px; transform: translateY(-50%); }
 .branch-label.true { color: rgb(var(--success-7)); background: rgb(var(--success-1)); }
 .branch-label.false { color: rgb(var(--danger-7)); background: rgb(var(--danger-1)); }
-@keyframes debug-pulse { 50% { box-shadow: 0 0 0 6px rgb(var(--primary-2)), 0 10px 28px rgb(var(--primary-6) / 18%); } }
+@keyframes debug-pulse { 50% { box-shadow: 0 0 0 6px var(--color-border-2), 0 10px 28px color-mix(in srgb, var(--color-text-1) 18%, transparent); } }
 @keyframes debug-spin { to { transform: rotate(360deg); } }
 </style>

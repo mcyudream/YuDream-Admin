@@ -81,7 +81,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <FaModal v-model="isShow" title="快捷键" :footer="false">
+  <YdModal v-model="isShow" title="快捷键" :footer="false">
     <div class="px-4">
       <div class="gap-4 grid sm-grid-cols-2">
         <div v-for="group in helpGroups" :key="group.id">
@@ -90,16 +90,16 @@ onUnmounted(() => {
           </h2>
           <ul class="text-sm ps-2 pt-2 list-none">
             <li v-for="item in group.items" :key="item.id" class="py-1 flex-baseline gap-2">
-              <FaKbdGroup>
-                <FaKbd v-for="key in item.displayKeys" :key="key">
+              <YdKbdGroup>
+                <YdKbd v-for="key in item.displayKeys" :key="key">
                   {{ key }}
-                </FaKbd>
-              </FaKbdGroup>
+                </YdKbd>
+              </YdKbdGroup>
               {{ item.title }}
             </li>
           </ul>
         </div>
       </div>
     </div>
-  </FaModal>
+  </YdModal>
 </template>

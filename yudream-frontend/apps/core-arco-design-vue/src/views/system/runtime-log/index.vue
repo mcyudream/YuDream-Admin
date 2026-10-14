@@ -72,8 +72,8 @@ const moduleFilterLabel = computed(() => {
   return `已选 ${filters.modules.length} 类`
 })
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 
 onMounted(async () => {
   await Promise.all([loadModules(), loadStats(), loadDockerSettings()])
@@ -360,99 +360,99 @@ async function saveDockerSettings() {
 
 <template>
   <div>
-    <FaPageHeader title="系统日志" class="mb-0">
+    <YdPageHeader title="系统日志" class="mb-0">
       <template #description>
         <span>实时查看宿主控制台运行日志（含插件、Milky 机器人及可选 docker 容器日志），自动缓存上限 {{ stats.maxEntries }} 条并自动清理。</span>
       </template>
-      <FaButton v-auth="'system:runtime-log:config'" variant="outline" @click="settingsOpen = !settingsOpen">
-        <FaIcon name="morph:database" />
+      <YdButton v-auth="'system:runtime-log:config'" variant="outline" @click="settingsOpen = !settingsOpen">
+        <YdIcon name="morph:database" />
         容器日志配置
-      </FaButton>
-      <FaButton v-auth="'system:runtime-log:download'" variant="outline" :loading="downloading" @click="downloadLogs">
-        <FaIcon name="morph:download" />
+      </YdButton>
+      <YdButton v-auth="'system:runtime-log:download'" variant="outline" :loading="downloading" @click="downloadLogs">
+        <YdIcon name="morph:download" />
         下载日志
-      </FaButton>
-      <FaButton v-auth="'system:runtime-log:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
-        <FaIcon name="morph:trash-2" />
+      </YdButton>
+      <YdButton v-auth="'system:runtime-log:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
+        <YdIcon name="morph:trash-2" />
         清空缓存
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div v-if="settingsOpen" class="docker-settings">
         <div class="settings-title">容器日志采集配置</div>
         <div class="settings-grid">
           <div class="settings-field">
             <span class="field-label">启用采集</span>
-            <FaSwitch v-model="dockerSettings.enabled" />
+            <YdSwitch v-model="dockerSettings.enabled" />
           </div>
           <div class="settings-field">
             <span class="field-label">传输方式</span>
-            <FaSelect v-model="dockerSettings.transport" :options="transportOptions" class="w-[260px]" />
+            <YdSelect v-model="dockerSettings.transport" :options="transportOptions" class="w-[260px]" />
           </div>
           <div class="settings-field">
             <span class="field-label">容器清单（逗号分隔）</span>
-            <FaInput v-model="dockerSettings.containers" placeholder="mongodb,redis,es" class="w-[320px]" />
+            <YdInput v-model="dockerSettings.containers" placeholder="mongodb,redis,es" class="w-[320px]" />
           </div>
           <div class="settings-field">
             <span class="field-label">Socket 路径</span>
-            <FaInput v-model="dockerSettings.socket" placeholder="/var/run/docker.sock" class="w-[320px]" />
+            <YdInput v-model="dockerSettings.socket" placeholder="/var/run/docker.sock" class="w-[320px]" />
           </div>
           <div class="settings-field">
             <span class="field-label">初始条数</span>
-            <FaNumberField v-model="dockerSettings.tail" :min="1" :max="100000" class="w-[140px]" />
+            <YdNumberField v-model="dockerSettings.tail" :min="1" :max="100000" class="w-[140px]" />
           </div>
         </div>
         <div class="settings-actions">
-          <FaButton :loading="saving" @click="saveDockerSettings">
-            <FaIcon name="morph:save" />
+          <YdButton :loading="saving" @click="saveDockerSettings">
+            <YdIcon name="morph:save" />
             保存配置
-          </FaButton>
+          </YdButton>
         </div>
       </div>
 
       <div class="log-toolbar">
-        <FaSelect v-model="filters.level" :options="levelOptions" placeholder="日志级别" class="toolbar-level" @change="applyFilters" />
-        <FaPopover v-model:open="modulePickerOpen" class="module-picker-popover" align="start">
-          <FaButton variant="outline" class="toolbar-module-trigger">
+        <YdSelect v-model="filters.level" :options="levelOptions" placeholder="日志级别" class="toolbar-level" @change="applyFilters" />
+        <YdPopover v-model:open="modulePickerOpen" class="module-picker-popover" align="start">
+          <YdButton variant="outline" class="toolbar-module-trigger">
             <span class="module-trigger-label">{{ moduleFilterLabel }}</span>
-            <FaIcon name="morph:chevron-down" />
-          </FaButton>
+            <YdIcon name="morph:chevron-down" />
+          </YdButton>
           <template #panel>
             <div class="module-picker">
               <div class="module-picker-actions">
-                <FaButton size="sm" variant="ghost" @click="selectAllModules">全选</FaButton>
-                <FaButton size="sm" variant="ghost" @click="clearSelectedModules">清空</FaButton>
+                <YdButton size="sm" variant="ghost" @click="selectAllModules">全选</YdButton>
+                <YdButton size="sm" variant="ghost" @click="clearSelectedModules">清空</YdButton>
               </div>
               <div v-for="group in groupedModuleOptions" :key="group.label" class="module-group">
-                <FaCheckbox
+                <YdCheckbox
                   :model-value="groupCheckedState(group.modules)"
                   class="module-group-title"
                   @update:model-value="checked => toggleGroup(group.modules, checked)"
                 >
                   {{ group.label }}
-                </FaCheckbox>
+                </YdCheckbox>
                 <div class="module-group-items">
-                  <FaCheckbox
+                  <YdCheckbox
                     v-for="module in group.modules"
                     :key="module"
                     :model-value="isModuleChecked(module)"
                     @update:model-value="checked => toggleModule(module, checked)"
                   >
                     {{ module }}
-                  </FaCheckbox>
+                  </YdCheckbox>
                 </div>
               </div>
             </div>
           </template>
-        </FaPopover>
-        <FaInput v-model="filters.keyword" placeholder="关键字（消息 / logger / 异常）" clearable class="toolbar-keyword" @clear="applyFilters" />
-        <FaButton variant="outline" @click="applyFilters">
+        </YdPopover>
+        <YdInput v-model="filters.keyword" placeholder="关键字（消息 / logger / 异常）" clearable class="toolbar-keyword" @clear="applyFilters" />
+        <YdButton variant="outline" @click="applyFilters">
           筛选
-        </FaButton>
-        <FaButton @click="resetFilters">
+        </YdButton>
+        <YdButton @click="resetFilters">
           重置
-        </FaButton>
+        </YdButton>
 
         <div class="toolbar-spacer" />
 
@@ -465,7 +465,7 @@ async function saveDockerSettings() {
           </span>
           <span class="meta-tail">
             自动滚动
-            <FaSwitch v-model="followTail" />
+            <YdSwitch v-model="followTail" />
           </span>
         </div>
       </div>
@@ -480,24 +480,24 @@ async function saveDockerSettings() {
             class="log-row"
             :class="levelClass(entry.level)"
           >
-            <div class="log-row-meta" @click="toggleRow(entry.sequence)">
+            <YdAction type="button" class="log-row-meta" :aria-expanded="expanded.has(entry.sequence)" @click="toggleRow(entry.sequence)">
               <span class="log-time">{{ entry.time }}</span>
-              <FaTag :variant="levelVariant(entry.level)" class="log-level">{{ entry.level }}</FaTag>
+              <YdTag :variant="levelVariant(entry.level)" class="log-level">{{ entry.level }}</YdTag>
               <span class="log-module">{{ entry.module }}</span>
               <span class="log-thread">{{ entry.thread }}</span>
-              <FaIcon
+              <YdIcon
                 v-if="entry.throwable"
                 name="morph:triangle-alert"
                 class="log-expand"
                 :class="{ 'is-open': expanded.has(entry.sequence) }"
               />
-            </div>
+            </YdAction>
             <div class="log-message">{{ entry.message }}</div>
             <pre v-if="entry.throwable && expanded.has(entry.sequence)" class="log-stack">{{ entry.throwable }}</pre>
           </div>
         </div>
       </div>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 
@@ -688,6 +688,8 @@ async function saveDockerSettings() {
 }
 
 .log-row-meta {
+  width: 100%;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 10px;

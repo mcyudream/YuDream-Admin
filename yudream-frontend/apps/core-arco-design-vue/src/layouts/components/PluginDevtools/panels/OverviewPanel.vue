@@ -149,11 +149,11 @@ function formatDuration(ms?: number) {
         <div class="status-card__value">
           {{ store.status?.devProjects.length ?? 0 }} 个
         </div>
-        <FaTooltip v-if="store.status?.devProjectStoreFile" :text="store.status.devProjectStoreFile" side="top">
+        <YdTooltip v-if="store.status?.devProjectStoreFile" :text="store.status.devProjectStoreFile" side="top">
           <div class="status-card__sub status-card__sub--mono">
             {{ store.status.devProjectStoreFile }}
           </div>
-        </FaTooltip>
+        </YdTooltip>
         <div v-else class="status-card__sub">
           未登记
         </div>
@@ -166,16 +166,16 @@ function formatDuration(ms?: number) {
         最近动态
       </span>
       <div class="flex-1" />
-      <FaButton variant="outline" size="sm" :disabled="!store.lifecycleEvents.length" @click="store.clearEvents()">
-        <FaIcon name="morph:trash-2" />
+      <YdButton variant="outline" size="sm" :disabled="!store.lifecycleEvents.length" @click="store.clearEvents()">
+        <YdIcon name="morph:trash-2" />
         清空
-      </FaButton>
+      </YdButton>
     </div>
 
     <div v-for="(event, index) in recentEvents" :key="index" class="event-row">
-      <FaTag :variant="event.success ? 'default' : 'destructive'" class="text-xs shrink-0">
+      <YdTag :variant="event.success ? 'default' : 'destructive'" class="text-xs shrink-0">
         {{ actionText(event.action) }}
-      </FaTag>
+      </YdTag>
       <div class="event-row__main">
         <div class="event-row__title">
           {{ event.pluginCode }}<span v-if="event.version" class="text-secondary-foreground/60"> v{{ event.version }}</span>
@@ -183,13 +183,13 @@ function formatDuration(ms?: number) {
         <div v-if="event.errorMessage" class="event-row__error">
           {{ event.errorMessage }}
         </div>
-        <button
-          v-if="diffEntries(event).length" type="button" class="event-row__diff"
+        <YdButton
+          v-if="diffEntries(event).length" type="button" variant="ghost" class="event-row__diff"
           :aria-expanded="expandedDiffs.has(index)" @click="toggleDiff(index)"
         >
-          <FaIcon :name="expandedDiffs.has(index) ? 'morph:chevron-down' : 'morph:chevron-right'" class="size-3" />
+          <YdIcon :name="expandedDiffs.has(index) ? 'morph:chevron-down' : 'morph:chevron-right'" class="size-3" />
           {{ diffSummary(event) }}
-        </button>
+        </YdButton>
         <ul v-if="expandedDiffs.has(index)" class="event-row__diff-detail">
           <li v-for="entry in diffEntries(event)" :key="entry.category">
             {{ diffEntryText(entry) }}

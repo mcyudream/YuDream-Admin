@@ -212,7 +212,7 @@ function handleMouseleave() {
   <template v-if="hasChildren">
     <Teleport to="body" :disabled="!rootMenu.isMenuPopup">
       <Transition v-bind="transitionClass" v-on="transitionEvent">
-        <FaScrollArea
+        <YdScrollArea
           v-if="expand" ref="subMenuRef" :scrollbar="false" :mask="rootMenu.isMenuPopup"
           :class="cn('sub-menu static h-[calc-size(auto,size)] rounded-lg', {
             'bg-[var(--g-sub-sidebar-bg)]': rootMenu.isMenuPopup,
@@ -223,7 +223,7 @@ function handleMouseleave() {
           <template v-for="item in menu.children" :key="rootMenu.getMenuNodeKey(item)">
             <SubMenu v-if="item.meta?.menu !== false" :unique-key="[...uniqueKey, rootMenu.getMenuNodeKey(item)]" :menu="item" :level="level + 1" />
           </template>
-        </FaScrollArea>
+        </YdScrollArea>
       </Transition>
     </Teleport>
   </template>

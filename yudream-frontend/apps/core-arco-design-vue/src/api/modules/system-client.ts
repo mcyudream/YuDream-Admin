@@ -63,7 +63,7 @@ systemClient.interceptors.response.use(
     if (result?.code === 401) {
       return retryAfterRefresh(systemClient, response.config)
     }
-    useFaToast().error('错误', { description: hintForMessage(result?.message || '请求失败') })
+    useYdToast().error('错误', { description: hintForMessage(result?.message || '请求失败') })
     return Promise.reject(new Error(result?.message || '请求失败'))
   },
   async (error: AxiosError) => {

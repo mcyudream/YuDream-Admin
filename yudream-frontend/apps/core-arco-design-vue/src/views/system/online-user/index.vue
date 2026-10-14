@@ -5,8 +5,8 @@ import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
 import { saveExcelResponse } from '@/utils/excel'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 const appAccountStore = useAppAccountStore()
 
 const loading = ref(false)
@@ -102,16 +102,16 @@ async function exportOnlineUsers() {
 
 <template>
   <div>
-    <FaPageHeader :title="onlineCountText" class="mb-0">
-      <FaButton v-auth="'system:monitor:online:export'" variant="outline" @click="exportOnlineUsers">
-        <FaIcon name="morph:file-spreadsheet" />
+    <YdPageHeader :title="onlineCountText" class="mb-0">
+      <YdButton v-auth="'system:monitor:online:export'" variant="outline" @click="exportOnlineUsers">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="token"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1080px]"
@@ -122,16 +122,16 @@ async function exportOnlineUsers() {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-              <FaInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   &#37325;&#32622;
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #empty>
           <div class="empty-state">
@@ -145,16 +145,16 @@ async function exportOnlineUsers() {
           <code>{{ shortToken(row.original.token) }}</code>
         </template>
         <template #cell-operation="{ row }">
-          <FaButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row.original)">
+          <YdButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row.original)">
             &#19979;&#32447;
-          </FaButton>
+          </YdButton>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.username || row.userId || '-' }}</span>
-                <FaTag variant="default">在线</FaTag>
+                <YdTag variant="default">在线</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div v-if="row.nickname" class="flex gap-2">
@@ -179,15 +179,15 @@ async function exportOnlineUsers() {
                 <code>{{ shortToken(row.token) }}</code>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row)">
+                <YdButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row)">
                   下线
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
-    </FaPageMain>
+      </YdResponsiveTable></YdLoadingOverlay>
+    </YdPageMain>
   </div>
 </template>
 

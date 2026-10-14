@@ -53,7 +53,7 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
         }"
       />
       <Component :is="useSlots('sub-sidebar-after-logo')" />
-      <FaScrollArea :scrollbar="false" mask class="overscroll-contain flex-1">
+      <YdScrollArea :scrollbar="false" mask class="overscroll-contain flex-1">
         <TransitionGroup :name="transitionName">
           <template v-for="(mainItem, mainIndex) in appMenuStore.allMenus" :key="mainIndex">
             <div v-show="mainIndex === appMenuStore.actived">
@@ -65,16 +65,16 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
             </div>
           </template>
         </TransitionGroup>
-      </FaScrollArea>
+      </YdScrollArea>
       <div
         v-if="appSettingsStore.mode === 'pc' && appSettingsStore.settings.menu.subMenuCollapseButton" class="px-4 py-3 flex items-center relative" :class="{
           'justify-center': isCollapse,
           'justify-end': !isCollapse,
         }"
       >
-        <FaButton variant="secondary" size="icon-sm" class="yd-interactive" :aria-label="isCollapse ? '展开侧边栏' : '收起侧边栏'" @click="appSettingsStore.toggleSidebarCollapse()">
-          <FaIcon name="app-toolbar-collapse" class="size-4 transition" :class="{ 'rotate-z--180': appSettingsStore.settings.menu.subMenuCollapse }" />
-        </FaButton>
+        <YdButton variant="secondary" size="icon-sm" class="yd-interactive" :aria-label="isCollapse ? '展开侧边栏' : '收起侧边栏'" @click="appSettingsStore.toggleSidebarCollapse()">
+          <YdIcon name="app-toolbar-collapse" class="size-4 transition" :class="{ 'rotate-z--180': appSettingsStore.settings.menu.subMenuCollapse }" />
+        </YdButton>
       </div>
       <Component :is="useSlots('sub-sidebar-after-menu')" />
       <div v-if="appSettingsStore.settings.menu.mode === 'single'" class="px-4 pb-3 flex-center">

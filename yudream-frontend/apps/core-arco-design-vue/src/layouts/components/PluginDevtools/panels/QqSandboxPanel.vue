@@ -50,7 +50,7 @@ function hydratePreferences(): SandboxPreferences {
   }
 }
 
-const toast = useFaToast()
+const toast = useYdToast()
 const store = usePluginDevtoolsStore()
 const sandbox = reactive(useQqSandbox())
 const preferences = reactive(hydratePreferences())
@@ -338,7 +338,7 @@ async function stopSession() {
 async function send() {
   const type = eventType.value
   const content = composer.value.trim()
-  // FaTextarea 会把 keydown 同时绑到根节点和内部 textarea（冒泡双触发），必须用 sending 闸门保证一次按键只发一次
+  // YdTextarea 会把 keydown 同时绑到根节点和内部 textarea（冒泡双触发），必须用 sending 闸门保证一次按键只发一次
   if (!sendReady.value || sandbox.sending) {
     return
   }
@@ -646,55 +646,55 @@ function caseTime(item: QqSandboxCase) {
 <template>
   <div class="qq-sandbox">
     <div class="sandbox-toolbar">
-      <FaSelect v-model="preferences.conversationType" :options="conversationOptions" class="sandbox-toolbar__type" />
-      <FaSelect v-model="preferences.randomMode" :options="randomModeOptions" class="sandbox-toolbar__random" />
+      <YdSelect v-model="preferences.conversationType" :options="conversationOptions" class="sandbox-toolbar__type" />
+      <YdSelect v-model="preferences.randomMode" :options="randomModeOptions" class="sandbox-toolbar__random" />
       <span v-if="pluginCode" class="plugin-scope">
         目标：{{ pluginCode }}
-        <button type="button" class="plugin-scope__clear" aria-label="清除插件范围" @click="pluginCode = ''">
-          <FaIcon name="morph:x" class="size-3" />
-        </button>
+        <YdButton type="button" variant="ghost" size="icon-sm" class="plugin-scope__clear" aria-label="清除插件范围" @click="pluginCode = ''">
+          <YdIcon name="morph:x" class="size-3" />
+        </YdButton>
       </span>
       <div class="flex-1" />
-      <FaTooltip text="用例列表" side="bottom">
-        <FaButton
+      <YdTooltip text="用例列表" side="bottom">
+        <YdButton
           variant="outline" size="icon" aria-label="用例列表"
           :loading="sandbox.replaying" @click="openCases"
         >
-          <FaIcon name="morph:list-plus" />
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip :text="collectableSteps.length ? `把当前时间线存为用例（${collectableSteps.length} 步）` : '先发送消息后才能存为用例'" side="bottom">
-        <FaButton
+          <YdIcon name="morph:list-plus" />
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip :text="collectableSteps.length ? `把当前时间线存为用例（${collectableSteps.length} 步）` : '先发送消息后才能存为用例'" side="bottom">
+        <YdButton
           variant="outline" size="icon" aria-label="存为用例"
           :disabled="!collectableSteps.length" @click="openSaveCase"
         >
-          <FaIcon name="morph:save" />
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip :text="showConfig ? '收起身份模拟设置' : '身份模拟设置（默认自动模拟）'" side="bottom">
-        <FaButton
+          <YdIcon name="morph:save" />
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip :text="showConfig ? '收起身份模拟设置' : '身份模拟设置（默认自动模拟）'" side="bottom">
+        <YdButton
           :variant="showConfig ? 'secondary' : 'outline'" size="icon"
           aria-label="身份模拟设置" @click="showConfig = !showConfig"
         >
-          <FaIcon name="morph:id-card" />
-        </FaButton>
-      </FaTooltip>
-      <FaTooltip :text="preferences.autoScroll ? '关闭自动滚动' : '开启自动滚动'" side="bottom">
-        <FaButton
+          <YdIcon name="morph:id-card" />
+        </YdButton>
+      </YdTooltip>
+      <YdTooltip :text="preferences.autoScroll ? '关闭自动滚动' : '开启自动滚动'" side="bottom">
+        <YdButton
           variant="outline" size="icon" :aria-label="preferences.autoScroll ? '关闭自动滚动' : '开启自动滚动'"
           @click="preferences.autoScroll = !preferences.autoScroll"
         >
-          <FaIcon :name="preferences.autoScroll ? 'morph:chevrons-down' : 'morph:pause'" />
-        </FaButton>
-      </FaTooltip>
-      <FaButton v-if="!sessionActive" size="sm" :loading="sandbox.creating" @click="startSession">
-        <FaIcon name="morph:play" />
+          <YdIcon :name="preferences.autoScroll ? 'morph:chevrons-down' : 'morph:pause'" />
+        </YdButton>
+      </YdTooltip>
+      <YdButton v-if="!sessionActive" size="sm" :loading="sandbox.creating" @click="startSession">
+        <YdIcon name="morph:play" />
         启动
-      </FaButton>
-      <FaButton v-else variant="outline" size="sm" @click="stopSession">
-        <FaIcon name="morph:square" />
+      </YdButton>
+      <YdButton v-else variant="outline" size="sm" @click="stopSession">
+        <YdIcon name="morph:square" />
         结束
-      </FaButton>
+      </YdButton>
     </div>
 
     <div class="sandbox-status">
@@ -703,18 +703,18 @@ function caseTime(item: QqSandboxCase) {
       <span v-if="sandbox.session" class="font-mono">{{ sandbox.session.sessionId }}</span>
       <span v-if="sandbox.streamError" class="sandbox-status__error">{{ sandbox.streamError }}</span>
       <div class="flex-1" />
-      <FaButton
+      <YdButton
         variant="ghost" size="icon-sm" title="导出时间线 JSON" :disabled="!sandbox.events.length"
         aria-label="导出时间线 JSON" @click="exportTimeline"
       >
-        <FaIcon name="morph:download" />
-      </FaButton>
-      <FaButton
+        <YdIcon name="morph:download" />
+      </YdButton>
+      <YdButton
         variant="ghost" size="icon-sm" title="清空内存时间线" :disabled="!sandbox.events.length"
         @click="sandbox.resetTimeline"
       >
-        <FaIcon name="morph:trash-2" />
-      </FaButton>
+        <YdIcon name="morph:trash-2" />
+      </YdButton>
     </div>
 
     <div class="sandbox-workspace" :class="{ 'sandbox-workspace--with-config': showConfig }">
@@ -724,7 +724,7 @@ function caseTime(item: QqSandboxCase) {
         </div>
         <label class="sandbox-field">
           <span>策略连接（加载真实群策略）</span>
-          <FaSelect
+          <YdSelect
             v-if="connectionOptions.length" v-model="preferences.policyConnectionId"
             :options="connectionOptions" :disabled="sessionActive" class="w-full"
           />
@@ -734,51 +734,51 @@ function caseTime(item: QqSandboxCase) {
         </label>
         <label class="sandbox-field">
           <span>机器人 ID（selfId，选择策略连接后自动带出）</span>
-          <FaInput v-model="preferences.botId" :disabled="sessionActive" />
+          <YdInput v-model="preferences.botId" :disabled="sessionActive" />
         </label>
         <label class="sandbox-field">
           <span>发送人（绑定用户走真实绑定与角色权限）</span>
-          <FaSelect
+          <YdSelect
             v-model="defaultSenderChoice" :options="senderSelectOptions" :disabled="sessionActive"
             class="w-full"
           />
         </label>
         <label v-if="defaultSenderChoice === CUSTOM_VALUE" class="sandbox-field">
           <span>自定义发送人 QQ</span>
-          <FaInput v-model="customSenderQq" :disabled="sessionActive" placeholder="输入未绑定的 QQ 号即模拟匿名用户" />
+          <YdInput v-model="customSenderQq" :disabled="sessionActive" placeholder="输入未绑定的 QQ 号即模拟匿名用户" />
         </label>
         <label class="sandbox-field sandbox-field--switch">
           <span>模拟未绑定（插件侧判定为未绑定 QQ）</span>
-          <FaSwitch v-model="preferences.forceUnbound" :disabled="sessionActive" />
+          <YdSwitch v-model="preferences.forceUnbound" :disabled="sessionActive" />
         </label>
         <label class="sandbox-field">
           <span>角色模拟（默认走发送人真实角色）</span>
-          <FaSelect
+          <YdSelect
             v-model="preferences.roleMode" :options="roleModeOptions" :disabled="sessionActive"
             class="w-full"
           />
         </label>
         <label v-if="preferences.roleMode === 'CUSTOM'" class="sandbox-field">
           <span>指定角色（可多选）</span>
-          <FaSelect
-            v-model="preferences.simulateRoles" multiple :options="roleOptions"
+          <YdMultiSelect
+            v-model="preferences.simulateRoles" :options="roleOptions"
             :disabled="sessionActive" placeholder="选择要模拟的角色" class="w-full"
           />
         </label>
         <label class="sandbox-field">
           <span>昵称</span>
-          <FaInput v-model="preferences.nickname" :disabled="sessionActive" />
+          <YdInput v-model="preferences.nickname" :disabled="sessionActive" />
         </label>
         <label v-if="preferences.conversationType === 'GROUP'" class="sandbox-field">
           <span>群（来自策略连接的真实群列表）</span>
-          <FaSelect
+          <YdSelect
             v-model="groupChoice" :options="groupSelectOptions" :disabled="sessionActive"
             :placeholder="sandbox.groupsLoading ? '群列表加载中…' : '选择群或自定义'" class="w-full"
           />
         </label>
         <label v-if="preferences.conversationType === 'GROUP' && groupChoice === CUSTOM_VALUE" class="sandbox-field">
           <span>自定义群 ID</span>
-          <FaInput v-model="customGroupId" :disabled="sessionActive" />
+          <YdInput v-model="customGroupId" :disabled="sessionActive" />
         </label>
         <div class="session-meta">
           <div><span>状态</span><b>{{ sandbox.session?.status || '-' }}</b></div>
@@ -789,64 +789,69 @@ function caseTime(item: QqSandboxCase) {
 
       <main class="sandbox-chat">
         <div ref="timelineRef" class="sandbox-timeline">
-          <!-- Chromium/WebKit 会把 button 后代的点击重定到 button 本身，img 的 click 永远收不到；用 div+role 保持整卡可选中 -->
           <div
             v-for="(event, index) in sandbox.events"
             :key="`${event.timestamp || index}:${event.event}`"
-            role="button"
-            tabindex="0"
             class="timeline-event"
             :class="{ 'timeline-event--selected': sandbox.selectedEvent === event }"
-            @click="sandbox.selectedEvent = event"
-            @keydown.enter.prevent="sandbox.selectedEvent = event"
-            @keydown.space.prevent="sandbox.selectedEvent = event"
           >
-            <span class="timeline-event__meta">
-              <FaTag :variant="isErrorEvent(event) ? 'destructive' : 'secondary'" class="text-xs">
-                {{ actionText(event) }}
-              </FaTag>
-              <span>{{ eventTitle(event) }}</span>
-              <time>{{ eventTime(event) }}</time>
-            </span>
-            <img
-              v-if="eventImageSrc(event)" class="timeline-event__image" :src="eventImageSrc(event)!"
-              alt="捕获的图片消息" @click.stop="openImagePreview(eventImageSrc(event)!)"
+            <YdAction type="button" class="timeline-event__select" :aria-pressed="sandbox.selectedEvent === event" @click="sandbox.selectedEvent = event">
+              <span class="timeline-event__meta">
+                <YdTag :variant="isErrorEvent(event) ? 'destructive' : 'secondary'" class="text-xs">
+                  {{ actionText(event) }}
+                </YdTag>
+                <span>{{ eventTitle(event) }}</span>
+                <time>{{ eventTime(event) }}</time>
+              </span>
+              <span v-if="!eventImageSrc(event)" class="timeline-event__content">{{ eventContent(event) }}</span>
+            </YdAction>
+            <YdAction
+              v-if="eventImageSrc(event)"
+              type="button"
+              class="timeline-event__preview"
+              aria-label="预览捕获的图片"
+              @click="openImagePreview(eventImageSrc(event)!)"
             >
-            <span v-else class="timeline-event__content">{{ eventContent(event) }}</span>
+              <img
+                class="timeline-event__image"
+                :src="eventImageSrc(event)!"
+                alt="捕获的图片消息"
+              >
+            </YdAction>
           </div>
           <div v-if="!sandbox.events.length" class="sandbox-empty">
             {{ sessionActive ? '等待 QQ 消息与处理事件' : '点击「启动」即可开聊，消息会广播给全部已启用插件' }}
           </div>
         </div>
         <div v-if="showMessageOptions" class="composer-options">
-          <FaSelect
+          <YdSelect
             v-model="senderOverrideChoice" :options="composerSenderOptions"
             placeholder="本条发送者（默认会话发送人）" class="w-full"
           />
           <template v-if="senderOverrideChoice === CUSTOM_VALUE">
-            <FaInput v-model="senderId" placeholder="自定义发送者 QQ" />
-            <FaInput v-model="messageNickname" placeholder="发送者昵称（默认会话昵称）" />
+            <YdInput v-model="senderId" placeholder="自定义发送者 QQ" />
+            <YdInput v-model="messageNickname" placeholder="发送者昵称（默认会话昵称）" />
           </template>
           <template v-if="eventType === 'message'">
-            <FaSelect
-              v-model="mentionSelected" multiple :options="mentionOptions"
+            <YdMultiSelect
+              v-model="mentionSelected" :options="mentionOptions"
               placeholder="提及人（可多选系统用户）" class="w-full"
             />
-            <FaInput v-model="mentionsInput" placeholder="额外提及 QQ，逗号或空格分隔" />
-            <FaInput v-model="replyMessageId" placeholder="回复消息 ID（可选）" />
+            <YdInput v-model="mentionsInput" placeholder="额外提及 QQ，逗号或空格分隔" />
+            <YdInput v-model="replyMessageId" placeholder="回复消息 ID（可选）" />
           </template>
-          <FaInput v-model="clientMessageId" placeholder="客户端消息 ID（可选，入群请求作为 request_id）" />
+          <YdInput v-model="clientMessageId" placeholder="客户端消息 ID（可选，入群请求作为 request_id）" />
         </div>
         <div class="sandbox-composer">
           <div class="composer-main">
             <div class="composer-meta">
-              <FaSelect v-model="eventType" :options="eventTypeOptions" class="composer-type" />
-              <FaInput
+              <YdSelect v-model="eventType" :options="eventTypeOptions" class="composer-type" />
+              <YdInput
                 v-if="eventType === 'button'" v-model="buttonId" class="flex-1"
                 placeholder="按钮 ID（插件 onButton 注册的标识）"
               />
             </div>
-            <FaTextarea
+            <YdTextarea
               v-model="composer"
               :rows="2"
               :disabled="!sessionActive"
@@ -855,27 +860,27 @@ function caseTime(item: QqSandboxCase) {
             />
           </div>
           <div class="composer-actions">
-            <FaTooltip v-if="eventType === 'message'" text="开启后本条消息模拟 @机器人（触发 Agent）" side="left">
+            <YdTooltip v-if="eventType === 'message'" text="开启后本条消息模拟 @机器人（触发 Agent）" side="left">
               <label class="mention-self">
-                <FaSwitch v-model="mentionSelf" />
+                <YdSwitch v-model="mentionSelf" />
               </label>
-            </FaTooltip>
-            <FaTooltip :text="showMessageOptions ? '收起消息选项' : '更多消息选项（提及/发送者/回复）'" side="left">
-              <FaButton
+            </YdTooltip>
+            <YdTooltip :text="showMessageOptions ? '收起消息选项' : '更多消息选项（提及/发送者/回复）'" side="left">
+              <YdButton
                 :variant="showMessageOptions ? 'secondary' : 'ghost'" size="icon-sm"
                 aria-label="更多消息选项" @click="showMessageOptions = !showMessageOptions"
               >
-                <FaIcon name="morph:sliders-horizontal" />
-              </FaButton>
-            </FaTooltip>
-            <FaTooltip text="发送" side="left">
-              <FaButton
+                <YdIcon name="morph:sliders-horizontal" />
+              </YdButton>
+            </YdTooltip>
+            <YdTooltip text="发送" side="left">
+              <YdButton
                 size="icon" :loading="sandbox.sending" :disabled="!sendReady"
                 aria-label="发送" @click="send"
               >
-                <FaIcon name="morph:send" />
-              </FaButton>
-            </FaTooltip>
+                <YdIcon name="morph:send" />
+              </YdButton>
+            </YdTooltip>
           </div>
         </div>
       </main>
@@ -899,32 +904,32 @@ function caseTime(item: QqSandboxCase) {
       </aside>
     </div>
 
-    <!-- FaModal 打开时也会回发 update:modelValue(true)，用 @close 清空避免回显把 src 立即置空 -->
-    <FaModal :model-value="!!imagePreviewSrc" title="图片预览" :footer="false" :z-index="2200" content-class="sm:max-w-3xl" @close="imagePreviewSrc = null">
+    <!-- YdModal 打开时也会回发 update:modelValue(true)，用 @close 清空避免回显把 src 立即置空 -->
+    <YdModal :model-value="!!imagePreviewSrc" title="图片预览" :footer="false" :z-index="2200" content-class="sm:max-w-3xl" @close="imagePreviewSrc = null">
       <div class="image-preview">
         <img v-if="imagePreviewSrc" :src="imagePreviewSrc" alt="图片预览">
       </div>
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="showSaveCaseModal" title="存为沙盒用例" :z-index="2200" content-class="sm:max-w-lg">
+    <YdModal v-model="showSaveCaseModal" title="存为沙盒用例" :z-index="2200" content-class="sm:max-w-lg">
       <div class="case-form">
-        <FaInput v-model="caseName" placeholder="用例名称，例如：词令冒烟流程" maxlength="60" />
-        <FaTextarea v-model="caseDescription" placeholder="用例描述（可选）" :rows="2" />
+        <YdInput v-model="caseName" placeholder="用例名称，例如：词令冒烟流程" maxlength="60" />
+        <YdTextarea v-model="caseDescription" placeholder="用例描述（可选）" :rows="2" />
         <p class="case-form__hint">
           将保存当前会话的初始参数与 {{ collectableSteps.length }} 条合成消息，回放时会新建会话并逐条发送
         </p>
       </div>
       <template #footer>
-        <FaButton variant="outline" @click="showSaveCaseModal = false">
+        <YdButton variant="outline" @click="showSaveCaseModal = false">
           取消
-        </FaButton>
-        <FaButton :loading="savingCase" :disabled="!caseName.trim()" @click="confirmSaveCase">
+        </YdButton>
+        <YdButton :loading="savingCase" :disabled="!caseName.trim()" @click="confirmSaveCase">
           保存
-        </FaButton>
+        </YdButton>
       </template>
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="showCasesModal" title="沙盒用例" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
+    <YdModal v-model="showCasesModal" title="沙盒用例" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
       <div v-if="sandbox.casesLoading" class="case-list__empty">
         正在加载用例…
       </div>
@@ -940,17 +945,17 @@ function caseTime(item: QqSandboxCase) {
             <span class="case-list__time">{{ caseTime(item) }}</span>
           </div>
           <div class="case-list__actions">
-            <FaButton size="sm" :loading="sandbox.replaying" @click="runReplayCase(item.id)">
-              <FaIcon name="morph:play" />
+            <YdButton size="sm" :loading="sandbox.replaying" @click="runReplayCase(item.id)">
+              <YdIcon name="morph:play" />
               回放
-            </FaButton>
-            <FaButton variant="outline" size="sm" @click="removeCase(item.id)">
-              <FaIcon name="morph:trash-2" />
-            </FaButton>
+            </YdButton>
+            <YdButton variant="outline" size="sm" @click="removeCase(item.id)">
+              <YdIcon name="morph:trash-2" />
+            </YdButton>
           </div>
         </li>
       </ul>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -1155,6 +1160,20 @@ function caseTime(item: QqSandboxCase) {
 .timeline-event:hover,
 .timeline-event--selected {
   background: var(--color-fill-2);
+}
+
+.timeline-event__select {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.timeline-event__preview {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  margin-top: 5px;
+  cursor: zoom-in;
 }
 
 .timeline-event__meta {

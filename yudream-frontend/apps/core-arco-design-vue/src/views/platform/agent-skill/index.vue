@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { AgentSkill } from '@/api/modules/platform-agent-skill'
 import type { TableColumn } from '@yudream/components'
+import type { YdFilePickerInstance } from '@yudream/components'
 import apiSkill from '@/api/modules/platform-agent-skill'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 const loading = ref(false)
 const visible = ref(false)
 const editing = ref<AgentSkill | null>(null)
@@ -17,7 +18,7 @@ const isCompact = useMediaQuery('(max-width: 640px)')
 const paginationLayout = computed(() => isCompact.value ? 'total, pager' : 'total, sizes, ->, pager, jumper')
 const keyword = ref('')
 const resourcesText = ref('{}')
-const uploadInput = ref<HTMLInputElement>()
+const uploadInput = ref<YdFilePickerInstance | null>(null)
 const form = reactive({ name: '', description: '', content: '', enabled: true })
 
 const columns = computed<TableColumn<AgentSkill>[]>(() => [
@@ -168,12 +169,11 @@ function batchRemove() {
   })
 }
 function pickZip() {
-  uploadInput.value?.click()
+  uploadInput.value?.open()
 }
-async function onZipChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function onZipChange(files: File[]) {
+  const file = files[0]
+  uploadInput.value?.reset()
   if (!file) {
     return
   }
@@ -192,15 +192,15 @@ function formatTime(value?: string) {
 
 <template>
   <div>
-    <FaPageHeader title="平台技能库" class="mb-0">
-      <FaButton v-auth="'platform:agent-skill:create'" @click="create">
-        <FaIcon name="morph:plus" /> 新建技能
-      </FaButton>
-    </FaPageHeader>
-    <FaPageMain>
+    <YdPageHeader title="平台技能库" class="mb-0">
+      <YdButton v-auth="'platform:agent-skill:create'" @click="create">
+        <YdIcon name="morph:plus" /> 新建技能
+      </YdButton>
+    </YdPageHeader>
+    <YdPageMain>
       <section class="skill-section">
-        <FaResponsiveTable
-          v-loading="loading"
+        <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
           row-key="id"
           :data="rows"
           :columns="columns"
@@ -210,59 +210,59 @@ function formatTime(value?: string) {
         >
           <template #toolbar>
             <div class="toolbar">
-              <FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 描述" @keydown.enter="load" />
+              <YdInput v-model="keyword" class="w-72" clearable placeholder="名称 / 描述" @keydown.enter="load" />
               <div class="flex-1" />
               <template v-if="selectedRows.length">
                 <span class="selected-hint">已选 {{ selectedRows.length }} 项</span>
-                <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(true)">
+                <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(true)">
                   批量启用
-                </FaButton>
-                <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(false)">
+                </YdButton>
+                <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(false)">
                   批量停用
-                </FaButton>
-                <FaButton v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="batchRemove">
+                </YdButton>
+                <YdButton v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="batchRemove">
                   批量删除
-                </FaButton>
+                </YdButton>
               </template>
-              <FaButton v-auth="'platform:agent-skill:create'" size="sm" variant="outline" @click="pickZip">
-                <FaIcon name="morph:upload" /> 上传压缩包
-              </FaButton>
+              <YdButton v-auth="'platform:agent-skill:create'" size="sm" variant="outline" @click="pickZip">
+                <YdIcon name="morph:upload" /> 上传压缩包
+              </YdButton>
             </div>
           </template>
           <template #cell-builtin="{ row }">
-            <FaTag :variant="row.original.builtin ? 'secondary' : 'default'">
+            <YdTag :variant="row.original.builtin ? 'secondary' : 'default'">
               {{ row.original.builtin ? '内置' : '自定义' }}
-            </FaTag>
+            </YdTag>
           </template>
           <template #cell-enabled="{ row }">
-            <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
+            <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
               {{ row.original.enabled ? '启用' : '停用' }}
-            </FaTag>
+            </YdTag>
           </template>
           <template #cell-updateTime="{ row }">
             {{ formatTime(row.original.updateTime) }}
           </template>
           <template #cell-operation="{ row }">
             <div class="flex gap-2 justify-center">
-              <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row.original)">
+              <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row.original)">
                 {{ row.original.enabled ? '停用' : '启用' }}
-              </FaButton>
-              <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row.original)">
+              </YdButton>
+              <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row.original)">
                 编辑
-              </FaButton>
-              <FaButton v-if="!row.original.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row.original)">
+              </YdButton>
+              <YdButton v-if="!row.original.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row.original)">
                 删除
-              </FaButton>
+              </YdButton>
             </div>
           </template>
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                  <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                  <YdTag :variant="row.enabled ? 'default' : 'secondary'">
                     {{ row.enabled ? '启用' : '停用' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div class="flex gap-2">
@@ -279,60 +279,60 @@ function formatTime(value?: string) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row)">
+                  <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row)">
                     {{ row.enabled ? '停用' : '启用' }}
-                  </FaButton>
-                  <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row)">
+                  </YdButton>
+                  <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row)">
                     编辑
-                  </FaButton>
-                  <FaButton v-if="!row.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row)">
+                  </YdButton>
+                  <YdButton v-if="!row.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row)">
                     删除
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
-        <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="paginationLayout" class="mt-3" @page-change="load" @size-change="load" />
+        </YdResponsiveTable></YdLoadingOverlay>
+        <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="paginationLayout" class="mt-3" @page-change="load" @size-change="load" />
       </section>
-    </FaPageMain>
-    <input ref="uploadInput" type="file" accept=".zip" class="hidden" @change="onZipChange">
-    <FaModal v-model="visible" :title="editing ? '编辑技能' : '新建技能'" class="sm:max-w-3xl">
+    </YdPageMain>
+    <YdFilePicker ref="uploadInput" accept=".zip" label="选择技能压缩包" @select="onZipChange"><template #default /></YdFilePicker>
+    <YdModal v-model="visible" :title="editing ? '编辑技能' : '新建技能'" class="sm:max-w-3xl">
       <div class="skill-form">
         <div class="gap-4 grid sm:grid-cols-2">
           <label class="form-field required">
             <span>技能名称</span>
-            <FaInput v-model="form.name" class="w-full" maxlength="60" placeholder="例如：code-reviewer" />
+            <YdInput v-model="form.name" class="w-full" maxlength="60" placeholder="例如：code-reviewer" />
           </label>
           <label class="form-field">
             <span>启用状态</span>
-            <label class="check-line"><input v-model="form.enabled" type="checkbox"> <span><b>启用技能</b><small>停用后 Agent 不再看到该技能</small></span></label>
+            <YdCheckbox v-model="form.enabled" class="check-line"><span><b>启用技能</b><small>停用后 Agent 不再看到该技能</small></span></YdCheckbox>
           </label>
         </div>
         <label class="form-field required">
           <span>技能描述</span>
-          <FaTextarea v-model="form.description" class="w-full" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="写清触发场景，例如：当用户需要代码评审、风格反馈或 PR 审核时使用" />
+          <YdTextarea v-model="form.description" class="w-full" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="写清触发场景，例如：当用户需要代码评审、风格反馈或 PR 审核时使用" />
           <small>模型根据这段描述决定是否加载技能，务必写具体触发场景而非笼统功能</small>
         </label>
         <label class="form-field required">
           <span>技能内容（Markdown）</span>
-          <FaTextarea v-model="form.content" class="w-full" input-class="font-mono" :autosize="{ minRows: 10, maxRows: 20 }" placeholder="# 技能标题&#10;&#10;执行步骤…" />
+          <YdTextarea v-model="form.content" class="w-full" input-class="font-mono" :autosize="{ minRows: 10, maxRows: 20 }" placeholder="# 技能标题&#10;&#10;执行步骤…" />
           <small>建议控制在 2k tokens 内，长篇资料放入 references 资源并按相对路径引用</small>
         </label>
         <label class="form-field">
           <span>引用资源（JSON，可选）</span>
-          <FaTextarea v-model="resourcesText" class="w-full" input-class="font-mono" :autosize="{ minRows: 4, maxRows: 10 }" placeholder='{ "references/style-guide.md": "内容…" }' />
+          <YdTextarea v-model="resourcesText" class="w-full" input-class="font-mono" :autosize="{ minRows: 4, maxRows: 10 }" placeholder='{ "references/style-guide.md": "内容…" }' />
           <small>相对路径 → 文本内容；技能内容中以相对路径引用（如 scripts/run.py）</small>
         </label>
       </div>
       <template #footer>
-        <FaButton variant="outline" @click="visible = false">
+        <YdButton variant="outline" @click="visible = false">
           取消
-        </FaButton><FaButton @click="save">
+        </YdButton><YdButton @click="save">
           保存技能
-        </FaButton>
+        </YdButton>
       </template>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -345,7 +345,6 @@ function formatTime(value?: string) {
 .form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }
 .form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }
 .check-line { display: flex; align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }
-.check-line input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }
 .check-line span { display: grid; gap: 2px; }
 .check-line b { color: var(--color-text-1); font-weight: 500; }
 .check-line small { color: var(--color-text-3); font-size: 10px; }

@@ -12,8 +12,8 @@ import {
 import { ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 
 const tasks = ref<WikiIngestTask[]>([])
 const loading = ref(false)
@@ -194,32 +194,32 @@ watch(() => store.spaceId.value, () => {
 
 <template>
   <div class="ing-panel">
-    <FaScrollArea class="ing-scroll">
+    <YdScrollArea class="ing-scroll">
       <div class="ing-inner">
         <div class="ing-head">
           <div class="ing-head__status">
             <span class="ing-live" :class="{ 'ing-live--on': live }" />
             <span>{{ live ? '实时进度已连接' : '实时进度未连接' }}</span>
-            <FaTag v-if="runningCount" variant="secondary">{{ runningCount }} 个任务进行中</FaTag>
+            <YdTag v-if="runningCount" variant="secondary">{{ runningCount }} 个任务进行中</YdTag>
           </div>
           <div class="ing-head__actions">
-            <FaButton v-if="sortedTasks.length" size="sm" variant="ghost" class="ing-danger" @click="clearTasks">
-              <FaIcon name="morph:trash-2" /> 清空队列
-            </FaButton>
-            <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-              <FaIcon name="morph:refresh-cw" /> 刷新
-            </FaButton>
+            <YdButton v-if="sortedTasks.length" size="sm" variant="ghost" class="ing-danger" @click="clearTasks">
+              <YdIcon name="morph:trash-2" /> 清空队列
+            </YdButton>
+            <YdButton size="sm" variant="outline" :loading="loading" @click="load">
+              <YdIcon name="morph:refresh-cw" /> 刷新
+            </YdButton>
           </div>
         </div>
 
         <div v-if="!sortedTasks.length && !loading" class="ing-empty">
-          <FaIcon name="morph:layers" />
+          <YdIcon name="morph:layers" />
           <strong>暂无摄入任务</strong>
           <p>在「资料源」面板对资料点击「摄入」，或在「深度研究」启动研究</p>
         </div>
 
         <div v-else class="ing-list">
-          <FaCard v-for="task in pagedTasks" :key="task.id" class="ing-card">
+          <YdCard v-for="task in pagedTasks" :key="task.id" class="ing-card">
             <div class="ing-card__row">
               <span
                 class="ing-card__status"
@@ -230,36 +230,36 @@ watch(() => store.spaceId.value, () => {
               <strong class="ing-card__type">{{ taskTypeLabel(task.taskType) }}</strong>
               <span class="ing-card__phase">{{ task.phase }}</span>
               <div class="ing-card__actions">
-                <FaButton
+                <YdButton
                   v-if="['QUEUED', 'RUNNING'].includes(task.status)"
                   size="sm"
                   variant="ghost"
                   class="ing-danger"
                   @click="cancelTask(task)"
                 >
-                  <FaIcon name="morph:circle-stop" /> 取消
-                </FaButton>
-                <FaButton
+                  <YdIcon name="morph:circle-stop" /> 取消
+                </YdButton>
+                <YdButton
                   v-if="['FAILED', 'CANCELLED'].includes(task.status)"
                   size="sm"
                   variant="outline"
                   @click="retryTask(task)"
                 >
-                  <FaIcon name="morph:rotate-cw" /> 重试
-                </FaButton>
-                <FaButton
+                  <YdIcon name="morph:rotate-cw" /> 重试
+                </YdButton>
+                <YdButton
                   v-if="!['QUEUED'].includes(task.status)"
                   size="sm"
                   variant="ghost"
                   class="ing-danger"
                   @click="deleteTask(task)"
                 >
-                  <FaIcon name="morph:trash-2" /> 删除
-                </FaButton>
+                  <YdIcon name="morph:trash-2" /> 删除
+                </YdButton>
               </div>
             </div>
             <div class="ing-card__progress">
-              <FaProgress
+              <YdProgress
                 :model-value="task.percent"
                 class="ing-progress"
                 :class="{ 'ing-progress--failed': task.status === 'FAILED' }"
@@ -268,11 +268,11 @@ watch(() => store.spaceId.value, () => {
               <span class="ing-card__attempts">尝试 {{ task.attempts }}/{{ task.maxAttempts }}</span>
             </div>
             <p v-if="task.errorMessage" class="ing-card__error">
-              <FaIcon name="morph:triangle-alert" /> {{ task.errorMessage }}
+              <YdIcon name="morph:triangle-alert" /> {{ task.errorMessage }}
             </p>
-          </FaCard>
+          </YdCard>
         </div>
-        <FaPagination
+        <YdPagination
           v-if="sortedTasks.length > pageSize"
           v-model:page="page"
           v-model:size="pageSize"
@@ -280,7 +280,7 @@ watch(() => store.spaceId.value, () => {
           class="ing-pagination"
         />
       </div>
-    </FaScrollArea>
+    </YdScrollArea>
   </div>
 </template>
 
@@ -329,8 +329,8 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-live--on {
-  background: #10b981;
-  box-shadow: 0 0 0 3px #10b98133;
+  background: var(--color-text-2);
+  box-shadow: 0 0 0 3px var(--color-text-2)33;
 }
 
 .ing-empty {
@@ -342,7 +342,7 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: rgb(var(--color-text-2));
   font-size: 36px;
 }
 
@@ -394,7 +394,7 @@ watch(() => store.spaceId.value, () => {
 }
 
 .ing-danger {
-  color: #dc2626;
+  color: var(--color-text-2);
 }
 
 .ing-card__progress {
@@ -433,8 +433,8 @@ watch(() => store.spaceId.value, () => {
   margin: 10px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #ef444412;
-  color: #dc2626;
+  background: var(--color-text-2)12;
+  color: var(--color-text-2);
   font-size: 12px;
 }
 </style>

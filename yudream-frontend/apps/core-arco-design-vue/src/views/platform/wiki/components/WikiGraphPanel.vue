@@ -15,7 +15,7 @@ const activeInsight = ref(-1)
 let chart: echarts.ECharts | null = null
 let resizeObserver: ResizeObserver | null = null
 
-const paletteTokens = ['rgb(var(--primary-2))', 'rgb(var(--primary-3))', 'rgb(var(--primary-4))', 'rgb(var(--primary-5))', 'rgb(var(--primary-6))', 'rgb(var(--primary-7))', 'rgb(var(--primary-8))', 'rgb(var(--primary-9))', 'rgb(var(--primary-10))', 'var(--color-text-2)']
+const paletteTokens = [30, 38, 46, 54, 62, 70, 78, 86, 94, 100].map(weight => weight === 100 ? 'var(--color-text-2)' : `color-mix(in srgb, var(--color-text-2) ${weight}%, var(--color-bg-1))`)
 
 const insightKindMeta: Record<string, { label: string, icon: string }> = {
   SURPRISING_CONNECTION: {label: '惊奇连接', icon: 'morph:sparkles'},
@@ -283,69 +283,73 @@ watch(() => store.spaceId.value, load)
     <div class="graph-canvas-card">
       <div class="graph-canvas__toolbar">
         <span class="graph-canvas__hint">
-          <FaIcon name="morph:move"/> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
+          <YdIcon name="morph:move"/> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
         </span>
-        <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-          <FaIcon name="morph:refresh-cw"/>
+        <YdButton size="sm" variant="outline" :loading="loading" @click="load">
+          <YdIcon name="morph:refresh-cw"/>
           刷新图谱
-        </FaButton>
+        </YdButton>
       </div>
       <div ref="chartEl" class="graph-canvas"/>
       <div v-if="!loading && (!graph || !graph.nodes.length)" class="graph-canvas__empty">
-        <FaIcon name="morph:waypoints"/>
+        <YdIcon name="morph:waypoints"/>
         <strong>暂无图谱数据</strong>
         <p>摄入更多资料后，系统会自动构建知识图谱</p>
       </div>
       <div v-if="loading" class="graph-canvas__loading">
-        <FaIcon name="morph:loader-circle" class="graph-spin"/>
+        <YdIcon name="morph:loader-circle" class="graph-spin"/>
         正在加载图谱…
       </div>
     </div>
 
     <aside class="graph-side">
-      <FaScrollArea class="graph-side__scroll">
-        <FaCard title="社区" class="graph-side__card">
+      <YdScrollArea class="graph-side__scroll">
+        <YdCard title="社区" class="graph-side__card">
           <template v-if="graph?.communities?.length">
-            <button
+            <YdButton
               v-for="(community, index) in graph.communities"
               :key="community.id"
+              variant="ghost"
               type="button"
               class="graph-community"
               :class="{ 'graph-community--active': activeCommunity === community.id }"
+              :aria-pressed="activeCommunity === community.id"
               @click="focusCommunity(community.id)"
             >
               <span class="graph-community__dot" :style="{ background: communityColor(index) }"/>
               <span class="graph-community__label">{{ community.label }}</span>
               <span class="graph-community__meta">{{ community.size }} 页 · 内聚 {{ (community.cohesion * 100).toFixed(0) }}%</span>
               <span v-if="community.lowCohesion" class="graph-community__warn">低内聚</span>
-            </button>
+            </YdButton>
           </template>
           <p v-else class="graph-side__empty">暂无社区划分</p>
-        </FaCard>
+        </YdCard>
 
-        <FaCard title="图谱洞察" class="graph-side__card">
+        <YdCard title="图谱洞察" class="graph-side__card">
           <template v-if="graph?.insights?.length">
-            <button
+            <YdButton
               v-for="(insight, index) in graph.insights"
               :key="`${insight.kind}-${index}`"
+              variant="ghost"
               type="button"
               class="graph-insight"
               :class="{ 'graph-insight--active': activeInsight === index }"
+              :aria-pressed="activeInsight === index"
               @click="focusInsight(index)"
             >
               <div class="graph-insight__head">
                 <span class="graph-insight__kind">
-                  <FaIcon :name="insightMeta(insight.kind).icon"/>
+                  <YdIcon :name="insightMeta(insight.kind).icon"/>
                   {{ insightMeta(insight.kind).label }}
                 </span>
                 <strong>{{ insight.title }}</strong>
               </div>
               <p>{{ insight.description }}</p>
-            </button>
+            </YdButton>
           </template>
           <p v-else class="graph-side__empty">暂无洞察</p>
-        </FaCard>
-      </FaScrollArea>
+        </YdCard>
+      </YdScrollArea>
     </aside>
   </div>
 </template>
@@ -408,7 +412,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .graph-canvas__empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-3);
   font-size: 40px;
 }
 
@@ -472,7 +476,7 @@ watch(() => store.spaceId.value, load)
 }
 
 .graph-community--active {
-  border-color: rgba(var(--primary-6), 0.35);
+  border-color: var(--color-border-2);
   background: var(--color-fill-2);
   color: var(--color-text-2);
 }
@@ -523,12 +527,12 @@ watch(() => store.spaceId.value, load)
 }
 
 .graph-insight:hover {
-  border-color: rgba(var(--primary-6), 0.35);
+  border-color: var(--color-border-2);
 }
 
 .graph-insight--active {
-  border-color: rgb(var(--primary-6));
-  background: rgba(var(--primary-6), 0.06);
+  border-color: var(--color-text-3);
+  background: var(--color-fill-2);
 }
 
 .graph-insight__head {

@@ -20,7 +20,7 @@ import {
   severityTag,
 } from './analysis'
 
-const toast = useFaToast()
+const toast = useYdToast()
 
 const loading = ref(false)
 const historyLoading = ref(false)
@@ -356,26 +356,26 @@ function stackPreview(row: HostThreadHotspot) {
 
 <template>
   <div>
-    <FaPageHeader title="资源监控" class="mb-0 resource-header" main-class="min-w-0" default-class="w-full min-w-0 flex-wrap sm:w-auto">
+    <YdPageHeader title="资源监控" class="mb-0 resource-header" main-class="min-w-0" default-class="w-full min-w-0 flex-wrap sm:w-auto">
       <template #description>
         <p class="host-meta">{{ hostMeta }}</p>
       </template>
-      <FaSelect v-model="hours" :options="hourOptions" class="w-full min-w-0 sm:w-[140px]" @update:model-value="loadHistory" />
-      <FaButton class="shrink-0" :loading="loading || historyLoading" @click="refreshAll">
-        <FaIcon name="morph:refresh-cw" />
+      <YdSelect v-model="hours" :options="hourOptions" class="w-full min-w-0 sm:w-[140px]" @update:model-value="loadHistory" />
+      <YdButton class="shrink-0" :loading="loading || historyLoading" @click="refreshAll">
+        <YdIcon name="morph:refresh-cw" />
         刷新
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain class="resource-main" main-class="min-w-0 overflow-x-hidden">
+    <YdPageMain class="resource-main" main-class="min-w-0 overflow-x-hidden">
       <p v-if="snapshot?.notice" class="monitor-notice">{{ snapshot.notice }}</p>
 
       <section class="monitor-panel analysis-panel">
         <div class="panel-title">
           <span>优化分析</span>
-          <FaTag :variant="severityTag(analysis.severity)">{{ severityLabel(analysis.severity) }}</FaTag>
+          <YdTag :variant="severityTag(analysis.severity)">{{ severityLabel(analysis.severity) }}</YdTag>
         </div>
-        <FaAlert
+        <YdAlert
           :icon="analysis.severity === 'warn' ? 'morph:triangle-alert' : 'morph:lightbulb'"
           :title="analysis.headline"
           :description="analysis.summary"
@@ -386,7 +386,7 @@ function stackPreview(row: HostThreadHotspot) {
           <article v-for="item in analysis.findings" :key="item.id" class="finding-card">
             <div class="finding-head">
               <strong>{{ item.title }}</strong>
-              <FaTag :variant="severityTag(item.severity)">{{ severityLabel(item.severity) }}</FaTag>
+              <YdTag :variant="severityTag(item.severity)">{{ severityLabel(item.severity) }}</YdTag>
             </div>
             <p>{{ item.summary }}</p>
             <p class="finding-action">{{ item.action }}</p>
@@ -403,7 +403,7 @@ function stackPreview(row: HostThreadHotspot) {
               <li v-for="item in analysis.memorySpenders" :key="`mem-${item.name}-${item.detail}`">
                 <div>
                   <strong>{{ item.name }}</strong>
-                  <FaTag v-if="item.current" variant="secondary">当前程序</FaTag>
+                  <YdTag v-if="item.current" variant="secondary">当前程序</YdTag>
                 </div>
                 <span>{{ item.detail }}</span>
                 <p>{{ item.hint }}</p>
@@ -420,7 +420,7 @@ function stackPreview(row: HostThreadHotspot) {
               <li v-for="item in analysis.cpuSpenders" :key="`cpu-${item.name}-${item.detail}`">
                 <div>
                   <strong>{{ item.name }}</strong>
-                  <FaTag v-if="item.current" variant="secondary">当前程序</FaTag>
+                  <YdTag v-if="item.current" variant="secondary">当前程序</YdTag>
                 </div>
                 <span>{{ item.detail }}</span>
                 <p>{{ item.hint }}</p>
@@ -434,7 +434,7 @@ function stackPreview(row: HostThreadHotspot) {
       <div class="monitor-summary">
         <div v-for="item in stats" :key="item.label" class="summary-item">
           <div class="summary-icon">
-            <FaIcon :name="item.icon" />
+            <YdIcon :name="item.icon" />
           </div>
           <div class="summary-body">
             <span>{{ item.label }}</span>
@@ -471,7 +471,7 @@ function stackPreview(row: HostThreadHotspot) {
         <section class="monitor-panel">
           <div class="panel-title">
             <span>JVM 内存池</span>
-            <FaTag variant="secondary">{{ snapshot?.memoryPools.length || 0 }}</FaTag>
+            <YdTag variant="secondary">{{ snapshot?.memoryPools.length || 0 }}</YdTag>
           </div>
           <p class="monitor-sub">饼图按已用字节看内存花在哪一块。Heap 高看 Eden/Old，RSS 明显高于 Heap 时再看 Metaspace、Code Cache 或 Direct。</p>
           <ChartWidget :dataset="poolDataset" :height="chartHeight" />
@@ -486,7 +486,7 @@ function stackPreview(row: HostThreadHotspot) {
         <section class="monitor-panel">
           <div class="panel-title">磁盘分区</div>
           <p class="monitor-sub">每个挂载点各自的容量。日志、上传和数据库文件通常不在同一个分区。</p>
-          <FaResponsiveTable
+          <YdResponsiveTable
             row-key="mount"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[640px]"
@@ -502,23 +502,23 @@ function stackPreview(row: HostThreadHotspot) {
               {{ percentText(row.original.usagePercent) }}
             </template>
             <template #card="{ row }">
-              <FaCard class="w-full min-w-0">
+              <YdCard class="w-full min-w-0">
                 <div class="card-row">
                   <strong>{{ row.name || row.mount }}</strong>
                   <span>{{ percentText(row.usagePercent) }}</span>
                 </div>
                 <p class="monitor-sub">{{ row.mount }} · {{ row.type || '未知类型' }}</p>
                 <p class="monitor-sub">{{ formatBytes(row.usedBytes) }} / {{ formatBytes(row.totalBytes) }}</p>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable>
         </section>
       </div>
 
       <section class="monitor-panel monitor-panel--wide">
         <div class="panel-title">网卡</div>
         <p class="monitor-sub">看具体哪块网卡在跑流量。虚拟网卡速率高不一定代表对外带宽打满。</p>
-        <FaResponsiveTable
+        <YdResponsiveTable
           row-key="name"
           table-root-class="rounded-md overflow-hidden"
           table-class="min-w-[640px]"
@@ -534,25 +534,25 @@ function stackPreview(row: HostThreadHotspot) {
             {{ formatRate(row.original.sentBytesPerSec) }}
           </template>
             <template #card="{ row }">
-            <FaCard class="w-full min-w-0">
+            <YdCard class="w-full min-w-0">
               <div class="card-row">
                 <strong>{{ row.name }}</strong>
                 <span>{{ row.ipv4 || '-' }}</span>
               </div>
               <p class="monitor-sub">{{ formatRate(row.recvBytesPerSec) }} ↓ / {{ formatRate(row.sentBytesPerSec) }} ↑</p>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
+        </YdResponsiveTable>
       </section>
 
       <div class="monitor-grid">
         <section class="monitor-panel">
           <div class="panel-title">
             <span>进程 RSS Top</span>
-            <FaTag variant="secondary">{{ snapshot?.topProcesses.length || 0 }}</FaTag>
+            <YdTag variant="secondary">{{ snapshot?.topProcesses.length || 0 }}</YdTag>
           </div>
           <p class="monitor-sub">本机物理内存占用最高的进程。带「当前 JVM」的才是这个管理端；如果第一名是别的程序，先别给 Java 加堆。</p>
-          <FaResponsiveTable
+          <YdResponsiveTable
             row-key="pid"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[860px]"
@@ -563,7 +563,7 @@ function stackPreview(row: HostThreadHotspot) {
           >
             <template #cell-name="{ row }">
               <span>{{ row.original.name }}</span>
-              <FaTag v-if="row.original.currentJvm" variant="secondary" class="ml-2">当前 JVM</FaTag>
+              <YdTag v-if="row.original.currentJvm" variant="secondary" class="ml-2">当前 JVM</YdTag>
             </template>
             <template #cell-rssBytes="{ row }">
               {{ formatBytes(row.original.rssBytes) }}
@@ -572,24 +572,24 @@ function stackPreview(row: HostThreadHotspot) {
               {{ percentText(row.original.cpuPercent) }}
             </template>
             <template #card="{ row }">
-              <FaCard class="w-full min-w-0">
+              <YdCard class="w-full min-w-0">
                 <div class="card-row">
                   <strong>{{ row.name }} #{{ row.pid }}</strong>
-                  <FaTag v-if="row.currentJvm" variant="secondary">当前 JVM</FaTag>
+                  <YdTag v-if="row.currentJvm" variant="secondary">当前 JVM</YdTag>
                 </div>
                 <p class="monitor-sub">RSS {{ formatBytes(row.rssBytes) }} · CPU {{ percentText(row.cpuPercent) }}</p>
                 <code>{{ row.commandLine || '-' }}</code>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable>
         </section>
         <section class="monitor-panel">
           <div class="panel-title">
             <span>线程 CPU Top</span>
-            <FaTag variant="secondary">{{ snapshot?.topThreads.length || 0 }}</FaTag>
+            <YdTag variant="secondary">{{ snapshot?.topThreads.length || 0 }}</YdTag>
           </div>
           <p class="monitor-sub">当前 JVM 里累计 CPU 最高的线程。RUNNABLE 更像计算热点；WAITING / BLOCKED 更像在等锁或 IO。</p>
-          <FaResponsiveTable
+          <YdResponsiveTable
             row-key="threadId"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[860px]"
@@ -605,21 +605,21 @@ function stackPreview(row: HostThreadHotspot) {
               <code>{{ stackPreview(row.original) }}</code>
             </template>
             <template #card="{ row }">
-              <FaCard class="w-full min-w-0">
+              <YdCard class="w-full min-w-0">
                 <div class="card-row">
                   <strong>{{ row.name }}</strong>
                   <span>{{ row.state || '-' }}</span>
                 </div>
                 <p class="monitor-sub">CPU {{ formatDuration(row.cpuTimeMs) }}</p>
                 <code>{{ stackPreview(row) }}</code>
-              </FaCard>
+              </YdCard>
             </template>
-          </FaResponsiveTable>
+          </YdResponsiveTable>
         </section>
       </div>
 
       <section class="monitor-panel glossary-panel">
-        <FaCollapsible v-model="glossaryOpen">
+        <YdCollapsible v-model="glossaryOpen">
           <template #trigger="{ open }">
             <div class="panel-title glossary-trigger">
               <span>名词解释</span>
@@ -632,7 +632,7 @@ function stackPreview(row: HostThreadHotspot) {
               <dd>{{ item.meaning }}</dd>
             </div>
           </dl>
-        </FaCollapsible>
+        </YdCollapsible>
         <dl v-if="!glossaryOpen" class="glossary-list glossary-preview">
           <div v-for="item in glossaryPreview" :key="item.term">
             <dt>{{ item.term }}</dt>
@@ -640,7 +640,7 @@ function stackPreview(row: HostThreadHotspot) {
           </div>
         </dl>
       </section>
-    </FaPageMain>
+    </YdPageMain>
   </div>
 </template>
 

@@ -11,9 +11,9 @@ const appSettingsStore = useAppSettingsStore()
 
 <template>
   <div class="flex items-center">
-    <FaButton v-if="appSettingsStore.mode === 'mobile'" variant="ghost" size="icon" class="size-9" @click="appSettingsStore.toggleSidebarCollapse()">
-      <FaIcon name="app-toolbar-collapse" class="size-4" />
-    </FaButton>
+    <YdButton v-if="appSettingsStore.mode === 'mobile'" variant="ghost" size="icon" class="size-9" @click="appSettingsStore.toggleSidebarCollapse()">
+      <YdIcon name="app-toolbar-collapse" class="size-4" />
+    </YdButton>
     <Component :is="useSlots('toolbar-start')" />
     <Tools mode="left-side" />
   </div>

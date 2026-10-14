@@ -233,7 +233,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <FaButton
+  <YdButton
     v-if="appSettingsStore.mode === 'mobile' && !appSettingsStore.settings.topbar.toolbar"
     ref="buttonRef"
     variant="outline"
@@ -248,6 +248,6 @@ onUnmounted(() => {
     @lostpointercapture="handleLostPointerCapture"
     @click="handleClick"
   >
-    <FaIcon name="app-toolbar-collapse" class="size-4 rotate-180" />
-  </FaButton>
+    <YdIcon name="app-toolbar-collapse" class="size-4 rotate-180" />
+  </YdButton>
 </template>

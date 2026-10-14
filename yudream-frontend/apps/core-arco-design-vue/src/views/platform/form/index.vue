@@ -6,8 +6,8 @@ import DynamicFormRenderer from './components/DynamicFormRenderer.vue'
 import FormSubmissionPanel from './components/FormSubmissionPanel.vue'
 
 const router = useRouter()
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const loading = ref(false)
 const previewLoading = ref(false)
@@ -185,16 +185,16 @@ function dateText(value?: string) {
 
 <template>
   <div>
-    <FaPageHeader title="动态表单" class="mb-0">
-      <FaButton v-auth="'platform:form:edit'" @click="openCreate">
-        <FaIcon name="morph:plus" />
+    <YdPageHeader title="动态表单" class="mb-0">
+      <YdButton v-auth="'platform:form:edit'" @click="openCreate">
+        <YdIcon name="morph:plus" />
         新建表单
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1280px]"
@@ -205,24 +205,24 @@ function dateText(value?: string) {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="表单名称 / 编码 / 描述" @keydown.enter="load" @clear="load" />
-              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
+              <YdInput v-model="search.keyword" clearable placeholder="表单名称 / 编码 / 描述" @keydown.enter="load" @clear="load" />
+              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">
+          <YdTag :variant="statusVariant(row.original.status)">
             {{ statusText(row.original.status) }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-allowAnonymous="{ row }">
           {{ row.original.allowAnonymous ? '是' : '登录后填写' }}
@@ -235,26 +235,26 @@ function dateText(value?: string) {
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
-            <FaButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row.original)">查看</FaButton>
-            <FaButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row.original)">设计</FaButton>
-            <FaButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row.original)">提交结果</FaButton>
-            <FaButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row.original)">统计</FaButton>
-            <FaButton size="sm" variant="ghost" :disabled="row.original.status !== 'PUBLISHED'" @click="copyPublicUrl(row.original)">公开链接</FaButton>
-            <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.original.id}`" :disabled="row.original.status === 'PUBLISHED'" @click="publish(row.original)">
+            <YdButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row.original)">查看</YdButton>
+            <YdButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row.original)">设计</YdButton>
+            <YdButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row.original)">提交结果</YdButton>
+            <YdButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row.original)">统计</YdButton>
+            <YdButton size="sm" variant="ghost" :disabled="row.original.status !== 'PUBLISHED'" @click="copyPublicUrl(row.original)">公开链接</YdButton>
+            <YdButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.original.id}`" :disabled="row.original.status === 'PUBLISHED'" @click="publish(row.original)">
               发布
-            </FaButton>
-            <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `unpublish-${row.original.id}`" :disabled="row.original.status !== 'PUBLISHED'" @click="unpublish(row.original)">
+            </YdButton>
+            <YdButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `unpublish-${row.original.id}`" :disabled="row.original.status !== 'PUBLISHED'" @click="unpublish(row.original)">
               下线
-            </FaButton>
-            <FaButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row.original)">删除</FaButton>
+            </YdButton>
+            <YdButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row.original)">删除</YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -275,37 +275,37 @@ function dateText(value?: string) {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row)">
+                <YdButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row)">
                   查看
-                </FaButton>
-                <FaButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row)">
                   设计
-                </FaButton>
-                <FaButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row)">
                   提交结果
-                </FaButton>
-                <FaButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row)">
                   统计
-                </FaButton>
-                <FaButton size="sm" variant="ghost" :disabled="row.status !== 'PUBLISHED'" @click="copyPublicUrl(row)">
+                </YdButton>
+                <YdButton size="sm" variant="ghost" :disabled="row.status !== 'PUBLISHED'" @click="copyPublicUrl(row)">
                   公开链接
-                </FaButton>
-                <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
                   发布
-                </FaButton>
-                <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `unpublish-${row.id}`" :disabled="row.status !== 'PUBLISHED'" @click="unpublish(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `unpublish-${row.id}`" :disabled="row.status !== 'PUBLISHED'" @click="unpublish(row)">
                   下线
-                </FaButton>
-                <FaButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
                   删除
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -313,20 +313,20 @@ function dateText(value?: string) {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="previewVisible" :title="previewForm ? `${previewForm.name} / 表单详情` : '表单详情'" class="sm:max-w-4xl">
-      <section v-loading="previewLoading" class="preview-panel">
+    <YdModal v-model="previewVisible" :title="previewForm ? `${previewForm.name} / 表单详情` : '表单详情'" class="sm:max-w-4xl">
+      <YdLoadingOverlay :loading="previewLoading"><section  class="preview-panel">
         <DynamicFormRenderer v-if="previewForm" :form="previewForm" readonly />
-      </section>
-    </FaModal>
+      </section></YdLoadingOverlay>
+    </YdModal>
 
-    <FaModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
+    <YdModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
       <FormSubmissionPanel :form="selected" :form-id="selected?.id" :form-name="selected?.name" embedded />
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="statisticsVisible" :title="selected ? `${selected.name} / 结果统计` : '结果统计'" class="sm:max-w-4xl">
-      <section v-loading="statisticsLoading" class="statistics-panel">
+    <YdModal v-model="statisticsVisible" :title="selected ? `${selected.name} / 结果统计` : '结果统计'" class="sm:max-w-4xl">
+      <YdLoadingOverlay :loading="statisticsLoading"><section  class="statistics-panel">
         <div class="stat-grid">
           <div class="stat-card">
             <span>总提交</span>
@@ -355,8 +355,8 @@ function dateText(value?: string) {
             </div>
           </article>
         </div>
-      </section>
-    </FaModal>
+      </section></YdLoadingOverlay>
+    </YdModal>
   </div>
 </template>
 

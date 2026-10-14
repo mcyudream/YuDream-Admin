@@ -125,22 +125,24 @@ onMounted(async () => {
         class="devtools-fab"
         :style="fabStyle"
       >
-        <div
+        <YdAction
+          type="button"
+          aria-label="展开插件开发者工具"
           v-if="fabState.docked"
           class="devtools-fab__strip"
           :class="`devtools-fab__strip--${fabState.side}`"
           title="展开插件开发者工具"
           @click="handleStripActivate"
         >
-          <FaIcon name="morph:bug" class="size-3.5" />
+          <YdIcon name="morph:bug" class="size-3.5" />
           <span v-if="store.unreadCount" class="devtools-fab__dot" />
-        </div>
-        <FaBadge v-else :value="store.unreadCount" variant="destructive">
-          <FaTooltip
+        </YdAction>
+        <YdBadge v-else :value="store.unreadCount" variant="destructive">
+          <YdTooltip
             text="插件开发者工具（可拖拽，拖到屏幕边缘收起）"
             :side="fabState.side === 'right' ? 'left' : 'right'"
           >
-            <FaButton
+            <YdButton
               size="icon-lg"
               class="rounded-full select-none shadow-md touch-none"
               :class="fabDragging ? 'cursor-grabbing' : 'cursor-grab'"
@@ -151,10 +153,10 @@ onMounted(async () => {
               @lostpointercapture="handleLostPointerCapture"
               @click="handleActivate(togglePanel)"
             >
-              <FaIcon name="morph:bug" class="size-5" />
-            </FaButton>
-          </FaTooltip>
-        </FaBadge>
+              <YdIcon name="morph:bug" class="size-5" />
+            </YdButton>
+          </YdTooltip>
+        </YdBadge>
       </div>
 
       <Transition name="devtools-panel">
@@ -174,23 +176,23 @@ onMounted(async () => {
             @pointercancel="handleHeaderPointerUp"
             @lostpointercapture="handleHeaderPointerUp"
           >
-            <FaIcon name="morph:bug" class="shrink-0 size-4" />
+            <YdIcon name="morph:bug" class="shrink-0 size-4" />
             <span class="devtools-panel__title">插件开发者工具</span>
-            <FaTooltip :text="`生命周期流${store.lifecycleConnected ? '已连接' : '未连接'}`" side="bottom">
+            <YdTooltip :text="`生命周期流${store.lifecycleConnected ? '已连接' : '未连接'}`" side="bottom">
               <span class="sse-dot" :class="store.lifecycleConnected ? 'sse-dot--on' : ''" />
-            </FaTooltip>
-            <FaTooltip :text="`追踪流${store.traceConnected ? '已连接' : '未连接'}`" side="bottom">
+            </YdTooltip>
+            <YdTooltip :text="`追踪流${store.traceConnected ? '已连接' : '未连接'}`" side="bottom">
               <span class="sse-dot" :class="store.traceConnected ? 'sse-dot--on' : ''" />
-            </FaTooltip>
+            </YdTooltip>
             <div class="flex-1" />
             <span class="devtools-panel__shortcut">Ctrl+Shift+D</span>
-            <FaButton variant="ghost" size="icon-sm" aria-label="关闭" @click="store.closeDrawer()">
-              <FaIcon name="morph:x" class="size-4" />
-            </FaButton>
+            <YdButton variant="ghost" size="icon-sm" aria-label="关闭" @click="store.closeDrawer()">
+              <YdIcon name="morph:x" class="size-4" />
+            </YdButton>
           </header>
 
           <div v-if="!store.status" class="devtools-unavailable">
-            <FaIcon name="morph:cloud-off" class="size-8" />
+            <YdIcon name="morph:cloud-off" class="size-8" />
             <p>后端开发者工具接口不可用{{ store.statusError ? `：${store.statusError}` : '。' }}</p>
             <p class="text-xs">
               请确认后端已部署包含插件开发者工具的版本并以管理员身份登录；vite dev 环境下此面板仅作降级展示。
@@ -199,22 +201,25 @@ onMounted(async () => {
 
           <div v-else class="devtools-body">
             <nav class="devtools-nav">
-              <FaTooltip
+              <YdTooltip
                 v-for="item in navItems"
                 :key="item.value"
                 :text="item.label"
                 side="right"
               >
-                <button
+                <YdButton
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   class="devtools-nav__item"
                   :class="{ 'devtools-nav__item--active': store.activePage === item.value }"
                   :aria-label="item.label"
+                  :aria-pressed="store.activePage === item.value"
                   @click="store.setActivePage(item.value)"
                 >
-                  <FaIcon :name="item.icon" class="shrink-0 size-4" />
-                </button>
-              </FaTooltip>
+                  <YdIcon :name="item.icon" class="shrink-0 size-4" />
+                </YdButton>
+              </YdTooltip>
             </nav>
 
             <div class="devtools-content">
@@ -470,7 +475,7 @@ onMounted(async () => {
 </style>
 
 <style>
-/* 浮窗 z-index 2100 高于 FaSelect 下拉默认的 z-2000，下拉 teleport 到 body 后会被浮窗挡住导致"点击无反应"，这里显式抬升 */
+/* 浮窗 z-index 2100 高于 YdSelect 下拉默认的 z-2000，下拉 teleport 到 body 后会被浮窗挡住导致"点击无反应"，这里显式抬升 */
 body [data-slot="select-content"] {
   z-index: 2200;
 }

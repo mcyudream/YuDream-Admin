@@ -1,3 +1,5 @@
+import { useYdFilePicker } from '@yudream/components'
+
 export interface ExcelImportResult {
   total: number
   success: number
@@ -22,17 +24,14 @@ export function saveExcelResponse(response: ExcelBlobResponse, fallbackName: str
   URL.revokeObjectURL(url)
 }
 
+const excelFilePicker = useYdFilePicker({ accept: '.xlsx,.xls' })
+
 export function pickExcelFile(onPick: (file: File) => void) {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.xlsx,.xls'
-  input.onchange = () => {
-    const file = input.files?.[0]
+  void excelFilePicker.open().then(([file]) => {
     if (file) {
       onPick(file)
     }
-  }
-  input.click()
+  })
 }
 
 export function excelForm(file: File) {

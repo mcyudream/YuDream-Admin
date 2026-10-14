@@ -12,8 +12,8 @@ const emit = defineEmits<{
   saved: []
 }>()
 
-const toast = useFaToast()
-const modal = useFaModal()
+const toast = useYdToast()
+const modal = useYdModal()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -225,7 +225,7 @@ function onPageSizeChange(size: number) {
 </script>
 
 <template>
-  <FaModal
+  <YdModal
     :model-value="props.visible"
     title="CMS 区块库"
     class="sm:max-w-[960px]"
@@ -237,26 +237,26 @@ function onPageSizeChange(size: number) {
   >
     <div class="block-library">
       <div class="block-library__toolbar">
-        <FaInput
+        <YdInput
           v-model="keyword"
           placeholder="搜索编码、名称"
           clearable
           class="w-[220px]"
         />
-        <FaSelect
+        <YdSelect
           v-model="categoryFilter"
           :options="categoryOptions"
           placeholder="选择分类"
           class="w-[160px]"
         />
-        <FaButton @click="openCreate">
-          <FaIcon name="morph:plus" />
+        <YdButton @click="openCreate">
+          <YdIcon name="morph:plus" />
           新增区块
-        </FaButton>
+        </YdButton>
       </div>
 
-      <FaResponsiveTable
-        v-loading="loading"
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[720px]"
@@ -266,35 +266,35 @@ function onPageSizeChange(size: number) {
         :data="blocks"
       >
         <template #cell-kind="{ row }">
-          <FaTag :variant="row.original.kind === 'PRESET' ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.kind === 'PRESET' ? 'default' : 'secondary'">
             {{ kindLabel(row.original.kind) }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-enabled="{ row }">
-          <FaSwitch :model-value="row.original.enabled" @update:model-value="toggleEnable(row.original)" />
+          <YdSwitch :model-value="row.original.enabled" @update:model-value="toggleEnable(row.original)" />
         </template>
         <template #cell-operation="{ row }">
           <div class="flex flex-wrap gap-2">
-            <FaButton size="sm" variant="outline" @click="openEdit(row.original)">
+            <YdButton size="sm" variant="outline" @click="openEdit(row.original)">
               编辑
-            </FaButton>
-            <FaButton size="sm" variant="outline" @click="toggleEnable(row.original)">
+            </YdButton>
+            <YdButton size="sm" variant="outline" @click="toggleEnable(row.original)">
               {{ row.original.enabled ? '禁用' : '启用' }}
-            </FaButton>
-            <FaButton size="sm" variant="destructive" @click="confirmDelete(row.original)">
+            </YdButton>
+            <YdButton size="sm" variant="destructive" @click="confirmDelete(row.original)">
               删除
-            </FaButton>
+            </YdButton>
           </div>
         </template>
 
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="row.kind === 'PRESET' ? 'default' : 'secondary'">
+                <YdTag :variant="row.kind === 'PRESET' ? 'default' : 'secondary'">
                   {{ kindLabel(row.kind) }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -312,25 +312,25 @@ function onPageSizeChange(size: number) {
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-sm text-secondary-foreground/60">启用</span>
-                <FaSwitch :model-value="row.enabled" @update:model-value="toggleEnable(row)" />
+                <YdSwitch :model-value="row.enabled" @update:model-value="toggleEnable(row)" />
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton size="sm" variant="outline" @click="openEdit(row)">
+                <YdButton size="sm" variant="outline" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton size="sm" variant="outline" @click="toggleEnable(row)">
+                </YdButton>
+                <YdButton size="sm" variant="outline" @click="toggleEnable(row)">
                   {{ row.enabled ? '禁用' : '启用' }}
-                </FaButton>
-                <FaButton size="sm" variant="destructive" @click="confirmDelete(row)">
+                </YdButton>
+                <YdButton size="sm" variant="destructive" @click="confirmDelete(row)">
                   删除
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -340,54 +340,54 @@ function onPageSizeChange(size: number) {
       />
     </div>
 
-    <FaModal
+    <YdModal
       v-model="formVisible"
       :title="editingBlock ? '编辑区块' : '新增区块'"
       class="sm:max-w-[720px]"
       :close-on-click-overlay="false"
       @close="closeForm"
     >
-      <a-form :model="form" layout="vertical">
+      <YdForm :model="form" layout="vertical">
         <div class="block-form-grid">
-          <a-form-item label="编码" required>
-            <FaInput v-model="form.code" placeholder="block-hero-center" :disabled="Boolean(editingBlock)" />
-          </a-form-item>
-          <a-form-item label="名称" required>
-            <FaInput v-model="form.name" placeholder="区块名称" />
-          </a-form-item>
-          <a-form-item label="分类">
-            <FaInput v-model="form.category" placeholder="预制" />
-          </a-form-item>
-          <a-form-item label="类型">
-            <FaSelect v-model="form.kind" :options="kindOptions" />
-          </a-form-item>
-          <a-form-item label="启用" class="block-form-switch">
-            <FaSwitch v-model="form.enabled" />
-          </a-form-item>
-          <a-form-item label="描述" class="block-form-span-2">
-            <FaTextarea v-model="form.description" rows="2" placeholder="可选描述" />
-          </a-form-item>
-          <a-form-item label="HTML 内容" class="block-form-span-2">
-            <FaTextarea v-model="form.htmlContent" rows="6" placeholder="<section>...</section>" />
-          </a-form-item>
-          <a-form-item label="CSS 内容" class="block-form-span-2">
-            <FaTextarea v-model="form.cssContent" rows="4" placeholder="可选 CSS" />
-          </a-form-item>
-          <a-form-item label="JS 内容" class="block-form-span-2">
-            <FaTextarea v-model="form.jsContent" rows="3" placeholder="可选 JS" />
-          </a-form-item>
+          <YdFormItem label="编码" required>
+            <YdInput v-model="form.code" placeholder="block-hero-center" :disabled="Boolean(editingBlock)" />
+          </YdFormItem>
+          <YdFormItem label="名称" required>
+            <YdInput v-model="form.name" placeholder="区块名称" />
+          </YdFormItem>
+          <YdFormItem label="分类">
+            <YdInput v-model="form.category" placeholder="预制" />
+          </YdFormItem>
+          <YdFormItem label="类型">
+            <YdSelect v-model="form.kind" :options="kindOptions" />
+          </YdFormItem>
+          <YdFormItem label="启用" class="block-form-switch">
+            <YdSwitch v-model="form.enabled" />
+          </YdFormItem>
+          <YdFormItem label="描述" class="block-form-span-2">
+            <YdTextarea v-model="form.description" rows="2" placeholder="可选描述" />
+          </YdFormItem>
+          <YdFormItem label="HTML 内容" class="block-form-span-2">
+            <YdTextarea v-model="form.htmlContent" rows="6" placeholder="<section>...</section>" />
+          </YdFormItem>
+          <YdFormItem label="CSS 内容" class="block-form-span-2">
+            <YdTextarea v-model="form.cssContent" rows="4" placeholder="可选 CSS" />
+          </YdFormItem>
+          <YdFormItem label="JS 内容" class="block-form-span-2">
+            <YdTextarea v-model="form.jsContent" rows="3" placeholder="可选 JS" />
+          </YdFormItem>
         </div>
-      </a-form>
+      </YdForm>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <FaButton variant="outline" @click="closeForm">取消</FaButton>
-          <FaButton :loading="saving" @click="saveForm">
+          <YdButton variant="outline" @click="closeForm">取消</YdButton>
+          <YdButton :loading="saving" @click="saveForm">
             保存
-          </FaButton>
+          </YdButton>
         </div>
       </template>
-    </FaModal>
-  </FaModal>
+    </YdModal>
+  </YdModal>
 </template>
 
 <style scoped>

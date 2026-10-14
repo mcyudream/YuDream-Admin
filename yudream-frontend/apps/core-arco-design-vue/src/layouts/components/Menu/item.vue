@@ -51,7 +51,7 @@ defineExpose({
     })"
   >
     <router-link v-slot="{ href, navigate }" custom :to="uniqueKey.at(-1) ?? ''">
-      <FaTooltip :disabled="!generateTitle(item.meta?.title) || !rootMenu.isMenuPopup || level !== 0 || subMenu" :text="generateTitle(item.meta?.title)" :side="rootMenu.props.mode === 'vertical' ? 'right' : 'bottom'" class="h-full w-full">
+      <YdTooltip :disabled="!generateTitle(item.meta?.title) || !rootMenu.isMenuPopup || level !== 0 || subMenu" :text="generateTitle(item.meta?.title)" :side="rootMenu.props.mode === 'vertical' ? 'right' : 'bottom'" class="h-full w-full">
         <Component
           :is="subMenu ? 'div' : 'a'" v-bind="{
             ...(!subMenu && {
@@ -81,7 +81,7 @@ defineExpose({
               '--indent-level': !rootMenu.isMenuPopup ? props.level ?? 0 : 0,
             }"
           >
-            <FaIcon
+            <YdIcon
               v-if="icon" :name="icon" :class="cn('menu-item-container-icon', {
                 'size-5': true,
               })"
@@ -105,7 +105,7 @@ defineExpose({
             })"
           />
         </component>
-      </FaTooltip>
+      </YdTooltip>
     </router-link>
   </div>
 </template>

@@ -32,16 +32,18 @@ onMounted(() => {
 <template>
   <div class="theme-config-form">
     <aside class="theme-config-form__nav">
-      <button
+      <YdButton
         v-for="section in schema.sections"
         :key="section.code"
+        variant="ghost"
         type="button"
         class="theme-config-form__nav-item"
         :class="{ active: activeSection === section.code }"
+        :aria-pressed="activeSection === section.code"
         @click="scrollToSection(section.code)"
       >
         {{ section.title }}
-      </button>
+      </YdButton>
     </aside>
     <div class="theme-config-form__sections">
       <section

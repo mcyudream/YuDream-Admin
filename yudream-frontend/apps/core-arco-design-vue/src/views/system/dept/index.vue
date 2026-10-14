@@ -7,8 +7,8 @@ import apiUser from '@/api/modules/system-user'
 import apiExcel from '@/api/modules/system-excel'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const loading = ref(false)
 const rows = ref<DeptManageItem[]>([])
@@ -187,28 +187,28 @@ function importDepts() {
 
 <template>
   <div>
-    <FaPageHeader title="部门管理" class="mb-0">
-      <FaButton v-auth="'system:dept:export'" variant="outline" @click="exportDepts">
-        <FaIcon name="morph:file-spreadsheet" />
+    <YdPageHeader title="部门管理" class="mb-0">
+      <YdButton v-auth="'system:dept:export'" variant="outline" @click="exportDepts">
+        <YdIcon name="morph:file-spreadsheet" />
         导出
-      </FaButton>
-      <FaButton v-auth="'system:dept:import'" variant="outline" @click="downloadDeptTemplate">
-        <FaIcon name="morph:download" />
+      </YdButton>
+      <YdButton v-auth="'system:dept:import'" variant="outline" @click="downloadDeptTemplate">
+        <YdIcon name="morph:download" />
         模板
-      </FaButton>
-      <FaButton v-auth="'system:dept:import'" variant="outline" @click="importDepts">
-        <FaIcon name="morph:upload" />
+      </YdButton>
+      <YdButton v-auth="'system:dept:import'" variant="outline" @click="importDepts">
+        <YdIcon name="morph:upload" />
         导入
-      </FaButton>
-      <FaButton v-auth="'system:dept:create'" @click="openCreate()">
-        <FaIcon name="morph:network" />
+      </YdButton>
+      <YdButton v-auth="'system:dept:create'" @click="openCreate()">
+        <YdIcon name="morph:network" />
         新增部门
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable
-        v-loading="loading"
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1120px]"
@@ -221,41 +221,41 @@ function importDepts() {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <FaInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
-              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <YdInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
+              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
               <div class="flex gap-2 col-end--1 justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton @click="loadTree">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton @click="loadTree">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-systemDept="{ row }">
-          <FaTag :variant="row.original.systemDept ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
             {{ row.original.systemDept ? '系统部门' : '普通部门' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
             {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-operation="{ row }">
           <div class="flex-center gap-2">
-            <FaButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row.original)">
+            <YdButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row.original)">
               子部门
-            </FaButton>
-            <FaButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
+            </YdButton>
+            <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
               编辑
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-if="row.original.status === 'DEPRECATED'"
               v-auth="'system:dept:edit'"
               variant="outline"
@@ -263,8 +263,8 @@ function importDepts() {
               @click="confirmEnable(row.original)"
             >
               启用
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-if="row.original.status === 'ACTIVE'"
               v-auth="'system:dept:delete'"
               variant="destructive"
@@ -273,22 +273,22 @@ function importDepts() {
               @click="confirmDisable(row.original)"
             >
               停用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
 
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                 <div class="flex gap-1">
-                  <FaTag :variant="row.systemDept ? 'default' : 'secondary'">
+                  <YdTag :variant="row.systemDept ? 'default' : 'secondary'">
                     {{ row.systemDept ? '系统部门' : '普通部门' }}
-                  </FaTag>
-                  <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                  </YdTag>
+                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
                     {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </FaTag>
+                  </YdTag>
                 </div>
               </div>
               <div class="flex flex-col gap-1 text-sm">
@@ -306,40 +306,40 @@ function importDepts() {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row)">
+                <YdButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row)">
                   子部门
-                </FaButton>
-                <FaButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                </YdButton>
+                <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton v-if="row.status === 'DEPRECATED'" v-auth="'system:dept:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'DEPRECATED'" v-auth="'system:dept:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
                   启用
-                </FaButton>
-                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:dept:delete'" variant="destructive" size="sm" :disabled="row.systemDept" @click="confirmDisable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:dept:delete'" variant="destructive" size="sm" :disabled="row.systemDept" @click="confirmDisable(row)">
                   停用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
-    </FaPageMain>
+      </YdResponsiveTable></YdLoadingOverlay>
+    </YdPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑部门' : '新增部门'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
-      <a-form :model="form" layout="vertical">
-        <a-grid :cols="2" :col-gap="16">
-          <a-grid-item>
-            <a-form-item label="部门名称" required>
-              <FaInput v-model="form.name" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="上级部门">
-              <FaSelect v-model="form.parentId" :options="deptOptions" placeholder="请选择上级部门" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="负责人ID">
+    <YdModal v-model="formVisible" :title="editing ? '编辑部门' : '新增部门'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
+      <YdForm :model="form" layout="vertical">
+        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+          <div>
+            <YdFormItem label="部门名称" required>
+              <YdInput v-model="form.name" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="上级部门">
+              <YdSelect v-model="form.parentId" :options="deptOptions" placeholder="请选择上级部门" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="负责人ID">
               <YdTablePicker
                 v-model="leaderPickerValue"
                 :columns="leaderColumns"
@@ -351,28 +351,28 @@ function importDepts() {
                 title="选择部门负责人"
                 placeholder="请选择负责人"
               />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="电话">
-              <FaInput v-model="form.phone" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item>
-            <a-form-item label="排序">
-              <FaNumberField v-model="sortOrderValue" :min="0" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-          <a-grid-item v-if="editing">
-            <a-form-item label="状态">
-              <FaSelect v-model="form.status" :disabled="editing.systemDept" :options="statusOptions" class="w-full" />
-            </a-form-item>
-          </a-grid-item>
-        </a-grid>
-        <a-form-item label="描述">
-          <FaTextarea v-model="form.description" rows="3" class="w-full" input-class="min-h-24" />
-        </a-form-item>
-      </a-form>
-    </FaModal>
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="电话">
+              <YdInput v-model="form.phone" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="排序">
+              <YdNumberField v-model="sortOrderValue" :min="0" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div v-if="editing">
+            <YdFormItem label="状态">
+              <YdSelect v-model="form.status" :disabled="editing.systemDept" :options="statusOptions" class="w-full" />
+            </YdFormItem>
+          </div>
+        </div>
+        <YdFormItem label="描述">
+          <YdTextarea v-model="form.description" rows="3" class="w-full" input-class="min-h-24" />
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
   </div>
 </template>

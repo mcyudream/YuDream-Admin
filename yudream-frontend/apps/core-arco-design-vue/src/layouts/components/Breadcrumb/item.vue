@@ -26,13 +26,15 @@ function onClick() {
     <span class="separator mx-2">
       {{ separator }}
     </span>
-    <span
+    <YdAction
+      type="button"
+      :disabled="!props.to"
       class="text opacity-60 flex items-center"
       :class="{
         'is-link cursor-pointer transition-opacity hover-opacity-100': !!props.to,
       }" @click="onClick"
     >
       <slot />
-    </span>
+    </YdAction>
   </div>
 </template>

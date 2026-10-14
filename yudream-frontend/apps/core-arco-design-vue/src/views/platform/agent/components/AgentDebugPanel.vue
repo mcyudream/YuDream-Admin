@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus } from './types'
+import { useYdFilePicker } from '@yudream/components'
 
 const props = defineProps<{
   messages: AgentDebugMessage[]
@@ -20,7 +21,7 @@ const input = ref('')
 const attachments = ref<AgentDebugAttachment[]>([])
 const attachmentError = ref('')
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
-const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
+const filePicker = useYdFilePicker()
 const fileAccept = computed(() => [
   props.allowImage ? 'image/*' : '',
   props.allowFiles ? '.txt,.md,.markdown,.json,.csv,.xml,.html,.css,.js,.ts,.yaml,.yml,.pdf,.doc,.docx,.rtf,.odt' : '',
@@ -46,14 +47,13 @@ function send() {
 }
 
 function pickFiles() {
-  fileInput.value?.click()
+  void filePicker.open({ accept: fileAccept.value, multiple: true }).then(onFileChange)
 }
 
-async function onFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
+async function onFileChange(files: File[]) {
   attachmentError.value = ''
   try {
-    for (const file of Array.from(target.files || [])) {
+    for (const file of files) {
       const image = file.type.startsWith('image/')
       if (image && !props.allowImage) {
         throw new Error('当前模型不支持图片输入')
@@ -84,7 +84,6 @@ async function onFileChange(event: Event) {
     attachmentError.value = error instanceof Error ? error.message : '附件读取失败'
   }
   finally {
-    target.value = ''
   }
 }
 
@@ -123,31 +122,31 @@ function statusIcon(status: AgentDebugStatus) {
   <aside class="debug-panel">
     <header class="debug-header">
       <div class="debug-title">
-        <span class="debug-mark"><FaIcon name="morph:bug" /></span>
+        <span class="debug-mark"><YdIcon name="morph:bug" /></span>
         <span>
           <strong>Agent 调试</strong>
           <small><i :class="{ active: running }" />{{ running ? '运行中' : modelLabel || '未选择模型' }}</small>
         </span>
       </div>
       <div class="debug-actions">
-        <button type="button" title="清空调试记录" aria-label="清空调试记录" :disabled="running || !messages.length" @click="emit('clear')">
-          <FaIcon name="morph:trash-2" />
-        </button>
-        <button type="button" title="返回配置" aria-label="返回配置" @click="emit('close')">
-          <FaIcon name="morph:x" />
-        </button>
+        <YdAction type="button" title="清空调试记录" aria-label="清空调试记录" :disabled="running || !messages.length" @click="emit('clear')">
+          <YdIcon name="morph:trash-2" />
+        </YdAction>
+        <YdAction type="button" title="返回配置" aria-label="返回配置" @click="emit('close')">
+          <YdIcon name="morph:x" />
+        </YdAction>
       </div>
     </header>
 
     <div ref="scrollEl" class="message-scroll">
       <div v-if="!messages.length" class="debug-empty">
-        <span><FaIcon name="morph:message-circle" /></span>
+        <span><YdIcon name="morph:message-circle" /></span>
         <strong>暂无调试记录</strong>
       </div>
 
       <article v-for="message in messages" :key="message.id" class="chat-message" :class="message.role">
         <div class="message-avatar">
-          <FaIcon :name="message.role === 'user' ? 'morph:user' : 'morph:bot'" />
+          <YdIcon :name="message.role === 'user' ? 'morph:user' : 'morph:bot'" />
         </div>
         <div class="message-main">
           <div class="message-meta">
@@ -159,14 +158,14 @@ function statusIcon(status: AgentDebugStatus) {
 
           <div v-if="message.steps?.length" class="debug-steps">
             <div v-for="step in message.steps" :key="`${step.nodeId}-${step.status}`" class="debug-step" :class="step.status.toLowerCase()">
-              <span class="step-icon"><FaIcon :name="statusIcon(step.status)" /></span>
+              <span class="step-icon"><YdIcon :name="statusIcon(step.status)" /></span>
               <span class="step-copy"><strong>{{ step.nodeTitle }}</strong><small>{{ step.message }}</small></span>
             </div>
           </div>
 
           <div v-if="message.tools?.length" class="tool-results">
             <div v-for="(tool, index) in message.tools" :key="`${tool.toolName}-${index}`">
-              <FaIcon name="morph:wrench" />
+              <YdIcon name="morph:wrench" />
               <span><strong>{{ tool.toolName }}</strong><small>{{ tool.message || tool.action || '工具执行完成' }}</small></span>
             </div>
           </div>
@@ -174,7 +173,7 @@ function statusIcon(status: AgentDebugStatus) {
           <div v-if="message.attachments?.length" class="message-attachments">
             <span v-for="attachment in message.attachments" :key="attachment.id">
               <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
-              <FaIcon v-else name="morph:file-text" />{{ attachment.name }}
+              <YdIcon v-else name="morph:file-text" />{{ attachment.name }}
             </span>
           </div>
 
@@ -189,30 +188,29 @@ function statusIcon(status: AgentDebugStatus) {
       <div v-if="attachments.length" class="attachment-list">
         <span v-for="attachment in attachments" :key="attachment.id">
           <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
-          <FaIcon v-else name="morph:file-text" />
+          <YdIcon v-else name="morph:file-text" />
           <b>{{ attachment.name }}</b>
-          <button type="button" title="移除附件" aria-label="移除附件" @click="attachments = attachments.filter(item => item.id !== attachment.id)"><FaIcon name="morph:x" /></button>
+          <YdAction type="button" title="移除附件" aria-label="移除附件" @click="attachments = attachments.filter(item => item.id !== attachment.id)"><YdIcon name="morph:x" /></YdAction>
         </span>
       </div>
       <p v-if="attachmentError" class="attachment-error">
         {{ attachmentError }}
       </p>
-      <FaTextarea v-model="input" class="w-full" :disabled="running" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="输入调试消息" @keydown="onKeydown" />
+      <YdTextarea v-model="input" class="w-full" :disabled="running" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="输入调试消息" @keydown="onKeydown" />
       <div class="composer-footer">
         <div>
-          <button v-if="allowImage || allowFiles" type="button" title="添加附件" aria-label="添加附件" :disabled="running" @click="pickFiles">
-            <FaIcon :name="allowImage ? 'morph:image-plus' : 'morph:paperclip'" />
-          </button>
+          <YdAction v-if="allowImage || allowFiles" type="button" title="添加附件" aria-label="添加附件" :disabled="running" @click="pickFiles">
+            <YdIcon :name="allowImage ? 'morph:image-plus' : 'morph:paperclip'" />
+          </YdAction>
           <span>{{ input.length }}/2000</span>
         </div>
-        <button v-if="running" type="button" class="send-button stop" title="停止调试" aria-label="停止调试" @click="emit('stop')">
-          <FaIcon name="morph:square" />
-        </button>
-        <button v-else type="button" class="send-button" title="发送消息" aria-label="发送消息" :disabled="!input.trim() && !attachments.length" @click="send">
-          <FaIcon name="morph:send" />
-        </button>
+        <YdAction v-if="running" type="button" class="send-button stop" title="停止调试" aria-label="停止调试" @click="emit('stop')">
+          <YdIcon name="morph:square" />
+        </YdAction>
+        <YdAction v-else type="button" class="send-button" title="发送消息" aria-label="发送消息" :disabled="!input.trim() && !attachments.length" @click="send">
+          <YdIcon name="morph:send" />
+        </YdAction>
       </div>
-      <input ref="fileInput" class="file-input" type="file" :accept="fileAccept" multiple @change="onFileChange">
     </footer>
   </aside>
 </template>
@@ -221,7 +219,7 @@ function statusIcon(status: AgentDebugStatus) {
 .debug-panel { display: grid; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; grid-template-rows: 66px minmax(0, 1fr) auto; border-left: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .debug-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--color-border-2); }
 .debug-title { display: flex; min-width: 0; align-items: center; gap: 9px; }
-.debug-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 6px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); }
+.debug-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 6px; color: rgb(var(--color-text-2)); background: rgb(var(--color-fill-1)); }
 .debug-title > span:last-child { display: grid; gap: 3px; }
 .debug-title strong { color: var(--color-text-1); font-size: 13px; }
 .debug-title small { display: flex; align-items: center; gap: 5px; color: var(--color-text-3); font-size: 9px; }
@@ -233,13 +231,13 @@ function statusIcon(status: AgentDebugStatus) {
 .debug-actions button:disabled { color: var(--color-text-4); cursor: not-allowed; }
 .message-scroll { min-height: 0; overflow: auto; padding: 16px 13px 22px; }
 .debug-empty { display: grid; height: 100%; place-items: center; align-content: center; gap: 10px; color: var(--color-text-3); }
-.debug-empty > span { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 8px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); font-size: 21px; }
+.debug-empty > span { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 8px; color: rgb(var(--color-text-2)); background: rgb(var(--color-fill-1)); font-size: 21px; }
 .debug-empty strong { font-size: 11px; font-weight: 500; }
 .chat-message { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: start; gap: 8px; }
 .chat-message + .chat-message { margin-top: 18px; }
 .chat-message.user { direction: rtl; }
 .chat-message.user > * { direction: ltr; }
-.message-avatar { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); font-size: 13px; }
+.message-avatar { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; color: rgb(var(--color-text-2)); background: rgb(var(--color-fill-1)); font-size: 13px; }
 .user .message-avatar { color: var(--color-text-2); background: var(--color-fill-3); }
 .message-main { min-width: 0; }
 .message-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; color: var(--color-text-3); font-size: 9px; }
@@ -247,12 +245,12 @@ function statusIcon(status: AgentDebugStatus) {
 .message-meta strong { color: var(--color-text-2); font-size: 10px; }
 .message-meta .failed { color: rgb(var(--danger-6)); }
 .message-content { padding: 9px 10px; border: 1px solid var(--color-border-2); border-radius: 6px; color: var(--color-text-1); background: var(--color-bg-1); font-size: 11px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
-.user .message-content { border-color: rgb(var(--primary-3)); background: rgb(var(--primary-1)); }
-.stream-caret { display: inline-block; width: 5px; height: 12px; margin-left: 2px; background: rgb(var(--primary-6)); animation: blink 0.85s infinite; vertical-align: -2px; }
+.user .message-content { border-color: rgb(var(--color-border-2)); background: rgb(var(--color-fill-1)); }
+.stream-caret { display: inline-block; width: 5px; height: 12px; margin-left: 2px; background: rgb(var(--color-text-2)); animation: blink 0.85s infinite; vertical-align: -2px; }
 .debug-steps { display: grid; gap: 1px; margin-bottom: 8px; padding: 7px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-fill-1); }
 .debug-step { display: grid; min-height: 33px; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 5px; }
 .step-icon { display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; color: var(--color-text-3); background: var(--color-fill-3); font-size: 10px; }
-.debug-step.running .step-icon { color: rgb(var(--primary-6)); background: rgb(var(--primary-2)); animation: spin 1.1s linear infinite; }
+.debug-step.running .step-icon { color: rgb(var(--color-text-2)); background: rgb(var(--color-fill-2)); animation: spin 1.1s linear infinite; }
 .debug-step.completed .step-icon { color: rgb(var(--success-6)); background: rgb(var(--success-1)); }
 .debug-step.failed .step-icon { color: rgb(var(--danger-6)); background: rgb(var(--danger-1)); }
 .step-copy { display: grid; min-width: 0; gap: 2px; }
@@ -275,7 +273,7 @@ function statusIcon(status: AgentDebugStatus) {
 .composer-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
 .composer-footer > div { display: flex; align-items: center; gap: 5px; }
 .composer-footer > div span { color: var(--color-text-4); font-size: 8px; }
-.send-button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 6px; color: white; background: rgb(var(--primary-6)); cursor: pointer; }
+.send-button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 6px; color: white; background: rgb(var(--color-text-2)); cursor: pointer; }
 .send-button.stop { background: rgb(var(--danger-6)); }
 .send-button:disabled { color: var(--color-text-4); background: var(--color-fill-3); cursor: not-allowed; }
 .file-input { display: none; }

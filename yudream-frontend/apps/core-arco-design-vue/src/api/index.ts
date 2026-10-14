@@ -102,7 +102,7 @@ api.interceptors.response.use(
       if ('status' in response.data) {
         if (response.data.status === 1) {
           if (response.data.error) {
-            useFaToast().warning('Warning', {
+            useYdToast().warning('Warning', {
               description: response.data.error,
             })
             return Promise.reject(response.data)
@@ -127,7 +127,7 @@ api.interceptors.response.use(
           if (response.data.code === 401) {
             return retryAfterRefresh(api, response.config)
           }
-          useFaToast().error('错误', {
+          useYdToast().error('错误', {
             description: hintForMessage(response.data.message || '请求失败'),
           })
           return Promise.reject(response.data)

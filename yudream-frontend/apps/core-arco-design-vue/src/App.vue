@@ -55,7 +55,7 @@ onMounted(() => {
       <AppNotAllowed v-else />
     </RouterView>
     <AppBackToTop />
-    <FaToast :theme="appSettingsStore.currentColorScheme" />
+    <YdToast :theme="appSettingsStore.currentColorScheme" />
     <AppSystemInfo />
   </Provider>
 </template>

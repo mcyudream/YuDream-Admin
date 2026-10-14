@@ -10,7 +10,7 @@ const { error, formItemId } = useFormField()
 </script>
 
 <template>
-  <FaLabel
+  <YdLabel
     data-slot="form-label"
     :data-error="!!error"
     :class="cn(
@@ -20,5 +20,5 @@ const { error, formItemId } = useFormField()
     :for="formItemId"
   >
     <slot />
-  </FaLabel>
+  </YdLabel>
 </template>

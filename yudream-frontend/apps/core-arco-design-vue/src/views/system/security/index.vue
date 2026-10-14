@@ -31,8 +31,8 @@ interface OAuthScopePickerRow {
   desc?: string
 }
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const activeTab = ref<SecurityTab>('policy')
 const oauthPane = ref<OAuthPane>('clients')
@@ -196,6 +196,11 @@ const oauthScopeColumns: TableColumn<OAuthScopePickerRow>[] = [
   { accessorKey: 'code', header: '范围码', minWidth: 220 },
   { accessorKey: 'module', header: '分组', minWidth: 120 },
 ]
+const permissionMultiSelectOptions = computed(() => permissionSelectOptions.value.flatMap(group => group.options.map(option => ({
+  label: `${group.label} · ${option.label}`,
+  value: option.value,
+}))))
+
 
 const permissionNameMap = computed(() => new Map(permissions.value.map(item => [item.code, item.name])))
 
@@ -808,67 +813,67 @@ function normalizeDateTime(value?: string) {
 
 <template>
   <div>
-    <FaPageHeader title="安全中心" class="mb-0">
-      <FaButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
-        <FaIcon name="morph:save" />
+    <YdPageHeader title="安全中心" class="mb-0">
+      <YdButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
+        <YdIcon name="morph:save" />
         保存策略
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="security-tabs">
-        <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
-          <FaIcon :name="tab.icon" />
+        <YdAction v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+          <YdIcon :name="tab.icon" />
           <span>{{ tab.label }}</span>
-        </button>
+        </YdAction>
       </div>
 
       <section v-if="activeTab === 'policy'" class="panel">
         <div class="section-title">
-          <FaIcon name="morph:shield-check" />
+          <YdIcon name="morph:shield-check" />
           安全策略
         </div>
         <div class="policy-grid">
           <div v-for="item in policyCards" :key="item.key" class="policy-card">
             <div class="policy-icon">
-              <FaIcon :name="item.icon" />
+              <YdIcon :name="item.icon" />
             </div>
             <div class="policy-body">
               <strong>{{ item.label }}</strong>
               <span>{{ item.desc }}</span>
             </div>
-            <FaSwitch v-model="policy[item.key]" />
+            <YdSwitch v-model="policy[item.key]" />
           </div>
         </div>
         <div class="token-grid">
-          <a-form-item label="访问令牌有效期（秒）">
-            <FaInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
-          </a-form-item>
-          <a-form-item label="刷新令牌有效期（秒）">
-            <FaInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
-          </a-form-item>
-          <a-form-item label="刷新令牌轮换">
-            <FaSwitch v-model="policy.refreshRotationEnabled" />
-          </a-form-item>
+          <YdFormItem label="访问令牌有效期（秒）">
+            <YdInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
+          </YdFormItem>
+          <YdFormItem label="刷新令牌有效期（秒）">
+            <YdInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
+          </YdFormItem>
+          <YdFormItem label="刷新令牌轮换">
+            <YdSwitch v-model="policy.refreshRotationEnabled" />
+          </YdFormItem>
         </div>
       </section>
 
       <section v-if="activeTab === 'apiKey'" class="panel">
-        <FaAlert v-if="!policy.apiKeyEnabled" icon="morph:info" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
+        <YdAlert v-if="!policy.apiKeyEnabled" icon="morph:info" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="morph:key" />
+            <YdIcon name="morph:key" />
             API Key
           </div>
           <div class="key-actions">
-            <FaButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
-              <FaIcon name="morph:key-round" />
+            <YdButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
+              <YdIcon name="morph:key-round" />
               创建
-            </FaButton>
+            </YdButton>
           </div>
         </div>
-        <FaResponsiveTable
-          v-loading="loading"
+        <YdLoadingOverlay :loading="loading"><YdResponsiveTable
+
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
           table-class="min-w-[980px]"
@@ -879,48 +884,48 @@ function normalizeDateTime(value?: string) {
           :data="apiKeyRows"
         >
           <template #toolbar>
-            <FaSearchBar class="w-full">
+            <YdSearchBar class="w-full">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
+                <YdInput v-model="search.keyword" clearable placeholder="名称 / 前缀" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
                 <div class="flex gap-2 md:justify-end">
-                  <FaButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</FaButton>
-                  <FaButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
-                    <FaIcon name="morph:search" />
+                  <YdButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</YdButton>
+                  <YdButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
+                    <YdIcon name="morph:search" />
                     筛选
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaSearchBar>
+            </YdSearchBar>
           </template>
           <template #cell-permissions="{ row }">
             <div class="tag-row">
-              <FaTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
+              <YdTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
                 {{ permissionText(item) }}
-              </FaTag>
-              <FaTag v-if="row.original.permissions.length > 3" variant="secondary">
+              </YdTag>
+              <YdTag v-if="row.original.permissions.length > 3" variant="secondary">
                 +{{ row.original.permissions.length - 3 }}
-              </FaTag>
+              </YdTag>
             </div>
           </template>
           <template #cell-status="{ row }">
-            <FaTag :variant="statusVariant(row.original.status)">
+            <YdTag :variant="statusVariant(row.original.status)">
               {{ statusText(row.original.status) }}
-            </FaTag>
+            </YdTag>
           </template>
           <template #cell-operation="{ row }">
-            <FaButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevoke(row.original)">
+            <YdButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevoke(row.original)">
               吊销
-            </FaButton>
+            </YdButton>
           </template>
 
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-base font-semibold break-all">{{ row.name }}</span>
-                  <FaTag :variant="statusVariant(row.status)">
+                  <YdTag :variant="statusVariant(row.status)">
                     {{ statusText(row.status) }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div v-if="row.maskedValue" class="flex gap-2">
@@ -941,66 +946,66 @@ function normalizeDateTime(value?: string) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevoke(row)">
+                  <YdButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevoke(row)">
                     吊销
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
-        <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
+        </YdResponsiveTable></YdLoadingOverlay>
+        <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
       </section>
 
       <section v-if="activeTab === 'oauth'" class="panel">
-        <FaAlert v-if="!oauthPaneEnabled()" icon="morph:info" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
+        <YdAlert v-if="!oauthPaneEnabled()" icon="morph:info" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="morph:log-in" />
+            <YdIcon name="morph:log-in" />
             OAuth
           </div>
           <div class="key-actions">
-            <FaButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
-            <FaButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
-            <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
-              <FaIcon name="morph:plus" />
+            <YdButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</YdButton>
+            <YdButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</YdButton>
+            <YdButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
+              <YdIcon name="morph:plus" />
               新增客户端
-            </FaButton>
-            <FaButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
-              <FaIcon name="morph:plus" />
+            </YdButton>
+            <YdButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
+              <YdIcon name="morph:plus" />
               新增提供商
-            </FaButton>
+            </YdButton>
           </div>
         </div>
 
-        <FaResponsiveTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
+        <YdResponsiveTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
           <template #cell-grantTypes="{ row }">
             <div class="tag-row">
-              <FaTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">{{ item }}</FaTag>
+              <YdTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">{{ item }}</YdTag>
             </div>
           </template>
           <template #cell-redirectUris="{ row }">
             <span class="line-clamp-1">{{ row.original.redirectUris?.join(', ') || '-' }}</span>
           </template>
           <template #cell-status="{ row }">
-            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
           </template>
           <template #cell-operation="{ row }">
             <div class="table-actions">
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">编辑</FaButton>
-              <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthClient(row.original)">停用</FaButton>
-              <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">启用</FaButton>
+              <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">编辑</YdButton>
+              <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthClient(row.original)">停用</YdButton>
+              <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">启用</YdButton>
             </div>
           </template>
 
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-base font-semibold break-all">{{ row.clientName }}</span>
-                  <FaTag :variant="statusVariant(row.status)">
+                  <YdTag :variant="statusVariant(row.status)">
                     {{ statusText(row.status) }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div v-if="row.clientId" class="flex gap-2">
@@ -1017,41 +1022,41 @@ function normalizeDateTime(value?: string) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row)">
+                  <YdButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row)">
                     编辑
-                  </FaButton>
-                  <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthClient(row)">
+                  </YdButton>
+                  <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthClient(row)">
                     停用
-                  </FaButton>
-                  <FaButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row)">
+                  </YdButton>
+                  <YdButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row)">
                     启用
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
+        </YdResponsiveTable>
 
-        <FaResponsiveTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
+        <YdResponsiveTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
           <template #cell-status="{ row }">
-            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
           </template>
           <template #cell-operation="{ row }">
             <div class="table-actions">
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">编辑</FaButton>
-              <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthProvider(row.original)">停用</FaButton>
-              <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">启用</FaButton>
+              <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">编辑</YdButton>
+              <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthProvider(row.original)">停用</YdButton>
+              <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">启用</YdButton>
             </div>
           </template>
 
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-base font-semibold break-all">{{ row.name }}</span>
-                  <FaTag :variant="statusVariant(row.status)">
+                  <YdTag :variant="statusVariant(row.status)">
                     {{ statusText(row.status) }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div class="flex gap-2">
@@ -1068,104 +1073,104 @@ function normalizeDateTime(value?: string) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row)">
+                  <YdButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row)">
                     编辑
-                  </FaButton>
-                  <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthProvider(row)">
+                  </YdButton>
+                  <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthProvider(row)">
                     停用
-                  </FaButton>
-                  <FaButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row)">
+                  </YdButton>
+                  <YdButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row)">
                     启用
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
+        </YdResponsiveTable>
       </section>
 
       <section v-if="activeTab === 'external'" class="panel">
-        <div class="key-toolbar"><div class="section-title"><FaIcon name="morph:link" />第三方登录</div></div>
-        <FaAlert icon="morph:info" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
-        <FaAlert v-if="pluginManagedProviders.length" class="mt-3" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
-        <a-form :model="externalLoginForm" layout="vertical" class="mt-4">
+        <div class="key-toolbar"><div class="section-title"><YdIcon name="morph:link" />第三方登录</div></div>
+        <YdAlert icon="morph:info" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
+        <YdAlert v-if="pluginManagedProviders.length" class="mt-3" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
+        <YdForm :model="externalLoginForm" layout="vertical" class="mt-4">
           <div class="form-grid">
-            <a-form-item label="提供方">
-              <FaSelect v-model="selectedHostProviderCode" :options="hostProviderOptions" class="w-full" @update:model-value="changeHostProvider" />
-            </a-form-item>
-            <a-form-item label="提供方编码">
-              <FaInput v-model="externalLoginForm.code" disabled />
-            </a-form-item>
-            <a-form-item label="名称">
-              <FaInput v-model="externalLoginForm.name" />
-            </a-form-item>
-            <a-form-item label="AppId">
-              <FaInput v-model="externalLoginForm.appId" />
-            </a-form-item>
-            <a-form-item label="AppKey">
-              <FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时留空不修改" />
-            </a-form-item>
+            <YdFormItem label="提供方">
+              <YdSelect v-model="selectedHostProviderCode" :options="hostProviderOptions" class="w-full" @update:model-value="changeHostProvider" />
+            </YdFormItem>
+            <YdFormItem label="提供方编码">
+              <YdInput v-model="externalLoginForm.code" disabled />
+            </YdFormItem>
+            <YdFormItem label="名称">
+              <YdInput v-model="externalLoginForm.name" />
+            </YdFormItem>
+            <YdFormItem label="AppId">
+              <YdInput v-model="externalLoginForm.appId" />
+            </YdFormItem>
+            <YdFormItem label="AppKey">
+              <YdInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时留空不修改" />
+            </YdFormItem>
           </div>
-          <a-form-item label="接口地址">
-            <FaInput v-model="externalLoginForm.endpoint" placeholder="https://login.wwoyun.cn/connect.php" />
-          </a-form-item>
-          <a-form-item label="回调地址" required>
-            <FaInput v-model="externalLoginForm.callbackUrl" />
-          </a-form-item>
-          <a-form-item label="启用平台">
-            <FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSwitch v-model="externalLoginForm.enabled" />
-          </a-form-item>
+          <YdFormItem label="接口地址">
+            <YdInput v-model="externalLoginForm.endpoint" placeholder="https://login.wwoyun.cn/connect.php" />
+          </YdFormItem>
+          <YdFormItem label="回调地址" required>
+            <YdInput v-model="externalLoginForm.callbackUrl" />
+          </YdFormItem>
+          <YdFormItem label="启用平台">
+            <YdMultiSelect v-model="selectedExternalTypes" :options="externalTypeOptions" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSwitch v-model="externalLoginForm.enabled" />
+          </YdFormItem>
           <div class="flex justify-end">
-            <FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
-              <FaIcon name="morph:save" />
+            <YdButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
+              <YdIcon name="morph:save" />
               保存配置
-            </FaButton>
+            </YdButton>
           </div>
-        </a-form>
+        </YdForm>
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">
-        <FaAlert v-if="!policy.passkeyEnabled" icon="morph:info" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
+        <YdAlert v-if="!policy.passkeyEnabled" icon="morph:info" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="morph:fingerprint" />
+            <YdIcon name="morph:fingerprint" />
             Passkey 凭据
           </div>
         </div>
-        <FaResponsiveTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
+        <YdResponsiveTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
           <template #toolbar>
-            <FaSearchBar class="w-full">
+            <YdSearchBar class="w-full">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <FaInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
+                <YdInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
                 <div class="flex gap-2 md:justify-end">
-                  <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
-                    <FaIcon name="morph:search" />
+                  <YdButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
+                    <YdIcon name="morph:search" />
                     筛选
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaSearchBar>
+            </YdSearchBar>
           </template>
           <template #cell-status="{ row }">
-            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
           </template>
           <template #cell-operation="{ row }">
-            <FaButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevokePasskey(row.original)">
+            <YdButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevokePasskey(row.original)">
               吊销
-            </FaButton>
+            </YdButton>
           </template>
 
           <template #card="{ row }">
-            <FaCard class="w-full">
+            <YdCard class="w-full">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-base font-semibold break-all">{{ row.deviceName || row.credentialId }}</span>
-                  <FaTag :variant="statusVariant(row.status)">
+                  <YdTag :variant="statusVariant(row.status)">
                     {{ statusText(row.status) }}
-                  </FaTag>
+                  </YdTag>
                 </div>
                 <div class="flex flex-col gap-1 text-sm">
                   <div v-if="row.userId" class="flex gap-2">
@@ -1186,85 +1191,83 @@ function normalizeDateTime(value?: string) {
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <FaButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevokePasskey(row)">
+                  <YdButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevokePasskey(row)">
                     吊销
-                  </FaButton>
+                  </YdButton>
                 </div>
               </div>
-            </FaCard>
+            </YdCard>
           </template>
-        </FaResponsiveTable>
+        </YdResponsiveTable>
       </section>
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="createVisible" title="创建 API Key" show-cancel-button class="sm:max-w-3xl" :confirm-loading="creating" @confirm="createApiKey">
-      <a-form :model="apiKeyForm" layout="vertical">
-        <a-form-item label="名称" required>
-          <FaInput v-model="apiKeyForm.name" placeholder="例如：外部系统同步" />
-        </a-form-item>
-        <a-form-item label="过期时间">
-          <FaInput v-model="apiKeyForm.expireTime" type="datetime-local" />
-        </a-form-item>
-        <a-form-item label="权限范围" required>
+    <YdModal v-model="createVisible" title="创建 API Key" show-cancel-button class="sm:max-w-3xl" :confirm-loading="creating" @confirm="createApiKey">
+      <YdForm :model="apiKeyForm" layout="vertical">
+        <YdFormItem label="名称" required>
+          <YdInput v-model="apiKeyForm.name" placeholder="例如：外部系统同步" />
+        </YdFormItem>
+        <YdFormItem label="过期时间">
+          <YdInput v-model="apiKeyForm.expireTime" type="datetime-local" />
+        </YdFormItem>
+        <YdFormItem label="权限范围" required>
           <div class="permission-select-panel">
-            <FaSelect
+            <YdMultiSelect
               v-model="apiKeyForm.permissions"
-              multiple
-              :options="permissionSelectOptions"
+              :options="permissionMultiSelectOptions"
               :disabled="!permissionSelectOptions.length"
-              class="w-full"
               placeholder="请选择 API Key 可访问权限"
             />
             <div class="permission-select-actions">
               <span>已选择 {{ apiKeyForm.permissions.length }} 项</span>
               <div>
-                <FaButton variant="ghost" size="sm" :disabled="!selectablePermissionCodes.length" @click="apiKeyForm.permissions = [...selectablePermissionCodes]">
+                <YdButton variant="ghost" size="sm" :disabled="!selectablePermissionCodes.length" @click="apiKeyForm.permissions = [...selectablePermissionCodes]">
                   全选可用
-                </FaButton>
-                <FaButton variant="ghost" size="sm" :disabled="!apiKeyForm.permissions.length" @click="apiKeyForm.permissions = []">
+                </YdButton>
+                <YdButton variant="ghost" size="sm" :disabled="!apiKeyForm.permissions.length" @click="apiKeyForm.permissions = []">
                   清空
-                </FaButton>
+                </YdButton>
               </div>
             </div>
           </div>
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="oauthClientVisible" :title="editingOAuthClient ? '编辑 OAuth 客户端' : '新增 OAuth 客户端'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthClient">
-      <a-form :model="oauthClientForm" layout="vertical">
+    <YdModal v-model="oauthClientVisible" :title="editingOAuthClient ? '编辑 OAuth 客户端' : '新增 OAuth 客户端'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthClient">
+      <YdForm :model="oauthClientForm" layout="vertical">
         <div class="form-grid">
-          <a-form-item label="Client ID" required>
-            <FaInput v-model="oauthClientForm.clientId" :disabled="!!editingOAuthClient" />
-          </a-form-item>
-          <a-form-item label="客户端名称" required>
-            <FaInput v-model="oauthClientForm.clientName" />
-          </a-form-item>
-          <a-form-item label="认证方式">
-            <FaSelect v-model="oauthClientForm.authMethod" :options="authMethodOptions" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="oauthClientForm.status" :options="statusOptions" />
-          </a-form-item>
-          <a-form-item label="访问令牌有效期">
-            <FaInput v-model.number="oauthClientForm.accessTokenTtlSeconds" type="number" min="1" />
-          </a-form-item>
-          <a-form-item label="刷新令牌有效期">
-            <FaInput v-model.number="oauthClientForm.refreshTokenTtlSeconds" type="number" min="1" />
-          </a-form-item>
+          <YdFormItem label="Client ID" required>
+            <YdInput v-model="oauthClientForm.clientId" :disabled="!!editingOAuthClient" />
+          </YdFormItem>
+          <YdFormItem label="客户端名称" required>
+            <YdInput v-model="oauthClientForm.clientName" />
+          </YdFormItem>
+          <YdFormItem label="认证方式">
+            <YdSelect v-model="oauthClientForm.authMethod" :options="authMethodOptions" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="oauthClientForm.status" :options="statusOptions" />
+          </YdFormItem>
+          <YdFormItem label="访问令牌有效期">
+            <YdInput v-model.number="oauthClientForm.accessTokenTtlSeconds" type="number" min="1" />
+          </YdFormItem>
+          <YdFormItem label="刷新令牌有效期">
+            <YdInput v-model.number="oauthClientForm.refreshTokenTtlSeconds" type="number" min="1" />
+          </YdFormItem>
         </div>
-        <a-form-item label="授权模式">
-          <FaCheckboxGroup
+        <YdFormItem label="授权模式">
+          <YdCheckboxGroup
             :model-value="oauthClientForm.grantTypes"
             :options="grantTypeOptions"
             class="flex flex-wrap gap-3"
             @update:model-value="value => (oauthClientForm.grantTypes = value as OAuthGrantType[])"
           />
-        </a-form-item>
-        <a-form-item label="回调地址（一行一个）">
-          <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris || [])" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
-        </a-form-item>
-        <a-form-item label="授权范围">
+        </YdFormItem>
+        <YdFormItem label="回调地址（一行一个）">
+          <YdTextarea :model-value="splitTextarea(oauthClientForm.redirectUris || [])" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
+        </YdFormItem>
+        <YdFormItem label="授权范围">
           <YdTablePicker
             v-model="oauthClientForm.scopes"
             :columns="oauthScopeColumns"
@@ -1276,62 +1279,62 @@ function normalizeDateTime(value?: string) {
             placeholder="请选择客户端可申请的授权范围"
             search-placeholder="搜索名称、范围码或分组"
           />
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="oauthProviderVisible" :title="editingOAuthProvider ? '编辑 OAuth 提供商' : '新增 OAuth 提供商'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthProvider">
-      <a-form :model="oauthProviderForm" layout="vertical">
+    <YdModal v-model="oauthProviderVisible" :title="editingOAuthProvider ? '编辑 OAuth 提供商' : '新增 OAuth 提供商'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthProvider">
+      <YdForm :model="oauthProviderForm" layout="vertical">
         <div class="form-grid">
-          <a-form-item label="编码" required>
-            <FaInput v-model="oauthProviderForm.code" :disabled="!!editingOAuthProvider" />
-          </a-form-item>
-          <a-form-item label="名称" required>
-            <FaInput v-model="oauthProviderForm.name" />
-          </a-form-item>
-          <a-form-item label="Client ID">
-            <FaInput v-model="oauthProviderForm.clientId" />
-          </a-form-item>
-          <a-form-item label="Client Secret">
-            <FaInput v-model="oauthProviderForm.clientSecret" type="password" :placeholder="editingOAuthProvider ? '留空则不修改' : ''" />
-          </a-form-item>
-          <a-form-item label="认证方式">
-            <FaSelect v-model="oauthProviderForm.authMethod" :options="authMethodOptions" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="oauthProviderForm.status" :options="statusOptions" />
-          </a-form-item>
+          <YdFormItem label="编码" required>
+            <YdInput v-model="oauthProviderForm.code" :disabled="!!editingOAuthProvider" />
+          </YdFormItem>
+          <YdFormItem label="名称" required>
+            <YdInput v-model="oauthProviderForm.name" />
+          </YdFormItem>
+          <YdFormItem label="Client ID">
+            <YdInput v-model="oauthProviderForm.clientId" />
+          </YdFormItem>
+          <YdFormItem label="Client Secret">
+            <YdInput v-model="oauthProviderForm.clientSecret" type="password" :placeholder="editingOAuthProvider ? '留空则不修改' : ''" />
+          </YdFormItem>
+          <YdFormItem label="认证方式">
+            <YdSelect v-model="oauthProviderForm.authMethod" :options="authMethodOptions" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="oauthProviderForm.status" :options="statusOptions" />
+          </YdFormItem>
         </div>
-        <a-form-item label="Issuer">
-          <FaInput v-model="oauthProviderForm.issuerUri" />
-        </a-form-item>
-        <a-form-item label="授权地址">
-          <FaInput v-model="oauthProviderForm.authorizationUri" />
-        </a-form-item>
-        <a-form-item label="Token 地址">
-          <FaInput v-model="oauthProviderForm.tokenUri" />
-        </a-form-item>
-        <a-form-item label="用户信息地址">
-          <FaInput v-model="oauthProviderForm.userInfoUri" />
-        </a-form-item>
-        <a-form-item label="回调地址">
-          <FaInput v-model="oauthProviderForm.redirectUri" />
-        </a-form-item>
-        <a-form-item label="授权范围（一行或逗号分隔）">
-          <FaTextarea :model-value="splitTextarea(oauthProviderForm.scopes || [])" rows="3" @update:model-value="value => updateList(oauthProviderForm.scopes, value)" />
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        <YdFormItem label="Issuer">
+          <YdInput v-model="oauthProviderForm.issuerUri" />
+        </YdFormItem>
+        <YdFormItem label="授权地址">
+          <YdInput v-model="oauthProviderForm.authorizationUri" />
+        </YdFormItem>
+        <YdFormItem label="Token 地址">
+          <YdInput v-model="oauthProviderForm.tokenUri" />
+        </YdFormItem>
+        <YdFormItem label="用户信息地址">
+          <YdInput v-model="oauthProviderForm.userInfoUri" />
+        </YdFormItem>
+        <YdFormItem label="回调地址">
+          <YdInput v-model="oauthProviderForm.redirectUri" />
+        </YdFormItem>
+        <YdFormItem label="授权范围（一行或逗号分隔）">
+          <YdTextarea :model-value="splitTextarea(oauthProviderForm.scopes || [])" rows="3" @update:model-value="value => updateList(oauthProviderForm.scopes, value)" />
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="secretVisible" title="一次性密钥" :show-cancel-button="false">
+    <YdModal v-model="secretVisible" title="一次性密钥" :show-cancel-button="false">
       <div class="secret-box">
         <code>{{ oneTimeSecret }}</code>
-        <FaButton variant="outline" @click="copySecret">
-          <FaIcon name="morph:copy" />
+        <YdButton variant="outline" @click="copySecret">
+          <YdIcon name="morph:copy" />
           复制
-        </FaButton>
+        </YdButton>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -1357,8 +1360,8 @@ function normalizeDateTime(value?: string) {
 
 .security-tabs button.active,
 .security-tabs button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
 }
 
 .panel {

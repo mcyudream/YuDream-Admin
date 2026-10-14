@@ -3,8 +3,8 @@ import type { TableColumn } from '@yudream/components'
 import type { GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
 import apiDocument from '@/api/modules/platform-document'
 
-const modal = useFaModal()
-const toast = useFaToast()
+const modal = useYdModal()
+const toast = useYdToast()
 
 const activeTab = ref<'templates' | 'records'>('templates')
 const loading = ref(false)
@@ -14,8 +14,8 @@ const recordRows = ref<WordGenerationRecord[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive({ keyword: '' })
 
-const fileInput = ref<HTMLInputElement>()
-const replaceInput = ref<HTMLInputElement>()
+const fileInput = ref<InstanceType<typeof YdFilePicker>>()
+const replaceInput = ref<InstanceType<typeof YdFilePicker>>()
 const pendingFile = ref<File | null>(null)
 const replacingTemplate = ref<WordTemplate | null>(null)
 const formVisible = ref(false)
@@ -113,13 +113,12 @@ function onSizeChange(size: number) {
 }
 
 function pickCreateFile() {
-  fileInput.value?.click()
+  fileInput.value?.open()
 }
 
-function onCreateFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+function onCreateFileChange(files: File[]) {
+  const file = files[0]
+  fileInput.value?.reset()
   if (!file) {
     return
   }
@@ -178,14 +177,13 @@ async function saveForm() {
 
 function pickReplaceFile(row: WordTemplate) {
   replacingTemplate.value = row
-  replaceInput.value?.click()
+  replaceInput.value?.open()
 }
 
-async function onReplaceFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+async function onReplaceFileChange(files: File[]) {
+  const file = files[0]
   const target = replacingTemplate.value
-  input.value = ''
+  replaceInput.value?.reset()
   if (!file || !target) {
     return
   }
@@ -334,21 +332,21 @@ function generationVariant(status: GenerationStatus) {
 
 <template>
   <div>
-    <FaPageHeader title="Word 模板" class="mb-0">
-      <FaButton v-if="activeTab === 'templates'" v-auth="'platform:document:edit'" @click="pickCreateFile">
-        <FaIcon name="morph:cloud-upload" />
+    <YdPageHeader title="Word 模板" class="mb-0">
+      <YdButton v-if="activeTab === 'templates'" v-auth="'platform:document:edit'" @click="pickCreateFile">
+        <YdIcon name="morph:cloud-upload" />
         上传模板
-      </FaButton>
-      <input ref="fileInput" type="file" accept=".docx" hidden @change="onCreateFileChange">
-      <input ref="replaceInput" type="file" accept=".docx" hidden @change="onReplaceFileChange">
-    </FaPageHeader>
+      </YdButton>
+      <YdFilePicker ref="fileInput" accept=".docx" label="选择 DOCX 模板" class="hidden" @select="onCreateFileChange"><template #default /></YdFilePicker>
+      <YdFilePicker ref="replaceInput" accept=".docx" label="替换 DOCX 模板" class="hidden" @select="onReplaceFileChange"><template #default /></YdFilePicker>
+    </YdPageHeader>
 
-    <FaPageMain>
+    <YdPageMain>
       <div class="document-tabs">
-        <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
-          <FaIcon :name="tab.icon" />
+        <YdAction v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+          <YdIcon :name="tab.icon" />
           <span>{{ tab.label }}</span>
-        </button>
+        </YdAction>
       </div>
 
       <section v-if="activeTab === 'templates'" class="template-guide" aria-label="Word 模板写法教程">
@@ -475,9 +473,9 @@ function generationVariant(status: GenerationStatus) {
         </div>
       </section>
 
-      <FaResponsiveTable
-        v-if="activeTab === 'templates'"
-        v-loading="loading"
+      <YdLoadingOverlay v-if="activeTab === 'templates'" :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1320px]"
@@ -488,65 +486,65 @@ function generationVariant(status: GenerationStatus) {
         :data="rows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-placeholders="{ row }">
           <div class="placeholder-tags">
-            <FaTag v-for="(_, key) in row.original.placeholders || {}" :key="key" variant="secondary">
+            <YdTag v-for="(_, key) in row.original.placeholders || {}" :key="key" variant="secondary">
               {{ key }}
-            </FaTag>
+            </YdTag>
             <span v-if="!Object.keys(row.original.placeholders || {}).length">-</span>
           </div>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">
+          <YdTag :variant="statusVariant(row.original.status)">
             {{ statusText(row.original.status) }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-updateTime="{ row }">
           {{ dateText(row.original.updateTime) }}
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
-            <FaButton v-auth="'platform:document:generate'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openGenerate(row.original)">
+            <YdButton v-auth="'platform:document:generate'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openGenerate(row.original)">
               生成
-            </FaButton>
-            <FaButton size="sm" variant="ghost" @click="openFile(row.original.templateFileUrl)">
+            </YdButton>
+            <YdButton size="sm" variant="ghost" @click="openFile(row.original.templateFileUrl)">
               原文件
-            </FaButton>
-            <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="openEdit(row.original)">
+            </YdButton>
+            <YdButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="openEdit(row.original)">
               编辑
-            </FaButton>
-            <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row.original)">
+            </YdButton>
+            <YdButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row.original)">
               替换
-            </FaButton>
-            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row.original)">
+            </YdButton>
+            <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row.original)">
               停用
-            </FaButton>
-            <FaButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row.original)">
+            </YdButton>
+            <YdButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row.original)">
               启用
-            </FaButton>
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -563,38 +561,38 @@ function generationVariant(status: GenerationStatus) {
                 </div>
               </div>
               <div v-if="Object.keys(row.placeholders || {}).length" class="flex flex-wrap gap-1">
-                <FaTag v-for="(_, key) in row.placeholders" :key="key" variant="secondary">
+                <YdTag v-for="(_, key) in row.placeholders" :key="key" variant="secondary">
                   {{ key }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton v-auth="'platform:document:generate'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openGenerate(row)">
+                <YdButton v-auth="'platform:document:generate'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openGenerate(row)">
                   生成
-                </FaButton>
-                <FaButton size="sm" variant="ghost" @click="openFile(row.templateFileUrl)">
+                </YdButton>
+                <YdButton size="sm" variant="ghost" @click="openFile(row.templateFileUrl)">
                   原文件
-                </FaButton>
-                <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="openEdit(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row)">
+                </YdButton>
+                <YdButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row)">
                   替换
-                </FaButton>
-                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row)">
+                </YdButton>
+                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row)">
                   停用
-                </FaButton>
-                <FaButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row)">
+                </YdButton>
+                <YdButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row)">
                   启用
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaResponsiveTable
-        v-else
-        v-loading="loading"
+      <YdLoadingOverlay v-else :loading="loading"><YdResponsiveTable
+
+
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
         table-class="min-w-[1160px]"
@@ -605,25 +603,25 @@ function generationVariant(status: GenerationStatus) {
         :data="recordRows"
       >
         <template #toolbar>
-          <FaSearchBar class="w-full">
+          <YdSearchBar class="w-full">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
+              <YdInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
               <div class="flex gap-2 md:justify-end">
-                <FaButton variant="outline" @click="resetSearch">
+                <YdButton variant="outline" @click="resetSearch">
                   重置
-                </FaButton>
-                <FaButton :loading="loading" @click="load">
-                  <FaIcon name="morph:search" />
+                </YdButton>
+                <YdButton :loading="loading" @click="load">
+                  <YdIcon name="morph:search" />
                   筛选
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaSearchBar>
+          </YdSearchBar>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="generationVariant(row.original.status)">
+          <YdTag :variant="generationVariant(row.original.status)">
             {{ generationText(row.original.status) }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-generatedAt="{ row }">
           {{ dateText(row.original.generatedAt) }}
@@ -632,16 +630,16 @@ function generationVariant(status: GenerationStatus) {
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
         <template #cell-operation="{ row }">
-          <FaButton size="sm" variant="outline" :disabled="!row.original.outputFileUrl" @click="openFile(row.original.outputFileUrl)">
+          <YdButton size="sm" variant="outline" :disabled="!row.original.outputFileUrl" @click="openFile(row.original.outputFileUrl)">
             下载
-          </FaButton>
+          </YdButton>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.templateCode }}</span>
-                <FaTag :variant="generationVariant(row.status)">{{ generationText(row.status) }}</FaTag>
+                <YdTag :variant="generationVariant(row.status)">{{ generationText(row.status) }}</YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div v-if="row.outputFilename" class="flex gap-2">
@@ -662,16 +660,16 @@ function generationVariant(status: GenerationStatus) {
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton size="sm" variant="outline" :disabled="!row.outputFileUrl" @click="openFile(row.outputFileUrl)">
+                <YdButton size="sm" variant="outline" :disabled="!row.outputFileUrl" @click="openFile(row.outputFileUrl)">
                   下载
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
+      </YdResponsiveTable></YdLoadingOverlay>
 
-      <FaPagination
+      <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
@@ -679,52 +677,52 @@ function generationVariant(status: GenerationStatus) {
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </FaPageMain>
+    </YdPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑 Word 模板' : '上传 Word 模板'" show-cancel-button class="sm:max-w-4xl" @confirm="saveForm">
-      <a-form :model="form" layout="vertical">
+    <YdModal v-model="formVisible" :title="editing ? '编辑 Word 模板' : '上传 Word 模板'" show-cancel-button class="sm:max-w-4xl" @confirm="saveForm">
+      <YdForm :model="form" layout="vertical">
         <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <a-form-item label="模板名称" required>
-            <FaInput v-model="form.name" />
-          </a-form-item>
-          <a-form-item label="模板编码" required>
-            <FaInput v-model="form.code" :disabled="!!editing" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <FaSelect v-model="form.status" :options="statusOptions" />
-          </a-form-item>
-          <a-form-item label="模板文件">
-            <FaInput :model-value="editing?.originalFilename || pendingFile?.name || '-'" disabled />
-          </a-form-item>
-          <a-form-item label="占位符 JSON" class="md:col-span-2">
-            <FaTextarea v-model="placeholdersJson" rows="8" input-class="font-mono" placeholder="{ &quot;name&quot;: &quot;姓名&quot;, &quot;date&quot;: &quot;日期&quot; }" />
-          </a-form-item>
-          <a-form-item label="描述" class="md:col-span-2">
-            <FaTextarea v-model="form.description" rows="4" />
-          </a-form-item>
+          <YdFormItem label="模板名称" required>
+            <YdInput v-model="form.name" />
+          </YdFormItem>
+          <YdFormItem label="模板编码" required>
+            <YdInput v-model="form.code" :disabled="!!editing" />
+          </YdFormItem>
+          <YdFormItem label="状态">
+            <YdSelect v-model="form.status" :options="statusOptions" />
+          </YdFormItem>
+          <YdFormItem label="模板文件">
+            <YdInput :model-value="editing?.originalFilename || pendingFile?.name || '-'" disabled />
+          </YdFormItem>
+          <YdFormItem label="占位符 JSON" class="md:col-span-2">
+            <YdTextarea v-model="placeholdersJson" rows="8" input-class="font-mono" placeholder="{ &quot;name&quot;: &quot;姓名&quot;, &quot;date&quot;: &quot;日期&quot; }" />
+          </YdFormItem>
+          <YdFormItem label="描述" class="md:col-span-2">
+            <YdTextarea v-model="form.description" rows="4" />
+          </YdFormItem>
         </div>
-      </a-form>
-    </FaModal>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="generateVisible" title="生成 Word 文档" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'generate'" @confirm="generate">
+    <YdModal v-model="generateVisible" title="生成 Word 文档" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'generate'" @confirm="generate">
       <div class="generate-grid">
-        <a-form :model="{}" layout="vertical">
-          <a-form-item label="生成数据 JSON">
-            <FaTextarea v-model="generateDataJson" rows="14" input-class="font-mono" />
-          </a-form-item>
-        </a-form>
+        <YdForm :model="{}" layout="vertical">
+          <YdFormItem label="生成数据 JSON">
+            <YdTextarea v-model="generateDataJson" rows="14" input-class="font-mono" />
+          </YdFormItem>
+        </YdForm>
         <section class="result-panel">
           <div class="section-title">
             最近结果
           </div>
           <pre>{{ lastRecord ? JSON.stringify(lastRecord, null, 2) : '尚未生成' }}</pre>
-          <FaButton v-if="lastRecord?.outputFileUrl" variant="outline" @click="openFile(lastRecord.outputFileUrl)">
-            <FaIcon name="morph:download" />
+          <YdButton v-if="lastRecord?.outputFileUrl" variant="outline" @click="openFile(lastRecord.outputFileUrl)">
+            <YdIcon name="morph:download" />
             下载生成文件
-          </FaButton>
+          </YdButton>
         </section>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
@@ -750,8 +748,8 @@ function generationVariant(status: GenerationStatus) {
 
 .document-tabs button.active,
 .document-tabs button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
 }
 
 .template-guide {
@@ -792,7 +790,7 @@ function generationVariant(status: GenerationStatus) {
 }
 
 .guide-eyebrow {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   font-size: 12px;
   font-weight: 700;
 }

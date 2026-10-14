@@ -32,7 +32,7 @@ const form = useForm({
 const onSubmit = form.handleSubmit((values) => {
   loading.value = true
   appAccountStore.editPassword(values).then(async () => {
-    useFaToast().success('模拟修改成功，请重新登录')
+    useYdToast().success('模拟修改成功，请重新登录')
     appAccountStore.logout()
   }).finally(() => {
     loading.value = false
@@ -54,11 +54,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="password">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="原密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="原密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -68,11 +68,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="newPassword">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="新密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -82,20 +82,20 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="checkPassword">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
           </Transition>
         </FormItem>
       </FormField>
-      <FaButton :loading="loading" size="lg" class="mt-8 w-full" type="submit">
+      <YdButton :loading="loading" size="lg" class="mt-8 w-full" type="submit">
         保存
-      </FaButton>
+      </YdButton>
     </form>
   </div>
 </template>

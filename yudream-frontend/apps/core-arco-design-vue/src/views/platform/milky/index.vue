@@ -14,7 +14,7 @@ import {
 } from '@/api/modules/official-qqbot-intent-catalog'
 import MilkyChatWorkspace from './components/MilkyChatWorkspace.vue'
 
-const toast = useFaToast()
+const toast = useYdToast()
 const loading = ref(false)
 const formVisible = ref(false)
 const rows = ref<MilkyConnection[]>([])
@@ -179,52 +179,52 @@ onMounted(load)
 
 <template>
   <div>
-    <FaPageHeader title="QQ 消息平台">
-      <FaButton v-auth="'platform:milky:config'" @click="openCreate">
-        <FaIcon name="morph:plus" />
+    <YdPageHeader title="QQ 消息平台">
+      <YdButton v-auth="'platform:milky:config'" @click="openCreate">
+        <YdIcon name="morph:plus" />
         新增连接
-      </FaButton>
-    </FaPageHeader>
+      </YdButton>
+    </YdPageHeader>
 
-    <FaPageMain>
-      <FaResponsiveTable v-loading="loading" :columns="columns" :data="rows" row-key="id" border stripe>
+    <YdPageMain>
+      <YdLoadingOverlay :loading="loading"><YdResponsiveTable  :columns="columns" :data="rows" row-key="id" border stripe>
         <template #cell-protocol="{ row }">
-          <FaTag variant="secondary">
+          <YdTag variant="secondary">
             {{ row.original.protocol === 'official' ? '官方机器人' : 'Milky' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
+          <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
             {{ row.original.enabled ? '已启用' : '已停用' }}
-          </FaTag>
+          </YdTag>
         </template>
         <template #cell-actions="{ row }">
           <div class="flex items-center gap-1">
-            <FaButton size="sm" variant="ghost" title="编辑" @click="openEdit(row.original)">
-              <FaIcon name="morph:pencil" />
-            </FaButton>
-            <FaButton size="sm" variant="ghost" title="测试连接" @click="test(row.original)">
-              <FaIcon name="morph:radar" />
-            </FaButton>
-            <FaButton v-if="row.original.protocol === 'official'" size="sm" variant="ghost" title="回填 @ 身份" @click="openMentionBind(row.original)">
-              <FaIcon name="morph:at-sign" />
-            </FaButton>
-            <FaButton size="sm" variant="ghost" :title="row.original.enabled ? '停用' : '启用'" @click="toggle(row.original)">
-              <FaIcon :name="row.original.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
-            </FaButton>
-            <FaButton size="sm" variant="ghost" :disabled="!row.original.enabled" title="WebQQ" @click="openChat(row.original)">
-              <FaIcon name="morph:message-circle" />
-            </FaButton>
+            <YdButton size="sm" variant="ghost" title="编辑" @click="openEdit(row.original)">
+              <YdIcon name="morph:pencil" />
+            </YdButton>
+            <YdButton size="sm" variant="ghost" title="测试连接" @click="test(row.original)">
+              <YdIcon name="morph:radar" />
+            </YdButton>
+            <YdButton v-if="row.original.protocol === 'official'" size="sm" variant="ghost" title="回填 @ 身份" @click="openMentionBind(row.original)">
+              <YdIcon name="morph:at-sign" />
+            </YdButton>
+            <YdButton size="sm" variant="ghost" :title="row.original.enabled ? '停用' : '启用'" @click="toggle(row.original)">
+              <YdIcon :name="row.original.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
+            </YdButton>
+            <YdButton size="sm" variant="ghost" :disabled="!row.original.enabled" title="WebQQ" @click="openChat(row.original)">
+              <YdIcon name="morph:message-circle" />
+            </YdButton>
           </div>
         </template>
         <template #card="{ row }">
-          <FaCard class="w-full">
+          <YdCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                <YdTag :variant="row.enabled ? 'default' : 'secondary'">
                   {{ row.enabled ? '已启用' : '已停用' }}
-                </FaTag>
+                </YdTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
                 <div class="flex gap-2">
@@ -237,36 +237,36 @@ onMounted(load)
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 border-t pt-3">
-                <FaButton size="sm" variant="outline" @click="openEdit(row)">
+                <YdButton size="sm" variant="outline" @click="openEdit(row)">
                   编辑
-                </FaButton>
-                <FaButton size="sm" variant="outline" @click="test(row)">
+                </YdButton>
+                <YdButton size="sm" variant="outline" @click="test(row)">
                   测试
-                </FaButton>
-                <FaButton v-if="row.protocol === 'official'" size="sm" variant="outline" @click="openMentionBind(row)">
+                </YdButton>
+                <YdButton v-if="row.protocol === 'official'" size="sm" variant="outline" @click="openMentionBind(row)">
                   回填@
-                </FaButton>
-                <FaButton size="sm" variant="outline" @click="toggle(row)">
+                </YdButton>
+                <YdButton size="sm" variant="outline" @click="toggle(row)">
                   {{ row.enabled ? '停用' : '启用' }}
-                </FaButton>
-                <FaButton size="sm" variant="ghost" :disabled="!row.enabled" @click="openChat(row)">
+                </YdButton>
+                <YdButton size="sm" variant="ghost" :disabled="!row.enabled" @click="openChat(row)">
                   WebQQ
-                </FaButton>
+                </YdButton>
               </div>
             </div>
-          </FaCard>
+          </YdCard>
         </template>
-      </FaResponsiveTable>
-      <FaPagination v-model:page="page.page" v-model:size="page.size" :total="page.total" class="mt-3" @page-change="load" @size-change="load" />
-    </FaPageMain>
+      </YdResponsiveTable></YdLoadingOverlay>
+      <YdPagination v-model:page="page.page" v-model:size="page.size" :total="page.total" class="mt-3" @page-change="load" @size-change="load" />
+    </YdPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑 QQ 连接' : '新增 QQ 连接'" show-cancel-button @confirm="save">
-      <a-form :model="form" layout="vertical">
-        <a-form-item label="名称" required>
-          <FaInput v-model="form.name" />
-        </a-form-item>
-        <a-form-item label="协议" required>
-          <FaSelect
+    <YdModal v-model="formVisible" :title="editing ? '编辑 QQ 连接' : '新增 QQ 连接'" show-cancel-button @confirm="save">
+      <YdForm :model="form" layout="vertical">
+        <YdFormItem label="名称" required>
+          <YdInput v-model="form.name" />
+        </YdFormItem>
+        <YdFormItem label="协议" required>
+          <YdSelect
             v-model="form.protocol"
             :disabled="!!editing"
             :options="[
@@ -275,39 +275,39 @@ onMounted(load)
             ]"
             @update:model-value="onProtocolChange"
           />
-        </a-form-item>
+        </YdFormItem>
         <template v-if="form.protocol === 'official'">
-          <a-form-item label="AppID" required>
-            <FaInput v-model="form.appId" placeholder="QQ 开放平台 AppID" />
-          </a-form-item>
-          <a-form-item :label="editing ? 'AppSecret（留空不修改）' : 'AppSecret'" :required="!editing">
-            <FaInput v-model="form.appSecret" type="password" />
-          </a-form-item>
-          <a-form-item label="沙箱环境">
-            <FaSwitch v-model="form.sandbox" @update:model-value="onSandboxChange" />
-          </a-form-item>
-          <a-form-item label="API 地址">
-            <FaInput v-model="form.baseUrl" placeholder="https://api.bot.qq.com" />
-          </a-form-item>
-          <a-form-item label="订阅事件">
+          <YdFormItem label="AppID" required>
+            <YdInput v-model="form.appId" placeholder="QQ 开放平台 AppID" />
+          </YdFormItem>
+          <YdFormItem :label="editing ? 'AppSecret（留空不修改）' : 'AppSecret'" :required="!editing">
+            <YdInput v-model="form.appSecret" type="password" />
+          </YdFormItem>
+          <YdFormItem label="沙箱环境">
+            <YdSwitch v-model="form.sandbox" @update:model-value="onSandboxChange" />
+          </YdFormItem>
+          <YdFormItem label="API 地址">
+            <YdInput v-model="form.baseUrl" placeholder="https://api.bot.qq.com" />
+          </YdFormItem>
+          <YdFormItem label="订阅事件">
             <div class="intent-picker">
               <div class="intent-picker-meta">
                 <span>已选 {{ officialIntentCount }} / {{ officialIntentTotal }} 类</span>
                 <div class="intent-picker-actions">
-                  <FaButton size="sm" variant="ghost" @click="selectRecommendedOfficialIntents">推荐</FaButton>
-                  <FaButton size="sm" variant="ghost" @click="selectAllOfficialIntents">全选</FaButton>
+                  <YdButton size="sm" variant="ghost" @click="selectRecommendedOfficialIntents">推荐</YdButton>
+                  <YdButton size="sm" variant="ghost" @click="selectAllOfficialIntents">全选</YdButton>
                 </div>
               </div>
               <div v-for="group in OFFICIAL_QQ_BOT_INTENT_GROUPS" :key="group.label" class="intent-group">
-                <FaCheckbox
+                <YdCheckbox
                   :model-value="groupIntentCheckedState(group.intents.map(intent => intent.bit))"
                   class="intent-group-title"
                   @update:model-value="checked => toggleOfficialIntentGroupBits(group.intents.map(intent => intent.bit), checked)"
                 >
                   {{ group.label }}
-                </FaCheckbox>
+                </YdCheckbox>
                 <div class="intent-group-items">
-                  <FaCheckbox
+                  <YdCheckbox
                     v-for="intent in group.intents"
                     :key="intent.code"
                     :model-value="isOfficialIntentChecked(intent.bit)"
@@ -317,40 +317,40 @@ onMounted(load)
                       <span class="intent-label">{{ intent.label }}</span>
                       <span class="intent-desc">{{ intent.description }}</span>
                     </span>
-                  </FaCheckbox>
+                  </YdCheckbox>
                 </div>
               </div>
             </div>
-          </a-form-item>
+          </YdFormItem>
         </template>
         <template v-else>
-          <a-form-item label="Milky HTTP 地址" required>
-            <FaInput v-model="form.baseUrl" placeholder="http://127.0.0.1:3010" />
-          </a-form-item>
-          <a-form-item :label="editing ? 'Access Token（留空不修改）' : 'Access Token'" :required="!editing">
-            <FaInput v-model="form.token" type="password" />
-          </a-form-item>
+          <YdFormItem label="Milky HTTP 地址" required>
+            <YdInput v-model="form.baseUrl" placeholder="http://127.0.0.1:3010" />
+          </YdFormItem>
+          <YdFormItem :label="editing ? 'Access Token（留空不修改）' : 'Access Token'" :required="!editing">
+            <YdInput v-model="form.token" type="password" />
+          </YdFormItem>
         </template>
-        <a-form-item label="指令菜单图片格式">
-          <FaSelect
+        <YdFormItem label="指令菜单图片格式">
+          <YdSelect
             v-model="form.commandMenuImageMode"
             :options="[
               { label: 'Base64（开发环境推荐）', value: 'base64' },
               { label: '公开链接（公网部署）', value: 'url' },
             ]"
           />
-        </a-form-item>
-        <a-form-item v-if="form.commandMenuImageMode === 'url'" label="公开访问基础地址">
-          <FaInput v-model="form.commandMenuPublicBaseUrl" placeholder="https://admin.example.com" />
-        </a-form-item>
-      </a-form>
-    </FaModal>
+        </YdFormItem>
+        <YdFormItem v-if="form.commandMenuImageMode === 'url'" label="公开访问基础地址">
+          <YdInput v-model="form.commandMenuPublicBaseUrl" placeholder="https://admin.example.com" />
+        </YdFormItem>
+      </YdForm>
+    </YdModal>
 
-    <FaModal v-model="chatVisible" :title="`${chatConnection?.name || 'QQ'} WebQQ`" :show-cancel-button="false" class="sm:max-w-6xl">
+    <YdModal v-model="chatVisible" :title="`${chatConnection?.name || 'QQ'} WebQQ`" :show-cancel-button="false" class="sm:max-w-6xl">
       <MilkyChatWorkspace v-if="chatConnection" :connection-id="chatConnection.id" :protocol="chatConnection.protocol || 'milky'" />
-    </FaModal>
+    </YdModal>
 
-    <FaModal v-model="mentionBindVisible" title="回填机器人 @ 身份" :show-cancel-button="false">
+    <YdModal v-model="mentionBindVisible" title="回填机器人 @ 身份" :show-cancel-button="false">
       <div class="flex flex-col gap-3 text-sm">
         <p>开通「接收所有消息」后，群里所有消息都以普通消息推送，机器人无法自动得知自己在群内被 @ 时的身份。按以下步骤一次性回填：</p>
         <ol class="flex flex-col gap-1 pl-5 list-decimal">
@@ -365,7 +365,7 @@ onMounted(load)
           已登记身份：{{ mentionBindConnection.mentionOpenIds.join('、') }}
         </div>
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 

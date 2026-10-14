@@ -71,13 +71,13 @@ watch(() => route, (val) => {
 function tabbarScrollTip() {
   if (tabContainerRef.value?.$el.clientWidth > (tabsRef.value?.ref?.$el.clientWidth ?? 0) && !localStorage.has('tabbarScrollTip')) {
     localStorage.setItem('tabbarScrollTip', '')
-    const tips = useFaToast().info('温馨提示', {
+    const tips = useYdToast().info('温馨提示', {
       description: '标签栏数量超过展示区域范围，可以将鼠标移到标签栏上，通过鼠标滚轮滑动浏览',
       position: 'top-center',
       duration: Infinity,
       action: {
         label: '知道了',
-        onClick: () => useFaToast().dismiss(tips),
+        onClick: () => useYdToast().dismiss(tips),
       },
     })
   }
@@ -187,7 +187,7 @@ watch(() => keys.alt, (val) => {
   <div class="tabbar">
     <Component :is="useSlots('tabbar-start')" />
     <div class="tabbar-container">
-      <FaScrollArea
+      <YdScrollArea
         ref="tabsRef" :scrollbar="false" mask horizontal class="tabs overscroll-contain"
       >
         <TransitionGroup ref="tabContainerRef" :name="!isInit ? 'tabbar' : undefined" tag="div" class="tab-container" @before-leave="onBeforeLeave" @after-leave="isAnimating = false">
@@ -195,24 +195,29 @@ watch(() => keys.alt, (val) => {
             v-for="(element, index) in appTabbarStore.list" :key="element.tabId"
             ref="tabRef" :data-index="index" class="tab" :class="{
               actived: element.tabId === activedTabId,
-            }" @click="!isAnimating && element.tabId !== activedTabId && router.push(element.fullPath)"
+            }"
           >
-            <FaContextMenu :items="contextMenuItems(element)">
+            <YdContextMenu :items="contextMenuItems(element)">
               <div class="size-full">
                 <div class="tab-dividers" />
                 <div class="tab-background" />
-                <FaTooltip :delay="1000" side="bottom">
+                <YdTooltip :delay="1000" side="bottom">
                   <div class="tab-content">
-                    <div :key="element.tabId" class="title">
-                      <FaIcon v-if="appSettingsStore.settings.tabbar.icon && iconName(element.icon)" :name="iconName(element.icon)!" class="icon" />
+                    <YdAction
+                      type="button"
+                      :aria-current="element.tabId === activedTabId ? 'page' : undefined"
+                      class="title"
+                      @click="!isAnimating && element.tabId !== activedTabId && router.push(element.fullPath)"
+                    >
+                      <YdIcon v-if="appSettingsStore.settings.tabbar.icon && iconName(element.icon)" :name="iconName(element.icon)!" class="icon" />
                       {{ generateTitle(element.title) }}
-                    </div>
-                    <div v-if="appTabbarStore.list.length > 1" class="action-icon" @click.stop="tabbar.closeById(element.tabId)">
-                      <FaIcon name="morph:x" />
-                    </div>
-                    <div v-show="appSettingsStore.settings.tabbar.hotkeys && keys.alt && getVisibleTabIndex(index) >= 0 && getVisibleTabIndex(index) < 9" class="hotkey-number">
-                      {{ getVisibleTabIndex(index) + 1 }}
-                    </div>
+                      <span v-show="appSettingsStore.settings.tabbar.hotkeys && keys.alt && getVisibleTabIndex(index) >= 0 && getVisibleTabIndex(index) < 9" class="hotkey-number">
+                        {{ getVisibleTabIndex(index) + 1 }}
+                      </span>
+                    </YdAction>
+                    <YdAction v-if="appTabbarStore.list.length > 1" type="button" class="action-icon" aria-label="关闭标签" @click.stop="tabbar.closeById(element.tabId)">
+                      <YdIcon name="morph:x" />
+                    </YdAction>
                   </div>
                   <template #content>
                     <div class="text-sm">
@@ -222,12 +227,12 @@ watch(() => keys.alt, (val) => {
                       {{ element.fullPath }}
                     </div>
                   </template>
-                </FaTooltip>
+                </YdTooltip>
               </div>
-            </FaContextMenu>
+            </YdContextMenu>
           </div>
         </TransitionGroup>
-      </FaScrollArea>
+      </YdScrollArea>
     </div>
     <Component :is="useSlots('tabbar-end')" />
   </div>

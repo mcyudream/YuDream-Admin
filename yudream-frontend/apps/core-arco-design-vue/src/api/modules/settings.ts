@@ -29,7 +29,7 @@ settingsApi.interceptors.response.use(
       return retryAfterRefresh(settingsApi, response.config)
     }
     const message = result?.message || '请求失败'
-    useFaToast().error('错误', { description: message })
+    useYdToast().error('错误', { description: message })
     return Promise.reject(new Error(message))
   },
   async (error) => {
@@ -40,7 +40,7 @@ settingsApi.interceptors.response.use(
       return retryAfterRefresh(settingsApi, error.config)
     }
     const message = error.response?.data?.message || error.message || '网络错误'
-    useFaToast().error('错误', { description: message })
+    useYdToast().error('错误', { description: message })
     return Promise.reject(error)
   },
 )

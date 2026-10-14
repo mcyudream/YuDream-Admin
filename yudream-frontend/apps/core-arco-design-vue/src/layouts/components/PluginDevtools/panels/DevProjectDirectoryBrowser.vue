@@ -2,7 +2,7 @@
 import type { PluginDevDirectoryBrowse } from '@/api/modules/platform-devtools'
 import apiDevtools from '@/api/modules/platform-devtools'
 
-// 嵌套在登记表单 FaModal（z-index 2200）之上，需用更高层级 2300
+// 嵌套在登记表单 YdModal（z-index 2200）之上，需用更高层级 2300
 const emit = defineEmits<{
   select: [path: string, inferredCode?: string]
 }>()
@@ -47,42 +47,43 @@ function choose() {
 </script>
 
 <template>
-  <FaModal v-model="open" title="选择插件源码目录" :footer="false" :z-index="2300" content-class="sm:max-w-xl">
+  <YdModal v-model="open" title="选择插件源码目录" :footer="false" :z-index="2300" content-class="sm:max-w-xl">
     <div class="browser">
       <div class="browser__bar">
-        <FaTooltip text="返回盘符列表" side="bottom">
-          <FaButton variant="outline" size="icon" :disabled="loading" @click="navigate('')">
-            <FaIcon name="morph:monitor" />
-          </FaButton>
-        </FaTooltip>
-        <FaTooltip text="上一级" side="bottom">
-          <FaButton variant="outline" size="icon" :disabled="loading || !browse?.parent" @click="browse?.parent && navigate(browse.parent)">
-            <FaIcon name="morph:arrow-up" />
-          </FaButton>
-        </FaTooltip>
-        <FaInput v-model="pathInput" class="flex-1" placeholder="粘贴宿主机绝对路径后回车" @keydown.enter="go" />
-        <FaButton variant="outline" size="icon" :loading="loading" title="刷新" @click="go">
-          <FaIcon name="morph:refresh-cw" />
-        </FaButton>
+        <YdTooltip text="返回盘符列表" side="bottom">
+          <YdButton variant="outline" size="icon" :disabled="loading" @click="navigate('')">
+            <YdIcon name="morph:monitor" />
+          </YdButton>
+        </YdTooltip>
+        <YdTooltip text="上一级" side="bottom">
+          <YdButton variant="outline" size="icon" :disabled="loading || !browse?.parent" @click="browse?.parent && navigate(browse.parent)">
+            <YdIcon name="morph:arrow-up" />
+          </YdButton>
+        </YdTooltip>
+        <YdInput v-model="pathInput" class="flex-1" placeholder="粘贴宿主机绝对路径后回车" @keydown.enter="go" />
+        <YdButton variant="outline" size="icon" :loading="loading" title="刷新" @click="go">
+          <YdIcon name="morph:refresh-cw" />
+        </YdButton>
       </div>
 
       <div class="browser__list">
-        <button
+        <YdButton
           v-for="entry in browse?.entries || []"
           :key="entry.path"
+          variant="ghost"
           type="button"
           class="browser-entry"
           @click="navigate(entry.path)"
         >
-          <FaIcon :name="browse?.rootList ? 'morph:hard-drive' : 'morph:folder'" class="browser-entry__icon" />
+          <YdIcon :name="browse?.rootList ? 'morph:hard-drive' : 'morph:folder'" class="browser-entry__icon" />
           <span class="browser-entry__name">{{ entry.name }}</span>
-          <FaTag v-if="entry.hasPluginYml" class="text-xs">
+          <YdTag v-if="entry.hasPluginYml" class="text-xs">
             插件模块{{ entry.inferredCode ? ` · ${entry.inferredCode}` : '' }}
-          </FaTag>
-          <FaTag v-else-if="entry.hasPom" variant="secondary" class="text-xs">
+          </YdTag>
+          <YdTag v-else-if="entry.hasPom" variant="secondary" class="text-xs">
             Maven
-          </FaTag>
-        </button>
+          </YdTag>
+        </YdButton>
         <div v-if="!loading && browse && !browse.entries.length" class="browser__empty">
           {{ browse.rootList ? '未检测到可用盘符' : '此目录下没有可进入的子目录' }}
         </div>
@@ -94,24 +95,24 @@ function choose() {
       <div v-if="browse && !browse.rootList" class="browser__current">
         <span class="browser__current-label">当前目录</span>
         <span class="browser__current-path">{{ browse.path }}</span>
-        <FaTag v-if="browse.hasPluginYml" class="text-xs">
+        <YdTag v-if="browse.hasPluginYml" class="text-xs">
           插件模块{{ browse.inferredCode ? ` · ${browse.inferredCode}` : '' }}
-        </FaTag>
-        <FaTag v-else-if="browse.hasPom" variant="secondary" class="text-xs">
+        </YdTag>
+        <YdTag v-else-if="browse.hasPom" variant="secondary" class="text-xs">
           Maven
-        </FaTag>
+        </YdTag>
       </div>
 
       <div class="browser__actions">
-        <FaButton variant="outline" @click="open = false">
+        <YdButton variant="outline" @click="open = false">
           取消
-        </FaButton>
-        <FaButton :disabled="!browse?.path" @click="choose">
+        </YdButton>
+        <YdButton :disabled="!browse?.path" @click="choose">
           选择当前目录
-        </FaButton>
+        </YdButton>
       </div>
     </div>
-  </FaModal>
+  </YdModal>
 </template>
 
 <style scoped>

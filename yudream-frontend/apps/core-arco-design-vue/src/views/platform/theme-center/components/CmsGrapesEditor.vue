@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { Editor } from 'grapesjs'
-import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolCallReply, YdChatToolCallRequest, YdChatToolEvent } from '@yudream/components'
+import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolCallReply, YdChatToolCallRequest, YdChatToolEvent, YdFilePickerInstance, YdPageBuilderAsset, YdPageBuilderEditorFacade, YdPageBuilderOptions } from '@yudream/components'
 import type { CmsModelSelectOption } from '../config/cms-model-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
@@ -8,6 +7,7 @@ import type { AiToolCallResult, CmsChatHistoryMessage } from '@/api/modules/plat
 import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
 import type { YdAgentChatSession, YdAgentChatSessionStore } from '@/components/YdAgentChatPanel/types'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
+import { useYdDomAction } from '@yudream/components'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
@@ -24,7 +24,8 @@ import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
 import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
 import CmsCodeEditor from './CmsCodeEditor.vue'
 import TokuiBlock from './TokuiBlock.vue'
-import 'grapesjs/dist/css/grapes.min.css'
+
+type Editor = YdPageBuilderEditorFacade['editor']
 
 interface GrapesSavePayload {
   htmlContent: string
@@ -86,20 +87,53 @@ const emit = defineEmits<{
   save: [payload: GrapesSavePayload]
 }>()
 
-const toast = useFaToast()
+const toast = useYdToast()
 const appSettingsStore = useAppSettingsStore()
 const editorEl = ref<HTMLElement>()
+const initialProjectJson = props.chromeFrame ? '' : props.builderProjectJson?.trim() || ''
+const invalidBuilderProject = (() => {
+  if (!initialProjectJson) {
+    return false
+  }
+  try {
+    const project: unknown = JSON.parse(initialProjectJson)
+    return !project || typeof project !== 'object' || Array.isArray(project)
+  }
+  catch {
+    return true
+  }
+})()
+const builderHtmlContent = ref(props.chromeFrame
+  ? chromeFrameTemplate(props.htmlContent || '', props.chromeLayout)
+  : props.htmlContent || starterHtml())
+const builderCssContent = ref(props.cssContent || '')
+const builderProjectJson = ref(invalidBuilderProject ? '' : initialProjectJson)
 const blocksEl = ref<HTMLElement>()
 const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
-const mediaInput = ref<HTMLInputElement>()
+const pageBuilderOptions = computed<YdPageBuilderOptions>(() => ({
+  width: 'auto',
+  undoManager: { trackSelection: false },
+  selectorManager: { componentFirst: true },
+  keepUnusedStyles: true,
+  blockManager: { appendTo: blocksEl.value! },
+  layerManager: { appendTo: layersEl.value! },
+  traitManager: { appendTo: traitsEl.value! },
+  styleManager: { appendTo: stylesEl.value!, sectors: styleSectors() },
+  deviceManager: { devices: cmsCanvasDevices() },
+  canvas: { styles: props.themeStyleUrls || [] },
+  plugins: cmsGrapesPlugins(),
+  pluginsOpts: cmsGrapesPluginsOpts(),
+  panels: { defaults: [] },
+}))
+const mediaInput = ref<YdFilePickerInstance | null>(null)
 const aiChatPanelRef = ref<InstanceType<typeof YdAgentChatPanel>>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 // CMS 助手直接选模型（provider/model），不再绑定 Agent
 const aiModelValue = ref('')
-// 本地极简模型下拉：内建 FaSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
+// 本地极简模型下拉：内建 YdSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
 const agentSelectOpen = ref(false)
 const agentSelectEl = ref<HTMLElement | null>(null)
 const aiModelOption = computed(() => findCmsModelOption(props.aiModelOptions || [], aiModelValue.value))
@@ -172,6 +206,7 @@ let templatePreviewTimer: ReturnType<typeof setTimeout> | null = null
 let pageJsSyncTimer: ReturnType<typeof setTimeout> | null = null
 let blockPanelObserver: MutationObserver | null = null
 let isRefreshingBlockPanel = false
+const blockFavoriteActions = new Map<HTMLElement, ReturnType<typeof useYdDomAction>>()
 
 const BLOCK_FAVORITES_KEY = 'yb:cms:block-favorites'
 const USER_BLOCKS_KEY = 'yb:cms:user-blocks'
@@ -722,69 +757,53 @@ watch([blockSearch, blockCategory, blockFavorites], () => {
   refreshBlockPanel()
 }, { flush: 'post' })
 
-onMounted(async () => {
-  const { default: grapes } = await import('grapesjs')
-  editor = grapes.init({
-    container: editorEl.value!,
-    height: '100%',
-    width: 'auto',
-    fromElement: false,
-    storageManager: false,
-    undoManager: { trackSelection: false },
-    selectorManager: { componentFirst: true },
-    keepUnusedStyles: true,
-    blockManager: { appendTo: blocksEl.value! },
-    layerManager: { appendTo: layersEl.value! },
-    traitManager: { appendTo: traitsEl.value! },
-    styleManager: {
-      appendTo: stylesEl.value!,
-      sectors: styleSectors(),
-    },
-    deviceManager: {
-      devices: cmsCanvasDevices(),
-    },
-    canvas: {
-      styles: props.themeStyleUrls || [],
-    },
-    plugins: cmsGrapesPlugins(),
-    pluginsOpts: cmsGrapesPluginsOpts(),
-    panels: { defaults: [] },
-  })
-  localizeCmsPluginBlocks(editor)
+function onBuilderSetup(instance: Editor) {
+  editor = instance
+  localizeCmsPluginBlocks(instance)
   if (import.meta.env.DEV) {
     // 开发环境暴露实例，便于用浏览器控制台/远程调试画布状态
-    ;(window as any).__cmsEditor = editor
+    ;(window as any).__cmsEditor = instance
     ;(window as any).__cmsCanvasFit = fitCanvasToWorkspace
   }
-  registerDynamicTypes(editor)
-  registerBlocks(editor, false)
-  loadAndRegisterUserBlocks(editor, false)
-  editor.BlockManager.render()
+  registerDynamicTypes(instance)
+  registerBlocks(instance, false)
+  loadAndRegisterUserBlocks(instance, false)
+  instance.BlockManager.render()
+  if (invalidBuilderProject) {
+    toast.warning('构建器源数据解析失败，已回退 HTML 内容')
+  }
+}
+
+async function onBuilderReady(facade: YdPageBuilderEditorFacade) {
+  const instance = facade.editor
+  editor = instance
+  if (props.chromeFrame) {
+    lockChromeFrameComponents(instance)
+  }
   observeBlockPanel()
   refreshBlockPanel()
   readCanvasZoom()
   requestAnimationFrame(fitCanvasToWorkspace)
   window.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
-  loadInitialContent(editor)
-  removeLayoutBlocks(editor)
-  injectCanvasHighlightStyle(editor)
-  injectCanvasChromePreviewStyle(editor)
-  scheduleCanvasTemplatePreview(editor, 80)
-  editor.on('component:add component:remove style:update undo redo', () => {
+  removeLayoutBlocks(instance)
+  injectCanvasHighlightStyle(instance)
+  injectCanvasChromePreviewStyle(instance)
+  scheduleCanvasTemplatePreview(instance, 80)
+  instance.on('component:add component:remove style:update undo redo', () => {
     editorDirty.value = true
     scheduleCanvasRefresh(80)
     scheduleSelectedSourceSync(80)
-    scheduleCanvasTemplatePreview(editor!, 100)
+    scheduleCanvasTemplatePreview(instance, 100)
   })
-  editor.on('load', () => injectCanvasChromePreviewStyle(editor!))
-  editor.on('load', () => refreshBlockPanel())
-  editor.on('component:update', () => {
+  instance.on('load', () => injectCanvasChromePreviewStyle(instance))
+  instance.on('load', () => refreshBlockPanel())
+  instance.on('component:update', () => {
     scheduleCanvasRefresh(220)
     scheduleSelectedSourceSync(220)
-    scheduleCanvasTemplatePreview(editor!, 260)
+    scheduleCanvasTemplatePreview(instance, 260)
   })
-  editor.on('component:selected component:deselected', () => {
+  instance.on('component:selected component:deselected', () => {
     clearScheduledCanvasWork()
     canvasRevision.value += 1
     syncSelectedSource(true)
@@ -792,14 +811,13 @@ onMounted(async () => {
   canvasRevision.value += 1
   editorReady.value = true
   readCanvasZoom()
-  editor.on('canvas:zoom', readCanvasZoom)
+  instance.on('canvas:zoom', readCanvasZoom)
   scheduleCanvasJsSync(250)
-  const mountedEditor = editor
   requestAnimationFrame(() => {
-    if (editor === mountedEditor) {
+    if (editor === instance) {
       setupCanvasPan()
       observeCanvasResize()
-      void loadAndRegisterBackendBlocks(mountedEditor)
+      void loadAndRegisterBackendBlocks(instance)
     }
   })
   await loadMedia()
@@ -808,9 +826,14 @@ onMounted(async () => {
   if (rightPanelTab.value === 'ai') {
     void restoreAiSession()
   }
-})
+}
 
+function onBuilderError(error: Error) {
+  toast.error(error.message)
+}
 onBeforeUnmount(() => {
+  blockFavoriteActions.forEach(action => action.dispose())
+  blockFavoriteActions.clear()
   editorReady.value = false
   clearScheduledCanvasWork()
   removeHandler('pick')
@@ -835,33 +858,8 @@ onBeforeUnmount(() => {
     canvasPanEnd = null
   }
   runCanvasJsDisposers(editor?.Canvas.getDocument()?.defaultView)
-  editor?.destroy()
   editor = null
 })
-
-function loadInitialContent(instance: Editor) {
-  if (props.chromeFrame) {
-    instance.setComponents(chromeFrameTemplate(props.htmlContent || '', props.chromeLayout))
-    if (props.cssContent) {
-      instance.setStyle(props.cssContent)
-    }
-    lockChromeFrameComponents(instance)
-    return
-  }
-  if (props.builderProjectJson) {
-    try {
-      instance.loadProjectData(JSON.parse(props.builderProjectJson))
-      return
-    }
-    catch {
-      toast.warning('构建器源数据解析失败，已回退 HTML 内容')
-    }
-  }
-  instance.setComponents(props.htmlContent || starterHtml())
-  if (props.cssContent) {
-    instance.setStyle(props.cssContent)
-  }
-}
 
 function scheduleCanvasRefresh(delay = 160) {
   if (canvasRefreshTimer) {
@@ -1231,20 +1229,27 @@ function refreshBlockPanel() {
         }
       }
 
-      let star = htmlEl.querySelector('.gjs-block-favorite') as HTMLButtonElement | null
-      if (!star) {
-        star = document.createElement('button')
-        star.type = 'button'
-        star.className = 'gjs-block-favorite'
-        star.title = '收藏'
-        star.addEventListener('click', (e) => {
-          e.stopPropagation()
-          toggleBlockFavorite(id)
+      let action = blockFavoriteActions.get(htmlEl)
+      if (!action) {
+        action = useYdDomAction(htmlEl, {
+          ariaLabel: '收藏区块',
+          title: '收藏',
+          onClick: (event) => {
+            event.stopPropagation()
+            toggleBlockFavorite(id)
+          },
         })
-        htmlEl.appendChild(star)
+        blockFavoriteActions.set(htmlEl, action)
       }
-      star.classList.toggle('is-active', favoriteBlockIds.value.has(id))
+      const active = favoriteBlockIds.value.has(id)
+      action.update({ class: ['gjs-block-favorite', { 'is-active': active }], pressed: active, ariaLabel: active ? '取消收藏区块' : '收藏区块' })
     })
+    for (const [element, action] of blockFavoriteActions) {
+      if (!element.isConnected) {
+        action.dispose()
+        blockFavoriteActions.delete(element)
+      }
+    }
   }
   finally {
     isRefreshingBlockPanel = false
@@ -2546,29 +2551,48 @@ async function loadMedia() {
 }
 
 function pickMedia() {
-  mediaInput.value?.click()
+  mediaInput.value?.open()
 }
 
-async function uploadMedia(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function uploadMedia(files: File[]): Promise<FileObject | null> {
+  const file = files[0]
+  mediaInput.value?.reset()
   if (!file) {
-    return
+    return null
   }
   if (!file.type.startsWith('image/')) {
     toast.error('请选择图片文件')
-    return
+    return null
   }
   const data = new FormData()
   data.append('file', file)
   data.append('module', 'cms')
   data.append('publicAccess', 'true')
-  await apiFiles.upload(data)
+  const response = await apiFiles.upload(data)
   toast.success('媒体已上传')
   await loadMedia()
+  return response.data
 }
 
+async function uploadBuilderMedia(files: File[]): Promise<YdPageBuilderAsset[]> {
+  const assets: YdPageBuilderAsset[] = []
+  for (const file of files) {
+    const uploaded = await uploadMedia([file])
+    if (!uploaded) {
+      continue
+    }
+    const url = uploaded.url || mediaItems.value.find(item => item.id === uploaded.id)?.url
+    if (!url) {
+      throw new Error(`上传文件“${file.name}”后接口未返回可用的媒体地址`)
+    }
+    assets.push({
+      src: toBackendAssetUrl(url),
+      type: uploaded.contentType || file.type,
+      name: uploaded.originalName || file.name,
+    })
+  }
+  return assets
+}
 function insertImage(item: FileObject) {
   if (!editor) {
     return
@@ -2726,50 +2750,50 @@ function selectBreadcrumb(component: any) {
   >
     <header class="grapes-header">
       <div class="grapes-header__brand">
-        <span class="grapes-header__mark"><FaIcon name="i-ri:layout-masonry-line" /></span>
+        <span class="grapes-header__mark"><YdIcon name="i-ri:layout-masonry-line" /></span>
         <div>
           <strong>{{ title || 'CMS 构建器' }}</strong>
           <span :class="{ 'is-dirty': editorDirty }">{{ editorDirty ? '有未保存修改' : editorReady ? '所有修改已保存' : '正在初始化画布' }}</span>
         </div>
       </div>
       <div v-if="selectedBreadcrumbs.length" class="grapes-header__breadcrumbs">
-        <button
+        <YdAction
           v-for="(crumb, index) in selectedBreadcrumbs"
           :key="index"
           type="button"
           @click="selectBreadcrumb(crumb.component)"
         >
           {{ crumb.label }}
-        </button>
+        </YdAction>
       </div>
       <div class="grapes-header__actions">
         <div class="workbench-command-group">
-          <FaTooltip text="撤销"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="morph:undo-2" /></button></FaTooltip>
-          <FaTooltip text="重做"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="morph:redo-2" /></button></FaTooltip>
-          <FaTooltip text="复制选中元素"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="morph:copy" /></button></FaTooltip>
-          <FaTooltip text="删除选中元素"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="morph:trash-2" /></button></FaTooltip>
+          <YdTooltip text="撤销"><YdAction type="button" class="workbench-icon-button" @click="command('core:undo')"><YdIcon name="morph:undo-2" /></YdAction></YdTooltip>
+          <YdTooltip text="重做"><YdAction type="button" class="workbench-icon-button" @click="command('core:redo')"><YdIcon name="morph:redo-2" /></YdAction></YdTooltip>
+          <YdTooltip text="复制选中元素"><YdAction type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><YdIcon name="morph:copy" /></YdAction></YdTooltip>
+          <YdTooltip text="删除选中元素"><YdAction type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><YdIcon name="morph:trash-2" /></YdAction></YdTooltip>
         </div>
         <div class="workbench-device-switch" aria-label="画布设备">
-          <FaTooltip text="桌面"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="morph:monitor" /></button></FaTooltip>
-          <FaTooltip text="平板"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="morph:tablet" /></button></FaTooltip>
-          <FaTooltip text="手机"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="morph:smartphone" /></button></FaTooltip>
+          <YdTooltip text="桌面"><YdAction type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><YdIcon name="morph:monitor" /></YdAction></YdTooltip>
+          <YdTooltip text="平板"><YdAction type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><YdIcon name="morph:tablet" /></YdAction></YdTooltip>
+          <YdTooltip text="手机"><YdAction type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><YdIcon name="morph:smartphone" /></YdAction></YdTooltip>
         </div>
         <div class="workbench-command-group grapes-header__zoom">
-          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="morph:minus" /></button>
-          <button type="button" class="workbench-zoom-value" @click="resetCanvasZoom">{{ canvasZoom }}%</button>
-          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="morph:plus" /></button>
-          <FaTooltip text="适应窗口"><button type="button" class="workbench-icon-button" @click="fitCanvasToWorkspace"><FaIcon name="morph:maximize" /></button></FaTooltip>
+          <YdAction type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><YdIcon name="morph:minus" /></YdAction>
+          <YdAction type="button" class="workbench-zoom-value" @click="resetCanvasZoom">{{ canvasZoom }}%</YdAction>
+          <YdAction type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><YdIcon name="morph:plus" /></YdAction>
+          <YdTooltip text="适应窗口"><YdAction type="button" class="workbench-icon-button" @click="fitCanvasToWorkspace"><YdIcon name="morph:maximize" /></YdAction></YdTooltip>
         </div>
         <div class="workbench-command-group">
-          <FaTooltip :text="previewActive ? '退出预览' : '预览页面'"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'morph:square-pen' : 'morph:eye'" /></button></FaTooltip>
-          <FaTooltip v-if="chromeFrame" text="还原固定布局"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="morph:layout-dashboard" /></button></FaTooltip>
-          <FaTooltip text="保存为区块"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="morph:archive" /></button></FaTooltip>
+          <YdTooltip :text="previewActive ? '退出预览' : '预览页面'"><YdAction type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><YdIcon :name="previewActive ? 'morph:square-pen' : 'morph:eye'" /></YdAction></YdTooltip>
+          <YdTooltip v-if="chromeFrame" text="还原固定布局"><YdAction type="button" class="workbench-icon-button" @click="restoreLockedLayout"><YdIcon name="morph:layout-dashboard" /></YdAction></YdTooltip>
+          <YdTooltip text="保存为区块"><YdAction type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><YdIcon name="morph:archive" /></YdAction></YdTooltip>
         </div>
-        <FaButton size="sm" :disabled="!editorReady" @click="save">
-          <FaIcon name="morph:save" />
+        <YdButton size="sm" :disabled="!editorReady" @click="save">
+          <YdIcon name="morph:save" />
           {{ editorDirty ? '保存修改' : '保存' }}
-        </FaButton>
-        <FaTooltip text="关闭构建器"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="morph:x" /></button></FaTooltip>
+        </YdButton>
+        <YdTooltip text="关闭构建器"><YdAction type="button" class="workbench-icon-button" @click="emit('close')"><YdIcon name="morph:x" /></YdAction></YdTooltip>
       </div>
     </header>
 
@@ -2777,23 +2801,22 @@ function selectBreadcrumb(component: any) {
       <aside class="grapes-sidebar left" :class="{ collapsed: leftSidebarCollapsed }">
         <div class="sidebar-rail-head">
           <div class="left-workspace-tabs" role="tablist" aria-label="素材工作区">
-            <button type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><FaIcon name="morph:layout-grid" /><span>区块</span></button>
-            <button type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><FaIcon name="morph:image" /><span>媒体</span></button>
+            <YdAction type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><YdIcon name="morph:layout-grid" /><span>区块</span></YdAction>
+            <YdAction type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><YdIcon name="morph:image" /><span>媒体</span></YdAction>
           </div>
-          <FaTooltip :text="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></button></FaTooltip>
+          <YdTooltip :text="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"><YdAction type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><YdIcon :name="leftSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></YdAction></YdTooltip>
         </div>
         <section v-show="leftWorkspace === 'blocks'" class="block-panel">
           <div class="block-panel__search-wrap">
-            <FaIcon name="morph:search" class="block-panel__search-icon" />
-            <input
+            <YdIcon name="morph:search" class="block-panel__search-icon" />
+            <YdInput
               v-model="blockSearch"
-              type="text"
               placeholder="搜索区块..."
               class="block-panel__search"
-            >
+            />
           </div>
           <div class="block-panel__tabs">
-            <button
+            <YdAction
               v-for="cat in blockCategories"
               :key="cat"
               type="button"
@@ -2801,26 +2824,39 @@ function selectBreadcrumb(component: any) {
               @click="blockCategory = cat"
             >
               {{ cat }}
-            </button>
+            </YdAction>
           </div>
           <div ref="blocksEl" />
         </section>
         <section v-show="leftWorkspace === 'media'" class="media-panel">
           <div class="media-head">
             <div><h3>媒体资源</h3><span>{{ mediaItems.length }} 项</span></div>
-            <FaButton size="sm" @click="pickMedia"><FaIcon name="morph:cloud-upload" />上传</FaButton>
+            <YdButton size="sm" @click="pickMedia"><YdIcon name="morph:cloud-upload" />上传</YdButton>
           </div>
-          <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
+          <YdFilePicker ref="mediaInput" accept="image/*" label="选择媒体图片" @select="uploadMedia"><template #default /></YdFilePicker>
           <div class="media-grid">
-            <button v-for="item in mediaItems" :key="item.id" type="button" @click="insertImage(item)">
+            <YdAction v-for="item in mediaItems" :key="item.id" type="button" @click="insertImage(item)">
               <img :src="toBackendAssetUrl(item.url)" :alt="item.originalName || 'CMS 图片'">
-            </button>
+            </YdAction>
           </div>
         </section>
       </aside>
 
       <main class="grapes-canvas">
-        <div ref="editorEl" class="grapes-editor" />
+        <div ref="editorEl" class="grapes-editor">
+          <YdPageBuilder
+            ref="pageBuilderRef"
+            v-model:html-content="builderHtmlContent"
+            v-model:css-content="builderCssContent"
+            v-model:builder-project-json="builderProjectJson"
+            :editor-options="pageBuilderOptions"
+            :upload="uploadBuilderMedia"
+            :setup="onBuilderSetup"
+            aria-label="CMS 页面构建器"
+            @ready="onBuilderReady"
+            @error="onBuilderError"
+          />
+        </div>
         <footer class="canvas-statusbar">
           <span><i :class="{ ready: editorReady }" />{{ editorReady ? '画布就绪' : '加载中' }}</span>
           <span>{{ activeDevice === 'desktop' ? '桌面' : activeDevice === 'tablet' ? '平板' : '手机' }}</span>
@@ -2833,7 +2869,7 @@ function selectBreadcrumb(component: any) {
       <aside class="grapes-sidebar right" :class="{ collapsed: rightSidebarCollapsed }">
         <div class="sidebar-rail-head right-sidebar-head">
         <div class="right-tabs" role="tablist" aria-label="构建器右侧面板">
-          <button
+          <YdAction
             v-for="tab in rightPanelTabs"
             :key="tab.value"
             type="button"
@@ -2842,11 +2878,11 @@ function selectBreadcrumb(component: any) {
             :aria-selected="rightPanelTab === tab.value"
             @click="rightPanelTab = tab.value; rightSidebarCollapsed = false"
           >
-            <FaIcon :name="tab.icon" />
+            <YdIcon :name="tab.icon" />
             <span>{{ tab.label }}</span>
-          </button>
+          </YdAction>
         </div>
-          <FaTooltip :text="rightSidebarCollapsed ? '展开检查器' : '收起检查器'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></button></FaTooltip>
+          <YdTooltip :text="rightSidebarCollapsed ? '展开检查器' : '收起检查器'"><YdAction type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><YdIcon :name="rightSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></YdAction></YdTooltip>
         </div>
 
         <section v-if="aiEnabled && rightPanelTab === 'ai'" class="right-panel ai-panel active">
@@ -2854,6 +2890,8 @@ function selectBreadcrumb(component: any) {
             ref="aiChatPanelRef"
             :endpoint="aiChatEndpoint"
             transport="websocket"
+            :durable-context-key="`${chatHistoryTargetType}:${chatHistoryTargetId}`"
+            :tools-ready="editorReady"
             :history-limit="20"
             :history-content="message => message.content"
             :build-body="buildAiChatBody"
@@ -2874,17 +2912,17 @@ function selectBreadcrumb(component: any) {
                <section v-if="message.id === pendingAskMessageId && (pendingAskDsl || pendingAskOptions.length)" class="ai-ask ai-ask--message" aria-label="AI 需求澄清">
                  <TokuiBlock v-if="pendingAskDsl" :dsl="pendingAskDsl" />
                  <div v-if="pendingAskOptions.length" class="ai-ask-options">
-                   <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
+                   <YdAction v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
                      <strong>{{ option.title }}</strong>
                      <span v-if="option.desc">{{ option.desc }}</span>
-                   </button>
+                   </YdAction>
                  </div>
                </section>
              </template>
              <template #actions>
               <div class="ai-panel-actions">
                 <div v-if="aiModelOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换模型">
-                  <button
+                  <YdAction
                     type="button"
                     class="ai-agent-select-trigger"
                     :class="{ open: agentSelectOpen }"
@@ -2892,13 +2930,13 @@ function selectBreadcrumb(component: any) {
                     :aria-expanded="agentSelectOpen"
                     @click.stop="toggleAgentSelect"
                   >
-                    <FaIcon name="morph:cpu" class="ai-agent-select-icon" />
+                    <YdIcon name="morph:cpu" class="ai-agent-select-icon" />
                     <span class="ai-agent-select-label">{{ aiModelLabel }}</span>
-                    <FaIcon name="morph:chevron-down" class="ai-agent-select-caret" />
-                  </button>
+                    <YdIcon name="morph:chevron-down" class="ai-agent-select-caret" />
+                  </YdAction>
                   <!-- 内联向上展开的弹层：teleport 到 body 的固定层在本构建器页面不渲染，故内联 -->
                   <div v-if="agentSelectOpen" class="ai-agent-pop" role="listbox" @click.stop>
-                    <button
+                    <YdAction
                       v-for="opt in aiModelOptions"
                       :key="opt.value"
                       type="button"
@@ -2909,12 +2947,12 @@ function selectBreadcrumb(component: any) {
                       @click="pickAgent(opt.value)"
                     >
                       <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
-                      <FaIcon v-if="opt.value === aiModelValue" name="morph:check" class="ai-agent-pop-item-check" />
-                    </button>
+                      <YdIcon v-if="opt.value === aiModelValue" name="morph:check" class="ai-agent-pop-item-check" />
+                    </YdAction>
                   </div>
                 </div>
                 <label class="ai-thinking-switch">
-                  <FaSwitch v-model="aiThinkingEnabled" />
+                  <YdSwitch v-model="aiThinkingEnabled" />
                   <span>深度思考</span>
                 </label>
               </div>
@@ -2923,10 +2961,10 @@ function selectBreadcrumb(component: any) {
               <section v-if="pendingAskDsl && !pendingAskMessageId" class="ai-ask" aria-label="AI 需求澄清">
                 <TokuiBlock :dsl="pendingAskDsl" />
                 <div v-if="pendingAskOptions.length" class="ai-ask-options">
-                  <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
+                  <YdAction v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
                     <strong>{{ option.title }}</strong>
                     <span v-if="option.desc">{{ option.desc }}</span>
-                  </button>
+                  </YdAction>
                 </div>
               </section>
               <div class="ai-context">
@@ -2959,14 +2997,14 @@ function selectBreadcrumb(component: any) {
               <span>{{ selectedSourceSummary }}</span>
             </div>
             <div class="source-panel__actions">
-              <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent || !selectedSourceCode.trim()" @click="formatSelectedSource">
-                <FaIcon name="morph:align-left" />
+              <YdButton variant="outline" size="sm" :disabled="!hasSelectedComponent || !selectedSourceCode.trim()" @click="formatSelectedSource">
+                <YdIcon name="morph:align-left" />
                 格式化
-              </FaButton>
-              <FaButton size="sm" :disabled="!hasSelectedComponent || selectedSourceLocked || !selectedSourceDirty" @click="applySelectedSource">
-                <FaIcon name="morph:check" />
+              </YdButton>
+              <YdButton size="sm" :disabled="!hasSelectedComponent || selectedSourceLocked || !selectedSourceDirty" @click="applySelectedSource">
+                <YdIcon name="morph:check" />
                 应用
-              </FaButton>
+              </YdButton>
             </div>
           </div>
           <div class="source-panel__body">
@@ -2988,14 +3026,14 @@ function selectBreadcrumb(component: any) {
               <div class="source-editor-section__head">
                 <strong>关联 CSS</strong>
                 <div class="source-editor-section__actions">
-                  <FaButton variant="outline" size="sm" :disabled="!selectedCssCode.trim()" @click="formatSelectedCss">
-                    <FaIcon name="morph:align-left" />
+                  <YdButton variant="outline" size="sm" :disabled="!selectedCssCode.trim()" @click="formatSelectedCss">
+                    <YdIcon name="morph:align-left" />
                     格式化
-                  </FaButton>
-                  <FaButton size="sm" :disabled="!hasSelectedComponent || !selectedCssDirty || !selectedCssCode.trim()" @click="applySelectedCss">
-                    <FaIcon name="morph:check" />
+                  </YdButton>
+                  <YdButton size="sm" :disabled="!hasSelectedComponent || !selectedCssDirty || !selectedCssCode.trim()" @click="applySelectedCss">
+                    <YdIcon name="morph:check" />
                     应用
-                  </FaButton>
+                  </YdButton>
                   <span>根据当前选择匹配规则</span>
                 </div>
               </div>
@@ -3012,10 +3050,10 @@ function selectBreadcrumb(component: any) {
               <div class="source-editor-section__head">
                 <strong>页面 JS</strong>
                 <div class="source-editor-section__actions">
-                  <FaButton variant="outline" size="sm" @click="formatPageJs">
-                    <FaIcon name="morph:align-left" />
+                  <YdButton variant="outline" size="sm" @click="formatPageJs">
+                    <YdIcon name="morph:align-left" />
                     格式化
-                  </FaButton>
+                  </YdButton>
                   <span>自动注入预览并随页面保存</span>
                 </div>
               </div>
@@ -3037,35 +3075,30 @@ function selectBreadcrumb(component: any) {
       </aside>
     </div>
 
-    <div v-if="showSaveBlockDialog" class="save-block-modal" role="dialog" aria-modal="true" aria-labelledby="save-block-title">
-      <div class="save-block-modal__overlay" @click="showSaveBlockDialog = false" />
-      <div class="save-block-modal__content">
-        <h3 id="save-block-title">保存为区块</h3>
+    <YdModal v-model="showSaveBlockDialog" title="保存为区块" :footer="false" :open-auto-focus="true">
+      <div class="save-block-form">
         <label class="save-block-modal__field">
           <span>名称</span>
-          <input v-model="saveBlockForm.name" type="text" placeholder="区块名称">
+          <YdInput v-model="saveBlockForm.name" placeholder="区块名称" />
         </label>
         <label class="save-block-modal__field">
           <span>分类</span>
-          <input v-model="saveBlockForm.category" type="text" placeholder="预制">
+          <YdInput v-model="saveBlockForm.category" placeholder="预制" />
         </label>
         <label class="save-block-modal__field">
           <span>类型</span>
-          <select v-model="saveBlockForm.kind">
-            <option value="atomic">原子</option>
-            <option value="preset">预制</option>
-          </select>
+          <YdSelect v-model="saveBlockForm.kind" :options="[{ label: '原子', value: 'atomic' }, { label: '预制', value: 'preset' }]" />
         </label>
         <label class="save-block-modal__field">
           <span>描述</span>
-          <textarea v-model="saveBlockForm.description" rows="2" placeholder="可选描述" />
+          <YdTextarea v-model="saveBlockForm.description" rows="2" placeholder="可选描述" />
         </label>
         <div class="save-block-modal__actions">
-          <FaButton variant="outline" size="sm" @click="showSaveBlockDialog = false">取消</FaButton>
-          <FaButton size="sm" @click="confirmSaveBlock">保存</FaButton>
+          <YdButton variant="outline" size="sm" @click="showSaveBlockDialog = false">取消</YdButton>
+          <YdButton size="sm" @click="confirmSaveBlock">保存</YdButton>
         </div>
       </div>
-    </div>
+    </YdModal>
   </div>
 </template>
 
@@ -3115,7 +3148,7 @@ function selectBreadcrumb(component: any) {
   width: 34px;
   height: 34px;
   border-radius: 7px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
   color: #fff !important;
   font-size: 17px !important;
   place-items: center;
@@ -3163,9 +3196,9 @@ function selectBreadcrumb(component: any) {
 }
 
 .grapes-header__breadcrumbs button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
-  background: rgb(var(--primary-1));
+  border-color: var(--color-border-focus);
+  color: var(--color-border-focus);
+  background: var(--color-fill-1);
 }
 
 .grapes-header__breadcrumbs button:not(:last-child)::after {
@@ -3213,7 +3246,7 @@ function selectBreadcrumb(component: any) {
 .workbench-device-switch button.active,
 .workbench-icon-button.active {
   background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-border-focus);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -3237,13 +3270,13 @@ function selectBreadcrumb(component: any) {
   --yb-block-bg: var(--color-bg-2);
   --yb-block-bg-hover: var(--color-bg-2);
   --yb-block-border: var(--color-border-2);
-  --yb-block-border-hover: rgb(var(--primary-6));
+  --yb-block-border-hover: var(--color-border-focus);
   --yb-block-text: var(--color-text-1);
-  --yb-block-text-hover: rgb(var(--primary-6));
+  --yb-block-text-hover: var(--color-border-focus);
   --yb-block-muted: var(--color-text-3);
   --yb-block-bg-2: var(--color-fill-1);
-  --yb-primary: rgb(var(--primary-6));
-  --yb-primary-soft: rgb(var(--primary-1));
+  --yb-primary: var(--color-border-focus);
+  --yb-primary-soft: var(--color-fill-1);
   --yb-star: #f59e0b;
 
   display: grid;
@@ -3254,13 +3287,13 @@ function selectBreadcrumb(component: any) {
   --yb-block-bg: var(--color-bg-2);
   --yb-block-bg-hover: var(--color-bg-2);
   --yb-block-border: var(--color-border-3);
-  --yb-block-border-hover: rgb(var(--primary-6));
+  --yb-block-border-hover: var(--color-border-focus);
   --yb-block-text: var(--color-text-1);
-  --yb-block-text-hover: rgb(var(--primary-6));
+  --yb-block-text-hover: var(--color-border-focus);
   --yb-block-muted: var(--color-text-3);
   --yb-block-bg-2: var(--color-fill-1);
-  --yb-primary: rgb(var(--primary-6));
-  --yb-primary-soft: rgb(var(--primary-1));
+  --yb-primary: var(--color-border-focus);
+  --yb-primary-soft: var(--color-fill-1);
   --yb-star: #fbbf24;
 }
 
@@ -3298,11 +3331,11 @@ function selectBreadcrumb(component: any) {
 .block-panel__search:focus {
   border-color: var(--yb-primary);
   background: var(--yb-block-bg);
-  box-shadow: 0 0 0 3px rgb(var(--primary-6) / 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-border-focus) 12%, transparent);
 }
 
 :global(.dark) .block-panel__search:focus {
-  box-shadow: 0 0 0 3px rgb(var(--primary-6) / 0.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-border-focus) 25%, transparent);
 }
 
 .block-panel__tabs {
@@ -3556,36 +3589,9 @@ function selectBreadcrumb(component: any) {
   gap: 8px;
 }
 
-.save-block-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
-
-.save-block-modal__overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-}
-
-.save-block-modal__content {
-  position: relative;
-  z-index: 1;
+.save-block-form {
   display: grid;
   gap: 14px;
-  width: min(100%, 400px);
-  padding: 20px;
-  border-radius: 14px;
-  background: var(--color-bg-2);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
-}
-
-.save-block-modal__content h3 {
-  margin: 0;
-  font-size: 16px;
 }
 
 .save-block-modal__field {
@@ -3593,26 +3599,6 @@ function selectBreadcrumb(component: any) {
   gap: 6px;
   font-size: 12px;
   color: var(--color-text-2);
-}
-
-.save-block-modal__field input,
-.save-block-modal__field select,
-.save-block-modal__field textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-fill-1);
-  color: var(--color-text-1);
-  font-size: 13px;
-  outline: none;
-}
-
-.save-block-modal__field input:focus,
-.save-block-modal__field select:focus,
-.save-block-modal__field textarea:focus {
-  border-color: rgb(var(--primary-6));
-  background: var(--color-bg-2);
 }
 
 .save-block-modal__actions {
@@ -3707,7 +3693,7 @@ function selectBreadcrumb(component: any) {
 
 .left-workspace-tabs button.active {
   background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-border-focus);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -3880,7 +3866,7 @@ function selectBreadcrumb(component: any) {
 
 .right-tabs button.active {
   background: var(--color-bg-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-border-focus);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -4299,9 +4285,9 @@ function selectBreadcrumb(component: any) {
 .ai-ask {
   padding: 12px;
   margin-bottom: 8px;
-  border: 1px solid rgb(var(--primary-2));
+  border: 1px solid var(--color-border-2);
   border-radius: 14px;
-  background: rgb(var(--primary-1));
+  background: var(--color-fill-1);
 }
 
 .ai-ask--message {
@@ -4321,17 +4307,17 @@ function selectBreadcrumb(component: any) {
   gap: 3px;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid rgb(var(--primary-2));
+  border: 1px solid var(--color-border-2);
   border-radius: 10px;
   background: var(--color-bg-2);
-  color: rgb(var(--primary-7));
+  color: var(--color-text-1);
   text-align: left;
   cursor: pointer;
 }
 
 .ai-ask-options button:hover {
-  border-color: rgb(var(--primary-4));
-  background: rgb(var(--primary-1));
+  border-color: var(--color-border-3);
+  background: var(--color-fill-1);
 }
 
 .ai-ask-options strong,
@@ -4365,7 +4351,7 @@ function selectBreadcrumb(component: any) {
 
 :deep(.gjs-four-color),
 :deep(.gjs-four-color-h:hover) {
-  color: rgb(var(--primary-6));
+  color: var(--color-border-focus);
 }
 
 :deep(.gjs-editor),
@@ -4498,8 +4484,8 @@ function selectBreadcrumb(component: any) {
 }
 
 :deep(.gjs-layer.gjs-selected .gjs-layer-title) {
-  background: rgb(var(--primary-1));
-  color: rgb(var(--primary-6));
+  background: var(--color-fill-1);
+  color: var(--color-border-focus);
 }
 
 :deep(.gjs-trt-trait) {
@@ -4533,13 +4519,13 @@ function selectBreadcrumb(component: any) {
 
 :deep(.cms-block-preview.section) {
   align-content: end;
-  background: linear-gradient(135deg, rgb(var(--primary-1)), var(--color-fill-1));
+  background: linear-gradient(135deg, var(--color-bg-2), var(--color-fill-1));
 }
 
 :deep(.cms-block-preview.section span) {
   width: 38%;
   height: 8px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.section strong) {
@@ -4578,7 +4564,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.grid span) {
   height: 100%;
   border-radius: 7px;
-  background: rgb(var(--primary-1));
+  background: var(--color-fill-1);
 }
 
 :deep(.cms-block-preview.text.heading strong) {
@@ -4616,7 +4602,7 @@ function selectBreadcrumb(component: any) {
   width: 64px;
   height: 24px;
   border-radius: 7px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.image) {
@@ -4670,7 +4656,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.repeat span) {
   height: 100%;
   border-radius: 7px;
-  background: rgb(var(--primary-1));
+  background: var(--color-fill-1);
 }
 
 :deep(.cms-block-preview.page-card) {
@@ -4710,7 +4696,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.visible strong) {
   width: 44%;
   height: 12px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.visible span) {
@@ -4767,7 +4753,7 @@ function selectBreadcrumb(component: any) {
 }
 
 :deep(.cms-block-preview.quote span) {
-  border-left: 3px solid rgb(var(--primary-6));
+  border-left: 3px solid var(--color-border-focus);
   padding-left: 6px;
   width: 78%;
 }
@@ -4776,7 +4762,7 @@ function selectBreadcrumb(component: any) {
   width: 50%;
   height: 7px;
   text-decoration: underline;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.hero-center) {
@@ -4801,7 +4787,7 @@ function selectBreadcrumb(component: any) {
   width: 46px;
   height: 20px;
   border-radius: 4px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.hero-split) {
@@ -4831,7 +4817,7 @@ function selectBreadcrumb(component: any) {
   width: 52px;
   height: 16px;
   border-radius: 4px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.hero-split-media) {
@@ -4848,7 +4834,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.features-3 span) {
   height: 100%;
   border-radius: 8px;
-  background: rgb(var(--primary-1));
+  background: var(--color-fill-1);
   border: 1px solid var(--color-border-2);
 }
 
@@ -4858,7 +4844,7 @@ function selectBreadcrumb(component: any) {
   text-align: center;
   gap: 8px;
   padding: 10px;
-  background: rgb(var(--primary-6));
+  background: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.cta-box strong) {
@@ -4933,7 +4919,7 @@ function selectBreadcrumb(component: any) {
 }
 
 :deep(.cms-block-preview.pricing-3 span:nth-child(2)) {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--color-border-focus);
 }
 
 :deep(.cms-block-preview.footer-simple) {

@@ -173,7 +173,7 @@ function onVerifyDone(payload?: { email?: string, status?: string }) {
     }
   }
   if (payload?.status === 'PASSED') {
-    useFaToast().success('身份核验已通过，可以继续注册')
+    useYdToast().success('身份核验已通过，可以继续注册')
     closeVerification()
   }
 }
@@ -258,7 +258,7 @@ const onSubmit = form.handleSubmit((values) => {
     bindingToken: props.bindingToken,
   }).then((data) => {
     const verified = data?.emailVerified === true
-    useFaToast().success('注册成功', {
+    useYdToast().success('注册成功', {
       description: verified
         ? (props.bindingToken ? '身份核验已通过，注册后将绑定该第三方账号' : '身份核验已通过，可直接登录')
         : (props.bindingToken ? '验证邮件已发送，验证后将绑定该第三方账号' : '验证邮件已发送，请前往邮箱查收并验证后再登录'),
@@ -284,11 +284,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="account">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="text" placeholder="用户名" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="text" placeholder="用户名" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:user" />
+                <YdIcon name="i-lucide:user" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -298,11 +298,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="email">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="text" placeholder="邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="text" placeholder="邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:mail" />
+                <YdIcon name="i-lucide:mail" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -312,11 +312,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="nickname">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="text" placeholder="昵称（选填）" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="text" placeholder="昵称（选填）" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:smile" />
+                <YdIcon name="i-lucide:smile" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -326,14 +326,14 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, value, errors }" name="password">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <FormDescription class="m-0">
-            <FaPasswordStrength :password="value" />
+            <YdPasswordStrength :password="value" />
           </FormDescription>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -343,11 +343,11 @@ const onSubmit = form.handleSubmit((values) => {
       <FormField v-slot="{ componentField, errors }" name="checkPassword">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <YdInput type="password" placeholder="确认密码" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
-                <FaIcon name="i-lucide:lock" />
+                <YdIcon name="i-lucide:lock" />
               </template>
-            </FaInput>
+            </YdInput>
           </FormControl>
           <Transition enter-active-class="transition-opacity" enter-from-class="opacity-0" leave-active-class="transition-opacity" leave-to-class="opacity-0">
             <FormMessage class="text-xs m-0 bottom-1 absolute" />
@@ -368,7 +368,7 @@ const onSubmit = form.handleSubmit((values) => {
                 {{ method.description }}
               </div>
             </div>
-            <FaButton
+            <YdButton
               v-if="methodState(method.code).status === 'PASSED'"
               type="button"
               variant="outline"
@@ -376,8 +376,8 @@ const onSubmit = form.handleSubmit((values) => {
               disabled
             >
               已核验
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-else-if="methodState(method.code).status === 'PENDING'"
               type="button"
               variant="outline"
@@ -386,8 +386,8 @@ const onSubmit = form.handleSubmit((values) => {
               @click="openVerification(method)"
             >
               审核中
-            </FaButton>
-            <FaButton
+            </YdButton>
+            <YdButton
               v-else
               type="button"
               variant="outline"
@@ -396,21 +396,21 @@ const onSubmit = form.handleSubmit((values) => {
               @click="openVerification(method)"
             >
               去核验
-            </FaButton>
+            </YdButton>
           </div>
         </div>
       </div>
-      <FaButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
+      <YdButton :loading="loading" size="lg" class="mt-4 w-full" type="submit">
         注册
-      </FaButton>
+      </YdButton>
       <div class="text-sm mt-4 flex-center gap-2">
         <span class="text-secondary-foreground op-50">已经有帐号?</span>
-        <FaButton variant="link" class="p-0 h-auto" @click="emits('onLogin', form.values.account)">
+        <YdButton variant="link" class="p-0 h-auto" @click="emits('onLogin', form.values.account)">
           去登录
-        </FaButton>
+        </YdButton>
       </div>
     </form>
-    <FaModal
+    <YdModal
       v-model="verifyOpen"
       :title="activeMethod?.displayName || '身份核验'"
       :footer="false"
@@ -423,9 +423,9 @@ const onSubmit = form.handleSubmit((values) => {
         </p>
         <p v-else-if="verifyError" class="text-sm text-destructive">
           {{ verifyError }}
-          <FaButton type="button" variant="link" class="p-0 h-auto" @click="fallbackToPage">
+          <YdButton type="button" variant="link" class="p-0 h-auto" @click="fallbackToPage">
             打开独立页面
-          </FaButton>
+          </YdButton>
         </p>
         <component
           :is="verifyComponent"
@@ -436,7 +436,7 @@ const onSubmit = form.handleSubmit((values) => {
           @update:email="(value: unknown) => verifyEmail = String(value || '')"
         />
       </div>
-    </FaModal>
+    </YdModal>
   </div>
 </template>
 
