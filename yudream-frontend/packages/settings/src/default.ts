@@ -24,7 +24,7 @@ const settingsDefault: RequiredDeep<SettingsOptions> = {
     },
   },
   theme: {
-    primaryColor: '#6366f1',
+    primaryColor: '#18181b',
     colorScheme: 'light',
     radius: 0.625,
     colorAmblyopia: false,
