@@ -64,6 +64,7 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 - 图标通过 `YdIcon` 使用 Morphicons，名称为 `morph:<lucide-kebab-name>`（`lucide:` 等价兼容）；缺失图标回退 Iconify。新页面/菜单优先从 `YdIconPicker` 选择，既有图标名称保持兼容。
 - 菜单默认按主要业务大类（如 MC、待办、社交）分组，一级大图标使用共享分类，插件模块与功能归入分类；菜单管理新建根节点默认 `CATEGORY`。分类由宿主持久化菜单树决定，前端不按插件名称自行猜分类。旧插件、显式独立入口与管理员已有结构保持兼容，根菜单/外链不得在转换菜单或路由时丢失；新插件声明方式见宿主 `docs/plugin-system/specification.md` 第 10 节。
 - **业务唯一入口是 `@yudream/components` 的公开 `Yd*` / `useYd*`**。禁止 Fa/useFa、Arco/TDesign/Reka 原生控件和手写通用交互。允许原生语义内容与布局元素；业务组件组合 YD，技术编辑器/图形引擎先做 YD 适配。第三方和 Fa 仅允许在共享组件内部及明确的框架启动装配边界。
+- 宿主与插件已迁移的 Vue Web 规范门禁保持零违规；保留 findings={} 与验收 Git SHA，不得重新放回历史例外。基线只能从明确已提交版本生成。
 - 缺少能力先封装 YD，保证 props/模型/事件/插槽/ref、键盘焦点、主题与弹层；同步根导出、resolver、SDK桥、预览、文档和严格检查映射后再迁移。不能只替名、复制组件或禁用规则。
 - **开始 UI 工作前读取 `../../docs/yd-ui-guidelines.md`**。完整分类和场景选型持续维护；API 边界见 `../../docs/yd-components.md`、`../../docs/yd-agent-workbench.md`。
 - 主题、主色和深浅模式由后台主题配置与组件体系统一控制。业务页面不得自行声明品牌色、固定色板或手写主色强调态；只使用中性语义变量和组件内建状态样式。

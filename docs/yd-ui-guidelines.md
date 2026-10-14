@@ -73,7 +73,7 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 `YdAction` 是保留原生按钮语义的基础动作容器，用于导航、卡片选择、编辑器工具等专门组合的可点击区域；它统一键盘、焦点和禁用行为，视觉由组合组件控制。普通 CRUD、表单提交与危险操作继续使用 `YdButton`，不能用 YdAction 到处自造主色按钮。
 
-`YdSelect` 与 Fa 基础实现同契约，不等于 Arco Select。它的 `options` 使用 `{ label, value, disabled? }` 或分组对象。单选绑定标量，`multiple` 绑定数组；选择框回显全部已选标签，空值默认显示“没有选择”，不得回落到第一项。`allowSearch` 可开启本地候选筛选，默认关闭；搜索不清除已有选择，不提供远程分页能力。不得通过裸 `Option` 子节点、任意字符串替换或传递不支持的远程搜索参数完成迁移。尤其多选必须验证模型、标签回显、取消选择和空态。修复契约见 [YD 下拉选择](yd-select-components.md)；插件仍须等待包含此修复的契约包发布验签后接入。
+`YdSelect` 与 Fa 基础实现同契约，不等于 Arco Select。它的 `options` 使用 `{ label, value, disabled? }` 或分组对象。单选绑定标量，`multiple` 绑定数组；选择框回显全部已选标签，空值默认显示“没有选择”，不得回落到第一项。`allowSearch` 可开启本地候选筛选，默认关闭；搜索不清除已有选择，不提供远程分页能力。不得通过裸 `Option` 子节点、任意字符串替换或传递不支持的远程搜索参数完成迁移。尤其多选必须验证模型、标签回显、取消选择和空态。修复契约见 [YD 下拉选择](yd-select-components.md)；该修复已包含在验签通过的 components 1.6.0 中。
 
 ### 3.2 树、级联与弹出集合选择
 
@@ -170,6 +170,8 @@ Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPa
 
 生产 AI 使用统一后端持久运行快照和游标，正文、真实推理、工具与进度独立；切页或关闭窗口不取消后台任务。`YdAgentWorkbench` 的 `availableModes` 只开放宿主实际支持的模式，`attachments` 与移除事件保持宿主上传列表一致，业务范围控件放 `sender-actions` 插槽。全局助手要求登录与权限，路由/页面感知及导航/高亮可分别关闭；工具只定位已授权路由和显式注册操作，不收集表单数据或代用户点击。
 
+`useYdPersistentChatStream` 与 `clearYdPersistentChatOwner` 不属于 components 1.6.0 / SDK 1.11.0 契约；使用前必须确认目标版本包含这两个入口并已完成发布验签，缺少入口时先扩充和发布契约。
+
 需要前端真实执行工具的持久 WebSocket 场景使用 `useYdPersistentChatStream`：以登录用户和稳定业务上下文保存观察状态，由宿主提供快照、取消、工具回执端口；断线只续订已有 run，不重复提交。已保存的真实工具结果只接续后端原生交互，不重复修改页面。业务工具结果放 `message-extra`，等待与重连提示放 `composer-before`；没有真实后端端口时明确说明未连接。
 
 引用必须有原文、来源标识与可定位链接。version 1 渲染协议使用 `markdown`、`reference`、`tool` 三类块，先校验再渲染。正文通过 `[[ref:id]]` 关联原文；不同回答实例锚点隔离。工作区文件通过事件交宿主定位，外链仅 HTTP(S)。Markdown 局部清理 HTML，工具输入、输出与错误是文本，不能作为任意执行界面。
@@ -246,7 +248,7 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 
 两仓 GitLab 的 `validate:yd-ui` 使用相同的 AST 扫描器，覆盖完整嵌套插槽、导入与类型导入、JSX/render、原生通用控件、无链接目标的动作锚点、`v-loading` 与私有品牌令牌；规则测试覆盖误判和绕过场景。正文链接事件代理、布局、标签与图表的多键数据浏览不视为动作按钮。
 
-迁移期间 CI 使用宿主 `yudream-frontend/eslint-rules/yd-only-baseline.json`、插件 `ci/yd-ui-baseline.json` 做不回退门禁。基线记录已提交源码的 SHA；只能用 `--source=git:<已提交版本> --write-baseline` 初始化或缩减，禁止从工作区接受新增违规。每个文件/规则/消息的计数只减不增，不能用一个页面减少的数量抵消另一个页面新增的违规。全部归零后删除基线，恢复零违规阻断门禁；`audit:ui` 报告的 `summary.violationCount` 是迁移验收计数，CI 保留完整报告而不倾倒源码到日志。
+迁移期间 CI 使用宿主 `yudream-frontend/eslint-rules/yd-only-baseline.json`、插件 `ci/yd-ui-baseline.json` 做不回退门禁。基线记录已提交源码的 SHA；只能用 `--source=git:<已提交版本> --write-baseline` 初始化或缩减，禁止从工作区接受新增违规。每个文件/规则/消息的计数只减不增，不能用一个页面减少的数量抵消另一个页面新增的违规。全部归零后保留 findings 为空的基线和验收提交 SHA，门禁仍按零违规阻断，不得重新接受历史例外；`audit:ui` 报告的 `summary.violationCount` 是迁移验收计数，CI 保留完整报告而不倾倒源码到日志。
 
 迁移时按独立模块收敛，每个模块验证通过后创建中文本地提交。保留用户已有修改；不批量覆盖尚未核对契约的复杂组件。生成式 CMS 内容、公开主题模板和第三方库内部生成 DOM 与业务 Vue 源码区分处理，禁止对已保存内容做无语义保证的字符串替换。
 
