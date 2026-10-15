@@ -15,6 +15,13 @@
 - 模板 B 的基础镜像明确为 `docker.io/library/mongo:8.0` 与 `docker.io/library/redis:7.4-alpine`；模板 A 不创建数据库容器。
 - `yda` 与 `library` 两个 Harbor 项目默认公开，拉取免登录；若改成私有（需 `docker login` 才能拉），按下面「环境变量完整参考」的 `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASSWORD` 填写，`deploy.sh` 会自动登录；watchtower 另需挂载宿主 `~/.docker/config.json`（见 `docker-compose.yml` 内注释）。
 
+CI 在推送 Harbor 后，会把同一构建产物按相同 tag 再同步一份到阿里云 ACR 个人版源，供国内网络加速拉取，同步范围仅 `backend` 与 `frontend`：
+
+- 镜像地址：`crpi-bavv47zo78j1v6cv.cn-hangzhou.personal.cr.aliyuncs.com/yudream/backend|frontend:<TAG>`，`latest` 更新规则与 Harbor 一致。
+- 用法：把 `CI_REGISTRY_IMAGE` 整体换成 `crpi-bavv47zo78j1v6cv.cn-hangzhou.personal.cr.aliyuncs.com/yudream` 即可；`render-server`、`kkfileview` 仍在 Harbor。
+- 该源为个人版 ACR，命名空间 `yudream` 下的仓库随首次推送自动创建；拉取需 `docker login`（个人版默认私有）。
+- 同步凭据经 CI 变量 `ALIYUN_REGISTRY_USER` / `ALIYUN_REGISTRY_PASSWORD` 注入；置 `ALIYUN_PUSH_ENABLED=false` 可临时关闭同步，不影响 Harbor 推送。
+
 ```mermaid
 flowchart LR
     U[用户] --> FE[frontend nginx:80]

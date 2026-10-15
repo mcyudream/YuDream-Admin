@@ -343,6 +343,14 @@ build-and-push-images:
     FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
     BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
     FRONTEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/frontend:latest"
+    # 阿里云 ACR 个人版镜像源：Harbor 仍是权威源，这里同一构建产物再同步一份供国内加速拉取。
+    # 同步开关不在此处赋默认值，以便用项目级变量 ALIYUN_PUSH_ENABLED=false 临时关闭（缺省视为开启）。
+    ALIYUN_REGISTRY: "crpi-bavv47zo78j1v6cv.cn-hangzhou.personal.cr.aliyuncs.com"
+    ALIYUN_REGISTRY_IMAGE: "$ALIYUN_REGISTRY/yudream"
+    ALIYUN_BACKEND_IMAGE: "$ALIYUN_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
+    ALIYUN_FRONTEND_IMAGE: "$ALIYUN_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
+    ALIYUN_BACKEND_IMAGE_LATEST: "$ALIYUN_REGISTRY_IMAGE/backend:latest"
+    ALIYUN_FRONTEND_IMAGE_LATEST: "$ALIYUN_REGISTRY_IMAGE/frontend:latest"
   dependencies:
     - build:backend
     - build:frontend-main
@@ -358,6 +366,17 @@ build-and-push-images:
         exit 1
       fi
       printf '%s' "$DOCKER_REGISTRY_PASSWORD" | docker login "$REGISTRY_SERVER" -u "$DOCKER_REGISTRY_USER" --password-stdin
+    # 阿里云 ACR 个人版同步源：凭据同样只经项目级 CI 变量注入，禁止写入仓库
+    - |
+      if [ "${ALIYUN_PUSH_ENABLED:-true}" = "true" ]; then
+        if [ -z "${ALIYUN_REGISTRY_USER:-}" ] || [ -z "${ALIYUN_REGISTRY_PASSWORD:-}" ]; then
+          echo "缺少 GitLab CI/CD 变量 ALIYUN_REGISTRY_USER / ALIYUN_REGISTRY_PASSWORD（阿里云 ACR 账号）"
+          exit 1
+        fi
+        printf '%s' "$ALIYUN_REGISTRY_PASSWORD" | docker login "$ALIYUN_REGISTRY" -u "$ALIYUN_REGISTRY_USER" --password-stdin
+      else
+        echo "ALIYUN_PUSH_ENABLED=false，跳过阿里云镜像源登录"
+      fi
     - docker info
   script:
     # 先构建并推送提交 SHA 标签
@@ -378,6 +397,27 @@ build-and-push-images:
           echo "非 v*/d* 标签（$CI_COMMIT_TAG），跳过 latest 标签推送"
           ;;
       esac
+    # 阿里云 ACR 同步：复用本地已构建产物换标签推送，不重复构建；latest 跟随规则与 Harbor 一致
+    - |
+      if [ "${ALIYUN_PUSH_ENABLED:-true}" = "true" ]; then
+        docker tag "$BACKEND_IMAGE" "$ALIYUN_BACKEND_IMAGE"
+        docker tag "$FRONTEND_IMAGE" "$ALIYUN_FRONTEND_IMAGE"
+        docker push "$ALIYUN_BACKEND_IMAGE"
+        docker push "$ALIYUN_FRONTEND_IMAGE"
+        case "$CI_COMMIT_TAG" in
+          v*|d*)
+            docker tag "$BACKEND_IMAGE" "$ALIYUN_BACKEND_IMAGE_LATEST"
+            docker tag "$FRONTEND_IMAGE" "$ALIYUN_FRONTEND_IMAGE_LATEST"
+            docker push "$ALIYUN_BACKEND_IMAGE_LATEST"
+            docker push "$ALIYUN_FRONTEND_IMAGE_LATEST"
+            ;;
+          *)
+            echo "非 v*/d* 标签（$CI_COMMIT_TAG），跳过阿里云 latest 标签推送"
+            ;;
+        esac
+      else
+        echo "ALIYUN_PUSH_ENABLED=false，跳过阿里云镜像源推送"
+      fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
