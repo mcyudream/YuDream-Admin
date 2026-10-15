@@ -451,6 +451,18 @@ async function openPluginPage(code: string) {
   }
 }
 
+/** 窄屏：选中插件后展示详情面板，返回按钮回到列表。 */
+const mobileShowingDetail = ref(false)
+
+function selectPlugin(item: PluginModule) {
+  selectedCode.value = item.code
+  mobileShowingDetail.value = true
+}
+
+function backToList() {
+  mobileShowingDetail.value = false
+}
+
 /** 卸载/删除依赖方弹窗确认：级联执行并自动恢复软依赖方。 */
 async function handleDependentsConfirm(cascade: boolean) {
   const code = dependentsInfo.value?.code
@@ -555,51 +567,55 @@ function actionText(action: string) {
         </div>
       </div>
 
-      <div class="plugin-browser">
-        <div class="plugin-browser-header">
-          <span class="plugin-result-count">共 {{ pagination.total }} 个插件</span>
-        </div>
-        <div v-if="pagedRows.length" class="plugin-grid">
-          <YdButton
-            v-for="item in pagedRows"
-            :key="item.code"
-            variant="ghost"
-            class="plugin-item"
-            :class="{ active: selected?.code === item.code }"
-            type="button"
-            :aria-pressed="selected?.code === item.code"
-            @click="selectedCode = item.code"
-          >
-            <YdIcon :name="pluginIcon(item)" class="plugin-item-icon" />
-            <div class="plugin-item-body">
-              <div class="plugin-item-title">
-                <strong>{{ item.name }}</strong>
-                <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
+      <div class="plugin-layout" :class="{ 'is-detail-open': mobileShowingDetail }">
+        <div class="plugin-browser">
+          <div class="plugin-browser-header">
+            <span class="plugin-result-count">共 {{ pagination.total }} 个插件</span>
+          </div>
+          <div v-if="pagedRows.length" class="plugin-list">
+            <YdButton
+              v-for="item in pagedRows"
+              :key="item.code"
+              variant="ghost"
+              class="plugin-item"
+              :class="{ active: selected?.code === item.code }"
+              type="button"
+              :aria-pressed="selected?.code === item.code"
+              @click="selectPlugin(item)"
+            >
+              <YdIcon :name="pluginIcon(item)" class="plugin-item-icon" />
+              <div class="plugin-item-body">
+                <div class="plugin-item-title">
+                  <strong>{{ item.name }}</strong>
+                  <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
+                </div>
+                <span class="plugin-item-code">{{ item.code }} · {{ item.version || '未知版本' }}</span>
+                <span v-if="updatePlanFor(item.code)" class="plugin-item-update">
+                  可更新至 {{ updatePlanFor(item.code)?.toVersion }}
+                </span>
               </div>
-              <span class="plugin-item-code">{{ item.code }} · {{ item.version || '未知版本' }}</span>
-              <p>{{ item.description || '暂无插件简介。' }}</p>
-            </div>
-            <YdTag v-if="updatePlanFor(item.code)" variant="default" class="update-tag">
-              可更新至 {{ updatePlanFor(item.code)?.toVersion }}
-            </YdTag>
-          </YdButton>
+            </YdButton>
+          </div>
+          <div v-else-if="!loading" class="empty-state">
+            <template v-if="rows.length">暂无符合当前筛选条件的插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
+            <template v-else>暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。</template>
+          </div>
+          <YdPagination
+            v-if="pagination.total > pagination.size"
+            v-model:page="pagination.page"
+            v-model:size="pagination.size"
+            :total="pagination.total"
+            class="plugin-pagination"
+          />
         </div>
-        <div v-else-if="!loading" class="empty-state">
-          <template v-if="rows.length">暂无符合当前筛选条件的插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
-          <template v-else>暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。</template>
-        </div>
-        <YdPagination
-          v-if="pagination.total > pagination.size"
-          v-model:page="pagination.page"
-          v-model:size="pagination.size"
-          :total="pagination.total"
-          class="plugin-pagination"
-        />
-      </div>
 
-      <section v-if="selected" class="plugin-detail">
+        <section v-if="selected" class="plugin-detail" :class="{ 'is-mobile-open': mobileShowingDetail }">
           <div class="detail-header">
             <div class="plugin-detail-title">
+              <YdButton variant="ghost" size="sm" class="detail-back" @click="backToList">
+                <YdIcon name="morph:arrow-left" />
+                返回列表
+              </YdButton>
               <YdIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
               <div>
                 <h2>{{ selected.name }}</h2>
@@ -705,7 +721,9 @@ function actionText(action: string) {
             {{ selected.errorMessage }}
           </div>
 
-          <div class="detail-actions">
+          <div class="detail-actions-group">
+            <div class="section-title">生命周期动作</div>
+            <div class="detail-actions">
             <YdButton
               variant="outline"
               :loading="actionLoading === `${selected.code}:open`"
@@ -753,17 +771,28 @@ function actionText(action: string) {
               <YdIcon name="i-ri:eject-line" />
               卸载
             </YdButton>
-            <YdButton
-              v-auth="'platform:plugin:manage'"
-              variant="destructive"
-              :loading="actionLoading === `${selected.code}:remove`"
-              @click="confirmRemove(selected)"
-            >
-              <YdIcon name="morph:trash-2" />
-              删除记录
-            </YdButton>
+            </div>
           </div>
-      </section>
+
+          <div class="detail-actions-group detail-actions-group--danger">
+            <div class="section-title">危险操作</div>
+            <div class="detail-actions">
+              <YdButton
+                v-auth="'platform:plugin:manage'"
+                variant="destructive"
+                :loading="actionLoading === `${selected.code}:remove`"
+                @click="confirmRemove(selected)"
+              >
+                <YdIcon name="morph:trash-2" />
+                删除记录
+              </YdButton>
+              <p class="detail-danger-hint">
+                删除只移除管理记录，不删除磁盘 JAR；有运行中依赖方时会先要求级联确认。
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <EnableDependencyDialog
         v-model="enableDialogOpen"
@@ -813,6 +842,13 @@ function actionText(action: string) {
   width: 140px;
 }
 
+.plugin-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
 .plugin-browser,
 .plugin-detail {
   border: 1px solid var(--color-border-2);
@@ -835,22 +871,20 @@ function actionText(action: string) {
   font-size: 12px;
 }
 
-.plugin-grid {
+.plugin-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  gap: 6px;
 }
 
 .plugin-item {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
   min-width: 0;
-  min-height: 116px;
-  padding: 14px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
   color: var(--color-text-1);
   text-align: left;
 }
@@ -879,24 +913,9 @@ function actionText(action: string) {
   white-space: nowrap;
 }
 
-.plugin-item-body p {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 13px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.update-tag {
-  grid-column: 2;
-  justify-self: start;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.plugin-item-update {
+  color: rgb(var(--success-6));
+  font-size: 12px;
 }
 
 .plugin-pagination {
@@ -905,8 +924,31 @@ function actionText(action: string) {
 
 .plugin-detail {
   min-width: 0;
-  margin-top: 14px;
   padding: 16px;
+}
+
+.detail-back {
+  display: none;
+}
+
+.detail-actions-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-2);
+}
+
+.detail-actions-group--danger .section-title {
+  color: rgb(var(--danger-6));
+}
+
+.detail-danger-hint {
+  flex: 1 1 240px;
+  margin: 0;
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .summary-grid {
@@ -1102,6 +1144,33 @@ function actionText(action: string) {
   color: rgb(var(--danger-6));
 }
 
+@media (max-width: 900px) {
+  .plugin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plugin-detail {
+    display: none;
+  }
+
+  .plugin-detail.is-mobile-open {
+    display: block;
+  }
+
+  .plugin-layout.is-detail-open .plugin-browser {
+    display: none;
+  }
+
+  .detail-back {
+    display: inline-flex;
+    margin-bottom: 4px;
+  }
+
+  .plugin-detail-title {
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 640px) {
   .plugin-toolbar,
   .plugin-toolbar-actions,
@@ -1114,14 +1183,6 @@ function actionText(action: string) {
   .plugin-search,
   .plugin-status-filter {
     width: 100%;
-  }
-
-  .plugin-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .plugin-item {
-    min-height: 108px;
   }
 
   .plugin-pagination {

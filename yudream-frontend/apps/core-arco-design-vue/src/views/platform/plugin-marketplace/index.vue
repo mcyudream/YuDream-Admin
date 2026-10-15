@@ -182,9 +182,17 @@ async function load() {
   }
 }
 
+/** 窄屏：选中插件后展示详情窗格，返回按钮回到目录。 */
+const mobileShowingDetail = ref(false)
+
 async function selectPlugin(code: string) {
   selectedCode.value = code
+  mobileShowingDetail.value = true
   await loadDetail(code)
+}
+
+function backToList() {
+  mobileShowingDetail.value = false
 }
 
 async function loadDetail(code: string, showLoading = true) {
@@ -496,53 +504,57 @@ function rollbackConfirmationContent(cascade: boolean) {
         </YdButton>
       </div>
 
-      <div v-if="pagedRows.length" class="marketplace-grid">
-        <YdButton
-          v-for="item in pagedRows"
-          :key="item.code"
-          :variant="selectedCode === item.code ? 'secondary' : 'ghost'"
-          class="plugin-card"
-          :class="{ active: selectedCode === item.code }"
-          type="button"
-          :aria-pressed="selectedCode === item.code"
-          @click="selectPlugin(item.code)"
-        >
-          <YdIcon :name="getDescriptor(item).icon || 'morph:store'" class="plugin-icon" />
-          <div class="plugin-card-body">
-            <div class="plugin-card-title">
-              <strong>{{ getDescriptor(item).displayName || getDescriptor(item).code }}</strong>
-              <YdTag variant="secondary">{{ getDescriptor(item).version }}</YdTag>
-            </div>
-            <div class="plugin-card-meta">
-              <YdTag variant="secondary">{{ marketplaceStatusLabel(item) }}</YdTag>
-              <YdTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</YdTag>
-              <YdTag v-if="getDescriptor(item).category" variant="secondary" :title="`分类：${getDescriptor(item).category}`">{{ getDescriptor(item).category }}</YdTag>
-            </div>
-            <p class="plugin-card-description" :title="getDescriptor(item).description || '暂无插件简介。'">
-              {{ getDescriptor(item).description || '暂无插件简介。' }}
-            </p>
+      <div class="marketplace-layout" :class="{ 'is-detail-open': mobileShowingDetail }">
+        <div class="marketplace-browser">
+          <div v-if="pagedRows.length" class="marketplace-list">
+            <YdButton
+              v-for="item in pagedRows"
+              :key="item.code"
+              variant="ghost"
+              class="plugin-card"
+              :class="{ active: selectedCode === item.code }"
+              type="button"
+              :aria-pressed="selectedCode === item.code"
+              @click="selectPlugin(item.code)"
+            >
+              <YdIcon :name="getDescriptor(item).icon || 'morph:store'" class="plugin-icon" />
+              <div class="plugin-card-body">
+                <div class="plugin-card-title">
+                  <strong>{{ getDescriptor(item).displayName || getDescriptor(item).code }}</strong>
+                  <YdTag variant="secondary">{{ getDescriptor(item).version }}</YdTag>
+                </div>
+                <div class="plugin-card-meta">
+                  <YdTag variant="secondary">{{ marketplaceStatusLabel(item) }}</YdTag>
+                  <YdTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</YdTag>
+                  <YdTag v-if="getDescriptor(item).category" variant="secondary" :title="`分类：${getDescriptor(item).category}`">{{ getDescriptor(item).category }}</YdTag>
+                </div>
+              </div>
+            </YdButton>
           </div>
-        </YdButton>
-      </div>
-      <div v-else-if="!loading" class="empty-state">
-        <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
-        <template v-else>
-          还没有可用插件。请先
-          <YdButton v-auth="'platform:plugin-market-source:create'" variant="link" @click="openAddSource">添加远程市场源</YdButton>
-          ，或启用「插件市场源」能力以使用本机源。
-        </template>
-      </div>
-      <YdPagination
-        v-if="pagination.total > pagination.size"
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="marketplace-pagination"
-      />
+          <div v-else-if="!loading" class="empty-state">
+            <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
+            <template v-else>
+              还没有可用插件。请先
+              <YdButton v-auth="'platform:plugin-market-source:create'" variant="link" @click="openAddSource">添加远程市场源</YdButton>
+              ，或启用「插件市场源」能力以使用本机源。
+            </template>
+          </div>
+          <YdPagination
+            v-if="pagination.total > pagination.size"
+            v-model:page="pagination.page"
+            v-model:size="pagination.size"
+            :total="pagination.total"
+            class="marketplace-pagination"
+          />
+        </div>
 
-      <section v-if="selected && detail" class="plugin-detail">
+      <section v-if="selected && detail" class="plugin-detail" :class="{ 'is-mobile-open': mobileShowingDetail }">
         <div class="detail-header">
           <div>
+            <YdButton variant="ghost" size="sm" class="detail-back" @click="backToList">
+              <YdIcon name="morph:arrow-left" />
+              返回目录
+            </YdButton>
             <h2>{{ getDescriptor(selected).displayName || getDescriptor(selected).code }}</h2>
             <p>{{ getDescriptor(selected).description || '暂无插件简介。' }}</p>
             <div class="detail-meta">
@@ -608,6 +620,7 @@ function rollbackConfirmationContent(cascade: boolean) {
           </div>
         </div>
       </section>
+      </div>
 
       <InstallDependencyDialog
         v-model="installPlanOpen"
@@ -741,26 +754,38 @@ function rollbackConfirmationContent(cascade: boolean) {
   margin-top: 16px;
 }
 
-.marketplace-grid {
+.marketplace-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
   gap: 14px;
+  align-items: start;
 }
 
-.plugin-card,
+.marketplace-browser,
 .plugin-detail {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-2);
 }
 
+.marketplace-browser {
+  min-width: 0;
+  padding: 12px;
+}
+
+.marketplace-list {
+  display: grid;
+  gap: 6px;
+}
+
 .plugin-card {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
   min-width: 0;
-  height: 100%;
-  padding: 14px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   color: var(--color-text-1);
   text-align: left;
 }
@@ -826,21 +851,13 @@ function rollbackConfirmationContent(cascade: boolean) {
   white-space: nowrap;
 }
 
-.plugin-card-description {
-  display: -webkit-box;
-  min-height: 2.6em;
-  margin: 6px 0;
-  overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 13px;
-  line-height: 1.3;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.plugin-detail {
+  min-width: 0;
+  padding: 16px;
 }
 
-.plugin-detail {
-  margin-top: 14px;
-  padding: 16px;
+.detail-back {
+  display: none;
 }
 
 .detail-header h2 {
@@ -903,6 +920,29 @@ function rollbackConfirmationContent(cascade: boolean) {
   padding: 32px 12px;
   color: var(--color-text-3);
   text-align: center;
+}
+
+@media (max-width: 900px) {
+  .marketplace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plugin-detail {
+    display: none;
+  }
+
+  .plugin-detail.is-mobile-open {
+    display: block;
+  }
+
+  .marketplace-layout.is-detail-open .marketplace-browser {
+    display: none;
+  }
+
+  .detail-back {
+    display: inline-flex;
+    margin-bottom: 4px;
+  }
 }
 
 @media (max-width: 640px) {
