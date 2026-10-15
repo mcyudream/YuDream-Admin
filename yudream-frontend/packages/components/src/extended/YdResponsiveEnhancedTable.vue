@@ -230,6 +230,15 @@ interface DropdownMenuItem {
 }
 
 /** 构建操作菜单项 */
+/** 无头像时的首字兜底（中文取前 2 字，拉丁取首字母） */
+function avatarFallback(row: TData): string {
+  const name = getUserName(row).trim()
+  if (!name) {
+    return '?'
+  }
+  const isAscii = name.charCodeAt(0) < 128
+  return isAscii ? name.slice(0, 1).toUpperCase() : name.slice(0, 2)
+}
 function buildActionItems(row: TData): DropdownMenuItem[][] {
   if (!props.actions) {
     return []
@@ -431,6 +440,7 @@ function fieldSlotProps(field: CardField, index: number): TableCellSlotProps<TDa
                 <FaAvatar
                   v-if="userColumn.avatarKey"
                   :src="getUserAvatar(item.node)"
+                  :fallback="avatarFallback(item.node)"
                   :alt="getUserName(item.node)"
                   class="shrink-0"
                 />

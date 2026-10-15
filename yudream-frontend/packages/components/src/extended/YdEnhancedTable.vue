@@ -115,6 +115,15 @@ interface DropdownMenuItem {
 }
 
 /** 构建操作菜单项 */
+/** 无头像时的首字兜底（中文取前 2 字，拉丁取首字母） */
+function avatarFallback(row: TData): string {
+  const name = getUserName(row).trim()
+  if (!name) {
+    return '?'
+  }
+  const isAscii = name.charCodeAt(0) < 128
+  return isAscii ? name.slice(0, 1).toUpperCase() : name.slice(0, 2)
+}
 function buildActionItems(row: TData): DropdownMenuItem[][] {
   if (!props.actions) {
     return []
@@ -152,6 +161,7 @@ function hasActionItems(groups: DropdownMenuItem[][]) {
         <FaAvatar
           v-if="userColumn.avatarKey"
           :src="getAvatarUrl(row.original) || ''"
+          :fallback="avatarFallback(row.original)"
           :alt="getUserName(row.original)"
           class="shrink-0"
         />
