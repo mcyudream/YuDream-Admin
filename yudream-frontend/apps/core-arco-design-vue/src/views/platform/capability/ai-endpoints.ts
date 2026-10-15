@@ -65,6 +65,7 @@ export function createAiModel(model = '', name = ''): AiModelDraft {
 export function createEndpointDraft(usage: AiEndpointUsage, presetId = ''): AiEndpointDraft {
   const preset = findPreset(presetId)
   const protocol: AiProtocol = preset?.protocol ?? defaultProtocol(usage)
+  const presetModels = preset ? (preset.models?.length ? preset.models : (preset.defaultModel ? [preset.defaultModel] : [])) : []
   return {
     code: '',
     name: preset?.label ?? '',
@@ -80,7 +81,8 @@ export function createEndpointDraft(usage: AiEndpointUsage, presetId = ''): AiEn
     temperature: usage === 'chat' ? '0.4' : '',
     extraBody: '',
     enabled: true,
-    models: [],
+    // 预设的默认模型直接登记，避免新建端点后模型列表为空、还要再手工补一遍。
+    models: presetModels.map(model => ({ ...createAiModel(model), kind: usage })),
   }
 }
 

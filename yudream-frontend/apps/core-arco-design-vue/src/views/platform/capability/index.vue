@@ -115,7 +115,7 @@ async function load() {
   loading.value = true
   try {
     const res = await apiCapability.list()
-    rows.value = res.data
+    rows.value = dedupeCapabilities(res.data)
     selectedCode.value = rows.value.some(item => item.code === selectedCode.value)
       ? selectedCode.value
       : rows.value[0]?.code ?? ''
@@ -123,6 +123,24 @@ async function load() {
   finally {
     loading.value = false
   }
+}
+
+/** 接口可能返回同一编码的多条记录（重复注册）：优先保留已启用、带运行指标与健康信息的一条。 */
+function dedupeCapabilities(list: CapabilityItem[]) {
+  const byCode = new Map<string, CapabilityItem>()
+  for (const item of list) {
+    const current = byCode.get(item.code)
+    if (!current || capabilityScore(item) > capabilityScore(current)) {
+      byCode.set(item.code, item)
+    }
+  }
+  return [...byCode.values()]
+}
+
+function capabilityScore(item: CapabilityItem) {
+  return (item.enabled ? 4 : 0)
+    + (Object.keys(item.metrics || {}).length ? 2 : 0)
+    + (item.healthMessage ? 1 : 0)
 }
 
 async function toggleCapability(item: CapabilityItem) {
@@ -339,8 +357,64 @@ function statusVariant(status: CapabilityStatus) {
   return status === 'ENABLED' ? 'default' : status === 'ERROR' ? 'destructive' : 'secondary'
 }
 
-function metricEntries(item?: CapabilityItem) {
-  return Object.entries(item?.metrics || {})
+/** 运行指标的展示名称：后端返回英文键，这里映射为管理员可读的中文（未知键原样显示）。 */
+const metricLabels: Record<string, string> = {
+  connections: '当前连接',
+  sessions: '会话数',
+  messages: '消息数',
+  providers: '已配置供应商',
+  providerCount: '供应商数量',
+  modelCount: '模型数量',
+  protocols: '使用协议',
+  embeddingEndpoints: '向量化端点',
+  embeddingModelCount: '向量化模型数',
+  rerankEndpoints: '重排序端点',
+  rerankModelCount: '重排序模型数',
+  apiKeyConfigured: '已配置密钥',
+  proxyEnabled: '启用代理',
+  queue: '队列',
+  exchange: '交换机',
+  nodes: '节点数',
+  documents: '文档数',
+}
+
+interface MetricEntry {
+  key: string
+  label: string
+  type: 'tags' | 'boolean' | 'text'
+  tags: string[]
+  text: string
+  ok: boolean
+}
+
+/** 指标值可能是数组、布尔或长字符串：转成可读的标签列表或文本，避免直接把原始 JSON 塞进卡片。 */
+function metricEntries(item?: CapabilityItem): MetricEntry[] {
+  return Object.entries(item?.metrics || {}).map(([key, value]) => {
+    const label = metricLabels[key] || key
+    if (Array.isArray(value)) {
+      const tags = value.map(entry => (entry === null || entry === undefined ? '-' : String(entry))).filter(Boolean)
+      return { key, label, type: 'tags' as const, tags, text: tags.join('、'), ok: true }
+    }
+    if (typeof value === 'boolean') {
+      return { key, label, type: 'boolean' as const, tags: [], text: value ? '是' : '否', ok: value }
+    }
+    if (value && typeof value === 'object') {
+      const text = Object.entries(value as Record<string, unknown>)
+        .map(([innerKey, innerValue]) => `${metricLabels[innerKey] || innerKey} ${String(innerValue)}`)
+        .join('；')
+      return { key, label, type: 'text' as const, tags: [], text: text || '-', ok: true }
+    }
+    return { key, label, type: 'text' as const, tags: [], text: value === null || value === undefined || value === '' ? '-' : String(value), ok: true }
+  })
+}
+
+/** 检查时间带 7 位小数时截断到秒，避免长串撑破信息卡。 */
+function formatTime(value?: string) {
+  if (!value) {
+    return '-'
+  }
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/)
+  return match ? `${match[1]} ${match[2]}` : value
 }
 
 function dependencyStatus(item?: CapabilityItem) {
@@ -576,7 +650,7 @@ function parseJsonConfig() {
                 <span>编码</span><code>{{ selected.code }}</code>
               </div>
               <div class="info-cell">
-                <span>检查时间</span><strong>{{ selected.checkedAt || '-' }}</strong>
+                <span>检查时间</span><strong>{{ formatTime(selected.checkedAt) }}</strong>
               </div>
             </div>
             <div v-if="dependencyRows.length" class="dependency-panel">
@@ -598,15 +672,28 @@ function parseJsonConfig() {
             </div>
             <div class="health-panel">
               <div class="section-title">
-                <span>健康信息</span><YdTag :variant="statusVariant(selected.status)">
-                  {{ selected.healthMessage || '-' }}
+                <span>健康信息</span>
+                <YdTag :variant="statusVariant(selected.status)">
+                  {{ selected.healthMessage || statusText(selected.status) }}
                 </YdTag>
               </div>
-              <div v-if="metricEntries(selected).length" class="metric-grid">
-                <div v-for="[key, value] in metricEntries(selected)" :key="key" class="metric-item">
-                  <span>{{ key }}</span><strong>{{ value }}</strong>
+              <dl v-if="metricEntries(selected).length" class="metric-grid">
+                <div v-for="metric in metricEntries(selected)" :key="metric.key" class="metric-item">
+                  <dt>{{ metric.label }}</dt>
+                  <dd>
+                    <template v-if="metric.type === 'tags'">
+                      <span v-if="!metric.tags.length" class="metric-empty">无</span>
+                      <YdTag v-for="tag in metric.tags" v-else :key="tag" variant="secondary">
+                        {{ tag }}
+                      </YdTag>
+                    </template>
+                    <YdTag v-else-if="metric.type === 'boolean'" :variant="metric.ok ? 'default' : 'secondary'">
+                      {{ metric.text }}
+                    </YdTag>
+                    <span v-else class="metric-text">{{ metric.text }}</span>
+                  </dd>
                 </div>
-              </div>
+              </dl>
               <div v-else class="empty-state">
                 暂无运行指标
               </div>
@@ -646,7 +733,10 @@ function parseJsonConfig() {
   margin-bottom: 24px;
 }
 
-.capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.82fr) minmax(0, 1.5fr); gap:16px; align-items:stretch; height:min(760px, calc(100dvh - 220px)); min-height:480px; }
+/* 两栏各自限制高度并独立滚动：目录滚动不再带动右侧详情，页面也不会超出可视区，
+   底部留白因此始终保留（外壳页签栏等高度变化只影响留白的大小，不会造成溢出）。 */
+.capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.78fr) minmax(0, 1.7fr); gap:16px; align-items:stretch; }
+.capability-workbench > * { max-height:var(--capability-pane-max-height, calc(100dvh - 272px)); min-height:280px; }
 .capability-browser { display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:16px; min-width:0; min-height:0; }
 .capability-browser :deep(.yd-loading-overlay) { min-height:0; height:100%; }
 .capability-browser :deep(.yd-loading-overlay__content) { display:grid; grid-template-rows:minmax(0,1fr); min-height:0; height:100%; }
@@ -671,14 +761,31 @@ function parseJsonConfig() {
 .capability-card__meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--color-text-3); font-size:11px; }
 .capability-card__meta code { padding:2px 6px; border-radius:4px; background:var(--color-fill-2); }
 .capability-card__chevron { align-self:center; color:var(--color-text-3); }
-.capability-detail { display:grid; gap:20px; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); scrollbar-gutter:stable; }
+/* align-content:start：grid 默认会把行拉伸填满容器，短内容会被撑出大片空白。 */
+.capability-detail { display:grid; gap:20px; align-content:start; container-type:inline-size; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); scrollbar-gutter:stable; }
 .detail-header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; }
 .detail-title { display:flex; min-width:0; gap:12px; align-items:center; }
 .detail-title h2 { margin:0 0 4px; font-size:18px; font-weight:650; }
 .detail-title p { margin:0; line-height:1.5; }
 .detail-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
 .detail-grid,.metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr)); gap:10px; }
-.info-cell,.metric-item { display:grid; gap:8px; min-height:74px; padding:12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
+/* 宽详情里四条基础信息排成一行，避免 3+1 的落单换行。 */
+@container (min-width: 520px) {
+  .detail-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+}
+/* 信息卡：值是标签时必须靠上靠左，grid 默认拉伸会把标签撑成大色块。 */
+.info-cell { display:grid; gap:8px; align-content:start; justify-items:start; padding:12px 14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
+.info-cell > span { color:var(--color-text-3); font-size:12px; }
+.info-cell > strong { color:var(--color-text-1); font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+.info-cell code { color:var(--color-text-2); font-size:13px; overflow-wrap:anywhere; }
+
+/* 健康指标：一行一个指标，标签在上、值在下，数组展开为标签，避免原始 JSON 撑破卡片 */
+.metric-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); align-content:start; }
+.metric-item { display:grid; gap:8px; min-width:0; padding:12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
+.metric-item dt { color:var(--color-text-3); font-size:12px; }
+.metric-item dd { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0; min-width:0; }
+.metric-text { color:var(--color-text-1); font-size:14px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.metric-empty { color:var(--color-text-3); font-size:13px; }
 .dependency-panel,.health-panel,.debug-panel { display:grid; gap:12px; padding-top:18px; border-top:1px solid var(--color-border-2); }
 .section-title { display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--color-text-1); font-weight:650; }
 .section-title span { display:inline-flex; gap:6px; align-items:center; }

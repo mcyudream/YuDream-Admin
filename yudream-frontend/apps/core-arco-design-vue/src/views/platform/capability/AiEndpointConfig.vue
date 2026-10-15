@@ -41,6 +41,18 @@ const toast = useYdToast()
 const activeUsage = ref<AiEndpointUsage>('chat')
 const activeEndpoint = shallowRef<AiEndpointDraft>()
 const presetPickerUsage = ref<AiEndpointUsage | null>(null)
+/**
+ * YdModal 会在 isOpen 变化时回传 update:modelValue（含打开时的 true），
+ * 因此必须用受控布尔模型：只有收到 false 才关闭，避免打开即被置空。
+ */
+const presetPickerOpen = computed({
+  get: () => presetPickerUsage.value !== null,
+  set: (value: boolean) => {
+    if (!value) {
+      presetPickerUsage.value = null
+    }
+  },
+})
 const discoverOpen = ref(false)
 const discoverLoading = ref(false)
 const discoverListed = ref(true)
@@ -64,7 +76,14 @@ const defaultEndpoint = computed(() => chatEndpoints.value.find(item => item.cod
 const defaultModelOptions = computed(() => modelOptionsOf(defaultEndpoint.value))
 const presetOptions = computed(() => {
   const usage = presetPickerUsage.value
-  return usage ? presetsFor(usage).map(preset => ({ label: preset.label, value: preset.id })) : []
+  return usage
+    ? presetsFor(usage).map(preset => ({
+        label: preset.label,
+        value: preset.id,
+        icon: preset.icon,
+        description: preset.baseUrl,
+      }))
+    : []
 })
 const activePresetOptions = computed(() =>
   [{ label: '自定义', value: '' }, ...presetsFor(active.value?.usage ?? 'chat').map(preset => ({ label: preset.label, value: preset.id }))])
@@ -104,13 +123,22 @@ function endpointTitle(endpoint: AiEndpointDraft) {
   return endpoint.name || endpoint.code || `未命名${AI_USAGE_LABELS[endpoint.usage]}`
 }
 
-function selectEndpointByCode(value: unknown) {
+function endpointSummary(endpoint: AiEndpointDraft) {
+  const models = endpoint.models.map(model => model.model || model.code).filter(Boolean)
+  return models.slice(0, 3).join(' / ') + (models.length > 3 ? ` 等 ${models.length} 个` : '')
+}
+
+function openPresetPicker() {
+  presetPickerUsage.value = activeUsage.value
+}
+
+function selectEndpoint(endpoint: AiEndpointDraft) {
   discoverSequence += 1
   discoverOpen.value = false
   discoverLoading.value = false
   discoverCandidates.value = []
   modelEditing.value = false
-  activeEndpoint.value = endpointsForUsage.value.find(item => item.code === value)
+  activeEndpoint.value = endpoint
 }
 
 function addEndpointFromPreset(presetId: string) {
@@ -317,23 +345,54 @@ function confirmDiscovery() {
       </p>
     </div>
 
-    <div v-if="endpointsForUsage.length" class="ai-config__endpoint-bar">
-      <div class="ai-config__endpoint-picker">
-        <span class="ai-config__eyebrow">当前{{ AI_USAGE_LABELS[activeUsage] }}</span>
-        <YdSelect
-          :model-value="active?.code ?? ''"
-          :options="endpointsForUsage.map(item => ({ label: endpointTitle(item), value: item.code }))"
-          :placeholder="`选择${AI_USAGE_LABELS[activeUsage]}`"
-          class="w-full"
-          @update:model-value="selectEndpointByCode"
-        />
-        <span class="ai-config__endpoint-count">{{ endpointsForUsage.length }} 个端点</span>
+    <section class="ai-endpoints">
+      <header class="ai-endpoints__head">
+        <div>
+          <h3>{{ AI_USAGE_LABELS[activeUsage] }}（{{ endpointsForUsage.length }}）</h3>
+          <p>{{ AI_USAGE_HINTS[activeUsage] }}</p>
+        </div>
+        <YdButton size="sm" variant="outline" @click="openPresetPicker">
+          <YdIcon name="morph:plus" />
+          添加端点
+        </YdButton>
+      </header>
+
+      <div v-if="endpointsForUsage.length" class="ai-endpoints__list">
+        <YdAction
+          v-for="endpoint in endpointsForUsage"
+          :key="endpoint.code"
+          class="ai-endpoint"
+          :class="{ 'is-active': endpoint === active }"
+          :aria-pressed="endpoint === active"
+          @click="selectEndpoint(endpoint)"
+        >
+          <YdIcon :name="endpoint.icon" class="ai-endpoint__icon" />
+          <div class="ai-endpoint__identity">
+            <div class="ai-endpoint__title">
+              <strong>{{ endpointTitle(endpoint) }}</strong>
+              <YdTag v-if="endpoint.usage === 'chat' && endpoint.code === defaultProvider" variant="secondary">
+                默认
+              </YdTag>
+              <YdTag v-if="!endpoint.enabled" variant="secondary">
+                已停用
+              </YdTag>
+            </div>
+            <span>{{ endpoint.baseUrl || '尚未设置 API 地址' }}</span>
+            <span v-if="endpointSummary(endpoint)" class="ai-endpoint__models">{{ endpointSummary(endpoint) }}</span>
+          </div>
+          <div class="ai-endpoint__meta">
+            {{ endpoint.models.length }} 个模型
+          </div>
+          <YdIcon name="morph:chevron-right" class="ai-endpoint__chevron" />
+        </YdAction>
       </div>
-      <YdButton size="sm" variant="outline" @click="presetPickerUsage = activeUsage">
-        <YdIcon name="morph:plus" />
-        添加端点
-      </YdButton>
-    </div>
+      <YdEmpty v-else title="尚未添加端点" description="从供应商预设开始，或选择自定义端点后填写地址与凭据。">
+        <YdButton size="sm" variant="outline" @click="openPresetPicker">
+          <YdIcon name="morph:plus" />
+          添加{{ AI_USAGE_LABELS[activeUsage] }}
+        </YdButton>
+      </YdEmpty>
+    </section>
 
     <div class="ai-config__editor-region">
       <section v-if="active" class="ai-editor" :data-usage="active.usage">
@@ -488,7 +547,7 @@ function confirmDiscovery() {
         title="尚未配置此类端点"
         :description="`添加${AI_USAGE_LABELS[activeUsage]}后，可在此配置地址、凭据和模型。`"
       >
-        <YdButton size="sm" variant="outline" @click="presetPickerUsage = activeUsage">
+        <YdButton size="sm" variant="outline" @click="openPresetPicker">
           <YdIcon name="morph:plus" />
           添加{{ AI_USAGE_LABELS[activeUsage] }}
         </YdButton>
@@ -496,26 +555,28 @@ function confirmDiscovery() {
     </div>
 
     <YdModal
-      :model-value="presetPickerUsage !== null"
-      :title="`添加${presetPickerUsage ? AI_USAGE_LABELS[presetPickerUsage] : ''}`"
+      v-model="presetPickerOpen"
+      :title="`添加${presetPickerUsage ? AI_USAGE_LABELS[presetPickerUsage] : '端点'}`"
       :footer="false"
       content-class="sm:max-w-2xl"
-      @update:model-value="presetPickerUsage = null"
     >
       <p class="ai-picker__hint">
         {{ presetPickerUsage ? AI_USAGE_HINTS[presetPickerUsage] : '' }}
       </p>
       <div class="ai-picker__grid">
-        <YdButton
+        <YdAction
           v-for="option in presetOptions"
           :key="option.value"
-          variant="outline"
-          type="button"
           class="ai-picker__item"
           @click="addEndpointFromPreset(option.value)"
         >
-          {{ option.label }}
-        </YdButton>
+          <YdIcon :name="option.icon" class="ai-picker__icon" />
+          <span class="ai-picker__text">
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+          <YdIcon name="morph:chevron-right" class="ai-picker__chevron" />
+        </YdAction>
       </div>
     </YdModal>
 
@@ -642,32 +703,22 @@ function confirmDiscovery() {
   line-height: 1.6;
 }
 
-.ai-config__endpoint-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-
-.ai-config__endpoint-picker {
-  display: grid;
-  flex: 1 1 260px;
-  grid-template-columns: minmax(0, 320px) auto;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-}
-
-.ai-config__endpoint-picker .ai-config__eyebrow {
-  grid-column: 1 / -1;
-}
-
-.ai-config__endpoint-count {
-  color: var(--color-text-3);
-  font-size: 12px;
-  white-space: nowrap;
-}
+.ai-endpoints { display:grid; gap:12px; }
+.ai-endpoints__head { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; justify-content:space-between; }
+.ai-endpoints__head h3 { margin:0; color:var(--color-text-1); font-size:15px; font-weight:650; }
+.ai-endpoints__head p { margin:5px 0 0; color:var(--color-text-3); font-size:12px; line-height:1.6; }
+.ai-endpoints__list { display:grid; gap:8px; }
+.ai-endpoint { display:grid; grid-template-columns:34px minmax(0,1fr) auto 16px; gap:14px; align-items:center; width:100%; min-width:0; padding:13px 14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); text-align:left; transition:border-color .16s ease, background-color .16s ease; }
+.ai-endpoint:hover,.ai-endpoint.is-active { border-color:var(--color-border-3); background:var(--color-fill-1); }
+.ai-endpoint.is-active { box-shadow:inset 3px 0 var(--color-border-3); }
+.ai-endpoint__icon { width:30px; height:30px; }
+.ai-endpoint__identity { display:grid; gap:4px; min-width:0; }
+.ai-endpoint__title { display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
+.ai-endpoint__title strong { color:var(--color-text-1); font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.ai-endpoint__identity > span { color:var(--color-text-3); font-size:12px; overflow-wrap:anywhere; }
+.ai-endpoint__models { color:var(--color-text-2) !important; }
+.ai-endpoint__meta { color:var(--color-text-3); font-size:12px; white-space:nowrap; }
+.ai-endpoint__chevron { color:var(--color-text-3); }
 
 .ai-config__editor-region {
   display: grid;
@@ -882,13 +933,31 @@ function confirmDiscovery() {
 
 .ai-picker__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 8px;
+  max-height: min(56vh, 460px);
+  overflow-y: auto;
 }
 
 .ai-picker__item {
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 14px;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-1);
+  text-align: left;
 }
+
+.ai-picker__item:hover { border-color: var(--color-border-3); background: var(--color-fill-1); }
+.ai-picker__icon { width: 24px; height: 24px; }
+.ai-picker__text { display: grid; gap: 3px; min-width: 0; }
+.ai-picker__text strong { color: var(--color-text-1); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.ai-picker__text small { color: var(--color-text-3); font-size: 12px; overflow-wrap: anywhere; }
+.ai-picker__chevron { color: var(--color-text-3); }
 
 .ai-discover {
   display: grid;
@@ -956,11 +1025,13 @@ function confirmDiscovery() {
   .ai-model-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .ai-model-row__badges { grid-column: 2; grid-row: 2; }
   .ai-model-row__op { grid-column: 3; grid-row: 1 / span 2; }
+  .ai-endpoint { grid-template-columns:30px minmax(0,1fr) 16px; }
+  .ai-endpoint__meta { grid-column:2; grid-row:2; }
+  .ai-endpoint__chevron { grid-column:3; grid-row:1 / span 2; }
+  .ai-picker__grid { grid-template-columns:minmax(0,1fr); }
 }
 
 @container (max-width: 390px) {
-  .ai-config__endpoint-picker { grid-template-columns: minmax(0, 1fr); }
-  .ai-config__endpoint-picker .ai-config__eyebrow { grid-column: 1; }
   .ai-model-row__op { flex-direction: column; align-items: flex-end; }
 }
 </style>
