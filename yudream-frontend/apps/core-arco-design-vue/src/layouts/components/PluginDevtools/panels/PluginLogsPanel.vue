@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PluginDevPlugin, PluginLogEntry } from '@/api/modules/platform-devtools'
+import { YdFilterSelect } from '@yudream/components'
 import apiDevtools from '@/api/modules/platform-devtools'
 import { usePluginLogs } from '../usePluginLogs'
 
@@ -98,11 +99,8 @@ function levelClass(entryLevel: string) {
 <template>
   <div class="logs-panel">
     <div class="logs-toolbar">
-      <YdSelect
-        v-model="pluginCode" :options="pluginOptions" placeholder="选择插件"
-        :loading="pluginsLoading" class="logs-toolbar__plugin"
-      />
-      <YdSelect v-model="level" :options="levelOptions" class="logs-toolbar__level" />
+      <YdFilterSelect v-model="pluginCode" :options="pluginOptions" placeholder="选择插件" :loading="pluginsLoading" :width="180" />
+      <YdFilterSelect v-model="level" :options="levelOptions" :width="110" />
       <YdInput v-model="keyword" placeholder="关键字过滤" class="logs-toolbar__keyword" clearable />
       <YdTooltip :text="paused ? '继续接收' : '暂停追加'" side="bottom">
         <YdButton variant="ghost" size="icon-sm" :aria-label="paused ? '继续' : '暂停'" @click="togglePause">
@@ -142,9 +140,9 @@ function levelClass(entryLevel: string) {
         <p>暂无日志</p>
       </div>
       <YdAction
-        type="button"
-        :disabled="!entry.throwable"
-        v-for="entry in entries" :key="entry.sequence" class="log-entry"
+        v-for="entry in entries"
+        :key="entry.sequence"
+        type="button" :disabled="!entry.throwable" class="log-entry"
         :class="{ 'log-entry--expandable': !!entry.throwable }"
         @click="entry.throwable && toggleExpand(entry)"
       >
@@ -177,14 +175,6 @@ function levelClass(entryLevel: string) {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-
-.logs-toolbar__plugin {
-  width: 180px;
-}
-
-.logs-toolbar__level {
-  width: 110px;
 }
 
 .logs-toolbar__keyword {

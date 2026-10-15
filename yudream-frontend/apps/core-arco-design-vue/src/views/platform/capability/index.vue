@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { YdListToolbarStatusItem } from '@yudream/components'
 import type { AiEndpointDraft } from './ai-endpoints'
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
-import { YdStateIllustration } from '@yudream/components'
+import { YdFilterSelect, YdListToolbar, YdStateIllustration } from '@yudream/components'
+
 import apiCapability from '@/api/modules/platform-capability'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
@@ -105,29 +107,17 @@ const summary = computed(() => {
 /**
  * 状态条：计数即筛选入口，一行取代四张统计卡，把高度留给能力目录。
  */
-const statusChips = computed(() => {
+const statusChips = computed<YdListToolbarStatusItem[]>(() => {
   const { total, enabled, disabled, error } = summary.value
   return [
-    { key: 'ALL', label: '全部', count: total, tone: 'neutral' },
-    { key: 'ENABLED', label: '运行中', count: enabled, tone: 'ok' },
-    { key: 'DISABLED', label: '未启用', count: disabled, tone: 'muted' },
-    { key: 'ERROR', label: '异常', count: error, tone: error > 0 ? 'bad' : 'muted' },
-  ] as { key: CapabilityStatus | 'ALL', label: string, count: number, tone: string }[]
+    { value: 'ALL', label: '全部', count: total, tone: 'neutral' },
+    { value: 'ENABLED', label: '运行中', count: enabled, tone: 'ok' },
+    { value: 'DISABLED', label: '未启用', count: disabled, tone: 'muted' },
+    { value: 'ERROR', label: '异常', count: error, tone: error > 0 ? 'bad' : 'muted' },
+  ]
 })
 
-/** 状态条右侧的窄条比例指示，只读展示，不做交互。 */
-const statusRatio = computed(() => {
-  const { total, enabled, disabled, error } = summary.value
-  const percent = (value: number) => (total ? Math.round(value / total * 100) : 0)
-  return {
-    segments: [
-      { key: 'enabled', percent: percent(enabled), tone: 'ok', label: `运行中 ${enabled}` },
-      { key: 'disabled', percent: percent(disabled), tone: 'muted', label: `未启用 ${disabled}` },
-      { key: 'error', percent: percent(error), tone: 'bad', label: `异常 ${error}` },
-    ],
-    enabledPercent: percent(enabled),
-  }
-})
+/** 目录筛选：搜索词 + 类别 + 状态，三者都为空时展示全部。 */
 const filteredRows = computed(() => {
   const query = keyword.value.trim().toLocaleLowerCase()
   return rows.value.filter((item) => {
@@ -142,6 +132,7 @@ const typeOptions = computed(() => [
   { label: '全部类别', value: 'ALL' as const },
   ...groups.filter(group => rows.value.some(item => item.type === group.type)).map(group => ({ label: group.title, value: group.type })),
 ])
+
 const selectedTypeText = computed(() => selected.value ? typeText(selected.value.type) : '')
 
 watch(filteredRows, (list) => {
@@ -729,49 +720,30 @@ function parseJsonConfig() {
     </YdPageHeader>
 
     <YdPageMain>
-      <div class="capability-toolbar">
-        <div class="capability-toolbar__filters">
-          <YdInput v-model="keyword" clearable placeholder="搜索名称或编码" class="capability-search" />
-          <YdSelect v-model="selectedType" :options="typeOptions" class="capability-filter" />
-          <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" class="capability-reset" @click="clearFilters">
+      <YdListToolbar
+        v-model:keyword="keyword"
+        v-model:status="selectedStatus"
+        class="capability-toolbar"
+        placeholder="搜索名称或编码"
+        :status-items="statusChips"
+        :search-width="300"
+      >
+        <template #filters>
+          <YdFilterSelect v-model="selectedType" :options="typeOptions" :width="168" placeholder="全部类别" />
+          <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" @click="clearFilters">
             重置
           </YdButton>
-        </div>
-        <YdButton variant="outline" :loading="loading" class="capability-refresh" aria-label="刷新能力状态" @click="load">
-          <YdIcon name="morph:refresh-cw" />
-          刷新
-        </YdButton>
-      </div>
+        </template>
+        <template #actions>
+          <YdButton variant="outline" :loading="loading" aria-label="刷新能力状态" @click="load">
+            <YdIcon name="morph:refresh-cw" />
+            刷新
+          </YdButton>
+        </template>
+      </YdListToolbar>
 
       <div class="capability-workbench">
         <section class="capability-browser" :class="{ 'has-more': hasMoreBelow }">
-          <div class="capability-status-bar">
-            <YdAction
-              v-for="chip in statusChips"
-              :key="chip.key"
-              class="status-chip"
-              :class="{ 'is-active': selectedStatus === chip.key }"
-              :data-tone="chip.tone"
-              :aria-pressed="selectedStatus === chip.key"
-              @click="selectedStatus = chip.key"
-            >
-              <i v-if="chip.tone === 'ok' || chip.tone === 'bad'" class="status-chip__dot" />
-              <span>{{ chip.label }}</span>
-              <strong>{{ chip.count }}</strong>
-            </YdAction>
-            <span class="status-ratio__label">运行中 {{ statusRatio.enabledPercent }}%</span>
-            <div class="status-ratio" role="img" :aria-label="statusRatio.segments.map(item => item.label).join('，')">
-              <span class="status-ratio__track">
-                <i
-                  v-for="segment in statusRatio.segments"
-                  :key="segment.key"
-                  :data-tone="segment.tone"
-                  :style="{ width: `${segment.percent}%` }"
-                />
-              </span>
-              <span class="status-ratio__label">运行中 {{ statusRatio.enabledPercent }}%</span>
-            </div>
-          </div>
           <YdLoadingOverlay :loading="loading">
             <div v-if="filteredRows.length" ref="catalogRef" class="capability-catalog" @scroll="syncCatalogOverflow">
               <YdAction
@@ -1044,14 +1016,6 @@ function parseJsonConfig() {
 
 <style scoped>
 /* 工具栏：搜索限宽、控件不换行；窄栏时刷新按钮收成图标 */
-/* 工具栏是页面级整行：左侧搜索与筛选、右侧刷新；搜索限宽，不再随整行拉伸。
-   YdSelect 的 class 落在没有作用域属性的内部元素上，限宽必须用 :deep。 */
-.capability-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; min-width:0; margin-bottom:18px; }
-.capability-toolbar__filters { display:flex; flex:1 1 auto; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
-.capability-toolbar .capability-search { flex:1 1 200px; min-width:140px; max-width:300px; }
-.capability-toolbar :deep(.capability-filter) { flex:0 1 168px; min-width:132px; }
-.capability-toolbar .capability-reset { flex:none; }
-.capability-toolbar .capability-refresh { flex:none; }
 
 /* 两栏各自限制高度并独立滚动：目录滚动不再带动右侧详情，页面也不会超出可视区，
    底部留白因此始终保留（外壳页签栏等高度变化只影响留白的大小，不会造成溢出）。 */
@@ -1063,22 +1027,6 @@ function parseJsonConfig() {
 .capability-browser.has-more::after { opacity:1; }
 .capability-browser :deep(.yd-loading-overlay) { min-height:0; height:100%; }
 .capability-browser :deep(.yd-loading-overlay__content) { display:grid; grid-template-rows:minmax(0,1fr); min-height:0; height:100%; }
-/* 状态条：计数即筛选，一行取代四张统计卡，高度全部还给能力目录 */
-.capability-status-bar { position:relative; display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-width:0; padding-bottom:7px; }
-.status-chip { display:inline-flex; gap:5px; align-items:center; padding:4px 9px; border:1px solid var(--color-border-2); border-radius:999px; background:var(--color-bg-1); color:var(--color-text-2); font-size:11.5px; transition:border-color .16s ease, background-color .16s ease, transform .16s cubic-bezier(.32,.72,0,1); }
-.status-chip:hover { transform:translateY(-1px); border-color:var(--color-border-3); background:var(--color-fill-1); }
-.status-chip.is-active { border-color:var(--color-text-2); background:var(--color-fill-2); color:var(--color-text-1); }
-.status-chip strong { color:var(--color-text-1); font-size:12px; font-weight:650; font-variant-numeric:tabular-nums; }
-.status-chip__dot { width:7px; height:7px; flex:none; border-radius:50%; background:currentColor; color:var(--color-text-3); opacity:.5; }
-.status-chip[data-tone='ok'] .status-chip__dot { color:var(--yd-emphasis, var(--color-text-1)); opacity:1; }
-.status-chip[data-tone='bad'] .status-chip__dot { color:var(--color-danger-6); opacity:1; }
-/* 比例条贴在状态条底部：视觉保留，高度为零 */
-.status-ratio { position:absolute; right:0; bottom:0; left:0; height:3px; }
-.status-ratio__track { display:flex; overflow:hidden; width:100%; height:100%; border-radius:999px; background:var(--color-fill-2); }
-.status-ratio__track i { display:block; height:100%; background:var(--yd-emphasis, var(--color-text-1)); transition:width .45s cubic-bezier(.32,.72,0,1); }
-.status-ratio__track i[data-tone='muted'] { background:var(--color-text-3); opacity:.4; }
-.status-ratio__track i[data-tone='bad'] { background:var(--color-danger-6); }
-.status-ratio__label { display:none; }
 .capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:0; }
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
@@ -1230,8 +1178,6 @@ function parseJsonConfig() {
 @media (max-width: 420px) {
   .capability-toolbar { align-items:stretch; }
   .capability-toolbar__filters { flex:1 1 100%; }
-  .capability-toolbar .capability-search { max-width:none; }
-  .status-chip { padding:6px 10px; }
   .capability-list-heading { align-items:center; }
   .capability-catalog { grid-template-columns:minmax(0,1fr); }
   .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }

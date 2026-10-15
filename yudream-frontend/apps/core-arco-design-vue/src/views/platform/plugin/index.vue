@@ -2,6 +2,7 @@
 import type { TableColumn, YdFilePickerInstance } from '@yudream/components'
 import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
+import { YdFilterSelect } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import { refreshPluginThemes } from '@/plugins/theme-runtime'
@@ -556,7 +557,7 @@ function actionText(action: string) {
         </div>
         <div class="plugin-filters">
           <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
-          <YdSelect v-model="filterStatus" :options="filterOptions" class="plugin-status-filter" />
+          <YdFilterSelect v-model="filterStatus" :options="filterOptions" :width="150" placeholder="全部状态" />
           <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">
             重置筛选
           </YdButton>
@@ -923,7 +924,6 @@ function actionText(action: string) {
 }
 
 .plugin-search { width: min(100%, 340px); }
-.plugin-status-filter { width: 150px; }
 
 .summary-grid {
   display: grid;
@@ -1034,7 +1034,7 @@ function actionText(action: string) {
 
 @media (max-width: 768px) {
   .plugin-toolbar, .plugin-toolbar-actions, .plugin-filters, .detail-header { align-items: stretch; flex-direction: column; }
-  .plugin-search, .plugin-status-filter { width: 100%; }
+.plugin-search { width: 100%; }
   .plugin-browser { padding: 14px; }
   .plugin-pagination { overflow-x: auto; }
 }

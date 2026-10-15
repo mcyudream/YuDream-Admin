@@ -2,6 +2,7 @@
 import type { PluginModule } from '@/api/modules/platform-plugin'
 import type { PluginMarketSource } from '@/api/modules/platform-plugin-market-source'
 import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceInstallPlan, PluginMarketplaceUpdatePlan, PluginStorePlugin, PluginStorePluginDescriptor, PluginStorePluginDetail, PluginStorePluginVersion } from '@/api/modules/platform-plugin-marketplace'
+import { YdFilterSelect } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketSource from '@/api/modules/platform-plugin-market-source'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
@@ -490,8 +491,8 @@ function rollbackConfirmationContent(cascade: boolean) {
       <div class="marketplace-toolbar">
         <div class="marketplace-filters">
           <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
-          <YdSelect v-model="status" :options="statusOptions" class="marketplace-status" />
-          <YdSelect v-model="categoryFilter" :options="categoryOptions" class="marketplace-category" />
+          <YdFilterSelect v-model="status" :options="statusOptions" :width="140" placeholder="全部状态" />
+          <YdFilterSelect v-model="categoryFilter" :options="categoryOptions" :width="170" placeholder="全部分类" />
         </div>
         <div class="marketplace-toolbar-actions">
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
@@ -525,7 +526,7 @@ function rollbackConfirmationContent(cascade: boolean) {
         <div class="advanced-filters__content">
           <label v-if="showSourceFilter" class="filter-field">
             <span>市场来源</span>
-            <YdSelect v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
+            <YdFilterSelect v-model="sourceFilter" :options="sourceOptions" :width="190" placeholder="全部来源" />
           </label>
           <label class="filter-field">
             <span>发布时间</span>
@@ -711,8 +712,6 @@ function rollbackConfirmationContent(cascade: boolean) {
 }
 
 .marketplace-search { flex: 1 1 260px; max-width: 420px; }
-.marketplace-status { width: 140px; }
-.marketplace-category { width: 170px; }
 .marketplace-toolbar-actions { justify-content: flex-end; }
 .result-count { color: var(--color-text-3); font-size: 13px; white-space: nowrap; }
 
@@ -736,7 +735,6 @@ function rollbackConfirmationContent(cascade: boolean) {
 }
 .filter-field { display: grid; gap: 8px; color: var(--color-text-2); font-size: 12px; }
 .filter-field--tags { flex: 1 1 100%; }
-.marketplace-source { width: 190px; }
 .marketplace-time { width: min(100%, 300px); }
 .marketplace-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .marketplace-tag { gap: 6px; }
@@ -825,8 +823,6 @@ function rollbackConfirmationContent(cascade: boolean) {
   .marketplace-filters,
   .marketplace-toolbar-actions { width: 100%; }
   .marketplace-search { max-width: none; }
-  .marketplace-status,
-  .marketplace-category { flex: 1 1 135px; }
   .marketplace-toolbar-actions { justify-content: flex-start; }
   .result-count { flex: 1 1 100%; }
   .marketplace-list { grid-template-columns: 1fr; }

@@ -8,6 +8,7 @@ import type {
   QqSandboxLaunchPayload,
   QqSandboxRandomMode,
 } from '@/api/modules/platform-devtools-qq-sandbox'
+import { YdFilterSelect } from '@yudream/components'
 import eventBus from '@/utils/eventBus'
 import { useQqSandbox } from '../useQqSandbox'
 
@@ -646,8 +647,8 @@ function caseTime(item: QqSandboxCase) {
 <template>
   <div class="qq-sandbox">
     <div class="sandbox-toolbar">
-      <YdSelect v-model="preferences.conversationType" :options="conversationOptions" class="sandbox-toolbar__type" />
-      <YdSelect v-model="preferences.randomMode" :options="randomModeOptions" class="sandbox-toolbar__random" />
+      <YdFilterSelect v-model="preferences.conversationType" :options="conversationOptions" :width="90" />
+      <YdFilterSelect v-model="preferences.randomMode" :options="randomModeOptions" :width="112" />
       <span v-if="pluginCode" class="plugin-scope">
         目标：{{ pluginCode }}
         <YdButton type="button" variant="ghost" size="icon-sm" class="plugin-scope__clear" aria-label="清除插件范围" @click="pluginCode = ''">
@@ -845,7 +846,7 @@ function caseTime(item: QqSandboxCase) {
         <div class="sandbox-composer">
           <div class="composer-main">
             <div class="composer-meta">
-              <YdSelect v-model="eventType" :options="eventTypeOptions" class="composer-type" />
+              <YdFilterSelect v-model="eventType" :options="eventTypeOptions" :width="108" />
               <YdInput
                 v-if="eventType === 'button'" v-model="buttonId" class="flex-1"
                 placeholder="按钮 ID（插件 onButton 注册的标识）"
@@ -974,14 +975,6 @@ function caseTime(item: QqSandboxCase) {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-
-.sandbox-toolbar__type {
-  width: 90px;
-}
-
-.sandbox-toolbar__random {
-  width: 112px;
 }
 
 .plugin-scope {
@@ -1332,11 +1325,6 @@ function caseTime(item: QqSandboxCase) {
   align-items: center;
 }
 
-.composer-type {
-  width: 108px;
-  flex-shrink: 0;
-}
-
 .composer-actions {
   display: flex;
   flex-direction: column;
@@ -1395,13 +1383,6 @@ function caseTime(item: QqSandboxCase) {
 
   .sandbox-toolbar {
     flex-wrap: wrap;
-  }
-
-  .sandbox-toolbar__type,
-  .sandbox-toolbar__random {
-    flex: 1;
-    width: auto;
-    min-width: 110px;
   }
 
   .sandbox-workspace,
