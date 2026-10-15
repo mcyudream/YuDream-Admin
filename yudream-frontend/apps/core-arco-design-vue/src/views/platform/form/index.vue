@@ -454,41 +454,9 @@ function errorText(error: unknown, fallback: string) {
   border-radius: 12px;
 }
 
-.form-toolbar {
-  display: grid;
-  gap: 10px;
-}
-
-.form-toolbar__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: center;
-}
-
-.form-toolbar__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-1);
-}
-
 .form-toolbar__count {
   font-size: 12px;
   color: var(--color-text-3);
-}
-
-.form-toolbar__filters {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(150px, 200px) auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.form-toolbar__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
 }
 
 .preview-panel {
@@ -621,15 +589,5 @@ function errorText(error: unknown, fallback: string) {
   font-size: 12px;
   font-style: normal;
   color: var(--color-text-3);
-}
-
-@media (width <= 900px) {
-  .form-toolbar__filters {
-    grid-template-columns: 1fr;
-  }
-
-  .form-toolbar__actions {
-    justify-content: flex-start;
-  }
 }
 </style>

@@ -555,35 +555,33 @@ function tabIcon(value: string | number) {
     </YdPageHeader>
 
     <YdPageMain>
-      <div class="doc-toolbar">
-        <YdListToolbar
-          v-model:keyword="search.keyword"
-          title="文档中心"
-          placeholder="模板名称 / 编码 / 文件名"
-          @search="load"
-          @clear="load"
-        >
-          <template #views>
-            <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
-              <template #option="{ option }">
-                <span class="doc-tab">
-                  <YdIcon :name="tabIcon(option.value)" />
-                  {{ option.label }}
-                </span>
-              </template>
-            </YdSegmented>
-          </template>
-          <template #actions>
-            <YdButton variant="outline" @click="resetSearch">
-              重置
-            </YdButton>
-            <YdButton :loading="loading" @click="load">
-              <YdIcon name="morph:search" />
-              筛选
-            </YdButton>
-          </template>
-        </YdListToolbar>
-      </div>
+      <YdListToolbar
+        v-model:keyword="search.keyword"
+        title="文档中心"
+        placeholder="模板名称 / 编码 / 文件名"
+        @search="load"
+        @clear="load"
+      >
+        <template #views>
+          <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
+            <template #option="{ option }">
+              <span class="doc-tab">
+                <YdIcon :name="tabIcon(option.value)" />
+                {{ option.label }}
+              </span>
+            </template>
+          </YdSegmented>
+        </template>
+        <template #actions>
+          <YdButton variant="outline" @click="resetSearch">
+            重置
+          </YdButton>
+          <YdButton :loading="loading" @click="load">
+            <YdIcon name="morph:search" />
+            筛选
+          </YdButton>
+        </template>
+      </YdListToolbar>
 
       <section :key="activeTab" class="doc-list doc-pane">
         <header class="doc-list__head">
@@ -918,10 +916,6 @@ function tabIcon(value: string | number) {
 <style scoped>
 /* 工具条：视图切换 + 查询 + 筛选收在一条窄带里，切标签页不再重复整个查询区 */
 .doc-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
   margin-bottom: 14px;
 }
 
