@@ -59,6 +59,8 @@ export { default as FaResponsiveTable } from './basic/responsive-table/index.vue
 export { default as FaScrollArea } from './basic/scroll-area/index.vue'
 export { default as FaSearchBar } from './basic/search-bar/index.vue'
 export { default as FaSelect } from './basic/select/index.vue'
+export { default as FaSettingsLayout } from './basic/settings-layout/index.vue'
+export { default as FaSettingsSection } from './basic/settings-section/index.vue'
 export { default as FaSlider } from './basic/slider/index.vue'
 export { default as FaSwitch } from './basic/switch/index.vue'
 export { default as YdTablePicker } from './basic/table-picker/index.vue'

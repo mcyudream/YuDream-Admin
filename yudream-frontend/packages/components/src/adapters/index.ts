@@ -35,6 +35,8 @@ import FaRadioGroup from '../basic/radio-group/index.vue'
 import FaResponsiveTable from '../basic/responsive-table/index.vue'
 import FaScrollArea from '../basic/scroll-area/index.vue'
 import FaSearchBar from '../basic/search-bar/index.vue'
+import FaSettingsLayout from '../basic/settings-layout/index.vue'
+import FaSettingsSection from '../basic/settings-section/index.vue'
 import FaSelect from '../basic/select/index.vue'
 import FaSlider from '../basic/slider/index.vue'
 import FaSwitch from '../basic/switch/index.vue'
@@ -86,6 +88,8 @@ export const YdRadioGroup = /* @__PURE__ */ createYdComponent(FaRadioGroup, 'YdR
 export const YdResponsiveTable = /* @__PURE__ */ createYdComponent(FaResponsiveTable, 'YdResponsiveTable', 'responsive-table')
 export const YdScrollArea = /* @__PURE__ */ createYdComponent(FaScrollArea, 'YdScrollArea', 'scroll-area')
 export const YdSearchBar = /* @__PURE__ */ createYdComponent(FaSearchBar, 'YdSearchBar', 'search-bar')
+export const YdSettingsLayout = /* @__PURE__ */ createYdComponent(FaSettingsLayout, 'YdSettingsLayout', 'settings-layout')
+export const YdSettingsSection = /* @__PURE__ */ createYdComponent(FaSettingsSection, 'YdSettingsSection', 'settings-section')
 export const YdSelect = /* @__PURE__ */ createYdComponent(FaSelect, 'YdSelect', 'select')
 export const YdSlider = /* @__PURE__ */ createYdComponent(FaSlider, 'YdSlider', 'slider')
 export const YdSwitch = /* @__PURE__ */ createYdComponent(FaSwitch, 'YdSwitch', 'switch')
