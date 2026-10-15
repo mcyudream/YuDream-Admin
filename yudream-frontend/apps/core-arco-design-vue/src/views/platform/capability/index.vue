@@ -1079,14 +1079,14 @@ function parseJsonConfig() {
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
 .capability-catalog { container-type:inline-size; display:grid; gap:6px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
 /* 目录卡片：左侧色条代表状态，第二行末尾用同色文字声明状态；窄栏两行、宽栏追加归类 */
-.capability-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:'icon name name' 'icon desc state'; column-gap:10px; row-gap:3px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-left-width:3px; border-radius:10px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 24ms); }
+.capability-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:'icon name state' 'icon desc desc'; column-gap:10px; row-gap:3px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-left-width:3px; border-radius:10px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 24ms); }
 .capability-card:hover { transform:translateY(-2px); background:var(--color-fill-1); box-shadow:0 6px 18px -12px oklch(0 0 0 / 45%); }
 .capability-card:hover .capability-card__icon { transform:scale(1.06) rotate(-2deg); }
 .capability-card.is-selected { background:var(--color-fill-2); border-color:var(--color-text-3); }
 .capability-card__icon { display:grid; grid-area:icon; width:30px; height:30px; place-items:center; border-radius:9px; background:var(--color-fill-2); color:var(--color-text-2); font-size:16px; transition:transform .18s cubic-bezier(.32,.72,0,1); }
 .capability-card__name { grid-area:name; overflow:hidden; font-size:14px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
 .capability-card__description { grid-area:desc; overflow:hidden; color:var(--color-text-3); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
-.capability-card__state { grid-area:state; font-size:11.5px; white-space:nowrap; }
+.capability-card__state { display:flex; grid-area:state; align-items:center; font-size:11.5px; white-space:nowrap; }
 .capability-card__meta { display:none; color:var(--color-text-3); font-size:11px; white-space:nowrap; }
 .capability-card__chevron { display:none; color:var(--color-text-3); }
 
@@ -1102,7 +1102,7 @@ function parseJsonConfig() {
 
 /* 容器够宽才追加归类与右箭头，窄栏保持两行不挤压 */
 @container (min-width: 400px) {
-  .capability-card { grid-template-columns:auto minmax(0,1fr) auto auto; grid-template-areas:'icon name meta chevron' 'icon desc state chevron'; }
+  .capability-card { grid-template-columns:auto minmax(0,1fr) auto auto; grid-template-areas:'icon name state chevron' 'icon desc meta chevron'; }
   .capability-card__meta { display:block; grid-area:meta; }
   .capability-card__chevron { display:block; grid-area:chevron; align-self:center; transition:transform .18s cubic-bezier(.32,.72,0,1); }
   .capability-card:hover .capability-card__chevron { transform:translateX(3px); color:var(--color-text-1); }
