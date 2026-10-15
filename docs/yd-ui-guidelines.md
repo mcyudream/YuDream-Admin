@@ -128,6 +128,7 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 | `YdDropdown` / `YdContextMenu` | 动作菜单；上下文菜单同时有可发现的普通入口 | 任意业务数据多选、正文阅读 |
 | `YdModal` / `useYdModal` | 聚焦确认、短编辑、独立选择 | 默认承载整个管理页面或层层嵌套 |
 | `YdDrawer` / `useYdDrawer` | 保留当前列表上下文的详情、较长编辑、审阅 | 无必要地阻断所有页面导航 |
+| `YdTour` | 分步新手引导：首次上手、新功能巡览，聚光灯高亮 `data-tour` 登记元素 | 代替操作文档或帮助中心；长驻遮挡高频操作路径的引导 |
 | `YdTablePicker` | 远程分页集合选择 | 内容详情和通用编辑 |
 
 关闭、Esc、遮罩与焦点恢复沿用组件能力；业务应处理未保存内容、执行中关闭和失败后继续编辑。确认框说明操作对象与结果，异步确认展示 loading，失败时保留现场。不要仅关闭弹窗就宣称服务端取消成功。多层浮层应减少到可理解的任务层级，不能在页面手写无限增长的 z-index。
@@ -196,7 +197,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdDescriptions`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
-| 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview` |
+| 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdTour` |
 | 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview` |
 | 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdProgress` |
 | 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdLoadingOverlay`、`YdMultiStepLoader` |

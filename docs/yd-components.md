@@ -417,6 +417,14 @@ const filters = ref({ keyword: '', status: 'enabled' })
 
 调用方可给装饰组件显式颜色；通用页面通常保留默认主题语义色，以便明暗和插件主题一致变化。避免在多个大型区域同时放置大量常驻装饰；动态组件在卸载时清理计时器、观察器与 RAF。ScratchOff 有键盘 Enter/Space 和直接揭晓入口，不依赖拖动才能访问结果。
 
+### 分步引导
+
+| 入口 | 核心参数 / 内容 |
+| --- | --- |
+| `YdTour` | `v-model:open`、`steps: YdTourStep[]`、`initialStep`、`mask`（遮罩是否拦截交互，默认 true）、`zIndex`（默认 3000）；步骤 `{ target?: string \| (() => HTMLElement \| null), title?, content, placement?: top/bottom/left/right }`；事件 `finish`、`skip`、`step-change(index)`；ref 方法 `next/prev/skip/goTo(index)`，ref 值 `current` |
+
+`target` 推荐稳定的 `[data-tour="标识"]` 选择器；目标缺失或不可见时该步骤自动降级为居中展示，不中断流程。键盘 Esc 跳过，←/→ 切换步骤；组件负责目标滚动入视口、窗口/滚动重定位与焦点恢复。步骤文案必须自含完整说明，不能依赖被高亮元素自身的 tooltip。宿主声明式引导运行时（内置与插件 manifest 引导）统一由宿主 tour runner 驱动本组件，业务页面只在需要自定义引导时直接使用。
+
 ## 实时预览与验证
 
 从仓库根启动：

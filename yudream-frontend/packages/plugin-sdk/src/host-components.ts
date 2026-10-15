@@ -150,6 +150,7 @@ export const YdTextHighlight = components.YdTextHighlight
 export const YdTextShiny = components.YdTextShiny
 export const YdTimeAgo = components.YdTimeAgo
 export const YdTimeline = components.YdTimeline
+export const YdTour = components.YdTour
 export const YdTree = components.YdTree
 export const YdSortableTree = components.YdSortableTree
 export const YdWorkflowCanvas = components.YdWorkflowCanvas

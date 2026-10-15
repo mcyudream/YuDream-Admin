@@ -131,6 +131,7 @@ const YD_COMPONENT_NAMES = [
   'YdTextarea',
   'YdToast',
   'YdTooltip',
+  'YdTour',
   'YdTrend',
   'YdCarousel',
   'YdLayoutContainer',
