@@ -139,8 +139,8 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
                 .replace("{{model}}", model.modelName())
                 .replace("{{modelCode}}", model.optionCode())
                 .replace("{{thinkingEnabled}}", String.valueOf(Boolean.TRUE.equals(model.thinkingEnabled())))
-                .replace("{{embeddingModel}}", firstText(provider.embeddingModels().stream().findFirst().orElse(""), ""))
-                .replace("{{rerankModel}}", firstText(provider.rerankModels().stream().findFirst().orElse(""), ""))
+                .replace("{{embeddingModel}}", firstText(provider.embeddingModelNames().stream().findFirst().orElse(""), ""))
+                .replace("{{rerankModel}}", firstText(provider.rerankModelNames().stream().findFirst().orElse(""), ""))
                 .replace("{{requestProviderCode}}", request.providerCode() == null ? "" : request.providerCode())
                 .replace("{{requestModelCode}}", request.modelCode() == null ? "" : request.modelCode());
     }
