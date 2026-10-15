@@ -47,11 +47,12 @@ class PluginScaffoldGeneratorTest {
         assertThat(pluginYaml).contains("name: demo-tool");
         assertThat(pluginYaml).contains("displayName: \"演示工具\"");
         assertThat(pluginYaml).contains("main: online.yudream.base.plugin.demotool.bootstrap.DemoToolPlugin");
-        assertThat(pluginYaml.replace("\r\n", "\n")).contains("menu:\n", "  category: other\n");
+        assertThat(pluginYaml.replace("\r\n", "\n")).contains("menu:\n", "  category: tools\n");
         try (var manifest = Files.newInputStream(root.resolve("src/main/resources/plugin.yml"))) {
             var menuPolicy = new PluginYamlDescriptorReader().readManifest(manifest).menuPolicy();
             assertThat(menuPolicy.categorized()).isTrue();
-            assertThat(menuPolicy.category().code()).isEqualTo("other");
+            assertThat(menuPolicy.category().code()).isEqualTo("tools");
+            assertThat(menuPolicy.category().name()).isEqualTo("工具");
         }
         assertThat(pluginYaml).contains("depend:\n  - wallet\n");
         assertThat(pluginYaml).contains("softdepend:\n  - wordle\n");

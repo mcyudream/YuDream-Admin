@@ -78,12 +78,12 @@ public class PluginYamlDescriptorReader {
         } catch (IllegalArgumentException e) {
             throw new BizException("plugin.yml 的 menu.mode 只允许 CATEGORY、LEGACY 或 INDEPENDENT");
         }
-        return new PluginMenuPolicy(mode, menuCategory(menuValues.get("category")));
+        return new PluginMenuPolicy(mode, mode == PluginMenuMode.CATEGORY ? menuCategory(menuValues.get("category")) : null);
     }
 
     private PluginMenuCategory menuCategory(Object category) {
         if (category == null) {
-            return PluginMenuCategory.named("other");
+            throw new BizException("plugin.yml 的 menu.category 必须声明语义分类（mc/social/content/campus/client/trade/tools/play/todo）");
         }
         if (category instanceof String code) {
             return PluginMenuCategory.named(code);
@@ -92,13 +92,16 @@ public class PluginYamlDescriptorReader {
             throw new BizException("plugin.yml 的 menu.category 必须是分类编码或 YAML 对象");
         }
         String code = requiredFieldValue(values, "plugin.yml 的 menu.category", "code");
-        PluginMenuCategory defaults = PluginMenuCategory.named(code);
+        PluginMenuCategory defaults = PluginMenuCategory.builtIn(code);
         String name = value(values, "name");
         String icon = value(values, "icon");
+        String builtInName = defaults == null ? null : defaults.name();
+        String builtInIcon = defaults == null ? null : defaults.icon();
+        Integer builtInSort = defaults == null ? null : defaults.sort();
         return new PluginMenuCategory(code,
-                name.isBlank() ? defaults.name() : name,
-                icon.isBlank() ? defaults.icon() : icon,
-                categorySort(values.get("sort"), defaults.sort()));
+                name.isBlank() ? (builtInName == null ? code : builtInName) : name,
+                icon.isBlank() ? builtInIcon : icon,
+                categorySort(values.get("sort"), builtInSort));
     }
 
     private Integer categorySort(Object sort, Integer defaultSort) {

@@ -36,15 +36,25 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 先确定任务类型，再选择交互，不从视觉特效出发倒推页面结构。
 
-管理导航按最主要的业务大类分组，例如 MC、待办、社交。默认一级大图标入口只展示共享分类，插件模块、功能目录和页面放在分类下；同类插件复用一个入口，不因新增功能持续扩张一级导航。菜单管理新建根节点默认 `CATEGORY`，分类选择来自宿主持久化菜单树。明确要求的独立入口、个例、旧插件和管理员已有结构保持兼容；新插件通过 `plugin.yml` 的 `menu.category` 声明分类，具体协议见宿主 `docs/plugin-system/specification.md` 第 10 节。
+管理导航按最主要的业务大类分组，例如 MC、待办、社交。默认一级大图标入口只展示共享分类，插件模块、功能目录和页面放在分类下；同类插件复用一个入口，不因新增功能持续扩张一级导航。菜单管理新建根节点默认 `CATEGORY`，分类选择来自宿主持久化菜单树。明确要求的独立入口、个例、旧插件和管理员已有结构保持兼容；新插件通过 `plugin.yml` 的 `menu.category` 声明分类，**不提供「其他」兜底**，内置分类为 mc/social/play/todo/content/campus/client/trade/tools/appearance。**一级菜单名称（分类名、独立一级模块名与宿主种子根节点名）最多 5 个字**：一级图标栏标签区只容纳 5 个汉字，超长在 manifest 解析与菜单投影时直接失败；二级及以下名称由子侧栏承载，不受此限。具体协议见宿主 `docs/plugin-system/specification.md` 第 10 节。
 
 | 用户任务 | 首选组件 | 使用判断 |
 | --- | --- | --- |
-| 普通管理页面 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdSearchBar` | 一个清晰标题、查询区、数据区和主操作；不要多层空卡片套卡片 |
-| 表格数据管理 | `YdResponsiveTable`、`YdPagination` | 桌面列表与移动卡片共同设计；通过 `#card` 保留字段和操作 |
-| 桌面专属、内部小型表格 | `YdTable` | 不代替业务列表的移动端方案；列与插槽遵循 TanStack 契约 |
+| 普通管理页面 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdSearchBar` | 一个清晰标题、查询区、数据区和主操作;不要多层空卡片套卡片 |
+| 内容行列表 | `YdList`、`YdListRow` | 活动、通知、收藏等非表格内容；管理数据使用 `YdResponsiveTable` / `YdEnhancedTable` |
+| 统计指标块 | `YdStats`、`YdStat` | 展示标题、数值、说明与图表/操作；动效数字可组合 `YdAnimatedCountTo` |
+| 页面角落快捷操作 | `YdFab` | 少量高频动作可用图标与短标签；不替代表单提交、批量操作或危险确认 |
+| 静态浏览器/窗口预览 | `YdMockupBrowser`、`YdMockupWindow` | 外框中的导航/窗口状态只驱动插槽演示，不访问 URL 或系统窗口 |
+| 表格数据管理 | `YdResponsiveTable`、`YdPagination` | 桌面列表与移动卡片共同设计;通过 `#card` 保留字段和操作 |
+| 图文并茂数据列表 | `YdEnhancedTable`、`YdResponsiveEnhancedTable` | 用户列表、成员管理等需要身份列+状态徽章+操作下拉;响应式版本在 768px 以下自动切卡片并复用 `#cell-*` 渲染,管理列表默认选它 |
+| 桌面专属、内部小型表格 | `YdTable` | 不代替业务列表的移动端方案;列与插槽遵循 TanStack 契约 |
 | 只读详情 | `YdDescriptions`、`YdTag`、`YdBadge` | 属性值与状态；避免用可编辑输入框展示不可编辑内容 |
-| 少量枚举单选 | `YdRadioGroup` 或 `YdSelect` | 所有选项需直观看见用 radio；节省空间用 select |
+| 少量枚举单选 | `YdRadioGroup`、`YdSelect` 或 `YdSegmented` | 所有选项需直观看见用 radio；紧凑的同级视图切换用 segmented；节省空间用 select |
+| 行内破坏性操作确认 | `YdPopconfirm` | 删除、停用等邻近按钮的小范围确认；长说明或多阶段确认仍用 `useYdModal` |
+| 颜色选择 | `YdColorPicker` | 支持 HEX/RGB/HSL/OKLCH 与透明度；不要用裸 `input[type=color]` 替代完整颜色编辑 |
+| 页面分区导航 | `YdAnchor`、`YdBreadcrumb` | 长页面目录使用 Anchor；路由层级使用 Breadcrumb |
+| 分页信息流加载 | `YdInfiniteScroll` | 仅用于天然连续的信息流；管理数据表仍使用分页 |
+| 树节点作为字段值 | `YdTreeSelect` | 需要下拉选择组织/分类时使用；复杂勾选管理仍用 `YdTree` |
 | 本地大集合搜索单选 | `YdCombobox` | 需要输入筛选、分组或虚拟列表；可选 `allowCreate` 显示明确的“使用这个编码”候选并发出 `create(string)`；不是通用远程多选 |
 | 少量多选 | `YdCheckboxGroup` | 选项直接可见；已有多选选择器需求先核对模型与展示能力 |
 | 按层级逐级选一个值 | `YdCascader` | 省市、分类路径等；单值，`leafOnly` 决定允许选父项还是叶子 |
@@ -59,7 +69,9 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 | 历史与事件记录 | `YdTimeline` | 按已有事件顺序展示；不是可执行流程图 |
 | 关系图与知识网络 | `YdGraphCanvas`、`YdChatGraphView` | 节点/边关系；不用于替换树或工作流编辑器 |
 | 技术工作流画布 | `YdWorkflowCanvas` | 受控流程节点/连线、可类型化节点 renderer 和引擎 ref facade；VueFlow 只在共享 YD 适配内部出现 |
-| 普通等待 | `YdLoading`、`YdProgress` | 不确定时长用 loading；有可信进度用 progress |
+| 普通等待 | `YdLoading`、`YdProgress`、`YdSkeleton` | 不确定时长用 loading；有可信进度用 progress；内容结构明确但数据未到时用 skeleton |
+| 敏感页面标记 | `YdWatermark` | 使用者/时间等追溯性标记；水印不是数据访问控制或防截屏安全措施 |
+| 结果页面状态 | `YdResult`、`YdEmpty` | 任务完成/失败/权限结果用 result；无数据与无搜索结果用 empty |
 | 短反馈 | `useYdToast` | 保存成功等非阻断反馈；不能承载必须处理的失败与确认 |
 | 需要持续可见的提示 | `YdAlert` | 权限限制、配置问题、可恢复错误；与对应操作放在一起 |
 | 没有数据或结果 | `YdEmpty` | 区分初始为空、筛选无结果与加载失败；需要时给下一步动作 |
@@ -163,7 +175,7 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 
 只读、禁用、加载、错误、选中、部分选中、待确认、已取消等状态都由组件契约表达，不用页面私有 class 伪造。局部刷新使用 `YdLoadingOverlay`，保留内容尺寸与状态；默认通过 inert 锁定该容器的交互并恢复原焦点，展示型遮罩可显式关闭 `blockInteraction`。不再使用裸 `v-loading`。筛选后保留隐藏但仍有效的所选数据；所有 Long/Snowflake ID 全程为字符串。
 
-`YdResponsiveTable` 通过 `v-model:row-selection` 控制选择键集合，桌面与卡片共享同一表格状态和禁用判定。`#card` 使用 `selected`、`selectDisabled`、`toggleSelected`，不另外维护移动端选中数组；切换断点不销毁表格状态。函数式旧导入入口使用 `useYdFilePicker().open()`，必须在用户动作中调用；取消、再次打开和作用域销毁释放临时输入，目录选择保留 File 的相对路径。
+`YdResponsiveTable` / `YdResponsiveEnhancedTable` 通过 `v-model:row-selection` 控制选择键集合，桌面与卡片共享同一表格状态和禁用判定。`#card` 使用 `selected`、`selectDisabled`、`toggleSelected`，不另外维护移动端选中数组；切换断点不销毁表格状态。函数式旧导入入口使用 `useYdFilePicker().open()`，必须在用户动作中调用；取消、再次打开和作用域销毁释放临时输入，目录选择保留 File 的相对路径。
 
 ## 6. AI 与 Agent 界面
 
@@ -187,22 +199,23 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 | 类别 | 公开入口 |
 | --- | --- |
-| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer` |
-| 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction` |
-| 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate` |
-| 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup` |
-| 层级与专用选择 | `YdTree`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
+| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
+| 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction`、`YdFab`、`YdPopconfirm` |
+| 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate`、`YdColorPicker`、`YdTreeSelect` |
+| 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup`、`YdSegmented` |
+| 层级与专用选择 | `YdTree`、`YdTreeSelect`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
 | 查询与分页 | `YdSearchBar`、`YdPagination` |
-| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdDescriptions`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas` |
+| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
-| 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdTour` |
-| 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview` |
-| 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdProgress` |
-| 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdLoadingOverlay`、`YdMultiStepLoader` |
+| 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdMockupBrowser`、`YdMockupWindow`、`YdTour`、`YdPopconfirm` |
+| 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview`、`YdCropper` |
+| 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdResult`、`YdProgress`、`YdImageCaptcha` |
+| 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdLoadingOverlay`、`YdSkeleton`、`YdMultiStepLoader`、`YdCountdown` |
+| 辅助标识 | `YdWatermark` |
 | 内容工具 | `YdCode`、`YdCodePreview`、`YdCodeEditor`、`YdMarkdownEditor`、`YdPageBuilder`、`YdQrcode`、`YdStorageBox` |
-| 数字与内容运动 | `YdCountTo`、`YdAnimatedCountTo`、`YdAnimatedCountToGroup`、`YdCarousel`、`YdSmoothSwipe`、`YdMarquee`、`YdScrollingText` |
+| 数字与内容运动 | `YdCountTo`、`YdAnimatedCountTo`、`YdAnimatedCountToGroup`、`YdStat`、`YdStats`、`YdCarousel`、`YdSmoothSwipe`、`YdMarquee`、`YdScrollingText` |
 | 文本动效 | `YdBlurReveal`、`YdFlipWords`、`YdSparklesText`、`YdTextHighlight`、`YdTextShiny` |
 | 装饰与互动 | `YdAnimatedBeam`、`YdBorderBeam`、`YdFlipCard`、`YdGlowyCard`、`YdGlowyCardWrapper`、`YdGradientButton`、`YdInteractiveButton`、`YdParticlesBg`、`YdPatternBg`、`YdSpotlightCard`、`YdScratchOff` |
 | Agent 组合 | `YdAgentWorkbench`、`YdAgentContextPanel`、`YdAgentAnswer` |
@@ -211,7 +224,17 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 组合式公开入口包括 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdFilePicker`、`useYdMotion`、`useYdChat`、`useYdChatStream`、`useYdPersistentChatStream`、`clearYdPersistentChatOwner`、`provideYdChatConfig`、`useYdChatConfig`。`useIsMobile` 是现有断点能力，不为改前缀另实现重复观察器。组件与模型详细边界见 [YD 通用组件库](yd-components.md)。
 
-### 7.1 当前需先封装的能力
+- `YdFab` 用 `v-model:open` 控制开合，动作配置支持图标、标签、禁用态；扇形最多四个动作，超过改用纵向布局。Escape/外点/焦点离开收起，动作由调用方处理。
+- `YdStats` 提供指标组合布局，卡片间使用主题间距；`YdStat` 以具名插槽承载图表和动作，数字动画通过 `YdCountTo` / `YdAnimatedCountTo` 组合。它们与 `YdDigitalCard` 的带强调边框单卡视觉用途不同。
+- `YdColorPicker`、`YdTreeSelect` 的面板传送到 body，必须由共享弹层样式承载，不允许把面板样式留在会被裁切的容器里。
+- `YdImageCaptcha` 只有 `mode="remote"` 接入服务端挑战与校验并拿到一次性票据；`demo` 模式是本地绘制，禁止用于认证、防刷或风控。
+- `YdList` / `YdListRow` 只用于非表格内容行；需要字段对齐、排序、分页或批量选择时使用表格组件。
+- `YdMockupBrowser` 地址输入、前后退、刷新只更新本地 `v-model:url` 和事件；`YdMockupWindow` 的最小化/最大化/关闭通过 `v-model` 状态表达，不访问外网或操作系统窗口。
+- `YdMockupBrowser` 地址输入、前后退、刷新只更新本地 `v-model:url` 和事件；`YdMockupWindow` 的最小化/最大化/关闭通过 `v-model` 状态表达，不访问外网或操作系统窗口。
+- `YdCode` 保持高亮、复制与 `lineNumbers`；新增 `prefixes` 可为每行提供终端提示符或结果标记。
+- `YdSteps` 的 `steps` 项可提供独立 `status` 与 `icon`，否则继续按 `v-model` 和全局 `status` 推导；`YdTimeline` 支持方向、紧凑布局、可选日期、图标及自定义 marker/content 插槽。
+- `YdSettingsLayout` 默认整块内容居中限宽（`align="center"`，`widthClass` 可覆盖），宽屏为左侧吸顶分区导航 + 右侧内容；窄屏**不**退化为横向标签，而是渲染分区选择器切换分区。宿主设置类页面（系统设置、安全中心、主题配置、数据备份）统一由它承载分区；页面已有 `YdPageHeader` 时不再传 `title`/`description`，避免双标题。
+- `YdResponsiveEnhancedTable` 是 `YdEnhancedTable` 的响应式版本：窄屏按桌面可见列生成卡片，`#cell-{id}` 插槽与列的 `cell` 渲染函数在卡片中复用，可用 `cardHiddenColumns` 隐藏宽列；`actions` 支持函数 `label`（启用/停用）与行级 `visible`。管理列表的桌面表格 + 移动卡片优先使用它，需要完全自绘卡片时用 `YdResponsiveTable` 的 `#card`。
 
 下表是能力缺口，不是可用组件目录。完成封装、公开导出和验证后，再更新为实际组件名称。
 
@@ -239,7 +262,7 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 1. 明确使用场景、现有组件无法覆盖的能力与归属，优先扩展现有受控契约。
 2. 在共享组件库实现 YD 入口，封装模型、事件、插槽、实例方法、属性透传与主题弹出层；保持稳定字符串 ID。
 3. 同步根/领域导出、resolver、自动导入、公开类型和插件 SDK 的宿主共享映射，避免一处有入口另一处为 undefined。
-4. 在实时预览提供可交互示例，包含真实的空/加载/失败/禁用/选中/取消等适用状态；演示与真实执行明确区分。
+4. 在实时预览（`yudream-frontend/apps/component-showcase`）提供或更新对应示例：组件库每次新增或修改组件都必须同步预览，示例应反映当前 API、外观与交互；适用时覆盖真实的空/加载/失败/禁用/选中/取消状态。演示与真实执行明确区分。
 5. 更新本文件的选型与目录、对应 API 文档、根与前端/插件 AGENTS，以及受影响的 architecture skill / knowledge 规则。
 6. 运行组件和受影响 app 的类型检查、定向 lint、构建及必要行为测试；在三套外观、深浅、移动和插件变量覆盖下检查视觉与交互。
 
@@ -260,6 +283,6 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 - 同一任务在灵动、雅致、紧凑及明暗主题下都有可读文本、边框、焦点和状态；主题插件继承不破坏布局与功能。
 - 通用交互全部来自 YD；组件缺口先封装，不在页面重造控件或裸用第三方控件。
 - 键盘可完成选择、输入、弹层打开/关闭与任务操作；输入法组合不误发送；移动端不依赖悬停。
-- 业务列表按 768px 断点使用 `YdResponsiveTable #card`，页面不重复手写双端列表或给全出血页面增加外边距。
+- 业务列表按 768px 断点使用 `YdResponsiveEnhancedTable`（或 `YdResponsiveTable #card`）双端视图，页面不重复手写双端列表或给全出血页面增加外边距。
 - 已启用动画在所有外观中保持功能，装饰不会抢夺交互；加载、取消、失败与重试来自真实业务状态。
 - 规范、目录、组件、resolver、SDK、预览与扫描规则保持同一事实，不存在文档承诺但没有实现的组件。

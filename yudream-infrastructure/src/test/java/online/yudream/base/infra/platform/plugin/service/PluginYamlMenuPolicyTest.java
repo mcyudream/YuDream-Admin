@@ -23,18 +23,17 @@ class PluginYamlMenuPolicyTest {
     }
 
     @Test
-    void anExplicitEmptyBlockUsesTheSharedOtherCategory() {
+    void anExplicitBlockWithoutCategoryIsRejectedInsteadOfFallingBackToOther() {
         for (String menu : new String[]{"menu: {}\n", "menu:\n"}) {
-            PluginMenuPolicy policy = read(menu);
-            assertTrue(policy.categorized());
-            assertEquals("other", policy.category().code());
-            assertEquals("其他", policy.category().name());
+            assertThrows(BizException.class, () -> read(menu), menu);
         }
     }
 
     @Test
     void builtInCategoriesProvideStableCodesAndLocalizedNames() {
-        for (String[] category : new String[][]{{"mc", "MC"}, {"todo", "待办"}, {"social", "社交"}}) {
+        for (String[] category : new String[][]{
+                {"mc", "MC"}, {"todo", "待办"}, {"social", "社交"}, {"content", "内容"},
+                {"campus", "校园"}, {"client", "客户端"}, {"trade", "交易"}, {"tools", "工具"}, {"play", "娱乐"}}) {
             PluginMenuPolicy policy = read("menu:\n  category: " + category[0] + "\n");
             assertTrue(policy.categorized());
             assertEquals("plugin-category:" + category[0], policy.category().menuCode());
@@ -56,7 +55,15 @@ class PluginYamlMenuPolicyTest {
         assertEquals("知识", policy.category().name());
         assertEquals("i-ri:book-line", policy.category().icon());
         assertEquals(75, policy.category().sort());
-        assertEquals("knowledge", read("menu:\n  category: knowledge\n").category().name());
+        // 一级菜单名称上限 5 个字：名称缺省时回落分类编码，编码本身也必须放得下。
+        assertEquals("wiki", read("menu:\n  category: wiki\n").category().name());
+        assertThrows(BizException.class, () -> read("menu:\n  category: knowledge\n"));
+        assertThrows(BizException.class, () -> read("""
+                menu:
+                  category:
+                    code: knowledge
+                    name: 太长的一级菜单名字
+                """));
     }
 
     @Test

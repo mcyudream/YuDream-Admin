@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.plugin;
 
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
 import online.yudream.base.application.system.menu.service.MenuAppService;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginMenuMode;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PluginMenuCategoryProjectionTest {
@@ -79,10 +81,19 @@ class PluginMenuCategoryProjectionTest {
     @Test
     void oldDeclarationsAndExplicitIndependentExceptionsKeepTheirRootMenus() {
         project("old", PluginMenuPolicy.legacy());
-        project("independent", new PluginMenuPolicy(PluginMenuMode.INDEPENDENT, PluginMenuCategory.named("mc")));
+        project("solo", new PluginMenuPolicy(PluginMenuMode.INDEPENDENT, PluginMenuCategory.named("mc")));
         assertNull(moduleMenu("old").getParentCode());
-        assertNull(moduleMenu("independent").getParentCode());
+        assertNull(moduleMenu("solo").getParentCode());
         assertTrue(repo.findByCode("plugin-category:mc").isEmpty());
+    }
+
+    @Test
+    void independentRootMenusMustFitTheFiveCharacterRailLabel() {
+        PluginFrontendModuleInfo tooLong = new PluginFrontendModuleInfo("demo", "entry", "admin", "", "",
+                "六个字的名字", "icon", 0, List.of(route("demo", false)))
+                .withMenuPolicy(new PluginMenuPolicy(PluginMenuMode.INDEPENDENT, null));
+        BizException error = assertThrows(BizException.class, () -> service.project("demo", List.of(tooLong)));
+        assertTrue(error.getMessage().contains("5"));
     }
 
     @Test

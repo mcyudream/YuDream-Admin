@@ -2,9 +2,11 @@ package online.yudream.base.application.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginMenuMode;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMenuCategory;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuPolicy;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuSource;
@@ -182,6 +184,17 @@ public class PluginMenuProjectionService {
                 throw new BizException("插件前端模块声明不能为空");
             }
             String moduleName = requireText(module.moduleName(), "插件前端模块名称");
+            PluginMenuPolicy policy = module.menuPolicy();
+            if (policy.categorized() && policy.category() == null) {
+                throw new BizException("插件菜单分类未声明，无法归入共享分类：" + moduleName);
+            }
+            // 只有独立一级入口会占用图标栏，此时名称必须落在标签区 5 个字以内；分类内的模块名不受此限。
+            if (policy.mode() == PluginMenuMode.INDEPENDENT) {
+                String railName = StringUtils.hasText(module.menuTitle()) ? module.menuTitle().trim() : moduleName;
+                if (PluginMenuCategory.displayLength(railName) > PluginMenuCategory.MAX_NAME_LENGTH) {
+                    throw new BizException("独立一级菜单名称最多 " + PluginMenuCategory.MAX_NAME_LENGTH + " 个字：" + railName);
+                }
+            }
             String moduleKey = "module:" + moduleName;
             registerKey(registrationKeys, moduleKey);
 
