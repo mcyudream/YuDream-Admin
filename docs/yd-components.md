@@ -51,9 +51,9 @@ const name = ref('')
 
 搜索型受控多选使用 `YdMultiSelect`，`modelValue` 为 `string[]`，选项为 `{ label, value, disabled? }[]`；支持本地搜索、标签删除、`maxTagCount`、`option` / `empty` 插槽及键盘选择。文件输入控件仅需触发系统选择并接收 `File[]` 时使用 `YdFilePicker`；`directory` 会设置浏览器的 `webkitdirectory`，选择结果仍是原生 `File[]`，每个 `File.webkitRelativePath` 保留浏览器给出的目录相对路径。组合式入口 `useYdFilePicker(options?)` 提供 `open(options?)`（返回 `Promise<File[]>`）、`cancel()` 与 `dispose()`；再次 `open()` 会先以空数组结算并清理上次选择器，Vue effect scope 销毁时也会结算待处理 promise 并移除临时 input。SSR 下 `open()` 返回空数组，不访问 DOM。完整上传队列继续使用 `YdFileUpload`。
 
-`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。此入口目前仅存在于工作区，待统一发布验签后插件才能使用。
+`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。该入口已包含在验签通过的 components 1.8.1 中。
 
-`YdCodeEditor` 使用 Monaco Editor 承载 JSON、HTML、CSS 和 JavaScript 编辑，编辑器内核与各语言 worker 都按需异步加载，只有渲染该组件时才下载对应分块。主题跟随宿主明暗模式：从 `--color-bg-1`、`--color-text-1`、`--color-fill-1` 与 `--primary-6` 等根变量解析实色后写入 Monaco 主题；选区使用主色半透明背景且不覆盖文字前景色，选中文字保持语法高亮可读。可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁编辑器实例并释放补全注册与主题监听。此入口同样只存在于当前工作区。
+`YdCodeEditor` 使用 Monaco Editor 承载 JSON、HTML、CSS 和 JavaScript 编辑，编辑器内核与各语言 worker 都按需异步加载，只有渲染该组件时才下载对应分块。主题跟随宿主明暗模式：从 `--color-bg-1`、`--color-text-1`、`--color-fill-1` 与 `--primary-6` 等根变量解析实色后写入 Monaco 主题；选区使用主色半透明背景且不覆盖文字前景色，选中文字保持语法高亮可读。可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁编辑器实例并释放补全注册与主题监听。该入口已包含在验签通过的 components 1.8.1 中（Monaco 内核自 1.8.0 起替换原 CodeMirror 实现）。
 
 `YdPageBuilder` 在共享组件内部异步创建并销毁 GrapesJS。`builderProjectJson` 是首选恢复来源，缺失或无效时回退 `htmlContent` / `cssContent`；三个模型以 `update:*` 与 `change(snapshot)` 同步。受控父级回显不会重新载入项目，外部模型变更才更新编辑器。`setup(editor)` 在初始内容加载前注册业务块/类型，`upload(files)` 注入业务媒体上传并返回 `{ src, type?, name? }`；引擎选项在初始化时传入。`ready` 提供有类型的 editor facade，支持快照、加载项目、设置 HTML/CSS 和释放实例。调用 facade 的 `dispose()` 后，该 facade 的属性与所有方法均抛出 `Error`，包括 `getSnapshot()`，以免把已销毁引擎伪装成有效快照；通过组件 ref 调用 `dispose()` 后先前发出的 facade 同样失效。未完成的媒体上传仅会回调启动时对应且仍存活的编辑器实例，卸载后上传错误不会继续发出 `error` 事件。`readOnly` 与 `disabled` 冻结画布交互，但不限制宿主通过 facade 加载受控内容；`error` 报告解析、初始化与有效实例上的上传错误。CMS 主题、AI、API 与媒体权限逻辑继续留在宿主。该入口已包含在验签通过的 components 1.6.0 中。
 
@@ -448,6 +448,8 @@ const filters = ref({ keyword: '', status: 'enabled' })
 | `@yudream/components/map` 的 `YdMap` | 必须从子路径显式导入；Leaflet 是 optional peer，仅挂载时加载；调用方提供 `tileUrl` 和 `attribution`，地图瓦片服务、许可和访问密钥由调用方负责 |
 
 `YdEmpty` 默认渲染 56px 图标盒，显式传 `illustration` 或 `#illustration` 才换成插画，既有页面无需改动。状态插画只有六个命名场景，随明暗、三套外观与减少动效偏好变化，不是可换皮肤的资源库；业务需要自有画面时用 `#illustration` 插槽传自绘 SVG，并自行负责配色令牌化与暗色适配。
+
+本表入口已包含在验签通过的 components 1.8.1 与 SDK 1.12.0 中；`@yudream/components/map` 需调用方自行安装 leaflet 后从子路径导入，它不属于宿主共享桥，也不在预览站示例内。
 
 `YdInfiniteScroll` 仅用于天然连续的信息流，管理列表默认仍采用服务端分页。`YdTreeSelect` 面向表单字段，不取代权限管理的 `YdTree`。Leaflet 地图未进入主入口/resolver/插件共享桥；普通组件消费者不需要安装地图依赖。
 

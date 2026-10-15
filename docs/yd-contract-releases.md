@@ -60,3 +60,28 @@
 - 两仓基线保持 `findings: {}`，保留验收 SHA；Git 固定快照测试确认中文文件、缺少主题元数据和未提交内容不会绕过检查。规范、AGENTS、skills 与公开文档同步维护。
 
 插件迁移交付为源码及依赖同步；此轮没有发布业务插件 JAR 到市场。后续插件发布须按各模块发布流程构建、验签与上架，不能以 Web 构建通过代替部署结果。
+
+## 组件库 1.8.0 / 1.8.1 与 SDK 1.12.0（已发布与验签）
+
+源码版本为 components `1.8.0`（随后补丁 `1.8.1`）与 SDK `1.12.0`。components 发布提交 `134c9128`、SDK 修复提交 `0fd47544`、兼容性补丁提交 `6c0521f4`，三者均已推送。
+
+| 契约 | 发布版本 | 变化 | 流水线 |
+| --- | --- | --- | --- |
+| `@yudream/components` | `1.8.1` | 日期/范围/时间选择器改为 Reka 面板 + 根令牌绘制（抽出共享 picker 基础层）；`YdCodeEditor` 由 CodeMirror 换到 Monaco（内核与语言 worker 按需分块）；新增 21 个组件入口（含 `YdStateIllustration` 状态插画并接入 `YdEmpty` / `YdResult`）；新增可选地图子路径入口 `@yudream/components/map`（Leaflet optional peer，仅挂载时动态加载，不进主入口/resolver/SDK 桥）。公开组件数为 162 | [#403](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/403)；首次 `1.8.0` 为 [#400](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/400) |
+| `@yudream/plugin-sdk` | `1.12.0` | 宿主共享桥同步本轮全部新组件与状态插画入口 | [#402](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/402)，tag `psdk-1.12.0-1` |
+
+失败与重试记录：
+
+- SDK `1.12.0` 首次 tag `psdk-1.12.0` 的 [#401](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/401) 在 `publish:npm-plugin-sdk` 构建阶段失败：宿主桥重复声明 `YdList`/`YdListRow`/`YdLoading`/`YdMockupBrowser`/`YdMockupWindow`/`YdStat`/`YdStats`（TS2451），组件 `resolver.ts` 同批重复登记。修复提交 `0fd47544` 去重并在 `ci/verify-contract-packages.sh` 增加重复条目门禁，保留失败 tag，新建 `psdk-1.12.0-1`。
+- components `1.8.0`（[#400](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/400)）发布验签通过后，插件仓消费时发现两处不兼容：`useYdChatStream` 使用 `findLast`（ES2023）超出 `@vue/tsconfig/tsconfig.dom.json` 的 `lib: ES2022`；`code-editor-workers.ts` 的 `?worker` 导入要求消费者声明 `vite/client` 类型。修复提交 `6c0521f4` 改为 `filter().at(-1)`，新增 `packages/components`、`packages/dataviz` 的 `tsconfig.consumer-lib.json` 与 `ci/verify-contract-package-tarballs.sh` 的「按插件消费条件编译」门禁（含 SDK build），发布 `1.8.1`（[#403](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/403)）。`1.8.0` 保留在 Nexus 但不再作为插件消费版本。
+
+Nexus 回读完整性值：
+
+| 契约 | `dist.integrity` |
+| --- | --- |
+| components `1.8.1` | `sha512-uUY9Vmajp8yqn4nw2Xg+1LuQ9LaTnK3bQYqyopyA/iwwUwNSi7j/nqEKBjqdNdJuxcp0bIhhBqWENcaygfLpNA==` |
+| SDK `1.12.0` | `sha512-6NmieRbxKZbwkA1cMBzdFTCJr+kGQd483WTBJ7bt14j4Brpzf1Iaz6GnNNGLyXcS5zQ0xjgFOdhdAA433m2aNg==` |
+
+插件仓同步（`main`，提交 `07cdda8` 规范副本、`cb802c1` 依赖升级，均已推送）：`docs/yd-ui-guidelines.md` 副本补齐设置页布局与响应式增强表格条目；catalog/lockfile 升到 components `1.8.1` / SDK `1.12.0`；12 个 Web 插件 tsconfig 补齐 `types`（9 个 `vite/client`，3 个 `vite/client` + `node`）。下游验证：`ci/verify-plugin-repo-readiness.sh` 通过，`pnpm -r --filter=@yudream/plugin-* run build` 覆盖 33 个 Web 插件与移动端插件，0 失败。
+
+地图入口遗留：`@yudream/components/map` 需调用方自行安装 leaflet 并显式导入，瓦片服务、许可与访问密钥由调用方负责；未进入预览站示例与公开目录，使用前按组件文档核对。此轮没有发布业务插件 JAR 到市场。
