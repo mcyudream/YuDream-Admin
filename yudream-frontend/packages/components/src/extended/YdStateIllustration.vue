@@ -21,7 +21,8 @@ withDefaults(defineProps<{
     <svg viewBox="0 0 120 120" role="presentation" focusable="false">
       <g v-if="name === 'empty'">
         <path class="blob" d="M28 62 38 98h44l10-36Z" />
-        <path class="line" d="M28 62h64M28 62 18 48M92 62 102 48" />
+        <path class="blob-line" d="M28 62 38 98h44l10-36Z" />
+        <path class="line" d="M28 62 18 48M92 62 102 48" />
         <g class="float">
           <circle class="dot" cx="52" cy="44" r="3.5" />
           <circle class="dot" cx="68" cy="34" r="2.5" />
@@ -78,6 +79,7 @@ withDefaults(defineProps<{
 
       <g v-else>
         <path class="blob" d="M60 26 102 96H18Z" />
+        <path class="blob-line" d="M60 26 102 96H18Z" />
         <g class="accent">
           <g class="float">
             <path class="stroke thick" d="M60 50v20" />
@@ -114,6 +116,8 @@ withDefaults(defineProps<{
 
 .yd-state-illustration .surface {
   fill: oklch(var(--muted));
+  stroke: oklch(var(--border));
+  stroke-width: 2;
 }
 
 .yd-state-illustration .blob {
@@ -123,16 +127,23 @@ withDefaults(defineProps<{
   stroke-linejoin: round;
 }
 
+.yd-state-illustration .blob-line {
+  fill: none;
+  stroke: oklch(var(--border));
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
 .yd-state-illustration .line {
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .yd-state-illustration .dot {
-  fill: currentColor;
+  fill: currentcolor;
 }
 
 .yd-state-illustration .cut {
@@ -158,7 +169,7 @@ withDefaults(defineProps<{
 
 .yd-state-illustration .accent .stroke {
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 3.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -169,7 +180,7 @@ withDefaults(defineProps<{
 }
 
 .yd-state-illustration .accent .fill {
-  fill: currentColor;
+  fill: currentcolor;
 }
 
 .yd-state-illustration .accent .on-accent {

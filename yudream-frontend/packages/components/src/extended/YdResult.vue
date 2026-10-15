@@ -23,7 +23,7 @@ const statusIllustration: Record<YdResultStatus, YdStateIllustrationName | false
   404: 'no-result',
   500: 'error',
 }
-const iconName = computed(() => ({ success: 'morph:circle-check', info: 'morph:circle-info', warning: 'morph:triangle-alert', error: 'morph:circle-alert', 403: 'morph:shield-alert', 404: 'morph:file-question', 500: 'morph:server-crash' })[props.status])
+const iconName = computed(() => ({ success: 'morph:circle-check', info: 'morph:info', warning: 'morph:triangle-alert', error: 'morph:circle-alert', 403: 'morph:shield-alert', 404: 'morph:file-question', 500: 'morph:server-crash' })[props.status])
 const illustrationName = computed(() => props.illustration === 'auto' ? statusIllustration[props.status] : props.illustration)
 </script>
 
@@ -48,9 +48,38 @@ const illustrationName = computed(() => props.illustration === 'auto' ? statusIl
 </template>
 
 <style scoped>
-.yd-result :deep(.yd-empty-icon) { color: var(--yd-status-info); background: color-mix(in srgb, var(--yd-status-info) 10%, transparent); border-color: color-mix(in srgb, var(--yd-status-info) 35%, transparent); }
-.yd-result[data-status="success"] :deep(.yd-empty-icon) { color: var(--yd-status-success); background: color-mix(in srgb, var(--yd-status-success) 10%, transparent); border-color: color-mix(in srgb, var(--yd-status-success) 35%, transparent); }
-.yd-result[data-status="warning"] :deep(.yd-empty-icon) { color: var(--yd-status-warning); background: color-mix(in srgb, var(--yd-status-warning) 10%, transparent); border-color: color-mix(in srgb, var(--yd-status-warning) 35%, transparent); }
-.yd-result[data-status="error"] :deep(.yd-empty-icon), .yd-result[data-status="403"] :deep(.yd-empty-icon), .yd-result[data-status="404"] :deep(.yd-empty-icon), .yd-result[data-status="500"] :deep(.yd-empty-icon) { color: var(--yd-status-danger); background: color-mix(in srgb, var(--yd-status-danger) 10%, transparent); border-color: color-mix(in srgb, var(--yd-status-danger) 35%, transparent); }
-.yd-result__icon { display: block; width: 1.5rem; height: 1.5rem; background: currentColor; mask: var(--yd-result-mask, none); }
+.yd-result :deep(.yd-empty-icon) {
+  color: var(--yd-status-info);
+  background: color-mix(in srgb, var(--yd-status-info) 10%, transparent);
+  border-color: color-mix(in srgb, var(--yd-status-info) 35%, transparent);
+}
+
+.yd-result[data-status="success"] :deep(.yd-empty-icon) {
+  color: var(--yd-status-success);
+  background: color-mix(in srgb, var(--yd-status-success) 10%, transparent);
+  border-color: color-mix(in srgb, var(--yd-status-success) 35%, transparent);
+}
+
+.yd-result[data-status="warning"] :deep(.yd-empty-icon) {
+  color: var(--yd-status-warning);
+  background: color-mix(in srgb, var(--yd-status-warning) 10%, transparent);
+  border-color: color-mix(in srgb, var(--yd-status-warning) 35%, transparent);
+}
+
+.yd-result[data-status="error"] :deep(.yd-empty-icon),
+.yd-result[data-status="403"] :deep(.yd-empty-icon),
+.yd-result[data-status="404"] :deep(.yd-empty-icon),
+.yd-result[data-status="500"] :deep(.yd-empty-icon) {
+  color: var(--yd-status-danger);
+  background: color-mix(in srgb, var(--yd-status-danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--yd-status-danger) 35%, transparent);
+}
+
+.yd-result__icon {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: currentcolor;
+  mask: var(--yd-result-mask, none);
+}
 </style>

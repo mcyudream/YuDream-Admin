@@ -131,7 +131,7 @@ const resultStates = ['success', 'info', 'warning', 'error', '403', '404', '500'
   <DemoCard title="YdAlert" description="持续可见的提示：icon / title / description，variant destructive 表达风险与错误">
     <div class="gap-3 grid max-w-2xl">
       <YdAlert
-        icon="morph:circle-info"
+        icon="morph:info"
         title="平台能力未启用"
         description="当前工作区未启用备份能力，请先在「能力管理」中开启后再试。"
       />
@@ -246,13 +246,13 @@ const resultStates = ['success', 'info', 'warning', 'error', '403', '404', '500'
 }
 
 .state-tile strong {
-  color: var(--color-text-1);
   font-size: 13px;
+  color: var(--color-text-1);
 }
 
 .state-tile span {
-  color: var(--color-text-3);
   font-size: 12px;
+  color: var(--color-text-3);
 }
 
 .state-empties {
@@ -267,6 +267,9 @@ const resultStates = ['success', 'info', 'warning', 'error', '403', '404', '500'
 }
 
 .result-grid :deep(.yd-result) {
+  display: grid;
+  align-content: center;
+  min-height: 208px;
   padding: var(--yd-content-gap);
   background: var(--color-fill-1);
   border: 1px solid var(--color-border-2);

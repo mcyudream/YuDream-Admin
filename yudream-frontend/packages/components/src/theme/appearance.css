@@ -7,9 +7,12 @@
     --yd-focus-ring: color-mix(in srgb, var(--yd-emphasis) 52%, transparent);
     --yd-disabled-opacity: 0.52;
     --yd-status-info: var(--yd-emphasis);
-    --yd-status-success: rgb(var(--success-6));
-    --yd-status-warning: rgb(var(--warning-6));
-    --yd-status-danger: rgb(var(--danger-6));
+
+    /* Arco 的状态调色板声明在 body 上，:root 解析不到 rgb(var(--success-6))，整条令牌会失效；
+     * 这里自带明暗两套默认值（取自 Arco 调色板），主题插件仍可在 :root / .dark 覆盖。 */
+    --yd-status-success: rgb(0 180 42);
+    --yd-status-warning: rgb(255 125 0);
+    --yd-status-danger: rgb(245 63 63);
     --yd-surface-radius: 20px;
     --yd-control-radius: 12px;
     --yd-surface-shadow: 0 4px 20px color-mix(in srgb, var(--color-text-1) 5%, transparent);
@@ -78,6 +81,9 @@
   :where(:root.dark) {
     --yd-emphasis: color-mix(in oklab, oklch(var(--primary)) 35%, oklch(var(--foreground)));
     --yd-focus-ring: color-mix(in srgb, var(--yd-emphasis) 68%, transparent);
+    --yd-status-success: rgb(39 195 70);
+    --yd-status-warning: rgb(255 150 38);
+    --yd-status-danger: rgb(247 105 101);
   }
 }
 
