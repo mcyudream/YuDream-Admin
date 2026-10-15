@@ -37,3 +37,4 @@
 
 - SPI 2.36.0 新手引导契约（`docs/plugin-system/spi-2.36.0-guides.md` + SPI/SDK 消费）：主仓已完成本地提交，未获发布授权；待 Nexus 发布验签后同步插件仓依赖与文档。
 - `docs/yd-ui-guidelines.md` 设置页布局与响应式增强表格条目（YdSettingsLayout 居中/窄屏分区选择器、YdResponsiveEnhancedTable 卡片按 cell 渲染）：插件仓同名副本存在未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待插件仓 WIP 落定后重跑同步。
+- `docs/yd-ui-guidelines.md` 设置页保存按钮页头规范与 `YdSettingsLayout surface` 铺满白底（宿主设置页新约定）：同上，随副本 WIP 落定后一并 `pnpm sync:ui-docs`。
