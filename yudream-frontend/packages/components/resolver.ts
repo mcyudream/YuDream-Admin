@@ -220,12 +220,6 @@ const YD_COMPONENT_NAMES = [
   'YdImageCaptcha',
   'YdInfiniteScroll',
   'YdAnchor',
-  'YdList',
-  'YdListRow',
-  'YdMockupBrowser',
-  'YdMockupWindow',
-  'YdStat',
-  'YdStats',
 ] as const
 
 const COMPONENT_NAMES = [

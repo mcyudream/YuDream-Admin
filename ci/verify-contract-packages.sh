@@ -72,6 +72,12 @@ if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/np
   fail "@yudream/components must publish to Nexus npm-public"
 fi
 
+echo "[verify-contract-packages] checking component ledgers for duplicate entries"
+BRIDGE_DUPES=$(grep -oE 'export const [A-Za-z0-9_]+' yudream-frontend/packages/plugin-sdk/src/host-components.ts | sort | uniq -d | tr '\n' ' ')
+[ -z "$BRIDGE_DUPES" ] || fail "plugin-sdk host-components.ts must not declare duplicate exports (breaks SDK tsc build): $BRIDGE_DUPES"
+RESOLVER_DUPES=$(grep -oE "^[[:space:]]*'[A-Za-z0-9]+'," yudream-frontend/packages/components/resolver.ts | sort | uniq -d | tr '\n' ' ')
+[ -z "$RESOLVER_DUPES" ] || fail "components resolver must not repeat component names: $RESOLVER_DUPES"
+
 echo "[verify-contract-packages] checking @yudream/dataviz"
 grep -q '"version":[[:space:]]*"0.1.2"' yudream-frontend/packages/dataviz/package.json \
   || fail "@yudream/dataviz must use stable version 0.1.2"
