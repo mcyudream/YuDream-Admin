@@ -71,7 +71,9 @@ const capabilityIconFallbacks: Record<string, string> = {
 }
 
 function capabilityIcon(item: CapabilityItem) {
-  return item.icon || capabilityIconFallbacks[item.code] || 'morph:puzzle'
+  // 后端仍在下发 Remix 图标名，离线集合里可能缺失（如 file-eye-line）会渲染成空白，
+  // 因此有策展图标的能力优先用 Morphicons，其余仍用后端图标。
+  return capabilityIconFallbacks[item.code] || item.icon || 'morph:puzzle'
 }
 
 const groups: CapabilityGroup[] = [
@@ -775,19 +777,15 @@ function parseJsonConfig() {
                 class="capability-card"
                 :class="{ 'is-selected': selected?.code === item.code }"
                 :style="{ '--card-index': Math.min(cardIndex, 12) }"
+                :data-status="item.status"
                 :aria-pressed="selected?.code === item.code"
                 @click="selectCapability(item)"
               >
                 <span class="capability-card__icon"><YdIcon :name="capabilityIcon(item)" /></span>
                 <span class="capability-card__name">{{ item.name }}</span>
-                <span class="capability-card__status">
-                  <i class="capability-card__dot" :class="{ 'is-live': item.status === 'ENABLED' }" />
-                  <YdTag :variant="statusVariant(item.status)">
-                    {{ statusText(item.status) }}
-                  </YdTag>
-                </span>
-                <span class="capability-card__description" :title="item.description">{{ item.description || '暂无说明' }}</span>
                 <span class="capability-card__meta">{{ typeText(item.type) }} · {{ item.code }}</span>
+                <span class="capability-card__description" :title="item.description">{{ item.description || '暂无说明' }}</span>
+                <span class="capability-card__state">{{ statusText(item.status) }}</span>
                 <YdIcon name="morph:chevron-right" class="capability-card__chevron" />
               </YdAction>
             </div>
@@ -1067,7 +1065,7 @@ function parseJsonConfig() {
 .status-chip.is-active { border-color:var(--color-text-2); background:var(--color-fill-2); color:var(--color-text-1); }
 .status-chip strong { color:var(--color-text-1); font-size:12px; font-weight:650; font-variant-numeric:tabular-nums; }
 .status-chip__dot { width:7px; height:7px; flex:none; border-radius:50%; background:currentColor; color:var(--color-text-3); opacity:.5; }
-.status-chip[data-tone='ok'] .status-chip__dot { color:var(--yd-emphasis, var(--color-text-1)); opacity:1; animation:capability-pulse 2.4s ease-in-out infinite; }
+.status-chip[data-tone='ok'] .status-chip__dot { color:var(--yd-emphasis, var(--color-text-1)); opacity:1; }
 .status-chip[data-tone='bad'] .status-chip__dot { color:var(--color-danger-6); opacity:1; }
 /* 比例条贴在状态条底部：视觉保留，高度为零 */
 .status-ratio { position:absolute; right:0; bottom:0; left:0; height:3px; }
@@ -1080,28 +1078,33 @@ function parseJsonConfig() {
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
 .capability-catalog { container-type:inline-size; display:grid; gap:6px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
-/* 目录卡片：窄栏两行排布（名称+状态 / 描述），宽栏才追加归类与箭头，标签永不挤压名称 */
-.capability-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:'icon name status' 'icon desc desc'; column-gap:10px; row-gap:3px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-radius:10px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 24ms); }
-.capability-card:hover { transform:translateY(-2px); border-color:var(--color-border-3); background:var(--color-fill-1); box-shadow:0 6px 18px -12px oklch(0 0 0 / 45%); }
+/* 目录卡片：左侧色条代表状态，第二行末尾用同色文字声明状态；窄栏两行、宽栏追加归类 */
+.capability-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:'icon name name' 'icon desc state'; column-gap:10px; row-gap:3px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-left-width:3px; border-radius:10px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 24ms); }
+.capability-card:hover { transform:translateY(-2px); background:var(--color-fill-1); box-shadow:0 6px 18px -12px oklch(0 0 0 / 45%); }
 .capability-card:hover .capability-card__icon { transform:scale(1.06) rotate(-2deg); }
-.capability-card.is-selected { border-color:var(--color-border-3); background:var(--color-fill-1); box-shadow:inset 3px 0 var(--color-border-3); }
+.capability-card.is-selected { background:var(--color-fill-2); border-color:var(--color-text-3); }
 .capability-card__icon { display:grid; grid-area:icon; width:30px; height:30px; place-items:center; border-radius:9px; background:var(--color-fill-2); color:var(--color-text-2); font-size:16px; transition:transform .18s cubic-bezier(.32,.72,0,1); }
 .capability-card__name { grid-area:name; overflow:hidden; font-size:14px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
-.capability-card__status { display:inline-flex; grid-area:status; flex:none; align-items:center; gap:6px; white-space:nowrap; }
-.capability-card__status :deep(.yd-tag), .capability-card__status :deep(span) { white-space:nowrap; }
 .capability-card__description { grid-area:desc; overflow:hidden; color:var(--color-text-3); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.capability-card__state { grid-area:state; font-size:11.5px; white-space:nowrap; }
 .capability-card__meta { display:none; color:var(--color-text-3); font-size:11px; white-space:nowrap; }
 .capability-card__chevron { display:none; color:var(--color-text-3); }
-.capability-card__dot { width:7px; height:7px; flex:none; border-radius:50%; background:currentColor; color:var(--color-text-3); opacity:.45; }
-.capability-card__dot.is-live { color:var(--yd-emphasis, var(--color-text-1)); opacity:1; animation:capability-pulse 2.4s ease-in-out infinite; }
-@keyframes capability-card-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-@keyframes capability-pulse { 0%,100% { box-shadow:0 0 0 0 currentColor; opacity:1; } 50% { box-shadow:0 0 0 4px transparent; opacity:.6; } }
 
-/* 容器够宽才展示归类与右箭头，避免窄栏挤压 */
+/* 状态即卡片配色：运行中用强调色，未启用走中性弱化，异常用危险色并轻微染色 */
+.capability-card[data-status='ENABLED'] { border-left-color:var(--yd-emphasis, var(--color-text-1)); }
+.capability-card[data-status='ENABLED'] .capability-card__state { color:var(--yd-emphasis, var(--color-text-1)); }
+.capability-card[data-status='DISABLED'] { border-left-color:var(--color-border-3); }
+.capability-card[data-status='DISABLED'] .capability-card__state { color:var(--color-text-3); }
+.capability-card[data-status='DISABLED'] .capability-card__icon { opacity:.72; }
+.capability-card[data-status='ERROR'] { border-left-color:var(--color-danger-6); background:color-mix(in oklab, var(--color-danger-6) 6%, var(--color-bg-1)); }
+.capability-card[data-status='ERROR'] .capability-card__state { color:var(--color-danger-6); font-weight:600; }
+@keyframes capability-card-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+/* 容器够宽才追加归类与右箭头，窄栏保持两行不挤压 */
 @container (min-width: 400px) {
-  .capability-card { grid-template-columns:auto minmax(0,1fr) auto auto auto; grid-template-areas:'icon name status meta chevron' 'icon desc desc desc desc'; }
+  .capability-card { grid-template-columns:auto minmax(0,1fr) auto auto; grid-template-areas:'icon name meta chevron' 'icon desc state chevron'; }
   .capability-card__meta { display:block; grid-area:meta; }
-  .capability-card__chevron { display:block; grid-area:chevron; transition:transform .18s cubic-bezier(.32,.72,0,1); }
+  .capability-card__chevron { display:block; grid-area:chevron; align-self:center; transition:transform .18s cubic-bezier(.32,.72,0,1); }
   .capability-card:hover .capability-card__chevron { transform:translateX(3px); color:var(--color-text-1); }
 }
 /* align-content:start：grid 默认会把行拉伸填满容器，短内容会被撑出大片空白。 */
