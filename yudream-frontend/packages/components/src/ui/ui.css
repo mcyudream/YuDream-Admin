@@ -143,45 +143,59 @@
   cursor: default;
 }
 
-/* 列表页工具栏：统一搜索限宽、状态计数筛选与两端对齐操作区，避免各页各写一套 */
+/* 列表页工具栏：标题与 tab 独立成行，筛选与表格列控件同属一行等宽网格 */
 .yd-list-toolbar {
   display: flex;
   flex-direction: column;
-  gap: var(--yd-content-gap, 16px);
+  gap: 12px;
   min-width: 0;
+}
+
+.yd-list-toolbar__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.yd-list-toolbar__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+  color: var(--color-text-1);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.yd-list-toolbar__views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .yd-list-toolbar__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
   align-items: center;
-  justify-content: space-between;
   min-width: 0;
 }
 
-.yd-list-toolbar__filters {
+.yd-list-toolbar__search-wrap {
   display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
   min-width: 0;
 }
 
 .yd-list-toolbar__actions {
   display: flex;
-  flex: none;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.yd-list-toolbar__search-wrap {
-  display: flex;
-  flex: 1 1 200px;
-  min-width: 140px;
-  max-width: 320px;
+  justify-content: flex-end;
 }
 
 .yd-list-toolbar__status {
@@ -274,6 +288,16 @@
 
 .yd-list-toolbar__ratio > span[data-tone='bad'] {
   background: var(--color-danger-6);
+}
+
+@media (max-width: 768px) {
+  .yd-list-toolbar__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yd-list-toolbar__actions {
+    justify-content: flex-start;
+  }
 }
 
 @keyframes yd-list-toolbar-pulse {

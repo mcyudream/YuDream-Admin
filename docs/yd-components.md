@@ -445,13 +445,13 @@ const filters = ref({ keyword: '', status: 'enabled' })
 | `YdImageCaptcha` | `mode=demo/remote`；demo 沿用 `length`、`noise`、`caseSensitive` 本地绘制。remote 需 `requestChallenge()` 返回 `{ id, image, expiresAt? }`、`verifyChallenge({ challengeId, code })` 返回 `{ valid, token? }`，组件负责加载/刷新/失败重试并向 `verify` 发出完整结果；ref 提供 `verify()` / `refresh()`。只有 remote 模式连接服务端签发的一次性票据，demo 仅为界面演示 |
 | `YdInfiniteScroll` | 默认槽为列表内容；`load`、`hasMore`、`distance`、`root`、`immediate`；v-model loading/finished；错误可重试，ref 提供 reset/check |
 | `YdAnchor` | `items:{id,title,disabled?}[]`、`container`、`offset`、`smooth`；v-model:active，滚动 spy 与真实片段链接，ref 提供 scrollTo/refresh |
-| `YdListToolbar` | 管理列表页统一工具栏：`v-model:keyword`（内置搜索，`placeholder`、`searchWidth` 默认 320）、`v-model:status` + `statusItems:{value,label,count?,tone?}[]`（计数即筛选的胶囊行，`statusRatio` 默认开启只读比例条）；`#search`/`#filters`/`#actions` 插槽；`search`/`clear` 事件 |
+| `YdListToolbar` | 管理列表页标准筛选区：`title` 与 `#views`（tab）独立成行、左标题右 tab；筛选行是等宽网格 `repeat(auto-fit,minmax(200px,1fr))`，`v-model:keyword`（内置搜索）、`#filters`（下拉筛选）、`#actions`（重置/筛选/表格列控件）；`v-model:status` + `statusItems:{value,label,count?,tone?}[]` 可选计数即筛选胶囊行；`search`/`clear` 事件；**不提供刷新按钮** |
 | `YdFilterSelect` | 宽度受控的 YD 选择器：`width`（默认 168）、`minWidth`（默认 132）以及 `options`/`placeholder`/`multiple`/`allowSearch`/`disabled`；用于筛选区，避免页面为 YdSelect 写 `:deep()` 限宽 |
 | `@yudream/components/map` 的 `YdMap` | 必须从子路径显式导入；Leaflet 是 optional peer，仅挂载时加载；调用方提供 `tileUrl` 和 `attribution`，地图瓦片服务、许可和访问密钥由调用方负责 |
 
 `YdEmpty` 默认渲染 56px 图标盒，显式传 `illustration` 或 `#illustration` 才换成插画，既有页面无需改动。状态插画只有六个命名场景，随明暗、三套外观与减少动效偏好变化，不是可换皮肤的资源库；业务需要自有画面时用 `#illustration` 插槽传自绘 SVG，并自行负责配色令牌化与暗色适配。
 
-`YdListToolbar` 与 `YdFilterSelect` 是列表页筛选区的统一入口：页面不再自建搜索框、状态计数胶囊与选择器限宽。搜索框由组件限宽（默认 320px，窄容器按可用宽度收缩），因此**禁止**在页面里用 `flex-1`/`w-full` 让搜索框铺满整行；状态计数一律通过 `statusItems` 传入，不要在页面重写一套胶囊。`YdFilterSelect` 的宽度以属性传入（落在内部触发器上），页面**不要**再对 YdSelect 写 scoped 限宽规则——FaSelect 用 `inheritAttrs:false` 把 class 摊到内部 trigger，页面作用域选择器不会命中，是静默失效的死样式。
+`YdListToolbar` 与 `YdFilterSelect` 是列表页筛选区的统一入口，版式即规范：**第一行**放列表标题（左）与视图切换 tab（右），**第二行**把搜索、各筛选控件、操作按钮与表格列控件排成同一行等宽网格，**表格页不设刷新按钮**（查询由「筛选」触发）。状态计数一律通过 `statusItems` 传入，不在页面重写胶囊；页面**禁止**自建搜索框、给搜索框写 `flex-1`/`w-full` 铺满整行、或另起一行放筛选。`YdFilterSelect` 的宽度以属性传入（内联落在内部触发器上），页面**不要**再对 YdSelect 写 scoped 限宽规则——FaSelect 用 `inheritAttrs:false` 把 class 摊到内部 trigger，页面作用域选择器不会命中，是静默失效的死样式。
 
 本表入口已包含在验签通过的 components 1.8.1 与 SDK 1.12.0 中；`@yudream/components/map` 需调用方自行安装 leaflet 后从子路径导入，它不属于宿主共享桥，也不在预览站示例内。
 
