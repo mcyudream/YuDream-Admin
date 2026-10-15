@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { DeptManageItem, DeptPayload, DeptStatus } from '@/api/modules/system-dept'
 import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
 import apiDept from '@/api/modules/system-dept'
-import apiUser from '@/api/modules/system-user'
 import apiExcel from '@/api/modules/system-excel'
+import apiUser from '@/api/modules/system-user'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -12,7 +12,7 @@ const toast = useYdToast()
 
 const loading = ref(false)
 const rows = ref<DeptManageItem[]>([])
-const search = reactive<{ keyword: string; status?: DeptStatus }>({ keyword: '' })
+const search = reactive<{ keyword: string, status?: DeptStatus }>({ keyword: '' })
 const formVisible = ref(false)
 const editing = ref<DeptManageItem | null>(null)
 
@@ -62,15 +62,35 @@ const sortOrderValue = computed({
     form.sortOrder = value
   },
 })
+const { auth } = useAppAuth()
+
+const deptUserColumn: UserColumn<DeptManageItem> = { nameKey: 'name', emailKey: 'leaderName', header: '部门', width: 240 }
+
+const deptStatusColumn: StatusColumn<DeptManageItem> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    ACTIVE: { label: '启用', variant: 'default' },
+    DEPRECATED: { label: '停用', variant: 'secondary' },
+  },
+}
+
+/** 行操作统一收进下拉 */
+const deptActions: ActionMenuItem<DeptManageItem>[] = [
+  { label: '新建子部门', icon: 'morph:folder-plus', visible: () => auth('system:dept:create'), onClick: openCreate },
+  { label: '编辑', icon: 'morph:pencil', visible: () => auth('system:dept:edit'), onClick: openEdit },
+  { label: '启用', icon: 'morph:circle-check', visible: row => row.status === 'DEPRECATED' && auth('system:dept:edit'), onClick: confirmEnable },
+  { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status === 'ACTIVE' && auth('system:dept:delete'), disabled: row => Boolean(row.systemDept), onClick: confirmDisable },
+]
+
 const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { accessorKey: 'name', header: '部门名称', width: 220, fixed: 'left' },
   { accessorKey: 'leaderName', header: '负责人', width: 140 },
   { accessorKey: 'phone', header: '电话', width: 140 },
   { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center' },
   { id: 'systemDept', header: '类型', width: 110, align: 'center' },
-  { id: 'status', header: '状态', width: 90, align: 'center' },
   { accessorKey: 'description', header: '描述', minWidth: 220 },
-  { id: 'operation', header: '操作', width: 240, align: 'center', fixed: 'right' },
 ])
 
 onMounted(loadTree)
@@ -207,127 +227,49 @@ function importDepts() {
     </YdPageHeader>
 
     <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1120px]"
-        column-visibility
-        border
-        stripe
-        tree
-        :default-expanded="true"
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <YdInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
-              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-              <div class="flex gap-2 col-end--1 justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  重置
-                </YdButton>
-                <YdButton @click="loadTree">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-systemDept="{ row }">
-          <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
-            {{ row.original.systemDept ? '系统部门' : '普通部门' }}
-          </YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
-            {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </YdTag>
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="flex-center gap-2">
-            <YdButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row.original)">
-              子部门
-            </YdButton>
-            <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
-              编辑
-            </YdButton>
-            <YdButton
-              v-if="row.original.status === 'DEPRECATED'"
-              v-auth="'system:dept:edit'"
-              variant="outline"
-              size="sm"
-              @click="confirmEnable(row.original)"
-            >
-              启用
-            </YdButton>
-            <YdButton
-              v-if="row.original.status === 'ACTIVE'"
-              v-auth="'system:dept:delete'"
-              variant="destructive"
-              size="sm"
-              :disabled="row.original.systemDept"
-              @click="confirmDisable(row.original)"
-            >
-              停用
-            </YdButton>
-          </div>
-        </template>
+      <YdLoadingOverlay :loading="loading">
+        <YdResponsiveEnhancedTable
+          table-root-class="rounded-lg overflow-hidden"
+          table-class="min-w-[1120px]"
 
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <div class="flex gap-1">
-                  <YdTag :variant="row.systemDept ? 'default' : 'secondary'">
-                    {{ row.systemDept ? '系统部门' : '普通部门' }}
-                  </YdTag>
-                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
-                    {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </YdTag>
+          column-visibility tree
+          :default-expanded="true"
+          :user-column="deptUserColumn"
+          :status-column="deptStatusColumn"
+          :actions="deptActions"
+          :card-hidden-columns="['systemDept', 'phone']"
+          :columns="tableColumns"
+          :data="rows"
+        >
+          <template #toolbar>
+            <YdSearchBar class="w-full">
+              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+                <YdInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
+                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+                <div class="flex gap-2 col-end--1 justify-end">
+                  <YdButton variant="outline" @click="resetSearch">
+                    重置
+                  </YdButton>
+                  <YdButton @click="loadTree">
+                    <YdIcon name="morph:search" />
+                    筛选
+                  </YdButton>
                 </div>
               </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div v-if="row.leaderName" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">负责人</span>
-                  <span>{{ row.leaderName }}</span>
-                </div>
-                <div v-if="row.phone" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">电话</span>
-                  <span>{{ row.phone }}</span>
-                </div>
-                <div v-if="row.description" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">描述</span>
-                  <span class="break-all">{{ row.description }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'system:dept:create'" variant="outline" size="sm" @click="openCreate(row)">
-                  子部门
-                </YdButton>
-                <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" @click="openEdit(row)">
-                  编辑
-                </YdButton>
-                <YdButton v-if="row.status === 'DEPRECATED'" v-auth="'system:dept:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
-                  启用
-                </YdButton>
-                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:dept:delete'" variant="destructive" size="sm" :disabled="row.systemDept" @click="confirmDisable(row)">
-                  停用
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+            </YdSearchBar>
+          </template>
+          <template #cell-systemDept="{ row }">
+            <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
+              {{ row.original.systemDept ? '系统部门' : '普通部门' }}
+            </YdTag>
+          </template>
+        </ydresponsiveenhancedtable>
+      </ydloadingoverlay>
     </YdPageMain>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑部门' : '新增部门'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
-        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
           <div>
             <YdFormItem label="部门名称" required>
               <YdInput v-model="form.name" class="w-full" />

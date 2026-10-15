@@ -180,113 +180,104 @@ async function save() {
     saving.value = false
   }
 }
+/** 保存由设置页页头统一触发 */
+defineExpose({ save })
 </script>
 
 <template>
-  <YdLoadingOverlay :loading="loading"><div  class="mt-6 space-y-6">
-    <div>
-      <YdDivider>
-        集成配置
-      </YdDivider>
-      <p class="text-xs text-muted-foreground">
-        邮件与对象存储运行时配置：保存后立即生效，密码与密钥加密存储且永不回显。
-      </p>
-    </div>
-
-    <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
-      <div>
-        <div class="mb-2 flex items-center font-medium">
-          邮件服务（SMTP）
-          <YdTag :variant="mail.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
-            {{ mail.source === 'custom' ? '已入库' : '环境变量兜底' }}
-          </YdTag>
-        </div>
-        <YdForm :model="mail" layout="vertical" class="space-y-0">
-        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <YdFormItem label="SMTP 主机" required>
-            <YdInput v-model="mail.host" class="w-full" placeholder="smtp.example.com" />
-          </YdFormItem>
-          <YdFormItem label="端口">
-            <YdInput v-model="mail.port" type="number" class="w-full" placeholder="465" />
-          </YdFormItem>
-          <YdFormItem label="账号">
-            <YdInput v-model="mail.username" class="w-full" placeholder="发件邮箱账号" />
-          </YdFormItem>
-          <YdFormItem label="密码" :extra="mail.passwordSet ? '已设置；留空保持不变' : '未设置'">
-            <YdInput v-model="mail.password" type="password" class="w-full" placeholder="留空保持不变" />
-          </YdFormItem>
-          <YdFormItem label="发件人">
-            <YdInput v-model="mail.from" class="w-full" placeholder="留空默认使用账号" />
-          </YdFormItem>
-          <YdFormItem label="加密方式">
-            <YdSelect
-              v-model="mailEncryptionOption"
-              :options="[{ label: 'SSL（465 常用）', value: 'ssl' }, { label: 'STARTTLS（587 常用）', value: 'starttls' }]"
-              class="w-full"
-            />
-          </YdFormItem>
-        </div>
-        <YdFormItem label="测试收件地址">
-          <div class="flex w-full items-center gap-2">
-            <YdInput v-model="mailTestTo" class="min-w-0 flex-1" placeholder="接收测试邮件的地址" />
-            <YdButton variant="outline" :loading="testingMail" @click="testMail">
-              <YdIcon name="morph:send" />
-              发送测试邮件
-            </YdButton>
+  <YdLoadingOverlay :loading="loading">
+    <YdSettingsSection
+      title="集成配置"
+      description="邮件与对象存储运行时配置：保存后立即生效，密码与密钥加密存储且永不回显。"
+    >
+      <div class="flex flex-col gap-6">
+        <div>
+          <div class="font-medium mb-2 flex items-center">
+            邮件服务（SMTP）
+            <YdTag :variant="mail.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
+              {{ mail.source === 'custom' ? '已入库' : '环境变量兜底' }}
+            </YdTag>
           </div>
-        </YdFormItem>
-        <p v-if="mailTestResult" class="text-xs" :class="mailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
-          {{ mailTestResult.message }}
-        </p>
-        </YdForm>
-      </div>
+          <YdForm :model="mail" layout="vertical" class="space-y-0">
+            <div class="flex flex-col gap-4 max-w-xl">
+              <YdFormItem label="SMTP 主机" required>
+                <YdInput v-model="mail.host" class="w-full" placeholder="smtp.example.com" />
+              </YdFormItem>
+              <YdFormItem label="端口">
+                <YdInput v-model="mail.port" type="number" class="w-full" placeholder="465" />
+              </YdFormItem>
+              <YdFormItem label="账号">
+                <YdInput v-model="mail.username" class="w-full" placeholder="发件邮箱账号" />
+              </YdFormItem>
+              <YdFormItem label="密码" :extra="mail.passwordSet ? '已设置；留空保持不变' : '未设置'">
+                <YdInput v-model="mail.password" type="password" class="w-full" placeholder="留空保持不变" />
+              </YdFormItem>
+              <YdFormItem label="发件人">
+                <YdInput v-model="mail.from" class="w-full" placeholder="留空默认使用账号" />
+              </YdFormItem>
+              <YdFormItem label="加密方式">
+                <YdSelect
+                  v-model="mailEncryptionOption"
+                  :options="[{ label: 'SSL（465 常用）', value: 'ssl' }, { label: 'STARTTLS（587 常用）', value: 'starttls' }]"
+                  class="w-full"
+                />
+              </YdFormItem>
+            </div>
+            <YdFormItem label="测试收件地址">
+              <div class="flex gap-2 w-full items-center">
+                <YdInput v-model="mailTestTo" class="flex-1 min-w-0" placeholder="接收测试邮件的地址" />
+                <YdButton variant="outline" :loading="testingMail" @click="testMail">
+                  <YdIcon name="morph:send" />
+                  发送测试邮件
+                </YdButton>
+              </div>
+            </YdFormItem>
+            <p v-if="mailTestResult" class="text-xs" :class="mailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
+              {{ mailTestResult.message }}
+            </p>
+          </YdForm>
+        </div>
 
-      <div>
-        <div class="mb-2 flex items-center font-medium">
-          对象存储（S3 兼容）
-          <YdTag :variant="storage.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
-            {{ storage.source === 'custom' ? '已入库' : '环境变量兜底' }}
-          </YdTag>
-        </div>
-        <YdForm :model="storage" layout="vertical" class="space-y-0">
-        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <YdFormItem label="Endpoint" required class="md:col-span-2">
-            <YdInput v-model="storage.endpoint" class="w-full" placeholder="http://localhost:9000" />
-          </YdFormItem>
-          <YdFormItem label="AccessKey">
-            <YdInput v-model="storage.accessKey" class="w-full" />
-          </YdFormItem>
-          <YdFormItem label="SecretKey" :extra="storage.secretKeySet ? '已设置；留空保持不变' : '未设置'">
-            <YdInput v-model="storage.secretKey" type="password" class="w-full" placeholder="留空保持不变" />
-          </YdFormItem>
-          <YdFormItem label="Bucket">
-            <YdInput v-model="storage.bucket" class="w-full" placeholder="yudream-admin" />
-          </YdFormItem>
-          <YdFormItem label="Region">
-            <YdInput v-model="storage.region" class="w-full" placeholder="us-east-1" />
-          </YdFormItem>
-        </div>
-        <YdFormItem label="Path-Style 访问">
-          <div class="flex w-full items-center justify-between gap-2">
-            <YdSwitch v-model="storage.pathStyle" />
-            <YdButton variant="outline" :loading="testingStorage" @click="testStorage">
-              <YdIcon name="morph:plug" />
-              测试连接
-            </YdButton>
+        <div>
+          <div class="font-medium mb-2 flex items-center">
+            对象存储（S3 兼容）
+            <YdTag :variant="storage.source === 'custom' ? 'default' : 'secondary'" class="ms-2">
+              {{ storage.source === 'custom' ? '已入库' : '环境变量兜底' }}
+            </YdTag>
           </div>
-        </YdFormItem>
-        <p v-if="storageTestResult" class="text-xs" :class="storageTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
-          {{ storageTestResult.message }}
-        </p>
-        </YdForm>
+          <YdForm :model="storage" layout="vertical" class="space-y-0">
+            <div class="flex flex-col gap-4 max-w-xl">
+              <YdFormItem label="Endpoint" required>
+                <YdInput v-model="storage.endpoint" class="w-full" placeholder="http://localhost:9000" />
+              </YdFormItem>
+              <YdFormItem label="AccessKey">
+                <YdInput v-model="storage.accessKey" class="w-full" />
+              </YdFormItem>
+              <YdFormItem label="SecretKey" :extra="storage.secretKeySet ? '已设置；留空保持不变' : '未设置'">
+                <YdInput v-model="storage.secretKey" type="password" class="w-full" placeholder="留空保持不变" />
+              </YdFormItem>
+              <YdFormItem label="Bucket">
+                <YdInput v-model="storage.bucket" class="w-full" placeholder="yudream-admin" />
+              </YdFormItem>
+              <YdFormItem label="Region">
+                <YdInput v-model="storage.region" class="w-full" placeholder="us-east-1" />
+              </YdFormItem>
+            </div>
+            <YdFormItem label="Path-Style 访问">
+              <div class="flex gap-2 w-full items-center justify-between">
+                <YdSwitch v-model="storage.pathStyle" />
+                <YdButton variant="outline" :loading="testingStorage" @click="testStorage">
+                  <YdIcon name="morph:plug" />
+                  测试连接
+                </YdButton>
+              </div>
+            </YdFormItem>
+            <p v-if="storageTestResult" class="text-xs" :class="storageTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
+              {{ storageTestResult.message }}
+            </p>
+          </YdForm>
+        </div>
       </div>
-    </div>
-
-    <div class="flex justify-end">
-      <YdButton v-auth="'system:setting:edit'" :loading="saving" @click="save">
-        <YdIcon name="morph:save" />
-        保存集成配置
-      </YdButton>
-    </div>
-  </div></YdLoadingOverlay>
+    </YdSettingsSection>
+  </YdLoadingOverlay>
 </template>

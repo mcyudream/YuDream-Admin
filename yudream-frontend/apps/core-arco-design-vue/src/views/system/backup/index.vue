@@ -760,427 +760,423 @@ function formatArchiveTime(millis?: number) {
 </script>
 
 <template>
-  <div>
+  <div class="bg-card min-h-full">
     <YdPageHeader title="数据备份" class="mb-0">
       <template #description>
         全量导出系统与插件数据为可迁移归档，按合并策略无损导入；支持 FTP/FTPS/WebDAV 异地定时备份与恢复。
       </template>
+      <YdButton v-if="activeTab === 'export'" v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
+        <YdIcon name="morph:save" />
+        立即执行备份
+      </YdButton>
     </YdPageHeader>
-    <YdPageMain>
-      <YdSettingsLayout v-model="activeTab" :list="tabList" width-class="max-w-5xl">
-        <template #export>
-          <YdSettingsSection
-            title="全量导出"
-            description="将所选范围打包为 ZIP 归档（Mongo 集合 EJSON + 对象存储 + 插件数据），可在本页下载或用于迁移导入。"
-          >
-            <YdFormItem label="导出范围">
-              <YdCheckboxGroup v-model="exportScopes" :options="scopeCheckOptions" />
-            </YdFormItem>
-            <YdFormItem label="执行方式" extra="选异地目标即「立即执行备份」：归档生成后当场推送，无需计划。">
-              <YdSelect v-model="exportTargetCode" :options="exportTargetOptions" class="max-w-sm" />
-            </YdFormItem>
-            <template #footer>
-              <YdButton v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
-                <YdIcon name="morph:save" />
-                立即执行备份
-              </YdButton>
-            </template>
-          </YdSettingsSection>
-
-          <YdSettingsSection
-            title="合并导入"
-            description="上传本系统导出的备份归档，先分析重复与缺失，再按管理员选择的「以哪边为准」策略无损合并。任一端独有数据始终保留。"
-          >
-            <YdFilePicker ref="importInputRef" accept=".zip" label="选择备份归档" class="hidden" @select="onImportFile">
-              <template #default />
-            </YdFilePicker>
-            <YdButton v-auth="'system:backup:import'" variant="outline" :loading="importing" @click="pickImportFile">
-              <YdIcon name="morph:cloud-upload" />
-              选择备份归档并分析
-            </YdButton>
-            <template v-if="importing">
-              <YdProgress :model-value="importingProgress ?? 0" />
-              <div class="text-xs text-secondary-foreground/60">
-                分片上传中 {{ importingProgress ?? 0 }}%（8MB/片，服务端合并后分析）
-              </div>
-            </template>
-            <YdAlert
-              icon="morph:info"
-              title="跨主机导入提示"
-              description="若源站主密钥（YUDREAM_CREDENTIAL_KEY）不同，归档中加密存储的凭据需导入后重新配置。"
-            />
-          </YdSettingsSection>
-        </template>
-
-        <template #jobs>
-          <YdSettingsSection
-            title="任务记录"
-            description="导出、导入与计划执行的历史记录；执行中的任务每 3 秒自动刷新。"
-          >
-            <YdProgress v-if="jobsLoading" :model-value="100" />
-            <YdResponsiveEnhancedTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1180px]"
-              :actions="jobActions"
-              :card-hidden-columns="['counts', 'targetName']"
-              :columns="jobColumns"
-              :data="jobs"
-            >
-              <template #toolbar>
-                <div class="flex justify-end">
-                  <YdButton variant="outline" size="sm" :loading="jobsLoading" @click="loadJobs()">
-                    <YdIcon name="morph:refresh-cw" />
-                    刷新
-                  </YdButton>
-                </div>
-              </template>
-              <template #cell-type="{ row }">
-                <YdTag variant="secondary">
-                  {{ jobTypeText(row.original) }}
-                </YdTag>
-              </template>
-              <template #cell-scopeTags="{ row }">
-                <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
-              </template>
-              <template #cell-status="{ row }">
-                <div class="flex flex-col gap-1 items-start">
-                  <YdTag :variant="jobStatusVariant(row.original)">
-                    {{ jobStatusText(row.original) }}
-                  </YdTag>
-                  <YdProgress
-                    v-if="row.original.status === 'RUNNING' || row.original.status === 'QUEUED'"
-                    :model-value="row.original.percent || 0"
-                    class="h-1 self-stretch"
-                  />
-                  <!-- td 自带 whitespace-nowrap，提示必须显式截断，否则会横穿右侧列 -->
-                  <span v-if="row.original.message" class="text-xs text-secondary-foreground/60 max-w-[154px] truncate" :title="row.original.message">
-                    {{ row.original.message }}
-                  </span>
-                </div>
-              </template>
-              <template #cell-archiveSize="{ row }">
-                {{ formatSize(row.original.archiveSize) }}
-              </template>
-              <template #cell-targetName="{ row }">
-                {{ row.original.targetName || '—' }}
-              </template>
-              <template #cell-counts="{ row }">
-                <span class="text-xs">{{ jobCountsText(row.original) }}</span>
-              </template>
-            </YdResponsiveEnhancedTable>
-          </YdSettingsSection>
-        </template>
-
-        <template #targets>
-          <YdSettingsSection
-            title="异地目标"
-            description="FTP/FTPS/WebDAV 目标，归档生成后可直接推送；密码经主密钥加密存储，仅需连通即可使用。"
-          >
-            <YdProgress v-if="targetsLoading" :model-value="100" />
-            <YdResponsiveEnhancedTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1080px]"
-              :user-column="targetUserColumn"
-              :status-column="targetStatusColumn"
-              :actions="targetActions"
-              :card-hidden-columns="['username']"
-              :columns="targetColumns"
-              :data="targets"
-            >
-              <template #toolbar>
-                <div class="flex justify-end">
-                  <YdButton v-auth="'system:backup:config'" @click="openTargetForm()">
-                    <YdIcon name="morph:plus" />
-                    添加目标
-                  </YdButton>
-                </div>
-              </template>
-              <template #cell-type="{ row }">
-                <YdTag variant="secondary">
-                  {{ row.original.type }}
-                </YdTag>
-              </template>
-              <template #cell-endpoint="{ row }">
-                <span class="text-sm break-all">{{ targetEndpoint(row.original) }}</span>
-              </template>
-            </YdResponsiveEnhancedTable>
-          </YdSettingsSection>
-        </template>
-
-        <template #plans>
-          <YdSettingsSection
-            title="备份计划"
-            description="cron 为 6 位 Spring 表达式（秒 分 时 日 月 周），如每天 3 点：0 0 3 * * *。"
-          >
-            <YdProgress v-if="plansLoading" :model-value="100" />
-            <YdResponsiveEnhancedTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1180px]"
-              :user-column="planUserColumn"
-              :status-column="planStatusColumn"
-              :actions="planActions"
-              :card-hidden-columns="['retentionCount']"
-              :columns="planColumns"
-              :data="plans"
-            >
-              <template #toolbar>
-                <div class="flex justify-end">
-                  <YdButton v-auth="'system:backup:config'" :disabled="targets.length === 0" @click="openPlanForm()">
-                    <YdIcon name="morph:plus" />
-                    添加计划
-                  </YdButton>
-                </div>
-              </template>
-              <template #cell-scopeTags="{ row }">
-                <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
-              </template>
-              <template #cell-lastRunAt="{ row }">
-                <div class="flex flex-col gap-1 items-start">
-                  <span class="text-sm">{{ formatTime(row.original.lastRunAt) }}</span>
-                  <YdTag v-if="row.original.lastStatus" :variant="row.original.lastStatus === 'SUCCEEDED' ? 'default' : 'destructive'">
-                    {{ row.original.lastStatus === 'SUCCEEDED' ? '成功' : row.original.lastStatus === 'FAILED' ? '失败' : '执行中' }}
-                  </YdTag>
-                </div>
-              </template>
-            </YdResponsiveEnhancedTable>
-          </YdSettingsSection>
-        </template>
-      </YdSettingsLayout>
-
-      <YdModal
-        v-model="importModalVisible"
-        title="合并导入分析"
-        show-cancel-button
-        class="sm:max-w-3xl"
-        confirm-button-text="开始导入"
-        @confirm="submitImport"
-      >
-        <template v-if="analysis">
-          <div class="text-xs text-secondary-foreground/70 mb-3 flex flex-wrap gap-2 items-center">
-            <YdTag :variant="analysis.masterKeyMatch ? 'default' : 'destructive'">
-              {{ analysis.masterKeyMatch ? '主密钥一致' : '主密钥不一致，加密凭据可能需重新配置' }}
-            </YdTag>
-            <span v-if="analysis.createdAt">备份时间：{{ formatTime(analysis.createdAt) }}</span>
-            <span v-if="analysis.hostVersion">宿主版本：{{ analysis.hostVersion }}</span>
-          </div>
-          <YdAlert
-            v-if="analysis.warnings.length"
-            icon="morph:triangle-alert"
-            title="导入前请注意"
-            :description="analysis.warnings.join('；')"
-            class="mb-3"
-          />
-          <YdResponsiveTable
-            row-key="name"
-            table-root-class="rounded-lg overflow-hidden"
-            border
-            :columns="analysisColumns"
-            :data="analysis.collections"
-          />
-          <div class="text-xs text-secondary-foreground/70 mt-2 flex flex-wrap gap-2 items-center">
-            <YdTag variant="secondary">
-              对象存储文件
-            </YdTag>
-            <span>归档 {{ analysis.objects.archiveCount }} · 本地缺失 {{ analysis.objects.missingCount }} · 重复冲突 {{ analysis.objects.conflictCount }} · 共 {{ formatSize(analysis.objects.totalBytes) }}</span>
-          </div>
-          <div v-if="analysis.pluginScopes.length" class="mt-3 flex flex-wrap gap-2">
-            <YdTag
-              v-for="scope in analysis.pluginScopes"
-              :key="`${scope.pluginCode}/${scope.scopeCode}`"
-              :variant="scope.available ? 'secondary' : 'destructive'"
-            >
-              {{ scope.pluginCode }}/{{ scope.scopeCode }} · {{ scope.fileCount }} 文件 · {{ scope.available ? '可恢复' : '插件未安装，将跳过' }}
-            </YdTag>
-          </div>
-          <YdDivider class="my-3" />
-          <YdRadioGroup v-model="importStrategy" :options="strategyOptions" />
-        </template>
-      </YdModal>
-
-      <YdModal
-        v-model="detailVisible"
-        :title="`任务详情 #${detailJob?.id || ''}`"
-        class="sm:max-w-2xl"
-        :show-cancel-button="false"
-        confirm-button-text="关闭"
-      >
-        <template v-if="detailJob">
-          <div class="mb-3 flex flex-wrap gap-2 items-center">
-            <YdTag :variant="jobStatusVariant(detailJob)">
-              {{ jobStatusText(detailJob) }}
-            </YdTag>
-            <YdTag variant="secondary">
-              {{ jobTypeText(detailJob) }}
-            </YdTag>
-            <YdTag v-if="detailJob.trigger === 'SCHEDULED'" variant="secondary">
-              计划触发
-            </YdTag>
-            <span class="text-xs text-secondary-foreground/60">创建于 {{ formatTime(detailJob.createTime) }}</span>
-          </div>
-          <div class="text-sm gap-x-4 gap-y-2 grid grid-cols-1 md:grid-cols-2">
-            <div>
-              <span class="text-secondary-foreground/60">备份范围：</span>{{ scopeText(detailJob.scopeTags) }}
-            </div>
-            <div>
-              <span class="text-secondary-foreground/60">异地目标：</span>{{ detailJob.targetName || '—' }}
-            </div>
-            <div>
-              <span class="text-secondary-foreground/60">归档名：</span>{{ detailJob.archiveName || '—' }}
-            </div>
-            <div>
-              <span class="text-secondary-foreground/60">归档大小：</span>{{ formatSize(detailJob.archiveSize) }}
-            </div>
-            <div>
-              <span class="text-secondary-foreground/60">开始时间：</span>{{ formatTime(detailJob.startedAt) }}
-            </div>
-            <div>
-              <span class="text-secondary-foreground/60">结束时间：</span>{{ formatTime(detailJob.finishedAt) }}
-            </div>
-          </div>
-          <YdDivider class="my-3" />
-          <div class="text-xs text-secondary-foreground/70 font-medium">
-            执行统计
-          </div>
-          <div class="text-sm mt-1">
-            {{ jobCountsText(detailJob) }}
-          </div>
-          <div class="text-xs text-secondary-foreground/70 font-medium mt-3">
-            信息 / 错误详情
-          </div>
-          <pre class="text-xs leading-5 mt-1 p-3 rounded-lg bg-secondary/40 max-h-[260px] whitespace-pre-wrap break-all overflow-auto">{{ detailJob.message || '无' }}</pre>
-        </template>
-      </YdModal>
-
-      <YdModal
-        v-model="targetFormVisible"
-        :title="editingTarget ? '编辑异地目标' : '添加异地目标'"
-        show-cancel-button
-        class="sm:max-w-2xl"
-        :confirm-loading="targetFormSaving"
-        @confirm="saveTargetForm"
-      >
-        <YdForm :model="targetForm" layout="vertical">
-          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
-            <YdFormItem label="目标编码">
-              <YdInput v-model="targetForm.code" :disabled="!!editingTarget" placeholder="小写字母、数字或连字符，如 nas-webdav" />
-            </YdFormItem>
-            <YdFormItem label="名称">
-              <YdInput v-model="targetForm.name" placeholder="目标显示名称" />
-            </YdFormItem>
-            <YdFormItem label="协议类型">
-              <YdSelect v-model="targetForm.type" :options="targetTypes" />
-            </YdFormItem>
-            <YdFormItem label="主机地址">
-              <YdInput v-model="targetForm.host" placeholder="如 192.168.1.10 或 nas.example.com" />
-            </YdFormItem>
-            <YdFormItem label="端口">
-              <YdNumberField v-model="targetForm.port" class="w-full" :min="1" :max="65535" />
-            </YdFormItem>
-            <YdFormItem label="账号">
-              <YdInput v-model="targetForm.username" placeholder="可留空" />
-            </YdFormItem>
-            <YdFormItem label="密码">
-              <YdInput v-model="targetForm.password" type="password" :placeholder="editingTarget?.passwordSet ? '留空保持原密码' : '访问密码'" />
-            </YdFormItem>
-            <YdFormItem label="基础路径">
-              <YdInput v-model="targetForm.basePath" placeholder="/dav/backup，须以 / 开头" />
-            </YdFormItem>
-          </div>
-          <YdFormItem v-if="targetForm.type !== 'FTP'" label="跳过 TLS 证书校验">
-            <YdSwitch v-model="targetForm.insecureTls" />
-            <div class="text-xs text-secondary-foreground/60 mt-1">
-              自签名证书或用 IP 直连 HTTPS/FTPS 时开启；存在中间人风险，仅建议可信内网使用。
-            </div>
+    <YdSettingsLayout v-model="activeTab" :list="tabList" surface width-class="max-w-5xl">
+      <template #export>
+        <YdSettingsSection
+          title="全量导出"
+          description="将所选范围打包为 ZIP 归档（Mongo 集合 EJSON + 对象存储 + 插件数据），可在本页下载或用于迁移导入。"
+        >
+          <YdFormItem label="导出范围">
+            <YdCheckboxGroup v-model="exportScopes" :options="scopeCheckOptions" />
           </YdFormItem>
-          <YdFormItem v-if="targetForm.type !== 'WEBDAV'" label="FTP 被动模式">
-            <YdSwitch v-model="targetForm.passiveMode" />
-            <div class="text-xs text-secondary-foreground/60 mt-1">
-              多数防火墙/NAT 环境需保持开启。
-            </div>
+          <YdFormItem label="执行方式" extra="选异地目标即「立即执行备份」：归档生成后当场推送，无需计划。">
+            <YdSelect v-model="exportTargetCode" :options="exportTargetOptions" class="max-w-sm" />
           </YdFormItem>
-          <YdAlert
-            icon="morph:key-round"
-            title="凭据与安全"
-            description="密码经主密钥加密存储；WebDAV 建议使用 HTTPS（非 80 端口默认按 HTTPS 访问）。归档将写入基础路径下，文件名前缀 yudream-backup-。"
-          />
-        </YdForm>
-      </YdModal>
+        </YdSettingsSection>
 
-      <YdModal
-        v-model="archivesVisible"
-        :title="`远端归档 · ${archivesTarget?.name || ''}`"
-        class="sm:max-w-3xl"
-        :show-cancel-button="false"
-        confirm-button-text="关闭"
-      >
-        <div class="text-sm mb-3 flex flex-wrap gap-3 items-center">
-          <span class="text-secondary-foreground/60 shrink-0">恢复策略</span>
-          <YdRadioGroup v-model="restoreStrategy" :options="strategyOptions" />
-        </div>
-        <YdProgress v-if="archivesLoading" :model-value="100" class="mb-2" />
-        <div v-if="archives.length === 0 && !archivesLoading" class="text-sm text-secondary-foreground/60 py-6 text-center">
-          远端暂无备份归档
-        </div>
-        <div v-else class="flex flex-col gap-2">
-          <div
-            v-for="archive in archives"
-            :key="archive.name"
-            class="p-3 border rounded-lg flex flex-wrap gap-2 items-center justify-between"
-          >
-            <div class="min-w-0">
-              <div class="text-sm font-medium break-all">
-                {{ archive.name }}
-              </div>
-              <div class="text-xs text-secondary-foreground/60">
-                {{ formatSize(archive.size) }} · {{ formatArchiveTime(archive.modifiedAtMillis) }}
-              </div>
+        <YdSettingsSection
+          title="合并导入"
+          description="上传本系统导出的备份归档，先分析重复与缺失，再按管理员选择的「以哪边为准」策略无损合并。任一端独有数据始终保留。"
+        >
+          <YdFilePicker ref="importInputRef" accept=".zip" label="选择备份归档" class="hidden" @select="onImportFile">
+            <template #default />
+          </YdFilePicker>
+          <YdButton v-auth="'system:backup:import'" variant="outline" :loading="importing" @click="pickImportFile">
+            <YdIcon name="morph:cloud-upload" />
+            选择备份归档并分析
+          </YdButton>
+          <template v-if="importing">
+            <YdProgress :model-value="importingProgress ?? 0" />
+            <div class="text-xs text-secondary-foreground/60">
+              分片上传中 {{ importingProgress ?? 0 }}%（8MB/片，服务端合并后分析）
             </div>
-            <YdButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRestore(archive)">
-              恢复
-            </YdButton>
-          </div>
-        </div>
-      </YdModal>
-
-      <YdModal
-        v-model="planFormVisible"
-        :title="editingPlan ? '编辑备份计划' : '添加备份计划'"
-        show-cancel-button
-        class="sm:max-w-2xl"
-        :confirm-loading="planFormSaving"
-        @confirm="savePlanForm"
-      >
-        <YdForm :model="planForm" layout="vertical">
-          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
-            <YdFormItem label="计划编码">
-              <YdInput v-model="planForm.code" :disabled="!!editingPlan" placeholder="小写字母、数字或连字符，如 daily-3am" />
-            </YdFormItem>
-            <YdFormItem label="名称">
-              <YdInput v-model="planForm.name" placeholder="计划显示名称" />
-            </YdFormItem>
-            <YdFormItem label="cron 表达式">
-              <YdInput v-model="planForm.cron" placeholder="0 0 3 * * *（每天 3 点）" />
-            </YdFormItem>
-            <YdFormItem label="异地目标">
-              <YdSelect v-model="planForm.targetCode" :options="targetOptions" placeholder="选择目标" />
-            </YdFormItem>
-            <YdFormItem label="保留份数">
-              <YdNumberField v-model="planForm.retentionCount" class="w-full" :min="1" :max="100" />
-            </YdFormItem>
-          </div>
-          <YdFormItem label="备份范围">
-            <YdCheckboxGroup v-model="planScopeModel" :options="scopeCheckOptions" />
-          </YdFormItem>
+          </template>
           <YdAlert
             icon="morph:info"
-            title="调度说明"
-            description="到点后按所选范围生成全量归档并推送到异地目标，自动清理超出保留份数的旧备份（按前缀匹配）。"
+            title="跨主机导入提示"
+            description="若源站主密钥（YUDREAM_CREDENTIAL_KEY）不同，归档中加密存储的凭据需导入后重新配置。"
           />
-        </YdForm>
-      </YdModal>
-    </YdPageMain>
+        </YdSettingsSection>
+      </template>
+
+      <template #jobs>
+        <YdSettingsSection
+          title="任务记录"
+          description="导出、导入与计划执行的历史记录；执行中的任务每 3 秒自动刷新。"
+        >
+          <YdProgress v-if="jobsLoading" :model-value="100" />
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1180px]"
+            :actions="jobActions"
+            :card-hidden-columns="['counts', 'targetName']"
+            :columns="jobColumns"
+            :data="jobs"
+          >
+            <template #toolbar>
+              <div class="flex justify-end">
+                <YdButton variant="outline" size="sm" :loading="jobsLoading" @click="loadJobs()">
+                  <YdIcon name="morph:refresh-cw" />
+                  刷新
+                </YdButton>
+              </div>
+            </template>
+            <template #cell-type="{ row }">
+              <YdTag variant="secondary">
+                {{ jobTypeText(row.original) }}
+              </YdTag>
+            </template>
+            <template #cell-scopeTags="{ row }">
+              <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
+            </template>
+            <template #cell-status="{ row }">
+              <div class="flex flex-col gap-1 items-start">
+                <YdTag :variant="jobStatusVariant(row.original)">
+                  {{ jobStatusText(row.original) }}
+                </YdTag>
+                <YdProgress
+                  v-if="row.original.status === 'RUNNING' || row.original.status === 'QUEUED'"
+                  :model-value="row.original.percent || 0"
+                  class="h-1 self-stretch"
+                />
+                <!-- td 自带 whitespace-nowrap，提示必须显式截断，否则会横穿右侧列 -->
+                <span v-if="row.original.message" class="text-xs text-secondary-foreground/60 max-w-[154px] truncate" :title="row.original.message">
+                  {{ row.original.message }}
+                </span>
+              </div>
+            </template>
+            <template #cell-archiveSize="{ row }">
+              {{ formatSize(row.original.archiveSize) }}
+            </template>
+            <template #cell-targetName="{ row }">
+              {{ row.original.targetName || '—' }}
+            </template>
+            <template #cell-counts="{ row }">
+              <span class="text-xs">{{ jobCountsText(row.original) }}</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdSettingsSection>
+      </template>
+
+      <template #targets>
+        <YdSettingsSection
+          title="异地目标"
+          description="FTP/FTPS/WebDAV 目标，归档生成后可直接推送；密码经主密钥加密存储，仅需连通即可使用。"
+        >
+          <YdProgress v-if="targetsLoading" :model-value="100" />
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+            :user-column="targetUserColumn"
+            :status-column="targetStatusColumn"
+            :actions="targetActions"
+            :card-hidden-columns="['username']"
+            :columns="targetColumns"
+            :data="targets"
+          >
+            <template #toolbar>
+              <div class="flex justify-end">
+                <YdButton v-auth="'system:backup:config'" @click="openTargetForm()">
+                  <YdIcon name="morph:plus" />
+                  添加目标
+                </YdButton>
+              </div>
+            </template>
+            <template #cell-type="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.type }}
+              </YdTag>
+            </template>
+            <template #cell-endpoint="{ row }">
+              <span class="text-sm break-all">{{ targetEndpoint(row.original) }}</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdSettingsSection>
+      </template>
+
+      <template #plans>
+        <YdSettingsSection
+          title="备份计划"
+          description="cron 为 6 位 Spring 表达式（秒 分 时 日 月 周），如每天 3 点：0 0 3 * * *。"
+        >
+          <YdProgress v-if="plansLoading" :model-value="100" />
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1180px]"
+            :user-column="planUserColumn"
+            :status-column="planStatusColumn"
+            :actions="planActions"
+            :card-hidden-columns="['retentionCount']"
+            :columns="planColumns"
+            :data="plans"
+          >
+            <template #toolbar>
+              <div class="flex justify-end">
+                <YdButton v-auth="'system:backup:config'" :disabled="targets.length === 0" @click="openPlanForm()">
+                  <YdIcon name="morph:plus" />
+                  添加计划
+                </YdButton>
+              </div>
+            </template>
+            <template #cell-scopeTags="{ row }">
+              <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
+            </template>
+            <template #cell-lastRunAt="{ row }">
+              <div class="flex flex-col gap-1 items-start">
+                <span class="text-sm">{{ formatTime(row.original.lastRunAt) }}</span>
+                <YdTag v-if="row.original.lastStatus" :variant="row.original.lastStatus === 'SUCCEEDED' ? 'default' : 'destructive'">
+                  {{ row.original.lastStatus === 'SUCCEEDED' ? '成功' : row.original.lastStatus === 'FAILED' ? '失败' : '执行中' }}
+                </YdTag>
+              </div>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdSettingsSection>
+      </template>
+    </YdSettingsLayout>
+
+    <YdModal
+      v-model="importModalVisible"
+      title="合并导入分析"
+      show-cancel-button
+      class="sm:max-w-3xl"
+      confirm-button-text="开始导入"
+      @confirm="submitImport"
+    >
+      <template v-if="analysis">
+        <div class="text-xs text-secondary-foreground/70 mb-3 flex flex-wrap gap-2 items-center">
+          <YdTag :variant="analysis.masterKeyMatch ? 'default' : 'destructive'">
+            {{ analysis.masterKeyMatch ? '主密钥一致' : '主密钥不一致，加密凭据可能需重新配置' }}
+          </YdTag>
+          <span v-if="analysis.createdAt">备份时间：{{ formatTime(analysis.createdAt) }}</span>
+          <span v-if="analysis.hostVersion">宿主版本：{{ analysis.hostVersion }}</span>
+        </div>
+        <YdAlert
+          v-if="analysis.warnings.length"
+          icon="morph:triangle-alert"
+          title="导入前请注意"
+          :description="analysis.warnings.join('；')"
+          class="mb-3"
+        />
+        <YdResponsiveTable
+          row-key="name"
+          table-root-class="rounded-lg overflow-hidden"
+          border
+          :columns="analysisColumns"
+          :data="analysis.collections"
+        />
+        <div class="text-xs text-secondary-foreground/70 mt-2 flex flex-wrap gap-2 items-center">
+          <YdTag variant="secondary">
+            对象存储文件
+          </YdTag>
+          <span>归档 {{ analysis.objects.archiveCount }} · 本地缺失 {{ analysis.objects.missingCount }} · 重复冲突 {{ analysis.objects.conflictCount }} · 共 {{ formatSize(analysis.objects.totalBytes) }}</span>
+        </div>
+        <div v-if="analysis.pluginScopes.length" class="mt-3 flex flex-wrap gap-2">
+          <YdTag
+            v-for="scope in analysis.pluginScopes"
+            :key="`${scope.pluginCode}/${scope.scopeCode}`"
+            :variant="scope.available ? 'secondary' : 'destructive'"
+          >
+            {{ scope.pluginCode }}/{{ scope.scopeCode }} · {{ scope.fileCount }} 文件 · {{ scope.available ? '可恢复' : '插件未安装，将跳过' }}
+          </YdTag>
+        </div>
+        <YdDivider class="my-3" />
+        <YdRadioGroup v-model="importStrategy" :options="strategyOptions" />
+      </template>
+    </YdModal>
+
+    <YdModal
+      v-model="detailVisible"
+      :title="`任务详情 #${detailJob?.id || ''}`"
+      class="sm:max-w-2xl"
+      :show-cancel-button="false"
+      confirm-button-text="关闭"
+    >
+      <template v-if="detailJob">
+        <div class="mb-3 flex flex-wrap gap-2 items-center">
+          <YdTag :variant="jobStatusVariant(detailJob)">
+            {{ jobStatusText(detailJob) }}
+          </YdTag>
+          <YdTag variant="secondary">
+            {{ jobTypeText(detailJob) }}
+          </YdTag>
+          <YdTag v-if="detailJob.trigger === 'SCHEDULED'" variant="secondary">
+            计划触发
+          </YdTag>
+          <span class="text-xs text-secondary-foreground/60">创建于 {{ formatTime(detailJob.createTime) }}</span>
+        </div>
+        <div class="text-sm gap-x-4 gap-y-2 grid grid-cols-1 md:grid-cols-2">
+          <div>
+            <span class="text-secondary-foreground/60">备份范围：</span>{{ scopeText(detailJob.scopeTags) }}
+          </div>
+          <div>
+            <span class="text-secondary-foreground/60">异地目标：</span>{{ detailJob.targetName || '—' }}
+          </div>
+          <div>
+            <span class="text-secondary-foreground/60">归档名：</span>{{ detailJob.archiveName || '—' }}
+          </div>
+          <div>
+            <span class="text-secondary-foreground/60">归档大小：</span>{{ formatSize(detailJob.archiveSize) }}
+          </div>
+          <div>
+            <span class="text-secondary-foreground/60">开始时间：</span>{{ formatTime(detailJob.startedAt) }}
+          </div>
+          <div>
+            <span class="text-secondary-foreground/60">结束时间：</span>{{ formatTime(detailJob.finishedAt) }}
+          </div>
+        </div>
+        <YdDivider class="my-3" />
+        <div class="text-xs text-secondary-foreground/70 font-medium">
+          执行统计
+        </div>
+        <div class="text-sm mt-1">
+          {{ jobCountsText(detailJob) }}
+        </div>
+        <div class="text-xs text-secondary-foreground/70 font-medium mt-3">
+          信息 / 错误详情
+        </div>
+        <pre class="text-xs leading-5 mt-1 p-3 rounded-lg bg-secondary/40 max-h-[260px] whitespace-pre-wrap break-all overflow-auto">{{ detailJob.message || '无' }}</pre>
+      </template>
+    </YdModal>
+
+    <YdModal
+      v-model="targetFormVisible"
+      :title="editingTarget ? '编辑异地目标' : '添加异地目标'"
+      show-cancel-button
+      class="sm:max-w-2xl"
+      :confirm-loading="targetFormSaving"
+      @confirm="saveTargetForm"
+    >
+      <YdForm :model="targetForm" layout="vertical">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
+          <YdFormItem label="目标编码">
+            <YdInput v-model="targetForm.code" :disabled="!!editingTarget" placeholder="小写字母、数字或连字符，如 nas-webdav" />
+          </YdFormItem>
+          <YdFormItem label="名称">
+            <YdInput v-model="targetForm.name" placeholder="目标显示名称" />
+          </YdFormItem>
+          <YdFormItem label="协议类型">
+            <YdSelect v-model="targetForm.type" :options="targetTypes" />
+          </YdFormItem>
+          <YdFormItem label="主机地址">
+            <YdInput v-model="targetForm.host" placeholder="如 192.168.1.10 或 nas.example.com" />
+          </YdFormItem>
+          <YdFormItem label="端口">
+            <YdNumberField v-model="targetForm.port" class="w-full" :min="1" :max="65535" />
+          </YdFormItem>
+          <YdFormItem label="账号">
+            <YdInput v-model="targetForm.username" placeholder="可留空" />
+          </YdFormItem>
+          <YdFormItem label="密码">
+            <YdInput v-model="targetForm.password" type="password" :placeholder="editingTarget?.passwordSet ? '留空保持原密码' : '访问密码'" />
+          </YdFormItem>
+          <YdFormItem label="基础路径">
+            <YdInput v-model="targetForm.basePath" placeholder="/dav/backup，须以 / 开头" />
+          </YdFormItem>
+        </div>
+        <YdFormItem v-if="targetForm.type !== 'FTP'" label="跳过 TLS 证书校验">
+          <YdSwitch v-model="targetForm.insecureTls" />
+          <div class="text-xs text-secondary-foreground/60 mt-1">
+            自签名证书或用 IP 直连 HTTPS/FTPS 时开启；存在中间人风险，仅建议可信内网使用。
+          </div>
+        </YdFormItem>
+        <YdFormItem v-if="targetForm.type !== 'WEBDAV'" label="FTP 被动模式">
+          <YdSwitch v-model="targetForm.passiveMode" />
+          <div class="text-xs text-secondary-foreground/60 mt-1">
+            多数防火墙/NAT 环境需保持开启。
+          </div>
+        </YdFormItem>
+        <YdAlert
+          icon="morph:key-round"
+          title="凭据与安全"
+          description="密码经主密钥加密存储；WebDAV 建议使用 HTTPS（非 80 端口默认按 HTTPS 访问）。归档将写入基础路径下，文件名前缀 yudream-backup-。"
+        />
+      </YdForm>
+    </YdModal>
+
+    <YdModal
+      v-model="archivesVisible"
+      :title="`远端归档 · ${archivesTarget?.name || ''}`"
+      class="sm:max-w-3xl"
+      :show-cancel-button="false"
+      confirm-button-text="关闭"
+    >
+      <div class="text-sm mb-3 flex flex-wrap gap-3 items-center">
+        <span class="text-secondary-foreground/60 shrink-0">恢复策略</span>
+        <YdRadioGroup v-model="restoreStrategy" :options="strategyOptions" />
+      </div>
+      <YdProgress v-if="archivesLoading" :model-value="100" class="mb-2" />
+      <div v-if="archives.length === 0 && !archivesLoading" class="text-sm text-secondary-foreground/60 py-6 text-center">
+        远端暂无备份归档
+      </div>
+      <div v-else class="flex flex-col gap-2">
+        <div
+          v-for="archive in archives"
+          :key="archive.name"
+          class="p-3 border rounded-lg flex flex-wrap gap-2 items-center justify-between"
+        >
+          <div class="min-w-0">
+            <div class="text-sm font-medium break-all">
+              {{ archive.name }}
+            </div>
+            <div class="text-xs text-secondary-foreground/60">
+              {{ formatSize(archive.size) }} · {{ formatArchiveTime(archive.modifiedAtMillis) }}
+            </div>
+          </div>
+          <YdButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRestore(archive)">
+            恢复
+          </YdButton>
+        </div>
+      </div>
+    </YdModal>
+
+    <YdModal
+      v-model="planFormVisible"
+      :title="editingPlan ? '编辑备份计划' : '添加备份计划'"
+      show-cancel-button
+      class="sm:max-w-2xl"
+      :confirm-loading="planFormSaving"
+      @confirm="savePlanForm"
+    >
+      <YdForm :model="planForm" layout="vertical">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
+          <YdFormItem label="计划编码">
+            <YdInput v-model="planForm.code" :disabled="!!editingPlan" placeholder="小写字母、数字或连字符，如 daily-3am" />
+          </YdFormItem>
+          <YdFormItem label="名称">
+            <YdInput v-model="planForm.name" placeholder="计划显示名称" />
+          </YdFormItem>
+          <YdFormItem label="cron 表达式">
+            <YdInput v-model="planForm.cron" placeholder="0 0 3 * * *（每天 3 点）" />
+          </YdFormItem>
+          <YdFormItem label="异地目标">
+            <YdSelect v-model="planForm.targetCode" :options="targetOptions" placeholder="选择目标" />
+          </YdFormItem>
+          <YdFormItem label="保留份数">
+            <YdNumberField v-model="planForm.retentionCount" class="w-full" :min="1" :max="100" />
+          </YdFormItem>
+        </div>
+        <YdFormItem label="备份范围">
+          <YdCheckboxGroup v-model="planScopeModel" :options="scopeCheckOptions" />
+        </YdFormItem>
+        <YdAlert
+          icon="morph:info"
+          title="调度说明"
+          description="到点后按所选范围生成全量归档并推送到异地目标，自动清理超出保留份数的旧备份（按前缀匹配）。"
+        />
+      </YdForm>
+    </YdModal>
   </div>
 </template>

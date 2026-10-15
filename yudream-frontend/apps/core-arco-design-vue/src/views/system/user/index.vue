@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
 import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
@@ -83,18 +83,42 @@ const canAssignRole = computed(() => auth('system:user:assign-role'))
 const canAssignDept = computed(() => auth('system:user:assign-dept'))
 const canImpersonate = computed(() => auth('system:user:impersonate'))
 
+/** 身份列：用户名 + 邮箱组合，卡片头部与桌面首列共用 */
+const userColumn: UserColumn<UserManageItem> = {
+  nameKey: 'username',
+  emailKey: 'email',
+  header: '用户',
+  width: 240,
+}
+
+const userStatusColumn: StatusColumn<UserManageItem> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    ACTIVE: { label: '启用', variant: 'default' },
+    DISABLED: { label: '停用', variant: 'secondary' },
+  },
+}
+
+/** 行操作统一收进下拉，按权限与行状态决定是否出现 */
+const userActions: ActionMenuItem<UserManageItem>[] = [
+  { label: '编辑', icon: 'morph:pencil', visible: () => auth('system:user:edit'), onClick: openEdit },
+  { label: '重置密码', icon: 'morph:key-round', visible: () => auth('system:user:edit'), onClick: openPassword },
+  { label: '部门与角色', icon: 'morph:network', visible: () => canAssignDept.value || canAssignRole.value, onClick: row => openAssign(row, 'depts') },
+  { label: '伪装登录', icon: 'morph:user-cog', visible: () => auth('system:user:impersonate'), disabled: row => !canImpersonateRow(row), onClick: confirmImpersonate },
+  { label: '启用', icon: 'morph:circle-check', visible: row => row.status === 'DISABLED' && auth('system:user:edit'), onClick: confirmEnable },
+  { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status !== 'DISABLED' && auth('system:user:delete'), onClick: confirmDisable },
+]
+
 const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
-  { accessorKey: 'username', header: '用户名', width: 140, fixed: 'left' },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
-  { accessorKey: 'email', header: '邮箱', width: 220 },
   { id: 'identities', header: '消息身份', width: 280 },
   { id: 'fields', header: '扩展资料', width: 240 },
   { id: 'tags', header: '标签', width: 220 },
   { id: 'deptNames', header: '部门', width: 220 },
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },
-  { id: 'status', header: '状态', width: 90, align: 'center' },
-  { id: 'operation', header: '操作', width: 430, align: 'center', fixed: 'right' },
 ])
 
 onMounted(async () => {
@@ -417,11 +441,6 @@ function identityKey(item: MessagingIdentity, index: string | number) {
   return [item.protocol, item.identityType, item.identity, item.groupOpenid, item.appId, item.connectionId, String(index)].join(':')
 }
 
-function identitySummary(item: MessagingIdentity) {
-  const suffix = item.groupOpenid ? ` / 群 ${item.groupOpenid}` : ''
-  return `${protocolLabel(item.protocol)} · ${identityTypeLabel(item.identityType)}：${item.identity || ''}${suffix}`
-}
-
 function sameDeptAssigns(payload: UserDeptAssign[], row: UserManageItem) {
   return sameIdArray(payload.map(item => item.deptId), row.deptIds) && sameId(defaultDeptId.value, row.defaultDeptId ?? row.deptIds[0])
 }
@@ -527,13 +546,15 @@ function importUsers() {
 
     <YdPageMain>
       <YdLoadingOverlay :loading="loading">
-        <YdResponsiveTable
-
+        <YdResponsiveEnhancedTable
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
           table-class="min-w-[1280px]"
-
-          column-visibility stripe border
+          column-visibility
+          :user-column="userColumn"
+          :status-column="userStatusColumn"
+          :actions="userActions"
+          :card-hidden-columns="['identities', 'fields']"
           :columns="tableColumns"
           :data="rows"
         >
@@ -603,102 +624,7 @@ function importUsers() {
               {{ row.original.emailVerified ? '已验证' : '未验证' }}
             </YdTag>
           </template>
-          <template #cell-status="{ row }">
-            <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
-              {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-            </YdTag>
-          </template>
-          <template #cell-operation="{ row }">
-            <div class="flex-center gap-2">
-              <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
-                编辑
-              </YdButton>
-              <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
-                改密
-              </YdButton>
-              <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
-                部门角色
-              </YdButton>
-              <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
-                伪装
-              </YdButton>
-              <YdButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
-                启用
-              </YdButton>
-              <YdButton v-else v-auth="'system:user:delete'" variant="outline" size="sm" class="text-destructive hover:text-destructive hover:bg-destructive/10" @click="confirmDisable(row.original)">
-                停用
-              </YdButton>
-            </div>
-          </template>
-
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex gap-2 items-center justify-between">
-                  <span class="text-base font-semibold min-w-0 break-words">{{ row.username }}</span>
-                  <div class="flex gap-1">
-                    <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
-                      {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                    </YdTag>
-                    <YdTag :variant="row.emailVerified ? 'default' : 'secondary'">
-                      {{ row.emailVerified ? '已验证' : '未验证' }}
-                    </YdTag>
-                  </div>
-                </div>
-                <div v-if="row.nickname" class="text-sm text-secondary-foreground/70">
-                  {{ row.nickname }}
-                </div>
-                <div class="text-sm flex flex-col gap-1">
-                  <div v-if="row.email" class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">邮箱</span>
-                    <span class="break-all">{{ row.email }}</span>
-                  </div>
-                  <div v-if="row.qq" class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
-                    <span>{{ row.qq }}</span>
-                  </div>
-                  <div v-for="(item, index) in row.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">协议</span>
-                    <span class="break-all">{{ identitySummary(item) }}</span>
-                  </div>
-                </div>
-                <div v-if="row.tags?.length" class="flex flex-wrap gap-1">
-                  <YdTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
-                    {{ tag.label }}
-                  </YdTag>
-                </div>
-                <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
-                  <YdTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
-                    {{ row.deptNames?.[index] || deptId }}{{ sameId(deptId, row.defaultDeptId) ? '（默认）' : '' }}
-                  </YdTag>
-                </div>
-                <div v-if="row.roleNames?.length" class="text-sm text-secondary-foreground/80">
-                  角色：{{ row.roleNames.join('、') }}
-                </div>
-                <div class="pt-3 border-t flex flex-wrap gap-2">
-                  <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
-                    编辑
-                  </YdButton>
-                  <YdButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
-                    改密
-                  </YdButton>
-                  <YdButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
-                    部门角色
-                  </YdButton>
-                  <YdButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
-                    伪装
-                  </YdButton>
-                  <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
-                    启用
-                  </YdButton>
-                  <YdButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
-                    停用
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable>
+        </YdResponsiveEnhancedTable>
       </YdLoadingOverlay>
 
       <YdPagination

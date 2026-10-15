@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
 import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
@@ -70,6 +70,25 @@ const levelOptions = [
 ]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
+const roleUserColumn: UserColumn<RoleManageItem> = { nameKey: 'name', emailKey: 'code', header: '角色', width: 220 }
+
+const roleStatusColumn: StatusColumn<RoleManageItem> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    ACTIVE: { label: '启用', variant: 'default' },
+    DEPRECATED: { label: '停用', variant: 'secondary' },
+  },
+}
+
+/** 行操作统一收进下拉 */
+const roleActions: ActionMenuItem<RoleManageItem>[] = [
+  { label: '编辑', icon: 'morph:pencil', visible: () => auth('system:role:edit'), onClick: openEdit },
+  { label: '启用', icon: 'morph:circle-check', visible: row => row.status === 'DEPRECATED' && auth('system:role:edit'), onClick: confirmEnable },
+  { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status === 'ACTIVE' && auth('system:role:delete'), disabled: row => Boolean(row.systemRole), onClick: confirmDisable },
+]
+
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
   { accessorKey: 'code', header: '编码', width: 180 },
@@ -77,8 +96,6 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'level', header: '等级', width: 120 },
   { accessorKey: 'permissionCount', header: '权限数', width: 100, align: 'center' },
   { id: 'systemRole', header: '类型', width: 110, align: 'center' },
-  { id: 'status', header: '状态', width: 90, align: 'center' },
-  { id: 'operation', header: '操作', width: 160, align: 'center', fixed: 'right' },
 ])
 
 onMounted(async () => {
@@ -444,119 +461,46 @@ function importRoles() {
     </YdPageHeader>
 
     <YdPageMain v-if="activeView === 'list'">
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1040px]"
-        column-visibility
-        border
-        stripe
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-              <YdInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
-              <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-              <div class="flex gap-2 col-end--1 justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  重置
-                </YdButton>
-                <YdButton @click="loadRoles">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-systemRole="{ row }">
-          <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
-            {{ row.original.systemRole ? '系统角色' : '自定义' }}
-          </YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="row.original.status === 'ACTIVE' ? 'default' : 'secondary'">
-            {{ row.original.status === 'ACTIVE' ? '启用' : '停用' }}
-          </YdTag>
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="flex-center gap-2">
-            <YdButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
-              编辑
-            </YdButton>
-            <YdButton
-              v-if="row.original.status === 'DEPRECATED'"
-              v-auth="'system:role:edit'"
-              variant="outline"
-              size="sm"
-              @click="confirmEnable(row.original)"
-            >
-              启用
-            </YdButton>
-            <YdButton
-              v-if="row.original.status === 'ACTIVE'"
-              v-auth="'system:role:delete'"
-              variant="destructive"
-              size="sm"
-              :disabled="row.original.systemRole"
-              @click="confirmDisable(row.original)"
-            >
-              停用
-            </YdButton>
-          </div>
-        </template>
+      <YdLoadingOverlay :loading="loading">
+        <YdResponsiveEnhancedTable
 
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <div class="flex gap-1">
-                  <YdTag :variant="row.systemRole ? 'default' : 'secondary'">
-                    {{ row.systemRole ? '系统角色' : '自定义' }}
-                  </YdTag>
-                  <YdTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
-                    {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                  </YdTag>
+          row-key="id"
+          table-root-class="rounded-lg overflow-hidden"
+          table-class="min-w-[1040px]"
+
+          column-visibility stripe border
+          :user-column="roleUserColumn"
+          :status-column="roleStatusColumn"
+          :actions="roleActions"
+          :card-hidden-columns="['systemRole']"
+          :columns="tableColumns"
+          :data="rows"
+        >
+          <template #toolbar>
+            <YdSearchBar class="w-full">
+              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+                <YdInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
+                <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+                <div class="flex gap-2 col-end--1 justify-end">
+                  <YdButton variant="outline" @click="resetSearch">
+                    重置
+                  </YdButton>
+                  <YdButton @click="loadRoles">
+                    <YdIcon name="morph:search" />
+                    筛选
+                  </YdButton>
                 </div>
               </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
-                  <span class="break-all">{{ row.code }}</span>
-                </div>
-                <div v-if="row.deptName" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">部门</span>
-                  <span>{{ row.deptName }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">等级</span>
-                  <span>{{ levelOptions.find(item => item.value === row.level)?.label || row.level }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">权限数</span>
-                  <span>{{ row.permissionCount }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row)">
-                  编辑
-                </YdButton>
-                <YdButton v-if="row.status === 'DEPRECATED'" v-auth="'system:role:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
-                  启用
-                </YdButton>
-                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:role:delete'" variant="destructive" size="sm" :disabled="row.systemRole" @click="confirmDisable(row)">
-                  停用
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+            </YdSearchBar>
+          </template>
+          <template #cell-systemRole="{ row }">
+            <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
+              {{ row.original.systemRole ? '系统角色' : '自定义' }}
+            </YdTag>
+          </template>
+        </YdResponsiveEnhancedTable>
+      </YdLoadingOverlay>
 
       <YdPagination
         v-model:page="pagination.page"
@@ -569,13 +513,15 @@ function importRoles() {
     </YdPageMain>
 
     <YdPageMain v-show="activeView !== 'list'">
-      <div v-if="overviewError" class="flex flex-wrap items-center justify-between gap-3 p-6" role="alert">
+      <div v-if="overviewError" class="p-6 flex flex-wrap gap-3 items-center justify-between" role="alert">
         <span>{{ overviewError }}</span>
-        <YdButton variant="outline" @click="loadOverview">重试</YdButton>
+        <YdButton variant="outline" @click="loadOverview">
+          重试
+        </YdButton>
       </div>
       <PermissionMatrix
-        ref="matrixRef"
         v-show="activeView === 'matrix' && !overviewError"
+        ref="matrixRef"
         :roles="overview?.roles || []"
         :permissions="overview?.permissions || []"
         :loading="overviewLoading"
@@ -585,12 +531,16 @@ function importRoles() {
         @dirty-change="matrixDirty = $event"
         @inspect-permission="operationsRef?.inspectPermission($event)"
       />
-      <div v-if="activeView === 'matrix' && matrixResults.length" class="flex flex-col gap-2 border-t p-4" aria-live="polite">
-        <p v-for="result in matrixResults" :key="result.roleId" class="flex flex-wrap items-center gap-2 text-sm">
-          <YdTag :variant="result.success ? 'secondary' : 'destructive'">{{ result.success ? '成功' : '需复核' }}</YdTag>
+      <div v-if="activeView === 'matrix' && matrixResults.length" class="p-4 border-t flex flex-col gap-2" aria-live="polite">
+        <p v-for="result in matrixResults" :key="result.roleId" class="text-sm flex flex-wrap gap-2 items-center">
+          <YdTag :variant="result.success ? 'secondary' : 'destructive'">
+            {{ result.success ? '成功' : '需复核' }}
+          </YdTag>
           <span>{{ result.name }}：{{ result.message }}</span>
         </p>
-        <p class="text-xs text-secondary-foreground/70">各角色独立保存，失败项的草稿保留；发生冲突需刷新复核后重新选择。</p>
+        <p class="text-xs text-secondary-foreground/70">
+          各角色独立保存，失败项的草稿保留；发生冲突需刷新复核后重新选择。
+        </p>
       </div>
       <PermissionConstellation
         v-if="activeView === 'trace' && overview && !overviewError"
@@ -610,7 +560,9 @@ function importRoles() {
         @user-unassigned="showUnassignedUsers"
         @refresh="loadOverview"
       />
-      <div v-if="activeView === 'trace' && !overview && !overviewError" class="p-16 text-center" role="status">正在加载权限全景…</div>
+      <div v-if="activeView === 'trace' && !overview && !overviewError" class="p-16 text-center" role="status">
+        正在加载权限全景…
+      </div>
     </YdPageMain>
 
     <PermissionOperations
@@ -626,7 +578,7 @@ function importRoles() {
 
     <YdModal v-model="formVisible" :title="editing ? '编辑角色' : '新增角色'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="gap-4 grid grid-cols-1 sm:grid-cols-2">
           <div>
             <YdFormItem label="角色名称" required>
               <YdInput v-model="form.name" class="w-full" />

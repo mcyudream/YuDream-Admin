@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, TableColumn, UserColumn } from '@yudream/components'
 import type { OnlineUser } from '@/api/modules/system-monitor'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
@@ -13,17 +13,32 @@ const loading = ref(false)
 const rows = ref<OnlineUser[]>([])
 const keyword = ref('')
 
+const { auth } = useAppAuth()
+
+/** 会话身份列：用户名 + 邮箱，卡片头部与桌面首列共用 */
+const sessionUserColumn: UserColumn<OnlineUser> = {
+  nameKey: 'username',
+  emailKey: 'email',
+  header: '用户',
+  width: 220,
+}
+
+/** 会话操作统一收进下拉 */
+const sessionActions: ActionMenuItem<OnlineUser>[] = [
+  { label: '强制下线', icon: 'morph:log-out', danger: true, visible: () => auth('system:monitor:online:kickout'), onClick: confirmKickout },
+]
+
 const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
-  { accessorKey: 'username', header: '\u7528\u6237\u540d', width: 140 },
-  { accessorKey: 'nickname', header: '\u6635\u79f0', width: 140 },
-  { accessorKey: 'email', header: '\u90ae\u7bb1', width: 220 },
-  { accessorKey: 'device', header: '\u8bbe\u5907', width: 120 },
-  { id: 'timeout', header: '\u4f1a\u8bdd\u5269\u4f59\u65f6\u95f4', width: 150 },
-  { id: 'token', header: '\u4f1a\u8bdd\u6807\u8bc6', width: 260 },
-  { id: 'operation', header: '\u64cd\u4f5c', width: 120, align: 'center', fixed: 'right' },
+  { accessorKey: 'username', header: '\u7528\u6237\u540D', width: 140 },
+  { accessorKey: 'nickname', header: '\u6635\u79F0', width: 140 },
+  { accessorKey: 'email', header: '\u90AE\u7BB1', width: 220 },
+  { accessorKey: 'device', header: '\u8BBE\u5907', width: 120 },
+  { id: 'timeout', header: '\u4F1A\u8BDD\u5269\u4F59\u65F6\u95F4', width: 150 },
+  { id: 'token', header: '\u4F1A\u8BDD\u6807\u8BC6', width: 260 },
+  { id: 'operation', header: '\u64CD\u4F5C', width: 120, align: 'center', fixed: 'right' },
 ])
 
-const onlineCountText = computed(() => `\u5f53\u524d\u5728\u7ebf ${rows.value.length} \u4eba`)
+const onlineCountText = computed(() => `\u5F53\u524D\u5728\u7EBF ${rows.value.length} \u4EBA`)
 
 onMounted(load)
 
@@ -49,7 +64,7 @@ function withCurrentSessionFallback(data: OnlineUser[]) {
     token: appAccountStore.token,
     username: appAccountStore.account,
     nickname: appAccountStore.account,
-    device: '\u5f53\u524d\u6d4f\u89c8\u5668',
+    device: '\u5F53\u524D\u6D4F\u89C8\u5668',
     timeout: undefined,
   }]
 }
@@ -64,7 +79,7 @@ function ttlText(value?: number) {
     return '-'
   }
   if (value < 0) {
-    return '\u6c38\u4e45'
+    return '\u6C38\u4E45'
   }
   if (value < 60) {
     return `${value}s`
@@ -84,11 +99,11 @@ function shortToken(token?: string) {
 
 function confirmKickout(row: OnlineUser) {
   modal.confirm({
-    title: '\u786e\u8ba4\u4e0b\u7ebf',
-    content: `\u786e\u8ba4\u5f3a\u5236\u4e0b\u7ebf ${row.username || row.userId || row.token} \uff1f`,
+    title: '\u786E\u8BA4\u4E0B\u7EBF',
+    content: `\u786E\u8BA4\u5F3A\u5236\u4E0B\u7EBF ${row.username || row.userId || row.token} \uFF1F`,
     onConfirm: async () => {
       await apiMonitor.kickoutOnlineUser(row.token)
-      toast.success('\u5df2\u4e0b\u7ebf')
+      toast.success('\u5DF2\u4E0B\u7EBF')
       await load()
     },
   })
@@ -110,83 +125,42 @@ async function exportOnlineUsers() {
     </YdPageHeader>
 
     <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="token"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1080px]"
-        border
-        stripe
-        column-visibility
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-              <YdInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  &#37325;&#32622;
-                </YdButton>
+      <YdLoadingOverlay :loading="loading">
+        <YdResponsiveEnhancedTable
+          row-key="token"
+          table-root-class="rounded-lg overflow-hidden"
+          table-class="min-w-[1080px]"
+          column-visibility
+          :user-column="sessionUserColumn"
+          :actions="sessionActions"
+          :columns="tableColumns"
+          :data="rows"
+        >
+          <template #toolbar>
+            <YdSearchBar class="w-full">
+              <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+                <YdInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
+                <div class="flex gap-2 md:justify-end">
+                  <YdButton variant="outline" @click="resetSearch">
+                    &#37325;&#32622;
+                  </YdButton>
+                </div>
               </div>
+            </YdSearchBar>
+          </template>
+          <template #empty>
+            <div class="empty-state">
+              &#26242;&#26080;&#22312;&#32447;&#20250;&#35805;&#65292;&#35831;&#30830;&#35748;&#24050;&#37325;&#21551;&#21518;&#31471;&#24182;&#37325;&#26032;&#30331;&#24405;
             </div>
-          </YdSearchBar>
-        </template>
-        <template #empty>
-          <div class="empty-state">
-            &#26242;&#26080;&#22312;&#32447;&#20250;&#35805;&#65292;&#35831;&#30830;&#35748;&#24050;&#37325;&#21551;&#21518;&#31471;&#24182;&#37325;&#26032;&#30331;&#24405;
-          </div>
-        </template>
-        <template #cell-timeout="{ row }">
-          {{ ttlText(row.original.timeout) }}
-        </template>
-        <template #cell-token="{ row }">
-          <code>{{ shortToken(row.original.token) }}</code>
-        </template>
-        <template #cell-operation="{ row }">
-          <YdButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row.original)">
-            &#19979;&#32447;
-          </YdButton>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.username || row.userId || '-' }}</span>
-                <YdTag variant="default">在线</YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div v-if="row.nickname" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">昵称</span>
-                  <span>{{ row.nickname }}</span>
-                </div>
-                <div v-if="row.email" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">邮箱</span>
-                  <span class="break-all">{{ row.email }}</span>
-                </div>
-                <div v-if="row.device" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">设备</span>
-                  <span>{{ row.device }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">剩余时间</span>
-                  <span>{{ ttlText(row.timeout) }}</span>
-                </div>
-              </div>
-              <div class="flex gap-2 text-sm">
-                <span class="shrink-0 text-secondary-foreground/60">会话标识</span>
-                <code>{{ shortToken(row.token) }}</code>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row)">
-                  下线
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+          </template>
+          <template #cell-timeout="{ row }">
+            {{ ttlText(row.original.timeout) }}
+          </template>
+          <template #cell-token="{ row }">
+            <code>{{ shortToken(row.original.token) }}</code>
+          </template>
+        </YdResponsiveEnhancedTable>
+      </YdLoadingOverlay>
     </YdPageMain>
   </div>
 </template>

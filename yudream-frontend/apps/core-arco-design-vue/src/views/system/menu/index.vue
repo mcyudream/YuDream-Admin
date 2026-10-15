@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult, YdTreeNode } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdTablePickerQuery, YdTablePickerResult, YdTreeNode } from '@yudream/components'
 import type { MenuCandidate, MenuManageItem, MenuNodeType, MenuPayload, MenuSource, MenuStatus } from '@/api/modules/system-menu'
 import apiExcel from '@/api/modules/system-excel'
 import apiMenu from '@/api/modules/system-menu'
@@ -114,13 +114,31 @@ const treeData = computed<TreeNode[]>(() => [{
   children: buildTreeNodes(rows.value),
 }])
 
+const buttonUserColumn: UserColumn<MenuManageItem> = { nameKey: 'name', emailKey: 'permission', header: '按钮', width: 260 }
+
+const buttonStatusColumn: StatusColumn<MenuManageItem> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 100,
+  statusMap: {
+    ACTIVE: { label: '启用', variant: 'default' },
+    DISABLED: { label: '停用', variant: 'secondary' },
+  },
+}
+
+/** 行操作统一收进下拉 */
+const buttonActions: ActionMenuItem<MenuManageItem>[] = [
+  { label: '编辑', icon: 'morph:pencil', visible: () => auth('system:menu:edit'), onClick: openEdit },
+  { label: '启用', icon: 'morph:circle-play', visible: row => row.status === 'DISABLED' && auth('system:menu:edit'), onClick: confirmEnable },
+  { label: '停用', icon: 'morph:circle-pause', visible: row => row.status === 'ACTIVE' && auth('system:menu:edit'), onClick: confirmDisable },
+  { label: '删除', icon: 'morph:trash-2', danger: true, visible: () => auth('system:menu:delete'), onClick: confirmDelete },
+]
+
 const buttonColumns = computed<TableColumn<MenuManageItem>[]>(() => [
   { id: 'index', header: '', width: 56, align: 'center' },
   { accessorKey: 'name', header: '按钮名称', minWidth: 180 },
   { accessorKey: 'permission', header: '权限标识', minWidth: 240 },
-  { id: 'status', header: '状态', width: 120, align: 'center' },
   { accessorKey: 'sort', header: '排序', width: 100, align: 'center' },
-  { id: 'operation', header: '操作', width: 140, align: 'center' },
 ])
 
 onMounted(async () => {
@@ -612,66 +630,116 @@ function importMenus() {
           </div>
 
           <div v-if="selectedMenu" class="detail-grid">
-            <div class="detail-cell detail-cell--label">菜单类型</div>
+            <div class="detail-cell detail-cell--label">
+              菜单类型
+            </div>
             <div class="detail-cell">
               <YdTag :variant="typeVariant(selectedMenu.type)">
                 {{ typeText(selectedMenu.type) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">菜单状态</div>
+            <div class="detail-cell detail-cell--label">
+              菜单状态
+            </div>
             <div class="detail-cell">
               <YdTag :variant="statusVariant(selectedMenu.status)">
                 {{ statusText(selectedMenu.status) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">来源</div>
+            <div class="detail-cell detail-cell--label">
+              来源
+            </div>
             <div class="detail-cell">
               <YdTag :variant="sourceVariant(selectedMenu.source)">
                 {{ sourceText(selectedMenu.source) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">运行状态</div>
+            <div class="detail-cell detail-cell--label">
+              运行状态
+            </div>
             <div class="detail-cell">
               <YdTag :variant="runtimeVariant(selectedMenu)">
                 {{ runtimeText(selectedMenu) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">菜单名称</div>
+            <div class="detail-cell detail-cell--label">
+              菜单名称
+            </div>
             <div class="detail-cell detail-cell__name">
               <YdIcon :name="menuIcon(selectedMenu)" />
               <span>{{ selectedMenu.name }}</span>
             </div>
-            <div class="detail-cell detail-cell--label">路由地址</div>
-            <div class="detail-cell">{{ displayValue(selectedMenu.path) }}</div>
-            <div class="detail-cell detail-cell--label">菜单编码</div>
-            <div class="detail-cell">{{ selectedMenu.code }}</div>
-            <div class="detail-cell detail-cell--label">权限标识</div>
-            <div class="detail-cell">{{ displayValue(selectedMenu.permission) }}</div>
-            <div class="detail-cell detail-cell--label">展示父级</div>
-            <div class="detail-cell">{{ selectedDisplayParentLabel }}</div>
-            <div class="detail-cell detail-cell--label">配置父级</div>
-            <div class="detail-cell">{{ selectedActualParentLabel }}</div>
-            <div class="detail-cell detail-cell--label">组件路径</div>
-            <div class="detail-cell">{{ displayValue(selectedMenu.component) }}</div>
-            <div class="detail-cell detail-cell--label">菜单显示</div>
+            <div class="detail-cell detail-cell--label">
+              路由地址
+            </div>
+            <div class="detail-cell">
+              {{ displayValue(selectedMenu.path) }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              菜单编码
+            </div>
+            <div class="detail-cell">
+              {{ selectedMenu.code }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              权限标识
+            </div>
+            <div class="detail-cell">
+              {{ displayValue(selectedMenu.permission) }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              展示父级
+            </div>
+            <div class="detail-cell">
+              {{ selectedDisplayParentLabel }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              配置父级
+            </div>
+            <div class="detail-cell">
+              {{ selectedActualParentLabel }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              组件路径
+            </div>
+            <div class="detail-cell">
+              {{ displayValue(selectedMenu.component) }}
+            </div>
+            <div class="detail-cell detail-cell--label">
+              菜单显示
+            </div>
             <div class="detail-cell">
               <YdTag :variant="visibleVariant(selectedMenu)">
                 {{ visibleText(selectedMenu) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">是否外链</div>
+            <div class="detail-cell detail-cell--label">
+              是否外链
+            </div>
             <div class="detail-cell">
               <YdTag :variant="isExternal(selectedMenu) ? 'outline' : 'secondary'">
                 {{ displayValue(isExternal(selectedMenu)) }}
               </YdTag>
             </div>
-            <div class="detail-cell detail-cell--label">外链地址</div>
-            <div class="detail-cell detail-cell--wide">{{ displayValue(selectedMenu.link) }}</div>
+            <div class="detail-cell detail-cell--label">
+              外链地址
+            </div>
+            <div class="detail-cell detail-cell--wide">
+              {{ displayValue(selectedMenu.link) }}
+            </div>
             <template v-if="selectedMenu.source === 'PLUGIN'">
-              <div class="detail-cell detail-cell--label">插件编码</div>
-              <div class="detail-cell">{{ displayValue(selectedMenu.pluginCode) }}</div>
-              <div class="detail-cell detail-cell--label">插件模块</div>
-              <div class="detail-cell">{{ displayValue(selectedMenu.pluginModuleName) }}</div>
+              <div class="detail-cell detail-cell--label">
+                插件编码
+              </div>
+              <div class="detail-cell">
+                {{ displayValue(selectedMenu.pluginCode) }}
+              </div>
+              <div class="detail-cell detail-cell--label">
+                插件模块
+              </div>
+              <div class="detail-cell">
+                {{ displayValue(selectedMenu.pluginModuleName) }}
+              </div>
             </template>
           </div>
           <div v-else class="empty-state">
@@ -684,105 +752,30 @@ function importMenus() {
             <h2>按钮权限列表</h2>
           </div>
 
-          <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-            
-            row-key="code"
-            table-root-class="rounded-lg overflow-hidden"
-            table-class="min-w-[720px]"
-            border
-            stripe
-            :columns="buttonColumns"
-            :data="buttonRows"
-          >
-            <template #cell-index="{ row }">
-              {{ row.index + 1 }}
-            </template>
-            <template #cell-status="{ row }">
-              <YdTag :variant="statusVariant(row.original.status)">
-                {{ statusText(row.original.status) }}
-              </YdTag>
-            </template>
-            <template #cell-operation="{ row }">
-              <div class="flex-center gap-2">
-                <YdButton v-auth="'system:menu:edit'" variant="ghost" size="sm" title="编辑" @click="openEdit(row.original)">
-                  <YdIcon name="morph:pencil" />
-                </YdButton>
-                <YdButton
-                  v-if="row.original.status === 'DISABLED'"
-                  v-auth="'system:menu:edit'"
-                  variant="ghost"
-                  size="sm"
-                  title="启用"
-                  @click="confirmEnable(row.original)"
-                >
-                  <YdIcon name="morph:circle-play" />
-                </YdButton>
-                <YdButton
-                  v-if="row.original.status === 'ACTIVE'"
-                  v-auth="'system:menu:edit'"
-                  variant="ghost"
-                  size="sm"
-                  title="停用"
-                  @click="confirmDisable(row.original)"
-                >
-                  <YdIcon name="morph:circle-pause" />
-                </YdButton>
-                <YdButton
-                  v-auth="'system:menu:delete'"
-                  variant="ghost"
-                  size="sm"
-                  title="删除"
-                  @click="confirmDelete(row.original)"
-                >
-                  <YdIcon name="morph:trash-2" />
-                </YdButton>
-              </div>
-            </template>
+          <YdLoadingOverlay :loading="loading">
+            <YdResponsiveEnhancedTable
 
-            <template #card="{ row }">
-              <YdCard class="w-full">
-                <div class="flex flex-col gap-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                    <YdTag :variant="statusVariant(row.status)">
-                      {{ statusText(row.status) }}
-                    </YdTag>
-                  </div>
-                  <div class="flex flex-col gap-1 text-sm">
-                    <div v-if="row.permission" class="flex gap-2">
-                      <span class="shrink-0 text-secondary-foreground/60">权限标识</span>
-                      <span class="break-all">{{ row.permission }}</span>
-                    </div>
-                    <div class="flex gap-2">
-                      <span class="shrink-0 text-secondary-foreground/60">排序</span>
-                      <span>{{ row.sort }}</span>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-2 border-t pt-3">
-                    <YdButton v-auth="'system:menu:edit'" variant="outline" size="sm" @click="openEdit(row)">
-                      编辑
-                    </YdButton>
-                    <YdButton v-if="row.status === 'DISABLED'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
-                      启用
-                    </YdButton>
-                    <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmDisable(row)">
-                      停用
-                    </YdButton>
-                    <YdButton v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDelete(row)">
-                      删除
-                    </YdButton>
-                  </div>
-                </div>
-              </YdCard>
-            </template>
-          </YdResponsiveTable></YdLoadingOverlay>
+              row-key="code"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[720px]"
+              :user-column="buttonUserColumn"
+              :status-column="buttonStatusColumn"
+              :actions="buttonActions"
+              :columns="buttonColumns"
+              :data="buttonRows"
+            >
+              <template #cell-index="{ row }">
+                {{ row.index + 1 }}
+              </template>
+            </YdResponsiveEnhancedTable>
+          </YdLoadingOverlay>
         </section>
       </main>
     </div>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑菜单' : '新增菜单'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
-        <div class="grid grid-cols-2 gap-x-4">
+        <div class="gap-x-4 grid grid-cols-2">
           <div>
             <YdFormItem label="菜单编码" required>
               <YdInput
@@ -837,7 +830,7 @@ function importMenus() {
           </div>
           <div>
             <YdFormItem label="导航菜单">
-              <div class="flex items-center gap-3 pt-1">
+              <div class="pt-1 flex gap-3 items-center">
                 <YdSwitch v-model="form.visible" />
                 <span class="text-sm text-muted-foreground">{{ form.visible ? '显示在导航中' : '仅保留路由访问' }}</span>
               </div>
