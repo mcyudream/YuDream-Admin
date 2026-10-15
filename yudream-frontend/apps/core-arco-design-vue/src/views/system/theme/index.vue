@@ -73,7 +73,7 @@ async function saveTheme() {
 </script>
 
 <template>
-  <div class="bg-card min-h-full">
+  <div class="settings-page-shell">
     <YdPageHeader title="主题配置" description="让工作空间拥有适合你的风格与节奏" class="mb-0">
       <YdButton v-auth="'system:setting:theme:edit'" :loading="saving" @click="saveTheme">
         <YdIcon name="morph:save" />
@@ -81,7 +81,13 @@ async function saveTheme() {
       </YdButton>
     </YdPageHeader>
 
-    <YdSettingsLayout v-model="activeTab" :list="settingTabs" surface width-class="max-w-4xl">
+    <YdSettingsLayout
+      v-model="activeTab"
+      :list="settingTabs"
+      surface
+      scroll
+      width-class="max-w-4xl"
+    >
       <template #appearance>
         <YdSettingsSection
           title="外观预设"

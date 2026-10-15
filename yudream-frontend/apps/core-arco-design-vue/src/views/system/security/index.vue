@@ -851,7 +851,7 @@ function normalizeDateTime(value?: string) {
 </script>
 
 <template>
-  <div class="bg-card min-h-full">
+  <div class="settings-page-shell">
     <YdPageHeader title="安全中心" class="mb-0">
       <YdButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
         <YdIcon name="morph:save" />
@@ -867,7 +867,8 @@ function normalizeDateTime(value?: string) {
       :model-value="activeTab"
       :list="settingsTabs"
       surface
-      width-class="max-w-5xl"
+      scroll
+      width-class="max-w-4xl"
       @update:model-value="onTabChange"
     >
       <template #policy>

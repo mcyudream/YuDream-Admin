@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type IntegrationSettings from './IntegrationSettings.vue'
 import type { SiteSetting } from '@/api/modules/settings'
 import apiSettings from '@/api/modules/settings'
 import apiSecurity from '@/api/modules/system-security'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
-import IntegrationSettings from './IntegrationSettings.vue'
 
 const toast = useYdToast()
 const appSettingsStore = useAppSettingsStore()
@@ -137,7 +137,7 @@ async function uploadAsset(files: File[], type: 'logo' | 'favicon' | 'loginBanne
 </script>
 
 <template>
-  <div class="bg-card min-h-full">
+  <div class="settings-page-shell">
     <YdPageHeader title="系统设置" class="mb-0">
       <YdButton v-if="activeSettingTab === 'basic' || activeSettingTab === 'login'" v-auth="'system:setting:edit'" :loading="saving" @click="saveSettings">
         <YdIcon name="morph:save" />
@@ -150,7 +150,13 @@ async function uploadAsset(files: File[], type: 'logo' | 'favicon' | 'loginBanne
     </YdPageHeader>
 
     <YdLoadingOverlay :loading="loading">
-      <YdSettingsLayout v-model="activeSettingTab" :list="settingTabs" surface width-class="max-w-[960px]">
+      <YdSettingsLayout
+        v-model="activeSettingTab"
+        :list="settingTabs"
+        surface
+        scroll
+        width-class="max-w-[960px]"
+      >
         <template #basic>
           <YdSettingsSection
             title="基础信息"

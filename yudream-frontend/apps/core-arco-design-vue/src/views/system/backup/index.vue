@@ -760,7 +760,7 @@ function formatArchiveTime(millis?: number) {
 </script>
 
 <template>
-  <div class="bg-card min-h-full">
+  <div class="settings-page-shell">
     <YdPageHeader title="数据备份" class="mb-0">
       <template #description>
         全量导出系统与插件数据为可迁移归档，按合并策略无损导入；支持 FTP/FTPS/WebDAV 异地定时备份与恢复。
@@ -770,7 +770,11 @@ function formatArchiveTime(millis?: number) {
         立即执行备份
       </YdButton>
     </YdPageHeader>
-    <YdSettingsLayout v-model="activeTab" :list="tabList" surface width-class="max-w-5xl">
+    <YdSettingsLayout
+      v-model="activeTab" :list="tabList" surface
+      scroll
+      width-class="max-w-4xl"
+    >
       <template #export>
         <YdSettingsSection
           title="全量导出"
