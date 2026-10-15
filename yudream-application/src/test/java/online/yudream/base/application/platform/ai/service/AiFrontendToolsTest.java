@@ -42,4 +42,17 @@ class AiFrontendToolsTest {
         var restored = json.convertValue(saved, AiFrontendContextDTO.class);
         assertEquals(List.of("ui.navigate"), AiFrontendTools.create(restored, null).stream().map(tool -> tool.descriptor().name()).toList());
     }
+
+    @Test void tourToolRequiresExplicitOptInAndCatalog() {
+        assertTrue(AiFrontendTools.create(new AiFrontendContextDTO(null, ROUTES, ACTIONS, true, true, List.of("system.welcome"), false), null)
+                .stream().noneMatch(tool -> "ui.tour".equals(tool.descriptor().name())));
+        assertTrue(AiFrontendTools.create(new AiFrontendContextDTO(null, ROUTES, ACTIONS, true, true, List.of(), true), null)
+                .stream().noneMatch(tool -> "ui.tour".equals(tool.descriptor().name())));
+        var tools = AiFrontendTools.create(new AiFrontendContextDTO(null, ROUTES, ACTIONS, false, false, List.of("system.welcome"), true), null);
+        assertEquals(List.of("ui.tour"), tools.stream().map(tool -> tool.descriptor().name()).toList());
+        @SuppressWarnings("unchecked") var schema = (Map<String, Object>) tools.getFirst().descriptor().inputSchema().get("tourCode");
+        assertEquals(List.of("system.welcome"), schema.get("enum"));
+        var tour = (AiExternalAgentTool) tools.getFirst();
+        assertThrows(BizException.class, () -> tour.prepare("tour-2", new AiAgentToolCall("ui.tour", Map.of("tourCode", "plugin:other:steal"))));
+    }
 }

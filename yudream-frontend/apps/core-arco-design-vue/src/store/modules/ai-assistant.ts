@@ -454,7 +454,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
         spaceSlug: scope.spaceSlug ?? session?.spaceSlug,
         attachments: request.attachments,
         contextEnabled: preferences.value.routeAwareness || preferences.value.pageAwareness,
-        frontendToolsEnabled: preferences.value.navigationTools || preferences.value.highlightTools,
+        frontendToolsEnabled: preferences.value.navigationTools || preferences.value.highlightTools || preferences.value.tourTools,
         frontendContext: frontendContext ? frontendContextForPreferences(frontendContext, preferences.value) : undefined,
       })
       if (started !== epoch) {

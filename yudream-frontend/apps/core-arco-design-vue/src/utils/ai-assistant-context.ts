@@ -5,6 +5,7 @@ export interface AiAssistantPreferences {
   pageAwareness: boolean
   navigationTools: boolean
   highlightTools: boolean
+  tourTools: boolean
   shortcut: 'mod-shift-y' | 'alt-shift-a' | 'disabled'
 }
 
@@ -13,6 +14,7 @@ export const defaultAiAssistantPreferences: AiAssistantPreferences = {
   pageAwareness: false,
   navigationTools: false,
   highlightTools: false,
+  tourTools: false,
   shortcut: 'mod-shift-y',
 }
 
@@ -23,6 +25,7 @@ export function parseAiAssistantPreferences(value: unknown): AiAssistantPreferen
     pageAwareness: raw.pageAwareness === true,
     navigationTools: raw.navigationTools === true,
     highlightTools: raw.highlightTools === true,
+    tourTools: raw.tourTools === true,
     shortcut: raw.shortcut === 'alt-shift-a' || raw.shortcut === 'disabled' ? raw.shortcut : 'mod-shift-y',
   }
 }
@@ -47,7 +50,7 @@ export function parseAiFrontendToolRequest(value: unknown): AiFrontendToolReques
   if (typeof raw.toolCallId !== 'string' || !raw.toolCallId || raw.toolCallId.length > 200) {
     return undefined
   }
-  if (raw.name !== 'ui.navigate' && raw.name !== 'ui.highlight') {
+  if (raw.name !== 'ui.navigate' && raw.name !== 'ui.highlight' && raw.name !== 'ui.tour') {
     return undefined
   }
   if (!raw.arguments || typeof raw.arguments !== 'object' || Array.isArray(raw.arguments)) {
@@ -55,21 +58,25 @@ export function parseAiFrontendToolRequest(value: unknown): AiFrontendToolReques
   }
   const args = raw.arguments as Record<string, unknown>
   // Reject arbitrary selectors, scripts, URL params and additional action payloads.
-  if (Object.keys(args).some(key => key !== 'routeName' && key !== 'actionCode')) {
+  if (Object.keys(args).some(key => key !== 'routeName' && key !== 'actionCode' && key !== 'tourCode')) {
     return undefined
   }
   const routeName = typeof args.routeName === 'string' ? args.routeName : undefined
   const actionCode = typeof args.actionCode === 'string' ? args.actionCode : undefined
+  const tourCode = typeof args.tourCode === 'string' ? args.tourCode : undefined
   if (raw.name === 'ui.navigate' && (!routeName || routeName.length > 180)) {
     return undefined
   }
   if (raw.name === 'ui.highlight' && !isSafeAiActionCode(actionCode)) {
     return undefined
   }
+  if (raw.name === 'ui.tour' && !isSafeAiActionCode(tourCode)) {
+    return undefined
+  }
   return {
     toolCallId: raw.toolCallId,
     name: raw.name,
-    arguments: { ...(routeName ? { routeName } : {}), ...(actionCode ? { actionCode } : {}) },
+    arguments: { ...(routeName ? { routeName } : {}), ...(actionCode ? { actionCode } : {}), ...(tourCode ? { tourCode } : {}) },
     expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : typeof raw.expiresAt === 'string' && Number.isFinite(Date.parse(raw.expiresAt)) ? Date.parse(raw.expiresAt) : undefined,
   }
 }
@@ -85,10 +92,14 @@ export function frontendContextForPreferences(context: AiFrontendContext, prefer
   if (preferences.pageAwareness || preferences.highlightTools) {
     result.actions = context.actions ?? []
   }
+  if (preferences.tourTools && context.tours?.length) {
+    result.tours = context.tours
+  }
   return Object.keys(result).length ? {
     ...result,
     navigationToolsEnabled: preferences.navigationTools,
     highlightToolsEnabled: preferences.highlightTools,
+    tourToolsEnabled: preferences.tourTools,
   } : undefined
 }
 

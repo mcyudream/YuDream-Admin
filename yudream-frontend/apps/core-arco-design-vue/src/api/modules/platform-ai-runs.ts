@@ -21,14 +21,17 @@ export interface AiFrontendContext {
   route?: { name: string, title: string, path?: string }
   routes?: AiFrontendRoute[]
   actions?: AiFrontendAction[]
+  /** 当前页面可用引导编码目录（按权限过滤），仅在引导工具开启时上报。 */
+  tours?: string[]
   navigationToolsEnabled?: boolean
   highlightToolsEnabled?: boolean
+  tourToolsEnabled?: boolean
 }
 
 export interface AiFrontendToolRequest {
   toolCallId: string
-  name: 'ui.navigate' | 'ui.highlight'
-  arguments: { routeName?: string, actionCode?: string }
+  name: 'ui.navigate' | 'ui.highlight' | 'ui.tour'
+  arguments: { routeName?: string, actionCode?: string, tourCode?: string }
   expiresAt?: number | string
 }
 

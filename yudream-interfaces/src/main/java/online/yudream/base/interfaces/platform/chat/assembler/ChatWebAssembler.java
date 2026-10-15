@@ -83,7 +83,8 @@ public final class ChatWebAssembler {
                 request.routes() == null ? List.of() : request.routes().stream().map(ChatWebAssembler::frontendRoute).toList(),
                 request.actions() == null ? List.of() : request.actions().stream().map(action ->
                         new online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO.Action(action.code(), action.label(), action.routeName())).toList(),
-                request.navigationToolsEnabled(), request.highlightToolsEnabled());
+                request.navigationToolsEnabled(), request.highlightToolsEnabled(),
+                request.tours(), request.tourToolsEnabled());
     }
     private static online.yudream.base.application.platform.ai.dto.AiFrontendContextDTO.Route frontendRoute(
             online.yudream.base.interfaces.platform.chat.request.ChatFrontendContextRequest.Route route) {

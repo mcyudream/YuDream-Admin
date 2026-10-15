@@ -9,6 +9,7 @@ import AiRunProgress from '@/components/AiRunProgress/index.vue'
 import { useAiAssistantActions } from '@/composables/ai-assistant-actions'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { useAiSystemRunsStore } from '@/store/modules/ai-system-runs'
+import { useTourStore } from '@/store/modules/tour'
 import { resolveRoutePath } from '@/utils'
 import { isSafeAiRoute, matchesAiAssistantShortcut } from '@/utils/ai-assistant-context'
 import QuotaReconciliation from './QuotaReconciliation.vue'
@@ -20,6 +21,7 @@ const router = useRouter()
 const { auth } = useAppAuth()
 const assistant = useAiAssistantStore()
 const systemRuns = useAiSystemRunsStore()
+const tours = useTourStore()
 const actions = useAiAssistantActions()
 const settingsOpen = ref(false)
 const tasksOpen = ref(false)
@@ -201,7 +203,7 @@ function send(request: YdAgentSendRequest) {
   const registeredTitle = [...route.matched].reverse().find(item => typeof item.meta.title === 'string')?.meta.title
   const name = typeof route.name === 'string' ? route.name : ''
   const current = name ? { name, title: typeof registeredTitle === 'string' ? registeredTitle : name } : undefined
-  void perform(() => assistant.send(request, { route: current, routes: visibleRoutes.value, actions: actions.catalog.value }))
+  void perform(() => assistant.send(request, { route: current, routes: visibleRoutes.value, actions: actions.catalog.value, tours: tours.availableTours(route.path).map(item => item.code) }))
 }
 
 function rename(session: YdAgentSession) {
@@ -245,6 +247,9 @@ async function executeFrontendTool(request: AiFrontendToolRequest): Promise<Reco
     }
     return result
   }
+  if (request.name === 'ui.tour') {
+    return playTour(request.arguments.tourCode)
+  }
   if (!assistant.preferences.highlightTools) {
     throw new Error('页面操作定位已关闭')
   }
@@ -255,6 +260,22 @@ async function executeFrontendTool(request: AiFrontendToolRequest): Promise<Reco
   assistant.open = false
   await nextTick()
   return { ...actions.highlight(action.code) }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function playTour(tourCode?: string) {
+  if (!assistant.preferences.tourTools) {
+    throw new Error('引导播放工具已关闭')
+  }
+  if (!tourCode || !tours.availableTours(route.path).some(item => item.code === tourCode)) {
+    throw new Error('当前页面没有此引导')
+  }
+  assistant.open = false
+  await nextTick()
+  if (!tours.start(tourCode)) {
+    throw new Error('引导未能启动')
+  }
+  return { tourCode, played: true }
 }
 </script>
 
@@ -337,6 +358,9 @@ async function executeFrontendTool(request: AiFrontendToolRequest): Promise<Reco
         </YdFormItem>
         <YdFormItem label="定位并高亮操作" description="启用后允许助手聚焦和高亮已注册的操作，操作仍需你手动点击。">
           <YdSwitch :model-value="assistant.preferences.highlightTools" @update:model-value="value => assistant.setPreferences({ highlightTools: value })" />
+        </YdFormItem>
+        <YdFormItem label="播放新手引导" description="启用后允许助手在当前页面播放分步引导，只做展示不会代你操作。">
+          <YdSwitch :model-value="assistant.preferences.tourTools" @update:model-value="value => assistant.setPreferences({ tourTools: value })" />
         </YdFormItem>
         <YdFormItem label="唤起快捷键">
           <YdSelect :model-value="assistant.preferences.shortcut" :options="[{ label: 'Ctrl / ⌘ + Shift + Y', value: 'mod-shift-y' }, { label: 'Alt + Shift + A', value: 'alt-shift-a' }, { label: '关闭快捷键', value: 'disabled' }]" @update:model-value="value => assistant.setPreferences({ shortcut: value as typeof assistant.preferences.shortcut })" />

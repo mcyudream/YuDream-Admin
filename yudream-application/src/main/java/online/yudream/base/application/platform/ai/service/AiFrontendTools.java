@@ -26,6 +26,10 @@ public final class AiFrontendTools {
                 || (context.highlightToolsEnabled() == null && context.actions() != null && !context.actions().isEmpty());
         if (highlight) tools.add(tool("ui.highlight", "突出显示页面操作", "聚焦并高亮当前页面真实登记的操作；不会点击或提交。仅使用页面上下文或导航结果提供的 actionCode，导航后以新页面反馈为准。",
                 "actionCode", Set.of(), emitter));
+        if (Boolean.TRUE.equals(context.tourToolsEnabled()) && context.tours() != null && !context.tours().isEmpty()) {
+            tools.add(tool("ui.tour", "播放页面新手引导", "在当前页面播放分步新手引导；仅展示与定位，不会点击或提交。仅使用提供的 tourCode。",
+                    "tourCode", Set.copyOf(context.tours()), emitter));
+        }
         return List.copyOf(tools);
     }
     private static AiAgentTool tool(String name, String title, String description, String argument,

@@ -57,4 +57,5 @@
 
 - 所有 AI 前端用公开 YD Agent/chat 组件；推理面板只渲染真实推理（OpenAI 兼容 `reasoningContent`/`reasoning_content`），自然语言增量、工具与生命周期进度分开；禁止业务页直接引 TDesign Chat。
 - `YdAgentWorkbench`/`YdAgentAnswer` 是受控 UI 投影：运行、权限、上下文压缩与持久化由宿主 Harness 管理；version 1 渲染协议含 markdown/reference/tool 块；入口先校验协议并局部清理 Markdown HTML，引用外链仅 HTTP(S)，文件引用与工具重试交宿主事件；Skills/MCP/工作区/审批无适配器时不得伪造连接，演示明确标识本地状态。详见 `docs/yd-agent-workbench.md`。
-- 生产 AI 不用阻塞结果整段回放模拟流式；统一根级会话 store 与后端运行快照/cursor；关窗/切页只解除观察，取消走显式 API。全局助手仅登录且有权限可用；路由/页面感知、导航、高亮分别可关；不抓 DOM/表单/query/token，前端工具按稳定路由/操作标识校验并回传真实结果，禁止任意 selector、脚本或自动点击。
+- 生产 AI 不用阻塞结果整段回放模拟流式；统一根级会话 store 与后端运行快照/cursor；关窗/切页只解除观察，取消走显式 API。全局助手仅登录且有权限可用；路由/页面感知、导航、高亮、引导播放分别可关；不抓 DOM/表单/query/token，前端工具按稳定路由/操作标识校验并回传真实结果，禁止任意 selector、脚本或自动点击。
+- 分步新手引导统一由 `YdTour` 与宿主 tour 运行时承载：插件经 SPI 声明式贡献（`docs/plugin-system/spi-2.36.0-guides.md`），目标只允许 `data-tour` 稳定标识；完成态按用户存浏览器，AI 触发走 `ui.tour` 前端工具且偏好默认关闭。

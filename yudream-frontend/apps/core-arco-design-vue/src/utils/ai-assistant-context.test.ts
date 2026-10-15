@@ -5,8 +5,8 @@ import { defaultAiAssistantPreferences, frontendContextForPreferences, isSafeAiR
 test('assistant context and frontend tools require explicit preference opt-in', () => {
   assert.deepEqual(parseAiAssistantPreferences(undefined), defaultAiAssistantPreferences)
   assert.equal(frontendContextForPreferences({ route: { name: 'users', title: '用户管理', path: '/system/user' }, routes: [], actions: [] }, defaultAiAssistantPreferences), undefined)
-  assert.deepEqual(frontendContextForPreferences({ routes: [{ name: 'users', title: '用户管理', path: '/system/user' }] }, { ...defaultAiAssistantPreferences, navigationTools: true }), { routes: [{ name: 'users', title: '用户管理', path: '/system/user' }], navigationToolsEnabled: true, highlightToolsEnabled: false })
-  assert.deepEqual(frontendContextForPreferences({ route: { name: 'theme-config', title: '主题配置' } }, { ...defaultAiAssistantPreferences, routeAwareness: true }), { route: { name: 'theme-config', title: '主题配置' }, navigationToolsEnabled: false, highlightToolsEnabled: false })
+  assert.deepEqual(frontendContextForPreferences({ routes: [{ name: 'users', title: '用户管理', path: '/system/user' }] }, { ...defaultAiAssistantPreferences, navigationTools: true }), { routes: [{ name: 'users', title: '用户管理', path: '/system/user' }], navigationToolsEnabled: true, highlightToolsEnabled: false, tourToolsEnabled: false })
+  assert.deepEqual(frontendContextForPreferences({ route: { name: 'theme-config', title: '主题配置' } }, { ...defaultAiAssistantPreferences, routeAwareness: true }), { route: { name: 'theme-config', title: '主题配置' }, navigationToolsEnabled: false, highlightToolsEnabled: false, tourToolsEnabled: false })
 })
 
 test('route catalog rejects URL parameters, dynamic IDs, external URLs and auth pages', () => {
@@ -24,6 +24,10 @@ test('frontend tool requests reject arbitrary scripts, selectors, parameters and
   assert.equal(parseAiFrontendToolRequest({ ...tool, name: 'ui.execute' }), undefined)
   assert.equal(parseAiFrontendToolRequest({ ...tool, arguments: { actionCode: 'button:nth-child(2)' } }), undefined)
   assert.equal(parseAiFrontendToolRequest({ ...tool, expiresAt: '2026-10-14T10:30:00Z' })?.expiresAt, Date.parse('2026-10-14T10:30:00Z'))
+  const tour = { toolCallId: 'tool-2', name: 'ui.tour', arguments: { tourCode: 'system.welcome' } }
+  assert.equal(parseAiFrontendToolRequest(tour)?.arguments.tourCode, 'system.welcome')
+  assert.equal(parseAiFrontendToolRequest({ ...tour, arguments: { tourCode: '[data-tour="x"]' } }), undefined)
+  assert.equal(parseAiFrontendToolRequest({ ...tour, arguments: {} }), undefined)
 })
 
 test('configurable shortcuts ignore composition and held keys', () => {
@@ -52,4 +56,15 @@ test('page awareness never grants highlight or navigation tools implicitly', () 
   const navigable = frontendContextForPreferences(context, { ...defaultAiAssistantPreferences, pageAwareness: true, navigationTools: true })
   assert.equal(navigable?.navigationToolsEnabled, true)
   assert.equal(navigable?.highlightToolsEnabled, false)
+})
+
+test('tour tools only receive the declared tour catalog when explicitly enabled', () => {
+  const context = { tours: ['system.welcome', 'plugin:wiki:intro'] }
+  assert.equal(frontendContextForPreferences(context, defaultAiAssistantPreferences), undefined)
+  const enabled = frontendContextForPreferences(context, { ...defaultAiAssistantPreferences, tourTools: true })
+  assert.deepEqual(enabled?.tours, context.tours)
+  assert.equal(enabled?.tourToolsEnabled, true)
+  assert.equal(enabled?.navigationToolsEnabled, false)
+  assert.equal(enabled?.highlightToolsEnabled, false)
+  assert.equal(frontendContextForPreferences({}, { ...defaultAiAssistantPreferences, tourTools: true }), undefined)
 })
