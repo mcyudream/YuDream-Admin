@@ -730,13 +730,16 @@ function parseJsonConfig() {
 
     <YdPageMain>
       <div class="capability-toolbar">
-        <YdInput v-model="keyword" clearable placeholder="搜索能力名称、编码或说明" class="capability-search" />
-        <YdSelect v-model="selectedType" :options="typeOptions" class="capability-filter" />
-        <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" @click="clearFilters">
-          重置筛选
-        </YdButton>
-        <YdButton variant="outline" :loading="loading" @click="load">
-          <YdIcon name="morph:refresh-cw" />刷新
+        <div class="capability-toolbar__filters">
+          <YdInput v-model="keyword" clearable placeholder="搜索名称或编码" class="capability-search" />
+          <YdSelect v-model="selectedType" :options="typeOptions" class="capability-filter" />
+          <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" class="capability-reset" @click="clearFilters">
+            重置
+          </YdButton>
+        </div>
+        <YdButton variant="outline" :loading="loading" class="capability-refresh" aria-label="刷新能力状态" @click="load">
+          <YdIcon name="morph:refresh-cw" />
+          刷新
         </YdButton>
       </div>
 
@@ -1040,19 +1043,21 @@ function parseJsonConfig() {
 </template>
 
 <style scoped>
-.capability-toolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) minmax(150px, 190px) auto;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 24px;
-}
+/* 工具栏：搜索限宽、控件不换行；窄栏时刷新按钮收成图标 */
+/* 工具栏是页面级整行：左侧搜索与筛选、右侧刷新；搜索限宽，不再随整行拉伸。
+   YdSelect 的 class 落在没有作用域属性的内部元素上，限宽必须用 :deep。 */
+.capability-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; min-width:0; margin-bottom:18px; }
+.capability-toolbar__filters { display:flex; flex:1 1 auto; flex-wrap:wrap; gap:8px; align-items:center; min-width:0; }
+.capability-toolbar .capability-search { flex:1 1 200px; min-width:140px; max-width:300px; }
+.capability-toolbar :deep(.capability-filter) { flex:0 1 168px; min-width:132px; }
+.capability-toolbar .capability-reset { flex:none; }
+.capability-toolbar .capability-refresh { flex:none; }
 
 /* 两栏各自限制高度并独立滚动：目录滚动不再带动右侧详情，页面也不会超出可视区，
    底部留白因此始终保留（外壳页签栏等高度变化只影响留白的大小，不会造成溢出）。 */
 .capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.78fr) minmax(0, 1.7fr); gap:16px; align-items:stretch; }
 .capability-workbench > * { max-height:var(--capability-pane-max-height, calc(100dvh - 272px)); min-height:280px; }
-.capability-browser { position:relative; display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:16px; min-width:0; min-height:0; }
+.capability-browser { position:relative; container-type:inline-size; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr); gap:16px; min-width:0; min-height:0; }
 /* 底部渐隐：提示目录还有更多内容，滚到底自动消失 */
 .capability-browser::after { position:absolute; right:0; bottom:0; left:0; height:36px; background:linear-gradient(to top, var(--color-bg-2), transparent); content:''; opacity:0; pointer-events:none; transition:opacity .2s ease; }
 .capability-browser.has-more::after { opacity:1; }
@@ -1077,7 +1082,7 @@ function parseJsonConfig() {
 .capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:0; }
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
-.capability-catalog { container-type:inline-size; display:grid; gap:6px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
+.capability-catalog { display:grid; gap:6px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
 /* 目录卡片：左侧色条代表状态，第二行末尾用同色文字声明状态；窄栏两行、宽栏追加归类 */
 .capability-card { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:'icon name state' 'icon desc desc'; column-gap:10px; row-gap:3px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-left-width:3px; border-radius:10px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 24ms); }
 .capability-card:hover { transform:translateY(-2px); background:var(--color-fill-1); box-shadow:0 6px 18px -12px oklch(0 0 0 / 45%); }
@@ -1223,8 +1228,9 @@ function parseJsonConfig() {
   .config-footer > * { flex:1; }
 }
 @media (max-width: 420px) {
-  .capability-toolbar { grid-template-columns:minmax(0,1fr); }
-  .capability-search { grid-column:1; }
+  .capability-toolbar { align-items:stretch; }
+  .capability-toolbar__filters { flex:1 1 100%; }
+  .capability-toolbar .capability-search { max-width:none; }
   .status-chip { padding:6px 10px; }
   .capability-list-heading { align-items:center; }
   .capability-catalog { grid-template-columns:minmax(0,1fr); }
