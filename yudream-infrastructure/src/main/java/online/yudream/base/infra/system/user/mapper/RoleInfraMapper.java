@@ -2,6 +2,7 @@ package online.yudream.base.infra.system.user.mapper;
 
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.user.aggregate.Role;
+import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.infra.system.user.dataobj.RoleDO;
@@ -26,6 +27,8 @@ public class RoleInfraMapper {
         roleDO.setLevel(role.getLevel());
         roleDO.setSystemRole(role.isSystemRole());
         roleDO.setSystemType(role.getSystemType());
+        roleDO.setIcon(role.getIcon());
+        roleDO.setColor(role.getColor() == null ? null : role.getColor().getCode());
         roleDO.setPermissions(role.getPermissions() == null ? Collections.emptyList() :
                 role.getPermissions().stream().map(PermissionID::getCode).collect(Collectors.toList()));
         roleDO.setStatus(role.getStatus());
@@ -45,6 +48,8 @@ public class RoleInfraMapper {
                 .level(roleDO.getLevel())
                 .systemRole(roleDO.isSystemRole())
                 .systemType(roleDO.getSystemType())
+                .icon(roleDO.getIcon())
+                .color(RoleColor.from(roleDO.getColor()))
                 .permissions(Optional.ofNullable(roleDO.getPermissions()).orElse(Collections.emptyList()).stream()
                         .map(PermissionID::of)
                         .collect(Collectors.toList()))

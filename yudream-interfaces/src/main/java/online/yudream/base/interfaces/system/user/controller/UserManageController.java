@@ -30,7 +30,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/system/users")
@@ -74,6 +78,17 @@ public class UserManageController {
     @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "编辑用户资料")
     public Result<UserManageRes> update(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest request) {
         return Result.ok(UserManageWebAssembler.toRes(userManageAppService.update(UserManageWebAssembler.toCmd(id, request))));
+    }
+
+    @PostMapping("/{id}/avatar")
+    @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "修改用户头像")
+    public Result<UserManageRes> updateAvatar(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        return Result.ok(UserManageWebAssembler.toRes(userManageAppService.updateAvatar(
+                id,
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize())));
     }
 
     @DeleteMapping("/{id}")

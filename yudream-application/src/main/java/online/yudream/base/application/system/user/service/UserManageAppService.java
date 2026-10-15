@@ -1,6 +1,8 @@
 package online.yudream.base.application.system.user.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.user.assembler.UserAssembler;
 import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +51,7 @@ public class UserManageAppService {
     private final DeptRepo deptRepo;
     private final PasswordEncoder passwordEncoder;
     private final MessagingIdentityAppService messagingIdentityAppService;
+    private final FileAppService fileAppService;
 
     @Transactional(readOnly = true)
     public UserManageDTO get(Long id) {
@@ -126,6 +130,16 @@ public class UserManageAppService {
         User user = getUser(cmd.getId());
         user.resetPassword(Password.of(cmd.getPassword(), passwordEncoder));
         userRepo.save(user);
+    }
+
+    /** 管理端改头像：校验与个人资料改头像一致（只接受图片），返回带最新头像地址的列表视图。 */
+    @Transactional
+    public UserManageDTO updateAvatar(Long id, InputStream inputStream, String originalName,
+                                      String contentType, long size) {
+        User user = getUser(id);
+        FileObjectDTO file = fileAppService.uploadAvatar(inputStream, originalName, contentType, size, user.getId());
+        user.updateAvatar(file.getId());
+        return toDTO(userRepo.save(user));
     }
 
     @Transactional
@@ -350,7 +364,7 @@ public class UserManageAppService {
         Map<Long, List<MessagingIdentity>> identities =
                 messagingIdentityAppService.listByUsers(users.stream().map(User::getId).toList());
         return users.stream().map(user -> UserAssembler.toManageDTO(user, roleMap, deptMap,
-                identities.getOrDefault(user.getId(), List.of()))).toList();
+                identities.getOrDefault(user.getId(), List.of()), fileAppService.fileUrl(user.getAvatarFileId()))).toList();
     }
 
     private UserManageDTO toDTO(User user) {
@@ -359,7 +373,8 @@ public class UserManageAppService {
         List<Long> deptIds = user.getDepts().stream().map(d -> d.id().getValue()).toList();
         Map<Long, Dept> deptMap = deptRepo.findByIds(deptIds).stream()
                 .collect(Collectors.toMap(Dept::getId, Function.identity()));
-        return UserAssembler.toManageDTO(user, roleMap, deptMap, messagingIdentityAppService.listByUser(user.getId()));
+        return UserAssembler.toManageDTO(user, roleMap, deptMap, messagingIdentityAppService.listByUser(user.getId()),
+                fileAppService.fileUrl(user.getAvatarFileId()));
     }
 
     private Email toEmail(String email) {

@@ -299,12 +299,9 @@ public class UserAppService {
 
     @Transactional
     public UserProfileDTO updateAvatar(Long userId, InputStream inputStream, String originalName, String contentType, long size) {
-        if (!StringUtils.hasText(contentType) || !contentType.toLowerCase().startsWith("image/")) {
-            throw new BizException("头像只支持图片文件");
-        }
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new BizException("用户不存在"));
-        FileObjectDTO file = fileAppService.upload(inputStream, originalName, contentType, size, "avatar", userId, true);
+        FileObjectDTO file = fileAppService.uploadAvatar(inputStream, originalName, contentType, size, userId);
         user.updateAvatar(file.getId());
         return toProfileDTO(userRepo.save(user));
     }

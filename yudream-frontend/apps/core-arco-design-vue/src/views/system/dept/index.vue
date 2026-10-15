@@ -5,6 +5,7 @@ import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiUser from '@/api/modules/system-user'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -15,6 +16,9 @@ const rows = ref<DeptManageItem[]>([])
 const search = reactive<{ keyword: string, status?: DeptStatus }>({ keyword: '' })
 const formVisible = ref(false)
 const editing = ref<DeptManageItem | null>(null)
+const formAvatar = ref('')
+const avatarInput = ref<InstanceType<typeof YdFilePicker>>()
+const avatarUploading = ref(false)
 
 const form = reactive<DeptPayload>({
   name: '',
@@ -64,7 +68,7 @@ const sortOrderValue = computed({
 })
 const { auth } = useAppAuth()
 
-const deptUserColumn: UserColumn<DeptManageItem> = { nameKey: 'name', emailKey: 'leaderName', header: '部门', width: 240 }
+const deptUserColumn: UserColumn<DeptManageItem> = { nameKey: 'name', emailKey: 'leaderName', avatarKey: 'avatar', header: '部门', width: 240 }
 
 const deptStatusColumn: StatusColumn<DeptManageItem> = {
   statusKey: 'status',
@@ -102,11 +106,20 @@ async function loadTree() {
       keyword: search.keyword || undefined,
       status: search.status,
     })
-    rows.value = res.data
+    rows.value = withBackendAvatars(res.data)
   }
   finally {
     loading.value = false
   }
+}
+
+/** 后端返回 /api/files/... 相对地址，列表落地前统一补后端基址 */
+function withBackendAvatars(items: DeptManageItem[]): DeptManageItem[] {
+  return items.map(item => ({
+    ...item,
+    avatar: item.avatar ? toBackendAssetUrl(item.avatar) : undefined,
+    children: item.children ? withBackendAvatars(item.children) : undefined,
+  }))
 }
 
 function resetSearch() {
@@ -117,6 +130,7 @@ function resetSearch() {
 
 function openCreate(parent?: DeptManageItem) {
   editing.value = null
+  formAvatar.value = ''
   Object.assign(form, {
     name: '',
     description: '',
@@ -131,6 +145,7 @@ function openCreate(parent?: DeptManageItem) {
 
 function openEdit(row: DeptManageItem) {
   editing.value = row
+  formAvatar.value = toBackendAssetUrl(row.avatar)
   Object.assign(form, {
     name: row.name,
     description: row.description,
@@ -153,6 +168,33 @@ async function saveForm() {
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
   await loadTree()
+}
+
+function pickDeptAvatar() {
+  avatarInput.value?.open()
+}
+
+async function uploadDeptAvatar(files: File[]) {
+  avatarInput.value?.reset()
+  const file = files[0]
+  const target = editing.value
+  if (!file || !target) {
+    return
+  }
+  const data = new FormData()
+  data.append('file', file)
+  avatarUploading.value = true
+  try {
+    const res = await apiDept.uploadAvatar(target.id, data)
+    const avatar = toBackendAssetUrl(res.data.avatar)
+    formAvatar.value = avatar
+    target.avatar = avatar
+    toast.success('部门头像已更新')
+    await loadTree()
+  }
+  finally {
+    avatarUploading.value = false
+  }
 }
 
 function confirmDisable(row: DeptManageItem) {
@@ -269,6 +311,19 @@ function importDepts() {
 
     <YdModal v-model="formVisible" :title="editing ? '编辑部门' : '新增部门'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
+        <YdFormItem v-if="editing" label="部门头像">
+          <div class="flex flex-wrap gap-3 items-center">
+            <YdAvatar :src="formAvatar" :fallback="form.name || '部门'" class="size-12" />
+            <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" :loading="avatarUploading" @click="pickDeptAvatar">
+              <YdIcon name="morph:cloud-upload" />
+              上传头像
+            </YdButton>
+            <span class="text-xs text-muted-foreground">仅支持图片文件，无头像时展示部门名称首字</span>
+            <YdFilePicker ref="avatarInput" accept="image/*" label="选择部门头像" class="hidden" @select="uploadDeptAvatar">
+              <template #default />
+            </YdFilePicker>
+          </div>
+        </YdFormItem>
         <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
           <div>
             <YdFormItem label="部门名称" required>

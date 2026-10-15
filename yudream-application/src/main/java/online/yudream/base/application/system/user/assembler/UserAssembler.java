@@ -19,6 +19,7 @@ import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
+import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 
@@ -73,16 +74,22 @@ public class UserAssembler {
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap) {
-        return toManageDTO(user, roleMap, deptMap, List.of());
+        return toManageDTO(user, roleMap, deptMap, List.of(), null);
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
                                             List<MessagingIdentity> identities) {
+        return toManageDTO(user, roleMap, deptMap, identities, null);
+    }
+
+    public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
+                                            List<MessagingIdentity> identities, String avatar) {
         List<Long> deptIds = user.getDepts().stream().map(d -> d.id().getValue()).toList();
         return UserManageDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .nickname(user.getNickname())
+                .avatar(avatar)
                 .email(user.getEmail() == null ? null : user.getEmail().getValue())
                 .phone(user.getPhone() == null ? null : user.getPhone().getValue())
                 .qq(user.getQq() == null ? null : user.getQq().getValue())
@@ -171,6 +178,8 @@ public class UserAssembler {
                 .level(role.getLevel())
                 .systemRole(role.isSystemRole())
                 .systemType(role.getSystemType())
+                .icon(role.getIcon())
+                .color(role.getColor() == null ? RoleColor.INFO.getCode() : role.getColor().getCode())
                 .permissions(role.getPermissions() == null ? new ArrayList<>() : role.getPermissions().stream().map(PermissionID::getCode).toList())
                 .permissionCount(role.getPermissions() == null ? 0 : role.getPermissions().size())
                 .status(role.getStatus())

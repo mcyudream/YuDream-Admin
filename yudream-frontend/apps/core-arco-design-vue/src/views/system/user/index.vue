@@ -9,6 +9,7 @@ import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
 import apiUser from '@/api/modules/system-user'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -87,6 +88,7 @@ const canImpersonate = computed(() => auth('system:user:impersonate'))
 const userColumn: UserColumn<UserManageItem> = {
   nameKey: 'username',
   emailKey: 'email',
+  avatarKey: 'avatar',
   header: '用户',
   width: 240,
 }
@@ -179,7 +181,10 @@ async function loadUsers() {
       emailVerified: resolveEmailVerifiedFilter(),
       status: search.status,
     })
-    rows.value = res.data.records
+    rows.value = res.data.records.map(item => ({
+      ...item,
+      avatar: item.avatar ? toBackendAssetUrl(item.avatar) : item.avatar,
+    }))
     pagination.total = res.data.total
   }
   finally {

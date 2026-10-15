@@ -24,6 +24,7 @@ public class DeptManageDTO implements Serializable {
     private Long id;
     private String name;
     private String description;
+    private String avatar;
     private Long leaderId;
     private String leaderName;
     private String phone;

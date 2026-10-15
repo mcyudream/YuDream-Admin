@@ -28,6 +28,7 @@ public class Dept extends BaseDomain {
     private Integer sortOrder;
     private SystemDeptType deptType;
     private DeptStatus status;
+    private Long avatarFileId;
 
     public static Dept create(Long id, String name, DeptID parentId, SystemDeptType type) {
         Dept d = new Dept();
@@ -58,6 +59,10 @@ public class Dept extends BaseDomain {
         this.phone = phone;
         this.parentId = parentId;
         this.sortOrder = sortOrder == null ? 0 : sortOrder;
+    }
+
+    public void updateAvatar(Long avatarFileId) {
+        this.avatarFileId = avatarFileId;
     }
 
     public void activate() {

@@ -2,7 +2,10 @@ package online.yudream.base.interfaces.system.user.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
+import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 
@@ -24,5 +27,11 @@ public class RoleUpdateRequest implements Serializable {
     private Long deptId;
     private RoleLevel level;
     private RoleStatus status;
+    /** Morphicons 名称（形如 morph:shield），可空。 */
+    @Size(max = 64, message = "角色图标名称不能超过 64 个字符")
+    private String icon;
+    /** 代表色固定键，可空，缺省 info。 */
+    @Pattern(regexp = RoleColor.CODES_PATTERN, message = "角色代表色不合法")
+    private String color;
     private List<String> permissions = new ArrayList<>();
 }

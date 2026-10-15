@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
@@ -29,6 +30,8 @@ public class Role extends BaseDomain {
     private RoleLevel level;          // 角色权重
     private boolean systemRole;
     private SystemRoleType systemType;
+    private String icon;              // Morphicons 名称（形如 morph:shield），可空
+    private RoleColor color;          // 代表色，固定语义枚举，默认 info
     private List<PermissionID> permissions = new ArrayList<>();
     private RoleStatus status;
 
@@ -42,18 +45,26 @@ public class Role extends BaseDomain {
         r.level = type.getLevel();
         r.systemRole = true;
         r.systemType = type;
+        r.icon = null;
+        r.color = RoleColor.INFO;
         r.status = RoleStatus.ACTIVE;
         return r;
     }
 
     // 创建普通角色
     public static Role create(String name, String code, DeptID deptId, RoleLevel level) {
+        return create(name, code, deptId, level, null, RoleColor.INFO);
+    }
+
+    // 创建普通角色（含视觉标识）
+    public static Role create(String name, String code, DeptID deptId, RoleLevel level, String icon, RoleColor color) {
         Role r = new Role();
         r.name = name;
         r.code = code;
         r.deptId = deptId;
         r.level = level;
         r.systemRole = false;
+        r.applyAppearance(icon, color);
         r.status = RoleStatus.ACTIVE;
         return r;
     }
@@ -72,6 +83,16 @@ public class Role extends BaseDomain {
         this.code = code;
         this.deptId = deptId;
         this.level = level;
+    }
+
+    /** 更新角色视觉标识：图标可空，代表色为空时回落默认 info。 */
+    public void updateAppearance(String icon, RoleColor color) {
+        applyAppearance(icon, color);
+    }
+
+    private void applyAppearance(String icon, RoleColor color) {
+        this.icon = icon == null || icon.isBlank() ? null : icon.trim();
+        this.color = color == null ? RoleColor.INFO : color;
     }
 
     public void replacePermissions(List<PermissionID> permissions) {

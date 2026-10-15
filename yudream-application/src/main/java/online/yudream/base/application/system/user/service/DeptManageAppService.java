@@ -2,6 +2,8 @@ package online.yudream.base.application.system.user.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
 import online.yudream.base.application.system.user.cmd.DeptUpdateCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.InputStream;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -32,6 +35,7 @@ public class DeptManageAppService {
 
     private final DeptRepo deptRepo;
     private final UserRepo userRepo;
+    private final FileAppService fileAppService;
 
     /**
      * 按「同父同级同名」自愈清理重复部门（导入合并产生的冗余；新建部门时同父同名本就被禁止）。
@@ -134,6 +138,17 @@ public class DeptManageAppService {
     }
 
     @Transactional
+    public DeptManageDTO updateAvatar(Long id, Long operatorId, InputStream inputStream, String originalName, String contentType, long size) {
+        if (!StringUtils.hasText(contentType) || !contentType.toLowerCase().startsWith("image/")) {
+            throw new BizException("部门头像只支持图片文件");
+        }
+        Dept dept = getDept(id);
+        FileObjectDTO file = fileAppService.upload(inputStream, originalName, contentType, size, "dept-avatar", operatorId, true);
+        dept.updateAvatar(file.getId());
+        return toDTO(deptRepo.save(dept), Map.of());
+    }
+
+    @Transactional
     public void disable(Long id) {
         Dept dept = getDept(id);
         ensureDeptCanDisable(id);
@@ -223,6 +238,7 @@ public class DeptManageAppService {
                 .id(dept.getId())
                 .name(dept.getName())
                 .description(dept.getDescription())
+                .avatar(fileAppService.fileUrl(dept.getAvatarFileId()))
                 .leaderId(dept.getLeader() == null ? null : dept.getLeader().getValue())
                 .leaderName(leader == null ? null : leader.getNickname())
                 .phone(dept.getPhone() == null ? null : dept.getPhone().getValue())

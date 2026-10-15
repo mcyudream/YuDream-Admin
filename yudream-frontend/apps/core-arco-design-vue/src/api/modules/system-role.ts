@@ -3,6 +3,23 @@ import systemClient from './system-client'
 
 export type RoleStatus = 'ACTIVE' | 'DEPRECATED'
 export type RoleLevel = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'GUEST'
+/** 角色代表色固定键；与后端领域枚举同源，禁止任意 hex/色值。 */
+export type RoleColor = 'info' | 'success' | 'warning' | 'danger' | 'emphasis' | 'neutral'
+
+export interface RoleColorOption {
+  label: string
+  value: RoleColor
+}
+
+/** 角色代表色选项：表单选择与列表渲染共用同一固定键集合。 */
+export const ROLE_COLORS: RoleColorOption[] = [
+  { label: '信息', value: 'info' },
+  { label: '成功', value: 'success' },
+  { label: '警告', value: 'warning' },
+  { label: '危险', value: 'danger' },
+  { label: '强调', value: 'emphasis' },
+  { label: '中性', value: 'neutral' },
+]
 
 export type IdValue = string
 
@@ -31,6 +48,10 @@ export interface RoleManageItem {
   level: RoleLevel
   systemRole: boolean
   systemType?: string
+  /** Morphicons 名称（形如 morph:shield），可空。 */
+  icon?: string
+  /** 代表色，缺省 info。 */
+  color?: RoleColor
   permissions: string[]
   permissionCount: number
   status: RoleStatus
@@ -52,6 +73,10 @@ export interface RolePayload {
   deptId?: IdValue
   level?: RoleLevel
   status?: RoleStatus
+  /** Morphicons 名称（形如 morph:shield），可空。 */
+  icon?: string
+  /** 代表色固定键，缺省 info。 */
+  color?: RoleColor
   permissions: string[]
 }
 

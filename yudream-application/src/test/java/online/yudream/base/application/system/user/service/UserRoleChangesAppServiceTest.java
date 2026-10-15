@@ -155,7 +155,7 @@ class UserRoleChangesAppServiceTest {
                 requiredDeptIds = departments;
                 return match;
             };
-            UserManageAppService details = new UserManageAppService(null, null, null, null, null) {
+            UserManageAppService details = new UserManageAppService(null, null, null, null, null, null) {
                 @Override
                 public UserManageDTO get(Long id) {
                     detailReads++;

@@ -27,6 +27,8 @@ public class DeptDO extends BaseDO {
 
     private String phone;
 
+    private Long avatarFileId;
+
     private Long parentId;
 
     private Integer sortOrder;

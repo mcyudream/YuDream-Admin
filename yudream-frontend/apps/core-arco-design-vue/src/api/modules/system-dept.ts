@@ -8,6 +8,7 @@ export interface DeptManageItem {
   id: IdValue
   name: string
   description?: string
+  avatar?: string
   leaderId?: IdValue
   leaderName?: string
   phone?: string
@@ -42,6 +43,7 @@ export default {
   options: () => systemClient.get<unknown, ApiResponse<OptionItem[]>>('api/system/depts/options'),
   create: (data: DeptPayload) => systemClient.post<unknown, ApiResponse<DeptManageItem>>('api/system/depts', data),
   update: (id: IdValue, data: DeptPayload) => systemClient.put<unknown, ApiResponse<DeptManageItem>>(`api/system/depts/${id}`, data),
+  uploadAvatar: (id: IdValue, data: FormData) => systemClient.post<unknown, ApiResponse<DeptManageItem>>(`api/system/depts/${id}/avatar`, data),
   enable: (id: IdValue) => systemClient.post<unknown, ApiResponse<null>>(`api/system/depts/${id}/enable`),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/depts/${id}`),
 }

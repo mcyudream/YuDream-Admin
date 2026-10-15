@@ -13,6 +13,7 @@ import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
+import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
@@ -79,7 +80,8 @@ public class RoleManageAppService {
             throw new BizException("角色编码已存在");
         }
         Dept dept = deptRepo.findById(cmd.getDeptId()).orElseThrow(() -> new BizException("部门不存在"));
-        Role role = Role.create(cmd.getName(), cmd.getCode(), DeptID.of(dept.getId()), cmd.getLevel() == null ? RoleLevel.USER : cmd.getLevel());
+        Role role = Role.create(cmd.getName(), cmd.getCode(), DeptID.of(dept.getId()),
+                cmd.getLevel() == null ? RoleLevel.USER : cmd.getLevel(), cmd.getIcon(), RoleColor.from(cmd.getColor()));
         role.replacePermissions(resolvePermissionIds(cmd.getPermissions()));
         return toDTO(roleRepo.save(role));
     }
@@ -92,6 +94,7 @@ public class RoleManageAppService {
         }
         Dept dept = deptRepo.findById(cmd.getDeptId()).orElseThrow(() -> new BizException("部门不存在"));
         role.updateBasic(cmd.getName(), cmd.getCode(), DeptID.of(dept.getId()), cmd.getLevel() == null ? role.getLevel() : cmd.getLevel());
+        role.updateAppearance(cmd.getIcon(), RoleColor.from(cmd.getColor()));
         role.replacePermissions(resolvePermissionIds(cmd.getPermissions()));
         if (cmd.getStatus() == RoleStatus.ACTIVE) {
             role.activate();
@@ -173,6 +176,8 @@ public class RoleManageAppService {
                 .level(role.getLevel())
                 .systemRole(role.isSystemRole())
                 .systemType(role.getSystemType())
+                .icon(role.getIcon())
+                .color(role.getColor() == null ? RoleColor.INFO.getCode() : role.getColor().getCode())
                 .permissions(role.getPermissions() == null ? new ArrayList<>() : role.getPermissions().stream().map(PermissionID::getCode).toList())
                 .permissionCount(role.getPermissions() == null ? 0 : role.getPermissions().size())
                 .status(role.getStatus())

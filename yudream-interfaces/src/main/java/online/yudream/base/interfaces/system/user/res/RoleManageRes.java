@@ -21,6 +21,10 @@ public class RoleManageRes {
     private RoleLevel level;
     private boolean systemRole;
     private SystemRoleType systemType;
+    /** Morphicons 名称（形如 morph:shield），可空。 */
+    private String icon;
+    /** 代表色键（info/success/warning/danger/emphasis/neutral）。 */
+    private String color;
     @Builder.Default
     private List<String> permissions = new ArrayList<>();
     private int permissionCount;

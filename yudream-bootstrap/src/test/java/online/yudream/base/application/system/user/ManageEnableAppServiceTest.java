@@ -1,5 +1,6 @@
 package online.yudream.base.application.system.user;
 
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.user.cmd.UserPasswordChangeCmd;
 import online.yudream.base.application.system.user.service.DeptManageAppService;
 import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
@@ -44,6 +45,8 @@ class ManageEnableAppServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private MessagingIdentityAppService messagingIdentityAppService;
+    @Mock
+    private FileAppService fileAppService;
 
     @Test
     void enableRoleOnlyChangesStatus() {
@@ -79,7 +82,7 @@ class ManageEnableAppServiceTest {
                 .build();
         when(deptRepo.findById(11L)).thenReturn(Optional.of(dept));
 
-        new DeptManageAppService(deptRepo, userRepo).enable(11L);
+        new DeptManageAppService(deptRepo, userRepo, fileAppService).enable(11L);
 
         assertThat(dept.getStatus()).isEqualTo(DeptStatus.ACTIVE);
         assertThat(dept.getName()).isEqualTo("Finance");
@@ -101,7 +104,7 @@ class ManageEnableAppServiceTest {
         cmd.setId(10L);
         cmd.setPassword("Passw0rd");
 
-        new UserManageAppService(userRepo, roleRepo, deptRepo, passwordEncoder, messagingIdentityAppService)
+        new UserManageAppService(userRepo, roleRepo, deptRepo, passwordEncoder, messagingIdentityAppService, fileAppService)
                 .changePassword(cmd);
 
         assertThat(user.getPassword().getEncodedPassword()).isEqualTo("encoded-Passw0rd");

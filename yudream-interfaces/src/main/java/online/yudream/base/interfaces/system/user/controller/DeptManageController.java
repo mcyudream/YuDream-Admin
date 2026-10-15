@@ -19,8 +19,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -54,6 +57,19 @@ public class DeptManageController {
     @PermissionRegister(code = "system:dept:edit", name = "编辑部门", module = "系统管理", desc = "编辑部门")
     public Result<DeptManageRes> update(@PathVariable Long id, @Valid @RequestBody DeptUpdateRequest request) {
         return Result.ok(UserManageWebAssembler.toRes(deptManageAppService.update(UserManageWebAssembler.toCmd(id, request))));
+    }
+
+    @PostMapping("/{id}/avatar")
+    @PermissionRegister(code = "system:dept:edit", name = "编辑部门", module = "系统管理", desc = "上传部门头像")
+    public Result<DeptManageRes> updateAvatar(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        StpUtil.checkPermission("system:dept:edit");
+        return Result.ok(UserManageWebAssembler.toRes(deptManageAppService.updateAvatar(
+                id,
+                StpUtil.getLoginIdAsLong(),
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize())));
     }
 
     @DeleteMapping("/{id}")

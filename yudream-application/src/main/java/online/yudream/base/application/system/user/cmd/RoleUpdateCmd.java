@@ -20,5 +20,7 @@ public class RoleUpdateCmd implements Serializable {
     private Long deptId;
     private RoleLevel level;
     private RoleStatus status;
+    private String icon;
+    private String color;
     private List<String> permissions = new ArrayList<>();
 }

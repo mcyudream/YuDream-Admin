@@ -15,6 +15,7 @@ export interface UserManageItem {
   id: IdValue
   username: string
   nickname?: string
+  avatar?: string
   email?: string
   phone?: string
   qq?: string
@@ -81,6 +82,7 @@ export default {
   update: (id: IdValue, data: UserUpdatePayload) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`, data),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/users/${id}`),
   enable: (id: IdValue) => systemClient.post<unknown, ApiResponse<null>>(`api/system/users/${id}/enable`),
+  uploadAvatar: (id: IdValue, data: FormData) => systemClient.post<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/avatar`, data),
   changePassword: (id: IdValue, password: string) => systemClient.put<unknown, ApiResponse<null>>(`api/system/users/${id}/password`, { password }),
   assignRoles: (id: IdValue, roleIds: IdValue[]) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/roles`, { roleIds }),
   assignDepts: (id: IdValue, depts: UserDeptAssign[]) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/depts`, { depts }),

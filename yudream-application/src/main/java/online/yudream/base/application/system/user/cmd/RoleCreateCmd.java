@@ -17,5 +17,7 @@ public class RoleCreateCmd implements Serializable {
     private String code;
     private Long deptId;
     private RoleLevel level;
+    private String icon;
+    private String color;
     private List<String> permissions = new ArrayList<>();
 }

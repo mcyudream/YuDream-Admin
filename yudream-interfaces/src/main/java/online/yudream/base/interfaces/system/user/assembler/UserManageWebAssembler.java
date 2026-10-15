@@ -102,6 +102,8 @@ public class UserManageWebAssembler {
         cmd.setCode(request.getCode());
         cmd.setDeptId(request.getDeptId());
         cmd.setLevel(request.getLevel());
+        cmd.setIcon(request.getIcon());
+        cmd.setColor(request.getColor());
         cmd.setPermissions(request.getPermissions());
         return cmd;
     }
@@ -114,6 +116,8 @@ public class UserManageWebAssembler {
         cmd.setDeptId(request.getDeptId());
         cmd.setLevel(request.getLevel());
         cmd.setStatus(request.getStatus());
+        cmd.setIcon(request.getIcon());
+        cmd.setColor(request.getColor());
         cmd.setPermissions(request.getPermissions());
         return cmd;
     }
@@ -176,6 +180,7 @@ public class UserManageWebAssembler {
                 .id(dto.getId())
                 .username(dto.getUsername())
                 .nickname(dto.getNickname())
+                .avatar(dto.getAvatar())
                 .email(dto.getEmail())
                 .phone(dto.getPhone())
                 .qq(dto.getQq())
@@ -231,6 +236,8 @@ public class UserManageWebAssembler {
                 .level(dto.getLevel())
                 .systemRole(dto.isSystemRole())
                 .systemType(dto.getSystemType())
+                .icon(dto.getIcon())
+                .color(dto.getColor())
                 .permissions(dto.getPermissions())
                 .permissionCount(dto.getPermissionCount())
                 .status(dto.getStatus())
@@ -244,6 +251,7 @@ public class UserManageWebAssembler {
                 .id(dto.getId())
                 .name(dto.getName())
                 .description(dto.getDescription())
+                .avatar(dto.getAvatar())
                 .leaderId(dto.getLeaderId())
                 .leaderName(dto.getLeaderName())
                 .phone(dto.getPhone())

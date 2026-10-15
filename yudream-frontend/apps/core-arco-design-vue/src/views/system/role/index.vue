@@ -2,13 +2,14 @@
 import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
-import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
+import type { IdValue, PermissionItem, RoleColor, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
 import type { UserManageItem } from '@/api/modules/system-user'
 import { useYdModal, useYdToast } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
-import apiRole from '@/api/modules/system-role'
+import apiRole, { ROLE_COLORS } from '@/api/modules/system-role'
+
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 import { permissionOperationError } from './components/permission-operations'
 import PermissionConstellation from './components/PermissionConstellation.vue'
@@ -55,6 +56,8 @@ const form = reactive<RolePayload>({
   deptId: undefined,
   level: 'USER',
   status: 'ACTIVE',
+  icon: undefined,
+  color: 'info',
   permissions: [],
 })
 
@@ -71,6 +74,15 @@ const levelOptions = [
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
 const roleUserColumn: UserColumn<RoleManageItem> = { nameKey: 'name', emailKey: 'code', header: '角色', width: 220 }
+
+/** 代表色键回落：缺省或非法值统一按 info 渲染，与后端领域枚举默认值一致。 */
+function roleColorOf(color?: string): RoleColor {
+  return ROLE_COLORS.some(item => item.value === color) ? color as RoleColor : 'info'
+}
+
+function roleColorLabel(color?: string): string {
+  return ROLE_COLORS.find(item => item.value === roleColorOf(color))?.label ?? '信息'
+}
 
 const roleStatusColumn: StatusColumn<RoleManageItem> = {
   statusKey: 'status',
@@ -91,6 +103,7 @@ const roleActions: ActionMenuItem<RoleManageItem>[] = [
 
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
+  { id: 'visual', header: '标识', width: 88, align: 'center' },
   { accessorKey: 'code', header: '编码', width: 180 },
   { accessorKey: 'deptName', header: '部门', width: 160 },
   { accessorKey: 'level', header: '等级', width: 120 },
@@ -340,6 +353,8 @@ function openCreate() {
     deptId: deptOptions.value[0]?.value,
     level: 'USER' as RoleLevel,
     status: 'ACTIVE' as RoleStatus,
+    icon: undefined,
+    color: 'info' as RoleColor,
     permissions: [],
   })
   formVisible.value = true
@@ -357,6 +372,8 @@ function openEdit(row: RoleManageItem) {
     deptId: row.deptId,
     level: row.level,
     status: row.status,
+    icon: row.icon,
+    color: roleColorOf(row.color),
     permissions: [...row.permissions],
   })
   formVisible.value = true
@@ -466,7 +483,7 @@ function importRoles() {
 
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1040px]"
+          table-class="min-w-[1128px]"
 
           column-visibility stripe border
           :user-column="roleUserColumn"
@@ -493,6 +510,13 @@ function importRoles() {
                 </div>
               </div>
             </YdSearchBar>
+          </template>
+          <template #cell-visual="{ row }">
+            <span class="role-chip" :class="`role-chip--${roleColorOf(row.original.color)}`">
+              <YdIcon v-if="row.original.icon" :name="row.original.icon" aria-hidden="true" />
+              <span v-else class="role-chip__dot" aria-hidden="true" />
+              <span class="sr-only">代表色：{{ roleColorLabel(row.original.color) }}</span>
+            </span>
           </template>
           <template #cell-systemRole="{ row }">
             <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
@@ -599,6 +623,22 @@ function importRoles() {
               <YdSelect v-model="form.level" :options="levelOptions" class="w-full" />
             </YdFormItem>
           </div>
+          <div>
+            <YdFormItem label="图标">
+              <YdIconPicker v-model="form.icon" placeholder="选择角色图标" class="w-full" />
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="代表色">
+              <div class="flex gap-2 w-full items-center">
+                <YdSelect v-model="form.color" :options="ROLE_COLORS" class="flex-1" />
+                <span class="role-chip shrink-0" :class="`role-chip--${roleColorOf(form.color)}`" aria-hidden="true">
+                  <YdIcon v-if="form.icon" :name="form.icon" />
+                  <span v-else class="role-chip__dot" />
+                </span>
+              </div>
+            </YdFormItem>
+          </div>
           <div v-if="editing">
             <YdFormItem label="状态">
               <YdSelect v-model="form.status" :disabled="editing.systemRole" :options="statusOptions" class="w-full" />
@@ -613,3 +653,54 @@ function importRoles() {
     </YdModal>
   </div>
 </template>
+
+<style scoped>
+/*
+  角色标识色块：代表色只消费 YD 语义令牌，不引用品牌色阶。
+  单一 class→var 映射表同时驱动图标与色块（均取 currentColor），列表与表单预览共用。
+*/
+.role-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-text-3);
+  background: color-mix(in srgb, currentcolor 16%, transparent);
+  border-radius: 8px;
+}
+
+.role-chip--info {
+  color: var(--yd-status-info);
+}
+
+.role-chip--success {
+  color: var(--yd-status-success);
+}
+
+.role-chip--warning {
+  color: var(--yd-status-warning);
+}
+
+.role-chip--danger {
+  color: var(--yd-status-danger);
+}
+
+.role-chip--emphasis {
+  color: var(--yd-emphasis);
+}
+
+.role-chip--neutral {
+  color: var(--color-text-3);
+}
+
+.role-chip__dot {
+  width: 8px;
+  height: 8px;
+  background: currentcolor;
+  border-radius: 999px;
+}
+</style>
