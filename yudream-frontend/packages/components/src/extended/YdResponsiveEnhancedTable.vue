@@ -4,7 +4,7 @@ import type { TableCellSlotProps, TableColumn, TableHeaderSlotProps } from '../b
 import type { BadgeVariant, EnhancedTableProps } from './YdEnhancedTable.types'
 import { FlexRender } from '@tanstack/vue-table'
 import { useMediaQuery } from '@vueuse/core'
-import { computed, ref, useAttrs, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, shallowRef, useAttrs, watch } from 'vue'
 import { YdCheckbox } from '../adapters/index'
 import FaAvatar from '../basic/avatar/index.vue'
 import FaBadge from '../basic/badge/index.vue'
@@ -89,7 +89,22 @@ function syncSelection(selection: RowSelectionState) {
 }
 
 watch(() => rowSelection.value, syncSelection, { deep: true, immediate: true })
-watch(() => tableRef.value?.table, () => syncSelection(rowSelection.value), { flush: 'post' })
+
+/**
+ * 桌面表格实例：卡片字段与选择桥都依赖它。
+ * 用 shallowRef 持有实例，保证表格挂载后 engineRows / cardItems 会重算，
+ * 否则首帧在子组件 ref 就绪前求值会一直停留在原始值回退分支。
+ */
+const tableInstance = shallowRef<TanStackTable<TData>>()
+watch(() => tableRef.value?.table, (table) => {
+  tableInstance.value = table
+  syncSelection(rowSelection.value)
+}, { flush: 'post' })
+onMounted(() => {
+  nextTick(() => {
+    tableInstance.value = tableRef.value?.table
+  })
+})
 
 function onSelectionChange(rows: TData[], selection: RowSelectionState) {
   if (!sameSelection(rowSelection.value, selection)) {
@@ -98,13 +113,20 @@ function onSelectionChange(rows: TData[], selection: RowSelectionState) {
   emit('selectionChange', rows, selection)
 }
 
-const engineRows = computed(() => new Map(tableRef.value?.table.getCoreRowModel().flatRows.map(row => [row.original, row]) ?? []))
+const engineRows = computed(() => {
+  const table = tableInstance.value
+  const rows = props.data
+  if (!table || rows.length === 0) {
+    return new Map<TData, Row<TData>>()
+  }
+  return new Map(table.getCoreRowModel().flatRows.map(row => [row.original, row]))
+})
 
 function cardSelection(row: TData) {
   const engineRow = engineRows.value.get(row)
   return {
     ...createYdResponsiveCardSelection(engineRow),
-    table: tableRef.value?.table,
+    table: tableInstance.value,
   }
 }
 
@@ -352,7 +374,7 @@ function fieldSlotProps(field: CardField, index: number): TableCellSlotProps<TDa
     column: field.cell!.column,
     index,
     row: field.row!,
-    table: tableRef.value!.table,
+    table: tableInstance.value!,
     value: field.value,
   }
 }

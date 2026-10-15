@@ -1,8 +1,8 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
-import type { RowData, RowSelectionState } from '@tanstack/vue-table'
+import type { RowData, RowSelectionState, Table as TanStackTable } from '@tanstack/vue-table'
 import type { TableColumn } from '../basic/table/index.vue'
 import type { BadgeVariant, EnhancedTableProps } from './YdEnhancedTable.types'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import FaAvatar from '../basic/avatar/index.vue'
 import { Badge } from '../basic/badge/badge'
 import FaButton from '../basic/button/index.vue'
@@ -17,6 +17,15 @@ const props = withDefaults(defineProps<EnhancedTableProps<TData>>(), {
 })
 
 const emit = defineEmits<{ selectionChange: [rows: TData[], selection: RowSelectionState] }>()
+
+/** 桌面表格实例，供响应式版本读取引擎行与可见单元格 */
+const tableRef = ref<{ table: TanStackTable<TData> }>()
+
+defineExpose({
+  get table() {
+    return tableRef.value?.table
+  },
+})
 
 /** 构建完整的列配置 */
 const fullColumns = computed<TableColumn<TData, any>[]>(() => {
@@ -130,6 +139,7 @@ function hasActionItems(groups: DropdownMenuItem[][]) {
 
 <template>
   <FaTable
+    ref="tableRef"
     v-bind="$props"
     :columns="fullColumns"
     class="yd-enhanced-table"
