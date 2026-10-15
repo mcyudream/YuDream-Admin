@@ -57,7 +57,10 @@
   padding-top: 0;
 }
 
-/* 视图切换与按钮同高：列表取控件高度，触发器填满列表，避免活动胶囊溢出容器 */
+/*
+ * 视图切换与同排按钮同高：列表取控件高度（40/38/32），触发器只填满列表（h 100%-1px）。
+ * 触发器禁止再设 min-height——列表有 3px 内边距，触发器撑到列表高度会溢出边框、与按钮错位。
+ */
 .yd-tabs [role="tablist"] {
   min-height: var(--yd-control-height);
   border-radius: var(--yd-control-radius);
