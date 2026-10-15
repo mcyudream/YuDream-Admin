@@ -1086,7 +1086,7 @@ function parseJsonConfig() {
 .capability-card__icon { display:grid; grid-area:icon; width:30px; height:30px; place-items:center; border-radius:9px; background:var(--color-fill-2); color:var(--color-text-2); font-size:16px; transition:transform .18s cubic-bezier(.32,.72,0,1); }
 .capability-card__name { grid-area:name; overflow:hidden; font-size:14px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
 .capability-card__description { grid-area:desc; overflow:hidden; color:var(--color-text-3); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
-.capability-card__state { display:flex; grid-area:state; align-items:center; font-size:11.5px; white-space:nowrap; }
+.capability-card__state { display:flex; grid-area:state; justify-self:end; align-items:center; font-size:11.5px; white-space:nowrap; }
 .capability-card__meta { display:none; color:var(--color-text-3); font-size:11px; white-space:nowrap; }
 .capability-card__chevron { display:none; color:var(--color-text-3); }
 
