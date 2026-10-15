@@ -11,8 +11,8 @@
   /* 头部高度 */
   --g-header-height: 60px;
 
-  /* 侧边栏宽度 */
-  --g-main-sidebar-width: 88px;
+  /* 侧边栏宽度（一级栏 80px：68px 按钮内 60px 标签区正好容纳 5 个汉字） */
+  --g-main-sidebar-width: 80px;
   --g-sub-sidebar-width: 220px;
   --g-sub-sidebar-collapse-width: 64px;
 
