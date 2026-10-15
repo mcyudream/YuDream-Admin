@@ -646,18 +646,20 @@ function parseJsonConfig() {
   margin-bottom: 24px;
 }
 
-.capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.82fr) minmax(0, 1.5fr); gap:16px; align-items:start; }
-.capability-browser { display:grid; gap:20px; min-width:0; }
+.capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.82fr) minmax(0, 1.5fr); gap:16px; align-items:stretch; height:min(760px, calc(100dvh - 220px)); min-height:480px; }
+.capability-browser { display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:16px; min-width:0; min-height:0; }
+.capability-browser :deep(.yd-loading-overlay) { min-height:0; height:100%; }
+.capability-browser :deep(.yd-loading-overlay__content) { display:grid; grid-template-rows:minmax(0,1fr); min-height:0; height:100%; }
 .capability-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); }
 .capability-overview > div { display:grid; gap:4px; min-width:0; padding:12px; }
 .capability-overview > div + div { border-left:1px solid var(--color-border-2); }
 .capability-overview span { color:var(--color-text-3); font-size:11px; }
 .capability-overview strong { color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-overview .has-errors strong { color:var(--color-danger-6); }
-.capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:0; }
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
-.capability-catalog { display:grid; gap:8px; }
+.capability-catalog { display:grid; gap:8px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
 .capability-card { display:grid; grid-template-columns:40px minmax(0,1fr) 16px; align-items:start; gap:12px; width:100%; min-width:0; padding:14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .16s ease, background-color .16s ease; }
 .capability-card:hover,.capability-card.is-selected { border-color:var(--color-border-3); background:var(--color-fill-1); }
 .capability-card.is-selected { box-shadow:inset 3px 0 var(--color-border-3); }
@@ -669,7 +671,7 @@ function parseJsonConfig() {
 .capability-card__meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--color-text-3); font-size:11px; }
 .capability-card__meta code { padding:2px 6px; border-radius:4px; background:var(--color-fill-2); }
 .capability-card__chevron { align-self:center; color:var(--color-text-3); }
-.capability-detail { display:grid; gap:20px; min-width:0; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); }
+.capability-detail { display:grid; gap:20px; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); scrollbar-gutter:stable; }
 .detail-header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; }
 .detail-title { display:flex; min-width:0; gap:12px; align-items:center; }
 .detail-title h2 { margin:0 0 4px; font-size:18px; font-weight:650; }
@@ -696,8 +698,12 @@ function parseJsonConfig() {
 .config-field__hint { color:var(--color-text-3); font-size:12px; font-weight:400; line-height:1.5; }
 .config-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:14px; border-top:1px solid var(--color-border-2); }
 @media (max-width: 760px) {
-  .capability-workbench { grid-template-columns:minmax(0,1fr); }
-  .capability-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .capability-workbench { grid-template-columns:minmax(0,1fr); height:auto; min-height:0; }
+  .capability-browser { grid-template-rows:auto auto auto; min-height:0; }
+  .capability-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:min(560px, 58dvh); }
+  .capability-browser :deep(.yd-loading-overlay),
+  .capability-browser :deep(.yd-loading-overlay__content) { height:auto; }
+  .capability-detail { max-height:none; overflow:visible; overscroll-behavior:auto; }
   .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
   .capability-card__icon { width:36px; height:36px; }
   .capability-overview > div { padding:10px; }
