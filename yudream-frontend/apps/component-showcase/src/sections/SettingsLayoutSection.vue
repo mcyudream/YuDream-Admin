@@ -69,7 +69,7 @@ const layoutCode = `<YdSettingsLayout
 </YdSettingsLayout>`
 
 // 分区选择器在窄屏使用；见组件 README 的「响应式行为」
-const mobileHint = '窄屏（lg 以下）渲染为分区选择器，而不是横向标签；title/description 不传时头部不渲染。'
+const mobileHint = '窄屏（lg 以下）渲染为分区选择器，而不是横向标签；title/description 不传时头部不渲染。宿主设置页用 surface 模式铺满白底替代 YdPageMain，保存类按钮统一放页头。'
 </script>
 
 <template>

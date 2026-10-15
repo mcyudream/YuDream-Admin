@@ -28,6 +28,8 @@ const props = withDefaults(defineProps<{
   align?: 'center' | 'start'
   /** 居中模式下的最大宽度类，可被页面 class 覆盖 */
   widthClass?: string
+  /** 页面级铺满：铺白色底并至少占满可视高度，用于替换卡片式的 YdPageMain 容器 */
+  surface?: boolean
   class?: HTMLAttributes['class']
   headerClass?: HTMLAttributes['class']
   navClass?: HTMLAttributes['class']
@@ -36,6 +38,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   align: 'center',
   widthClass: 'max-w-4xl',
+  surface: false,
 })
 
 const emits = defineEmits<{
@@ -73,7 +76,12 @@ function handleMobileChange(value: string | number | undefined) {
 
 <template>
   <div
-    :class="cn('w-full', props.align === 'center' && ['mx-auto', props.widthClass], props.class)"
+    :class="cn(
+      'w-full',
+      props.surface && 'min-h-full bg-card py-5 lg:py-6',
+      props.align === 'center' && ['mx-auto', props.widthClass],
+      props.class,
+    )"
   >
     <header
       v-if="title || description || slots.header || slots.title || slots.description"
