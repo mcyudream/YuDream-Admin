@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AiEndpointDraft } from './ai-endpoints'
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
+import { YdStateIllustration } from '@yudream/components'
 import apiCapability from '@/api/modules/platform-capability'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
@@ -381,32 +382,110 @@ const metricLabels: Record<string, string> = {
 interface MetricEntry {
   key: string
   label: string
-  type: 'tags' | 'boolean' | 'text'
+  type: 'tags' | 'boolean' | 'text' | 'number' | 'link'
   tags: string[]
   text: string
+  number: number
   ok: boolean
+  icon: string
 }
 
-/** 指标值可能是数组、布尔或长字符串：转成可读的标签列表或文本，避免直接把原始 JSON 塞进卡片。 */
+/** 指标图标与单位：让每个数字有语义，而不是一排同样的空白卡。 */
+const metricIcons: Record<string, string> = {
+  connections: 'morph:plug-zap',
+  sessions: 'morph:radio',
+  messages: 'morph:message-square',
+  providers: 'morph:boxes',
+  providerCount: 'morph:boxes',
+  modelCount: 'morph:brain-circuit',
+  protocols: 'morph:git-branch',
+  embeddingEndpoints: 'morph:waypoints',
+  embeddingModelCount: 'morph:waypoints',
+  rerankEndpoints: 'morph:list-ordered',
+  rerankModelCount: 'morph:list-ordered',
+  apiKeyConfigured: 'morph:key-round',
+  proxyEnabled: 'morph:network',
+  nodes: 'morph:circle-dot',
+  documents: 'morph:file-text',
+}
+
+function metricIcon(key: string) {
+  return metricIcons[key] || 'morph:activity'
+}
+
+/** 指标值可能是数组、布尔、数字或长字符串：转成可读的标签列表/数字/文本，避免原始 JSON 直接进卡片。 */
 function metricEntries(item?: CapabilityItem): MetricEntry[] {
   return Object.entries(item?.metrics || {}).map(([key, value]) => {
     const label = metricLabels[key] || key
+    const icon = metricIcon(key)
     if (Array.isArray(value)) {
       const tags = value.map(entry => (entry === null || entry === undefined ? '-' : String(entry))).filter(Boolean)
-      return { key, label, type: 'tags' as const, tags, text: tags.join('、'), ok: true }
+      return { key, label, icon, type: 'tags' as const, tags, text: tags.join('、'), number: tags.length, ok: tags.length > 0 }
     }
     if (typeof value === 'boolean') {
-      return { key, label, type: 'boolean' as const, tags: [], text: value ? '是' : '否', ok: value }
+      return { key, label, icon, type: 'boolean' as const, tags: [], text: value ? '是' : '否', number: value ? 1 : 0, ok: value }
+    }
+    if (typeof value === 'number') {
+      return { key, label, icon, type: 'number' as const, tags: [], text: String(value), number: value, ok: true }
     }
     if (value && typeof value === 'object') {
       const text = Object.entries(value as Record<string, unknown>)
         .map(([innerKey, innerValue]) => `${metricLabels[innerKey] || innerKey} ${String(innerValue)}`)
         .join('；')
-      return { key, label, type: 'text' as const, tags: [], text: text || '-', ok: true }
+      return { key, label, icon, type: 'text' as const, tags: [], text: text || '-', number: 0, ok: true }
     }
-    return { key, label, type: 'text' as const, tags: [], text: value === null || value === undefined || value === '' ? '-' : String(value), ok: true }
+    const text = value === null || value === undefined || value === '' ? '-' : String(value)
+    const isLink = /^(?:https?:)?\/\//.test(text) || text.startsWith('/')
+    return { key, label, icon, type: (isLink ? 'link' : 'text') as 'link' | 'text', tags: [], text, number: 0, ok: text !== '-' }
   })
 }
+
+/** AI 能力的模型分布：只用接口上报的数字，不虚构数据。 */
+const aiModelBreakdown = computed(() => {
+  const metrics = selected.value?.metrics || {}
+  const total = Number(metrics.modelCount ?? 0)
+  const embedding = Number(metrics.embeddingModelCount ?? 0)
+  const rerank = Number(metrics.rerankModelCount ?? 0)
+  const chat = Math.max(0, total - embedding - rerank)
+  const sum = chat + embedding + rerank
+  return {
+    total,
+    sum,
+    items: [
+      { key: 'chat', label: '对话', value: chat, icon: 'morph:messages-square' },
+      { key: 'embedding', label: '向量化', value: embedding, icon: 'morph:waypoints' },
+      { key: 'rerank', label: '重排序', value: rerank, icon: 'morph:list-ordered' },
+    ].map(item => ({ ...item, percent: sum ? Math.round(item.value / sum * 100) : 0 })),
+  }
+})
+
+const dependencyReady = computed(() => dependencyRows.value.filter(item => item.enabled).length)
+const dependencyPercent = computed(() => dependencyRows.value.length
+  ? Math.round(dependencyReady.value / dependencyRows.value.length * 100)
+  : 100)
+const dependencySummary = computed(() => {
+  if (!dependencyRows.value.length) {
+    return '该能力不依赖其他能力'
+  }
+  return missingDependencies.value.length
+    ? `需先启用：${missingDependencies.value.map(item => item.name).join('、')}`
+    : '依赖全部满足，可以启用'
+})
+
+/** 未上报运行指标时展示已保存的连接配置，避免整块空白。 */
+const configHighlights = computed(() => {
+  const config = selected.value?.config || {}
+  const secretKeys = Object.keys(selected.value?.secretConfigured || {})
+  const fields = fieldsOf(selected.value?.code)
+  const entries = fields
+    .filter(field => field.type !== 'password' && config[field.key])
+    .map(field => ({ key: field.key, label: field.label, value: String(config[field.key]) }))
+  const baseUrl = config.baseUrl || config.uri || config.host
+  if (baseUrl && !entries.some(item => item.value === baseUrl)) {
+    entries.unshift({ key: 'endpoint', label: '服务地址', value: String(baseUrl) })
+  }
+  return { entries, secretCount: secretKeys.length }
+})
 
 /** 检查时间带 7 位小数时截断到秒，避免长串撑破信息卡。 */
 function formatTime(value?: string) {
@@ -423,10 +502,53 @@ function dependencyStatus(item?: CapabilityItem) {
     return {
       code,
       name: dependency?.name || code,
+      icon: dependency?.icon || 'morph:puzzle',
       enabled: Boolean(dependency?.enabled),
       available: Boolean(dependency),
     }
   })
+}
+
+/** 概览区展示的数字指标；AI 的模型数已由环形图承载，避免重复。 */
+const breakdownKeys = ['modelCount', 'embeddingModelCount', 'rerankModelCount']
+const healthNumbers = computed(() => metricEntries(selected.value)
+  .filter(metric => metric.type === 'number' && !(aiModelBreakdown.value.sum && breakdownKeys.includes(metric.key))))
+/** 事实清单：标签、布尔、链接等逐行展示，窄栏也读得顺。 */
+const healthFacts = computed(() => metricEntries(selected.value).filter(metric => metric.type !== 'number'))
+
+/** 环形图用 conic-gradient 表达三段占比，颜色只由强调色与透明层次决定，不引入私有色板。 */
+const donutStyle = computed(() => {
+  const items = aiModelBreakdown.value.items.filter(item => item.value > 0)
+  const sum = items.reduce((total, item) => total + item.value, 0)
+  if (!sum) {
+    return {}
+  }
+  let cursor = 0
+  const stops = items.map((item) => {
+    const from = cursor / sum * 360
+    cursor += item.value
+    const to = cursor / sum * 360
+    const base = 'var(--yd-emphasis, var(--color-text-1))'
+    const color = item.key === 'chat'
+      ? base
+      : item.key === 'embedding'
+        ? `color-mix(in oklab, ${base} 62%, transparent)`
+        : `color-mix(in oklab, ${base} 32%, transparent)`
+    return `${color} ${from}deg ${to}deg`
+  })
+  return { background: `conic-gradient(${stops.join(', ')})` }
+})
+
+/** 依赖项可点击跳转：省去在目录里再找一次。 */
+function focusCapability(code: string) {
+  const target = rows.value.find(row => row.code === code)
+  if (!target) {
+    return
+  }
+  if (configEditing.value) {
+    cancelConfig()
+  }
+  selectedCode.value = target.code
 }
 
 function fieldsOf(code?: string): CapabilityConfigField[] {
@@ -553,10 +675,26 @@ function parseJsonConfig() {
           </div>
           <YdLoadingOverlay :loading="loading">
             <div v-if="filteredRows.length" class="capability-catalog">
-              <YdAction v-for="item in filteredRows" :key="item.code" class="capability-card" :class="{ 'is-selected': selected?.code === item.code }" :aria-pressed="selected?.code === item.code" @click="selectCapability(item)">
+              <YdAction
+                v-for="(item, cardIndex) in filteredRows"
+                :key="item.code"
+                class="capability-card"
+                :class="{ 'is-selected': selected?.code === item.code }"
+                :style="{ '--card-index': Math.min(cardIndex, 12) }"
+                :aria-pressed="selected?.code === item.code"
+                @click="selectCapability(item)"
+              >
                 <span class="capability-card__icon"><YdIcon :name="item.icon || 'morph:puzzle'" /></span>
                 <span class="capability-card__content">
-                  <span class="capability-card__topline"><strong>{{ item.name }}</strong><YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag></span>
+                  <span class="capability-card__topline">
+                    <strong>{{ item.name }}</strong>
+                    <span class="capability-card__status">
+                      <i class="capability-card__dot" :class="{ 'is-live': item.status === 'ENABLED' }" />
+                      <YdTag :variant="statusVariant(item.status)">
+                        {{ statusText(item.status) }}
+                      </YdTag>
+                    </span>
+                  </span>
                   <span class="capability-card__description">{{ item.description || '暂无说明' }}</span>
                   <span class="capability-card__meta"><span>{{ typeText(item.type) }}</span><code>{{ item.code }}</code></span>
                 </span>
@@ -655,21 +793,39 @@ function parseJsonConfig() {
             </div>
             <div v-if="dependencyRows.length" class="dependency-panel">
               <div class="section-title">
-                <span>依赖能力</span><YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
+                <span>依赖能力</span>
+                <YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
                   {{ missingDependencies.length ? '未满足' : '已满足' }}
                 </YdTag>
               </div>
+              <div class="dependency-progress">
+                <YdProgress :model-value="dependencyPercent" class="dependency-progress__bar" />
+                <span>{{ dependencyReady }} / {{ dependencyRows.length }} 已启用</span>
+              </div>
               <div class="dependency-list">
-                <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
-                  <div><strong>{{ dependency.name }}</strong><code>{{ dependency.code }}</code></div><YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
+                <YdAction
+                  v-for="dependency in dependencyRows"
+                  :key="dependency.code"
+                  class="dependency-item"
+                  :class="{ 'is-missing': !dependency.enabled }"
+                  @click="focusCapability(dependency.code)"
+                >
+                  <span class="dependency-item__icon"><YdIcon :name="dependency.icon" /></span>
+                  <span class="dependency-item__body">
+                    <strong>{{ dependency.name }}</strong>
+                    <code>{{ dependency.code }}</code>
+                  </span>
+                  <YdTag :variant="dependency.enabled ? 'default' : dependency.available ? 'secondary' : 'destructive'">
                     {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
                   </YdTag>
-                </div>
+                  <YdIcon name="morph:arrow-right" class="dependency-item__jump" />
+                </YdAction>
               </div>
-              <p v-if="missingDependencies.length" class="dependency-tip">
-                当前能力需要先启用依赖能力：{{ missingDependencies.map(item => item.name).join('、') }}
+              <p class="dependency-tip">
+                {{ dependencySummary }}
               </p>
             </div>
+
             <div class="health-panel">
               <div class="section-title">
                 <span>健康信息</span>
@@ -677,27 +833,94 @@ function parseJsonConfig() {
                   {{ selected.healthMessage || statusText(selected.status) }}
                 </YdTag>
               </div>
-              <dl v-if="metricEntries(selected).length" class="metric-grid">
-                <div v-for="metric in metricEntries(selected)" :key="metric.key" class="metric-item">
-                  <dt>{{ metric.label }}</dt>
-                  <dd>
-                    <template v-if="metric.type === 'tags'">
-                      <span v-if="!metric.tags.length" class="metric-empty">无</span>
-                      <YdTag v-for="tag in metric.tags" v-else :key="tag" variant="secondary">
-                        {{ tag }}
-                      </YdTag>
-                    </template>
-                    <YdTag v-else-if="metric.type === 'boolean'" :variant="metric.ok ? 'default' : 'secondary'">
-                      {{ metric.text }}
-                    </YdTag>
-                    <span v-else class="metric-text">{{ metric.text }}</span>
-                  </dd>
+
+              <template v-if="metricEntries(selected).length">
+                <div class="health-overview">
+                  <div
+                    v-if="aiModelBreakdown.sum"
+                    class="health-donut"
+                    :style="donutStyle"
+                    role="img"
+                    :aria-label="`模型分布：${aiModelBreakdown.items.map(item => `${item.label} ${item.value} 个`).join('，')}`"
+                  >
+                    <div class="health-donut__hole">
+                      <strong><YdAnimatedCountTo :value="aiModelBreakdown.total" /></strong>
+                      <span>模型</span>
+                    </div>
+                  </div>
+                  <div class="health-overview__body">
+                    <ul v-if="healthNumbers.length" class="health-overview__stats">
+                      <li v-for="metric in healthNumbers" :key="metric.key">
+                        <span>{{ metric.label }}</span>
+                        <strong><YdAnimatedCountTo :value="metric.number" /></strong>
+                      </li>
+                    </ul>
+                    <ul v-if="aiModelBreakdown.sum" class="health-overview__legend">
+                      <li v-for="item in aiModelBreakdown.items" :key="item.key">
+                        <i :data-usage="item.key" />
+                        <span>{{ item.label }}</span>
+                        <strong>{{ item.value }}</strong>
+                        <small v-if="item.percent">{{ item.percent }}%</small>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
-              </dl>
-              <div v-else class="empty-state">
-                暂无运行指标
+
+                <ul v-if="healthFacts.length" class="health-facts">
+                  <li v-for="metric in healthFacts" :key="metric.key">
+                    <span class="health-facts__label">{{ metric.label }}</span>
+                    <div class="health-facts__value">
+                      <template v-if="metric.type === 'tags'">
+                        <YdTag v-for="tag in metric.tags" :key="tag" variant="secondary">
+                          {{ tag }}
+                        </YdTag>
+                        <span v-if="!metric.tags.length" class="health-facts__muted">无</span>
+                      </template>
+                      <YdTag v-else-if="metric.type === 'boolean'" :variant="metric.ok ? 'default' : 'secondary'">
+                        <YdIcon :name="metric.ok ? 'morph:check' : 'morph:minus'" />
+                        {{ metric.text }}
+                      </YdTag>
+                      <a v-else-if="metric.type === 'link'" class="health-facts__link" :href="metric.text" target="_blank" rel="noopener">
+                        <YdIcon name="morph:external-link" />{{ metric.text }}
+                      </a>
+                      <span v-else>{{ metric.text }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </template>
+
+              <div v-else class="health-empty">
+                <YdStateIllustration :name="selected.status === 'ERROR' ? 'error' : 'empty'" size="sm" />
+                <div>
+                  <strong>{{ selected.enabled ? '该能力暂未上报运行指标' : '启用后即可查看运行指标' }}</strong>
+                  <p>{{ selected.enabled ? '当前状态正常，无需处理。' : '可以先检查下方连接配置，再启用能力。' }}</p>
+                </div>
+              </div>
+
+              <div v-if="configHighlights.entries.length || configHighlights.secretCount" class="health-config">
+                <div class="section-title">
+                  <span>当前配置</span>
+                  <YdTag v-if="configHighlights.secretCount" variant="secondary">
+                    {{ configHighlights.secretCount }} 项凭据已配置
+                  </YdTag>
+                </div>
+                <ul>
+                  <li v-for="entry in configHighlights.entries" :key="entry.key">
+                    <span>{{ entry.label }}</span>
+                    <code>{{ entry.value }}</code>
+                    <YdCopyButton :text="entry.value" label="" />
+                    <a
+                      v-if="entry.key === 'endpoint' && /^https?:/.test(entry.value)"
+                      :href="entry.value"
+                      target="_blank"
+                      rel="noopener"
+                      class="health-config__open"
+                    >打开</a>
+                  </li>
+                </ul>
               </div>
             </div>
+
             <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
               <div class="section-title">
                 <span>连接调试</span>
@@ -750,17 +973,25 @@ function parseJsonConfig() {
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
 .capability-catalog { display:grid; gap:8px; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:2px 8px 2px 2px; }
-.capability-card { display:grid; grid-template-columns:40px minmax(0,1fr) 16px; align-items:start; gap:12px; width:100%; min-width:0; padding:14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .16s ease, background-color .16s ease; }
-.capability-card:hover,.capability-card.is-selected { border-color:var(--color-border-3); background:var(--color-fill-1); }
-.capability-card.is-selected { box-shadow:inset 3px 0 var(--color-border-3); }
-.capability-card__icon { display:grid; width:40px; height:40px; place-items:center; border-radius:8px; background:var(--color-fill-2); color:var(--color-text-2); font-size:20px; }
+.capability-card { position:relative; display:grid; grid-template-columns:40px minmax(0,1fr) 16px; align-items:start; gap:12px; width:100%; min-width:0; padding:14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; animation:capability-card-in .32s cubic-bezier(.32,.72,0,1) both; animation-delay:calc(var(--card-index, 0) * 26ms); }
+.capability-card:hover { transform:translateY(-2px); border-color:var(--color-border-3); background:var(--color-fill-1); box-shadow:0 6px 18px -12px oklch(0 0 0 / 45%); }
+.capability-card:hover .capability-card__chevron { transform:translateX(3px); }
+.capability-card:hover .capability-card__icon { transform:scale(1.06) rotate(-2deg); }
+.capability-card.is-selected { border-color:var(--color-border-3); background:var(--color-fill-1); box-shadow:inset 3px 0 var(--color-border-3); }
+.capability-card__icon { display:grid; width:40px; height:40px; place-items:center; border-radius:8px; background:var(--color-fill-2); color:var(--color-text-2); font-size:20px; transition:transform .18s cubic-bezier(.32,.72,0,1); }
+.capability-card__status { position:relative; display:inline-flex; align-items:center; gap:6px; }
+.capability-card__dot { width:7px; height:7px; flex:none; border-radius:50%; background:currentColor; color:var(--color-text-3); opacity:.45; }
+.capability-card__dot.is-live { color:var(--yd-emphasis, var(--color-text-1)); opacity:1; animation:capability-pulse 2.4s ease-in-out infinite; }
+@keyframes capability-card-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes capability-pulse { 0%,100% { box-shadow:0 0 0 0 currentColor; opacity:1; } 50% { box-shadow:0 0 0 4px transparent; opacity:.6; } }
 .capability-card__content { display:grid; gap:7px; min-width:0; }
 .capability-card__topline { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
 .capability-card__topline strong { font-size:14px; font-weight:600; }
 .capability-card__description { display:-webkit-box; min-height:34px; overflow:hidden; color:var(--color-text-3); font-size:12px; line-height:1.5; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 .capability-card__meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--color-text-3); font-size:11px; }
 .capability-card__meta code { padding:2px 6px; border-radius:4px; background:var(--color-fill-2); }
-.capability-card__chevron { align-self:center; color:var(--color-text-3); }
+.capability-card__chevron { align-self:center; color:var(--color-text-3); transition:transform .18s cubic-bezier(.32,.72,0,1), color .18s ease; }
+.capability-card:hover .capability-card__chevron { color:var(--color-text-1); }
 /* align-content:start：grid 默认会把行拉伸填满容器，短内容会被撑出大片空白。 */
 .capability-detail { display:grid; gap:20px; align-content:start; container-type:inline-size; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); scrollbar-gutter:stable; }
 .detail-header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; }
@@ -779,21 +1010,66 @@ function parseJsonConfig() {
 .info-cell > strong { color:var(--color-text-1); font-size:15px; font-weight:600; overflow-wrap:anywhere; }
 .info-cell code { color:var(--color-text-2); font-size:13px; overflow-wrap:anywhere; }
 
-/* 健康指标：一行一个指标，标签在上、值在下，数组展开为标签，避免原始 JSON 撑破卡片 */
-.metric-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); align-content:start; }
-.metric-item { display:grid; gap:8px; min-width:0; padding:12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
-.metric-item dt { color:var(--color-text-3); font-size:12px; }
-.metric-item dd { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0; min-width:0; }
-.metric-text { color:var(--color-text-1); font-size:14px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
-.metric-empty { color:var(--color-text-3); font-size:13px; }
+/* 健康信息：概览（环形图 + 关键数字）与逐行事实清单，避免一格一卡的堆叠 */
+.health-overview { display:grid; grid-template-columns:auto minmax(0,1fr); gap:20px; align-items:center; padding:16px 18px; border:1px solid var(--color-border-2); border-radius:12px; background:linear-gradient(180deg, var(--color-fill-1), var(--color-bg-1)); }
+.health-overview__body { display:grid; gap:12px; min-width:0; }
+.health-overview__stats { display:flex; flex-wrap:wrap; gap:28px; margin:0; padding:0; list-style:none; }
+.health-overview__stats li { display:grid; gap:2px; }
+.health-overview__stats span { color:var(--color-text-3); font-size:12px; }
+.health-overview__stats strong { color:var(--color-text-1); font-size:26px; font-weight:650; line-height:1.15; }
+.health-overview__stats .yd-number-flow { font-size:26px; font-weight:650; color:var(--color-text-1); }
+.health-overview__legend { display:flex; flex-wrap:wrap; gap:16px; margin:0; padding:0; list-style:none; }
+.health-overview__legend li { display:inline-flex; gap:6px; align-items:center; color:var(--color-text-2); font-size:13px; }
+.health-overview__legend i { width:9px; height:9px; border-radius:3px; background:var(--yd-emphasis, var(--color-text-1)); }
+.health-overview__legend i[data-usage='embedding'] { opacity:.62; }
+.health-overview__legend i[data-usage='rerank'] { opacity:.32; }
+.health-overview__legend strong { color:var(--color-text-1); font-weight:600; }
+.health-overview__legend small { color:var(--color-text-3); }
+.health-donut { display:grid; width:104px; height:104px; place-items:center; border-radius:50%; }
+.health-donut__hole { display:grid; width:70px; height:70px; place-content:center; border-radius:50%; background:var(--color-bg-2); text-align:center; }
+.health-donut__hole strong { color:var(--color-text-1); font-size:20px; font-weight:650; line-height:1.1; }
+.health-donut__hole .yd-number-flow { font-size:20px; font-weight:650; color:var(--color-text-1); }
+.health-donut__hole span { color:var(--color-text-3); font-size:11px; }
+
+.health-facts { display:grid; gap:0; margin:0; padding:0; list-style:none; }
+.health-facts li { display:grid; grid-template-columns:minmax(96px, 132px) minmax(0,1fr); gap:16px; align-items:center; padding:11px 2px; border-bottom:1px solid var(--color-border-2); }
+.health-facts li:last-child { border-bottom:none; }
+.health-facts__label { color:var(--color-text-3); font-size:13px; }
+.health-facts__value { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-width:0; color:var(--color-text-1); font-size:14px; font-weight:600; }
+.health-facts__muted { color:var(--color-text-3); font-weight:400; }
+.health-facts__link { display:inline-flex; gap:6px; align-items:center; color:var(--color-text-1); font-size:13px; overflow-wrap:anywhere; text-decoration:underline; text-decoration-color:var(--color-border-3); text-underline-offset:3px; }
+
+.health-empty { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding:18px; border:1px dashed var(--color-border-2); border-radius:12px; background:var(--color-fill-1); }
+.health-empty strong { color:var(--color-text-1); font-size:14px; }
+.health-empty p { margin:6px 0 0; color:var(--color-text-3); font-size:12px; line-height:1.6; }
+
+.health-config { display:grid; gap:10px; }
+.health-config ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.health-config li { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:10px; align-items:center; padding:9px 12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
+.health-config li > span { color:var(--color-text-3); font-size:12px; }
+.health-config code { overflow:hidden; color:var(--color-text-1); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.health-config__open { color:var(--color-text-2); font-size:12px; text-decoration:underline; text-underline-offset:3px; }
 .dependency-panel,.health-panel,.debug-panel { display:grid; gap:12px; padding-top:18px; border-top:1px solid var(--color-border-2); }
 .section-title { display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--color-text-1); font-weight:650; }
 .section-title span { display:inline-flex; gap:6px; align-items:center; }
+/* 依赖能力：进度条 + 可点击跳转的依赖行 */
+.dependency-progress { display:flex; gap:12px; align-items:center; }
+.dependency-progress__bar { flex:1 1 auto; min-width:120px; }
+.dependency-progress > span { color:var(--color-text-3); font-size:12px; white-space:nowrap; }
 .dependency-list { display:grid; gap:8px; }
-.dependency-item { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid var(--color-border-2); border-radius:7px; background:var(--color-bg-1); }
-.dependency-item div { display:flex; min-width:0; flex-wrap:wrap; gap:8px; align-items:center; }
-.dependency-item strong { color:var(--color-text-1); }
-.dependency-tip { margin:0; color:var(--color-danger-6); font-size:12px; }
+.dependency-item { display:grid; grid-template-columns:32px minmax(0,1fr) auto 16px; gap:12px; align-items:center; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); text-align:left; transition:border-color .16s ease, background-color .16s ease, transform .16s cubic-bezier(.32,.72,0,1); }
+.dependency-item:hover { transform:translateX(2px); border-color:var(--color-border-3); background:var(--color-fill-1); }
+.dependency-item:hover .dependency-item__jump { opacity:1; transform:none; }
+.dependency-item.is-missing { border-style:dashed; }
+.dependency-item__icon { display:grid; width:30px; height:30px; place-items:center; border-radius:8px; background:var(--color-fill-2); color:var(--color-text-2); font-size:16px; }
+.dependency-item__body { display:grid; gap:2px; min-width:0; }
+.dependency-item__body strong { color:var(--color-text-1); font-size:13px; font-weight:600; }
+.dependency-item__body code { color:var(--color-text-3); font-size:11px; }
+.dependency-item__jump { opacity:0; color:var(--color-text-3); transform:translateX(-3px); transition:opacity .16s ease, transform .16s cubic-bezier(.32,.72,0,1); }
+.dependency-tip { margin:0; color:var(--color-text-3); font-size:12px; }
+.dependency-tip:not(:empty) { color:var(--color-text-3); }
+.dependency-panel .dependency-tip { color:var(--color-danger-6); }
+.dependency-panel .dependency-tip:only-child { color:var(--color-text-3); }
 .debug-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .debug-row > span { color:var(--color-text-2); }
 .debug-message { flex:1 1 220px; min-width:180px; }
@@ -804,6 +1080,16 @@ function parseJsonConfig() {
 .config-field > span { color:var(--color-text-2); font-size:13px; font-weight:600; }
 .config-field__hint { color:var(--color-text-3); font-size:12px; font-weight:400; line-height:1.5; }
 .config-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:14px; border-top:1px solid var(--color-border-2); }
+/* 雅致/紧凑外观与系统「减少动态效果」下关闭位移与入场动画 */
+:global([data-admin-style='calm']) .capability-card,
+:global([data-admin-style='compact']) .capability-card { animation:none; }
+@media (prefers-reduced-motion: reduce) {
+  .capability-card { animation:none; }
+  .capability-card:hover,
+  .health-metric:hover,
+  .dependency-item:hover { transform:none; }
+  .capability-card__dot.is-live { animation:none; }
+}
 @media (max-width: 760px) {
   .capability-workbench { grid-template-columns:minmax(0,1fr); height:auto; min-height:0; }
   .capability-browser { grid-template-rows:auto auto auto; min-height:0; }
@@ -832,6 +1118,9 @@ function parseJsonConfig() {
   .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
   .capability-card__icon { width:36px; height:36px; }
   .capability-detail { padding:16px; }
+  .health-overview { grid-template-columns:minmax(0,1fr); justify-items:center; text-align:center; }
+  .health-overview__stats { justify-content:center; }
+  .health-facts li { grid-template-columns:minmax(0,1fr); gap:6px; }
   .detail-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .debug-row > span { flex-basis:100%; }
 }
