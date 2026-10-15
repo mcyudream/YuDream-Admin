@@ -36,6 +36,9 @@ const configDraft = ref<Record<string, string>>({})
 /** AI 端点草稿：聊天 / 向量化 / 重排序各自独立，由 AiEndpointConfig 维护。 */
 const aiEndpoints = ref<AiEndpointDraft[]>([])
 const testMessage = ref('平台能力测试消息')
+const keyword = ref('')
+const selectedType = ref<CapabilityType | 'ALL'>('ALL')
+const selectedStatus = ref<CapabilityStatus | 'ALL'>('ALL')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
 let websocket: WebSocket | null = null
@@ -53,7 +56,7 @@ const groups: CapabilityGroup[] = [
   { type: 'DISTRIBUTION', title: '插件分发', icon: 'morph:store' },
 ]
 
-const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
+const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
 const configFields = computed(() => fieldsOf(selected.value?.code))
 const isAiConfig = computed(() => selected.value?.code === 'ai')
 const usesStructuredConfig = computed(() => isAiConfig.value || configFields.value.length > 0)
@@ -63,13 +66,44 @@ const canEnableSelected = computed(() => !selected.value?.enabled && missingDepe
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
-  return [
-    { label: '能力总数', value: rows.value.length, icon: 'morph:list-tree' },
-    { label: '已启用', value: enabled, icon: 'morph:circle-check', tone: 'ok' },
-    { label: '异常', value: error, icon: 'morph:triangle-alert', tone: error > 0 ? 'bad' : 'ok' },
-    { label: '实时连接', value: connectionCount(), icon: 'morph:activity' },
-  ]
+  const disabled = rows.value.filter(item => !item.enabled && item.status !== 'ERROR').length
+  return { total: rows.value.length, enabled, error, disabled }
 })
+const filteredRows = computed(() => {
+  const query = keyword.value.trim().toLocaleLowerCase()
+  return rows.value.filter((item) => {
+    const matchesQuery = !query || [item.name, item.code, item.description, typeText(item.type)]
+      .some(value => value?.toLocaleLowerCase().includes(query))
+    const matchesType = selectedType.value === 'ALL' || item.type === selectedType.value
+    const matchesStatus = selectedStatus.value === 'ALL' || item.status === selectedStatus.value
+    return matchesQuery && matchesType && matchesStatus
+  })
+})
+const typeOptions = computed(() => [
+  { label: '全部类别', value: 'ALL' as const },
+  ...groups.filter(group => rows.value.some(item => item.type === group.type)).map(group => ({ label: group.title, value: group.type })),
+])
+const statusOptions: { label: string, value: CapabilityStatus | 'ALL' }[] = [
+  { label: '全部状态', value: 'ALL' },
+  { label: '运行中', value: 'ENABLED' },
+  { label: '未启用', value: 'DISABLED' },
+  { label: '异常', value: 'ERROR' },
+] as const
+const selectedTypeText = computed(() => selected.value ? typeText(selected.value.type) : '')
+
+watch(filteredRows, (list) => {
+  if (selectedCode.value && !list.some(item => item.code === selectedCode.value)) {
+    if (list.length) {
+      selectedCode.value = list[0].code
+    }
+    if (configEditing.value) {
+      cancelConfig()
+    }
+  }
+  else if (!selectedCode.value && list.length) {
+    selectedCode.value = list[0].code
+  }
+}, { immediate: true })
 
 onMounted(load)
 onBeforeUnmount(() => {
@@ -82,9 +116,9 @@ async function load() {
   try {
     const res = await apiCapability.list()
     rows.value = res.data
-    if (!selectedCode.value && rows.value.length) {
-      selectedCode.value = rows.value[0].code
-    }
+    selectedCode.value = rows.value.some(item => item.code === selectedCode.value)
+      ? selectedCode.value
+      : rows.value[0]?.code ?? ''
   }
   finally {
     loading.value = false
@@ -122,6 +156,12 @@ function selectCapability(item: CapabilityItem) {
     cancelConfig()
   }
   selectedCode.value = item.code
+}
+
+function clearFilters() {
+  keyword.value = ''
+  selectedType.value = 'ALL'
+  selectedStatus.value = 'ALL'
 }
 
 function openConfig(item: CapabilityItem) {
@@ -271,17 +311,6 @@ function replaceItem(item: CapabilityItem) {
   }
 }
 
-function itemsByType(type: CapabilityType) {
-  return rows.value.filter(item => item.type === type)
-}
-
-function connectionCount() {
-  return rows.value.reduce((total, item) => {
-    const value = item.metrics?.connections ?? item.metrics?.sessions ?? 0
-    return total + Number(value || 0)
-  }, 0)
-}
-
 function httpEndpoint(path: string) {
   const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   return `${base.replace(/\/$/, '')}${path}`
@@ -421,47 +450,52 @@ function parseJsonConfig() {
 
     <YdPageMain>
       <div class="capability-toolbar">
-        <YdInput v-model="testMessage" placeholder="测试消息内容" class="flex-1 min-w-0" />
+        <YdInput v-model="keyword" clearable placeholder="搜索能力名称、编码或说明" class="capability-search" />
+        <YdSelect v-model="selectedType" :options="typeOptions" class="capability-filter" />
+        <YdSelect v-model="selectedStatus" :options="statusOptions" class="capability-filter" />
+        <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" @click="clearFilters">
+          重置筛选
+        </YdButton>
       </div>
 
-      <div class="summary-grid">
-        <div v-for="item in summary" :key="item.label" class="summary-item">
-          <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
-            <YdIcon :name="item.icon" />
-          </div>
-          <div class="summary-body">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="capability-layout">
-        <section class="capability-list">
-          <template v-for="group in groups" :key="group.type">
-            <div v-if="itemsByType(group.type).length" class="section-title">
-              <span><YdIcon :name="group.icon" /> {{ group.title }}</span>
-              <YdTag variant="secondary">
-                {{ itemsByType(group.type).length }}
-              </YdTag>
+      <div class="capability-workbench">
+        <section class="capability-browser">
+          <div class="capability-overview">
+            <div><span>能力总数</span><strong>{{ summary.total }}</strong></div>
+            <div><span>运行中</span><strong>{{ summary.enabled }}</strong></div>
+            <div><span>未启用</span><strong>{{ summary.disabled }}</strong></div>
+            <div :class="{ 'has-errors': summary.error > 0 }">
+              <span>异常</span><strong>{{ summary.error }}</strong>
             </div>
-            <YdButton
-              v-for="item in itemsByType(group.type)"
-              :key="item.code"
-              variant="ghost"
-              class="capability-item"
-              :class="{ active: selected?.code === item.code }"
-              type="button"
-              :aria-pressed="selected?.code === item.code"
-              @click="selectCapability(item)"
-            >
-              <YdIcon :name="item.icon || 'morph:puzzle'" />
-              <span>{{ item.name }}</span>
-              <YdTag :variant="statusVariant(item.status)">
-                {{ statusText(item.status) }}
-              </YdTag>
+          </div>
+          <div class="capability-list-heading">
+            <div>
+              <h2>能力目录</h2>
+              <p>{{ filteredRows.length }} / {{ rows.length }} 项能力</p>
+            </div>
+            <YdButton variant="outline" :loading="loading" @click="load">
+              <YdIcon name="morph:refresh-cw" />刷新
             </YdButton>
-          </template>
+          </div>
+          <YdLoadingOverlay :loading="loading">
+            <div v-if="filteredRows.length" class="capability-catalog">
+              <YdAction v-for="item in filteredRows" :key="item.code" class="capability-card" :class="{ 'is-selected': selected?.code === item.code }" :aria-pressed="selected?.code === item.code" @click="selectCapability(item)">
+                <span class="capability-card__icon"><YdIcon :name="item.icon || 'morph:puzzle'" /></span>
+                <span class="capability-card__content">
+                  <span class="capability-card__topline"><strong>{{ item.name }}</strong><YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag></span>
+                  <span class="capability-card__description">{{ item.description || '暂无说明' }}</span>
+                  <span class="capability-card__meta"><span>{{ typeText(item.type) }}</span><code>{{ item.code }}</code></span>
+                </span>
+                <YdIcon name="morph:chevron-right" class="capability-card__chevron" />
+              </YdAction>
+            </div>
+            <YdEmpty v-else-if="rows.length" title="没有匹配的能力" description="调整搜索词或筛选条件后重试。">
+              <YdButton variant="outline" @click="clearFilters">
+                清除筛选
+              </YdButton>
+            </YdEmpty>
+            <YdEmpty v-else title="暂无平台能力" description="当前服务未返回可管理的能力。" />
+          </YdLoadingOverlay>
         </section>
 
         <section v-if="selected" class="capability-detail">
@@ -471,24 +505,18 @@ function parseJsonConfig() {
                 <div class="detail-icon">
                   <YdIcon :name="selected.icon || 'morph:puzzle'" />
                 </div>
-                <div>
-                  <h2>配置 {{ selected.name }}</h2>
-                  <p>{{ typeText(selected.type) }} · {{ statusText(selected.status) }}</p>
-                </div>
+                <div><h2>配置 {{ selected.name }}</h2><p>{{ selectedTypeText }} · {{ statusText(selected.status) }}</p></div>
               </div>
               <div class="detail-actions">
                 <YdButton variant="ghost" @click="cancelConfig">
                   取消
                 </YdButton>
                 <YdButton :loading="saving" @click="saveConfig">
-                  <YdIcon name="morph:check" />
-                  保存配置
+                  <YdIcon name="morph:check" />保存配置
                 </YdButton>
               </div>
             </div>
-
             <div class="config-body">
-              <!-- AI 能力：端点用途切换（聊天 / 向量化 / 重排序）与端点编辑 -->
               <AiEndpointConfig
                 v-if="isAiConfig"
                 v-model:endpoints="aiEndpoints"
@@ -496,117 +524,70 @@ function parseJsonConfig() {
                 v-model:default-model="configDraft.defaultModel"
                 :capability-enabled="Boolean(selected?.enabled)"
               />
-
-              <!-- 其他结构化配置 -->
               <div v-else-if="usesStructuredConfig" class="config-form">
                 <label v-for="field in configFields" :key="field.key" class="config-field">
                   <span>{{ field.label }}</span>
-                  <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">
-                    已配置，留空不修改
-                  </small>
-                  <YdTextarea
-                    v-if="field.type === 'textarea'"
-                    v-model="configDraft[field.key]"
-                    rows="5"
-                    input-class="font-mono"
-                    :placeholder="field.placeholder"
-                  />
-                  <YdInput
-                    v-else
-                    v-model="configDraft[field.key]"
-                    :type="field.type || 'text'"
-                    :placeholder="field.placeholder"
-                  />
+                  <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">已配置，留空不修改</small>
+                  <YdTextarea v-if="field.type === 'textarea'" v-model="configDraft[field.key]" rows="5" input-class="font-mono" :placeholder="field.placeholder" />
+                  <YdInput v-else v-model="configDraft[field.key]" :type="field.type || 'text'" :placeholder="field.placeholder" />
                 </label>
               </div>
               <YdTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
             </div>
-
             <div class="config-footer">
               <YdButton variant="ghost" @click="cancelConfig">
                 取消
               </YdButton>
               <YdButton :loading="saving" @click="saveConfig">
-                <YdIcon name="morph:check" />
-                保存配置
+                <YdIcon name="morph:check" />保存配置
               </YdButton>
             </div>
           </template>
-
           <template v-else>
             <div class="detail-header">
               <div class="detail-title">
                 <div class="detail-icon">
                   <YdIcon :name="selected.icon || 'morph:puzzle'" />
                 </div>
-                <div>
-                  <h2>{{ selected.name }}</h2>
-                  <p>{{ selected.description }}</p>
-                </div>
+                <div><h2>{{ selected.name }}</h2><p>{{ selected.description || '暂无说明' }}</p></div>
               </div>
               <div class="detail-actions">
                 <YdButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
-                  <YdIcon name="morph:settings-2" />
-                  配置
+                  <YdIcon name="morph:settings-2" />配置
                 </YdButton>
-                <YdButton
-                  v-auth="'platform:capability:test'"
-                  variant="outline"
-                  :disabled="!selected.enabled"
-                  :loading="actionLoading === `${selected.code}:test`"
-                  @click="testCapability(selected)"
-                >
-                  <YdIcon name="morph:send" />
-                  测试
+                <YdButton v-auth="'platform:capability:test'" variant="outline" :disabled="!selected.enabled" :loading="actionLoading === `${selected.code}:test`" @click="testCapability(selected)">
+                  <YdIcon name="morph:send" />测试
                 </YdButton>
-                <YdButton
-                  v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
-                  :variant="selected.enabled ? 'destructive' : 'default'"
-                  :disabled="!selected.enabled && !canEnableSelected"
-                  :loading="actionLoading === `${selected.code}:toggle`"
-                  @click="toggleCapability(selected)"
-                >
-                  <YdIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
-                  {{ selected.enabled ? '禁用' : '启用' }}
+                <YdButton v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'" :variant="selected.enabled ? 'destructive' : 'default'" :disabled="!selected.enabled && !canEnableSelected" :loading="actionLoading === `${selected.code}:toggle`" @click="toggleCapability(selected)">
+                  <YdIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />{{ selected.enabled ? '禁用' : '启用' }}
                 </YdButton>
               </div>
             </div>
-
             <div class="detail-grid">
               <div class="info-cell">
-                <span>类型</span>
-                <strong>{{ typeText(selected.type) }}</strong>
-              </div>
-              <div class="info-cell">
-                <span>状态</span>
-                <YdTag :variant="statusVariant(selected.status)">
+                <span>状态</span><YdTag :variant="statusVariant(selected.status)">
                   {{ statusText(selected.status) }}
                 </YdTag>
               </div>
               <div class="info-cell">
-                <span>编码</span>
-                <code>{{ selected.code }}</code>
+                <span>类别</span><strong>{{ selectedTypeText }}</strong>
               </div>
               <div class="info-cell">
-                <span>检查时间</span>
-                <strong>{{ selected.checkedAt || '-' }}</strong>
+                <span>编码</span><code>{{ selected.code }}</code>
+              </div>
+              <div class="info-cell">
+                <span>检查时间</span><strong>{{ selected.checkedAt || '-' }}</strong>
               </div>
             </div>
-
             <div v-if="dependencyRows.length" class="dependency-panel">
               <div class="section-title">
-                <span>依赖能力</span>
-                <YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
+                <span>依赖能力</span><YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
                   {{ missingDependencies.length ? '未满足' : '已满足' }}
                 </YdTag>
               </div>
               <div class="dependency-list">
                 <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
-                  <div>
-                    <strong>{{ dependency.name }}</strong>
-                    <code>{{ dependency.code }}</code>
-                  </div>
-                  <YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
+                  <div><strong>{{ dependency.name }}</strong><code>{{ dependency.code }}</code></div><YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
                     {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
                   </YdTag>
                 </div>
@@ -615,44 +596,36 @@ function parseJsonConfig() {
                 当前能力需要先启用依赖能力：{{ missingDependencies.map(item => item.name).join('、') }}
               </p>
             </div>
-
             <div class="health-panel">
               <div class="section-title">
-                <span>健康信息</span>
-                <YdTag :variant="statusVariant(selected.status)">
+                <span>健康信息</span><YdTag :variant="statusVariant(selected.status)">
                   {{ selected.healthMessage || '-' }}
                 </YdTag>
               </div>
               <div v-if="metricEntries(selected).length" class="metric-grid">
                 <div v-for="[key, value] in metricEntries(selected)" :key="key" class="metric-item">
-                  <span>{{ key }}</span>
-                  <strong>{{ value }}</strong>
+                  <span>{{ key }}</span><strong>{{ value }}</strong>
                 </div>
               </div>
               <div v-else class="empty-state">
                 暂无运行指标
               </div>
             </div>
-
             <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
               <div class="section-title">
                 <span>连接调试</span>
               </div>
               <div v-if="selected.code === 'sse'" class="debug-row">
-                <span>SSE：{{ sseStatus }}</span>
-                <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">
+                <span>SSE：{{ sseStatus }}</span><YdInput v-model="testMessage" placeholder="测试消息内容" class="debug-message" /><YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">
                   连接
-                </YdButton>
-                <YdButton size="sm" variant="ghost" @click="closeSse">
+                </YdButton><YdButton size="sm" variant="ghost" @click="closeSse">
                   断开
                 </YdButton>
               </div>
               <div v-if="selected.code === 'websocket'" class="debug-row">
-                <span>WebSocket：{{ wsStatus }}</span>
-                <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">
+                <span>WebSocket：{{ wsStatus }}</span><YdInput v-model="testMessage" placeholder="测试消息内容" class="debug-message" /><YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">
                   连接
-                </YdButton>
-                <YdButton size="sm" variant="ghost" @click="closeWs">
+                </YdButton><YdButton size="sm" variant="ghost" @click="closeWs">
                   断开
                 </YdButton>
               </div>
@@ -666,302 +639,87 @@ function parseJsonConfig() {
 
 <style scoped>
 .capability-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) minmax(150px, 190px) auto;
   gap: 10px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 24px;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+.capability-workbench { display:grid; grid-template-columns:minmax(300px, 0.82fr) minmax(0, 1.5fr); gap:16px; align-items:start; }
+.capability-browser { display:grid; gap:20px; min-width:0; }
+.capability-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); }
+.capability-overview > div { display:grid; gap:4px; min-width:0; padding:12px; }
+.capability-overview > div + div { border-left:1px solid var(--color-border-2); }
+.capability-overview span { color:var(--color-text-3); font-size:11px; }
+.capability-overview strong { color:var(--color-text-1); font-size:18px; font-weight:650; }
+.capability-overview .has-errors strong { color:var(--color-danger-6); }
+.capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
+.capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
+.capability-catalog { display:grid; gap:8px; }
+.capability-card { display:grid; grid-template-columns:40px minmax(0,1fr) 16px; align-items:start; gap:12px; width:100%; min-width:0; padding:14px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); color:var(--color-text-1); text-align:left; transition:border-color .16s ease, background-color .16s ease; }
+.capability-card:hover,.capability-card.is-selected { border-color:var(--color-border-3); background:var(--color-fill-1); }
+.capability-card.is-selected { box-shadow:inset 3px 0 var(--color-border-3); }
+.capability-card__icon { display:grid; width:40px; height:40px; place-items:center; border-radius:8px; background:var(--color-fill-2); color:var(--color-text-2); font-size:20px; }
+.capability-card__content { display:grid; gap:7px; min-width:0; }
+.capability-card__topline { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.capability-card__topline strong { font-size:14px; font-weight:600; }
+.capability-card__description { display:-webkit-box; min-height:34px; overflow:hidden; color:var(--color-text-3); font-size:12px; line-height:1.5; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.capability-card__meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--color-text-3); font-size:11px; }
+.capability-card__meta code { padding:2px 6px; border-radius:4px; background:var(--color-fill-2); }
+.capability-card__chevron { align-self:center; color:var(--color-text-3); }
+.capability-detail { display:grid; gap:20px; min-width:0; padding:20px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); }
+.detail-header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; }
+.detail-title { display:flex; min-width:0; gap:12px; align-items:center; }
+.detail-title h2 { margin:0 0 4px; font-size:18px; font-weight:650; }
+.detail-title p { margin:0; line-height:1.5; }
+.detail-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+.detail-grid,.metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr)); gap:10px; }
+.info-cell,.metric-item { display:grid; gap:8px; min-height:74px; padding:12px; border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-1); }
+.dependency-panel,.health-panel,.debug-panel { display:grid; gap:12px; padding-top:18px; border-top:1px solid var(--color-border-2); }
+.section-title { display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--color-text-1); font-weight:650; }
+.section-title span { display:inline-flex; gap:6px; align-items:center; }
+.dependency-list { display:grid; gap:8px; }
+.dependency-item { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid var(--color-border-2); border-radius:7px; background:var(--color-bg-1); }
+.dependency-item div { display:flex; min-width:0; flex-wrap:wrap; gap:8px; align-items:center; }
+.dependency-item strong { color:var(--color-text-1); }
+.dependency-tip { margin:0; color:var(--color-danger-6); font-size:12px; }
+.debug-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.debug-row > span { color:var(--color-text-2); }
+.debug-message { flex:1 1 220px; min-width:180px; }
+.empty-state { padding:20px; color:var(--color-text-3); text-align:center; }
+.config-body { display:grid; gap:16px; margin-top:16px; }
+.config-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; }
+.config-field { display:grid; gap:7px; min-width:0; }
+.config-field > span { color:var(--color-text-2); font-size:13px; font-weight:600; }
+.config-field__hint { color:var(--color-text-3); font-size:12px; font-weight:400; line-height:1.5; }
+.config-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:14px; border-top:1px solid var(--color-border-2); }
+@media (max-width: 760px) {
+  .capability-workbench { grid-template-columns:minmax(0,1fr); }
+  .capability-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
+  .capability-card__icon { width:36px; height:36px; }
+  .capability-overview > div { padding:10px; }
+  .capability-overview strong { font-size:16px; }
+  .capability-list-heading { align-items:flex-start; }
+  .detail-header { flex-direction:column; align-items:stretch; }
+  .detail-actions { justify-content:flex-start; }
+  .config-footer { position:sticky; bottom:0; z-index:2; justify-content:stretch; padding:12px; background:var(--color-bg-2); }
+  .config-footer > * { flex:1; }
 }
-
-.summary-item,
-.capability-list,
-.capability-detail {
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.summary-item {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 12px;
-}
-
-.summary-icon,
-.detail-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: none;
-  place-items: center;
-  border-radius: 6px;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-  font-size: 19px;
-}
-
-.summary-body,
-.info-cell,
-.metric-item {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.summary-body span,
-.info-cell span,
-.metric-item span,
-.detail-title p {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.summary-body strong,
-.info-cell strong,
-.metric-item strong {
-  color: var(--color-text-1);
-  font-weight: 700;
-}
-
-.capability-layout {
-  display: grid;
-  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.capability-list {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-}
-
-.section-title {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--color-text-1);
-  font-weight: 700;
-}
-
-.section-title span {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.capability-item {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-1);
-  text-align: left;
-}
-
-.capability-item.active,
-.capability-item:hover {
-  border-color: var(--color-border-3);
-  background: var(--color-fill-2);
-}
-
-.capability-item span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.capability-detail {
-  min-width: 0;
-  padding: 16px;
-}
-
-.detail-header {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.detail-title {
-  display: flex;
-  min-width: 0;
-  gap: 12px;
-}
-
-.detail-title h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.detail-title p {
-  margin: 0;
-}
-
-.detail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.detail-grid,
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.info-cell,
-.metric-item {
-  min-height: 72px;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.dependency-panel,
-.health-panel,
-.debug-panel {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-.dependency-list {
-  display: grid;
-  gap: 8px;
-}
-
-.dependency-item {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.dependency-item div {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.dependency-item strong {
-  color: var(--color-text-1);
-}
-
-.dependency-tip {
-  margin: 0;
-  color: var(--color-danger-6);
-  font-size: 12px;
-}
-
-.debug-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.debug-row span {
-  min-width: 220px;
-  color: var(--color-text-2);
-}
-
-.empty-state {
-  padding: 24px;
-  border: 1px dashed var(--color-border-2);
-  border-radius: 6px;
-  color: var(--color-text-3);
-  text-align: center;
-}
-
-.config-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.config-field {
-  display: grid;
-  gap: 6px;
-}
-
-.config-field span {
-  color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.config-field__hint {
-  color: var(--color-text-3);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
-/* 配置视图：替换只读详情，长表单底部操作常驻可达 */
-.config-body {
-  display: grid;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.config-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-@media (max-width: 900px) {
-  .capability-toolbar,
-  .detail-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .capability-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-actions {
-    justify-content: flex-start;
-  }
-
-  .config-footer {
-    justify-content: stretch;
-  }
-
-  .config-footer > * {
-    flex: 1;
-  }
+@media (max-width: 420px) {
+  .capability-toolbar { grid-template-columns:minmax(0,1fr); }
+  .capability-search { grid-column:1; }
+  .capability-overview > div { padding:8px 6px; }
+  .capability-overview span { font-size:10px; }
+  .capability-overview strong { font-size:15px; }
+  .capability-list-heading { align-items:center; }
+  .capability-catalog { grid-template-columns:minmax(0,1fr); }
+  .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
+  .capability-card__icon { width:36px; height:36px; }
+  .capability-detail { padding:16px; }
+  .detail-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .debug-row > span { flex-basis:100%; }
 }
 </style>
