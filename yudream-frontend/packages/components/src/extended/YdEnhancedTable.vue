@@ -63,6 +63,7 @@ const fullColumns = computed<TableColumn<TData, any>[]>(() => {
       id: 'actions',
       header: props.actionsHeader,
       width: props.actionsWidth,
+      fixed: 'right',
       cell: () => '', // 通过插槽渲染
     })
   }
