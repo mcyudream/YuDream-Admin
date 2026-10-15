@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { PermissionItem } from '@/api/modules/system-role'
 import type {
-  ApiKeyCredential,
   ApiKeyCreatePayload,
+  ApiKeyCredential,
   ApiSecurityPolicy,
   CredentialStatus,
+  ExternalLoginProvider,
+  ExternalLoginProviderPayload,
   OAuthClient,
   OAuthClientAuthMethod,
   OAuthClientPayload,
@@ -12,13 +15,10 @@ import type {
   OAuthProvider,
   OAuthProviderPayload,
   OAuthRegistrationStatus,
-  ExternalLoginProvider,
-  ExternalLoginProviderPayload,
   PasskeyCredential,
 } from '@/api/modules/system-security'
-import type { PermissionItem } from '@/api/modules/system-role'
-import apiSecurity from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
+import apiSecurity from '@/api/modules/system-security'
 import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
 type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'external' | 'passkey'
@@ -156,6 +156,15 @@ const tabs = computed(() => tabOptions.filter((tab) => {
   return true
 }))
 
+/** YdSettingsLayout 分区列表，与顶部标签的可用性过滤保持一致 */
+const settingsTabs = computed(() => tabs.value.map(tab => ({ icon: tab.icon, label: tab.label, value: tab.key })))
+
+const { auth } = useAppAuth()
+
+function onTabChange(value: string | number) {
+  activeTab.value = String(value) as SecurityTab
+}
+
 const policyCards = computed(() => [
   { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'morph:lock-keyhole' },
   { key: 'dualTokenEnabled', label: '双 Token', desc: '访问令牌与刷新令牌分离，可配置有效期', icon: 'morph:arrow-left-right' },
@@ -256,31 +265,65 @@ const oauthClientScopeInitialLabels = computed<Record<string, string>>(() => {
 })
 
 const apiKeyColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
-  { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
-  { accessorKey: 'maskedValue', header: '密钥标识', width: 180 },
   { id: 'permissions', header: '权限', width: 220 },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
+  { accessorKey: 'maskedValue', header: '密钥标识', width: 180 },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
   { accessorKey: 'expireTime', header: '过期时间', width: 180 },
-  { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
 
+const apiKeyUserColumn: UserColumn<ApiKeyCredential> = { nameKey: 'name', header: '名称', width: 180 }
+const apiKeyStatusColumn: StatusColumn<ApiKeyCredential> = {
+  statusKey: 'status',
+  header: '状态',
+  statusMap: {
+    ACTIVE: { label: '启用', variant: 'default' },
+    DISABLED: { label: '停用', variant: 'secondary' },
+    REVOKED: { label: '已吊销', variant: 'secondary' },
+    EXPIRED: { label: '已过期', variant: 'secondary' },
+  },
+}
+const apiKeyActions: ActionMenuItem<ApiKeyCredential>[] = [{
+  label: '吊销',
+  icon: 'morph:ban',
+  danger: true,
+  disabled: row => row.status !== 'ACTIVE' || !auth('system:security:api-key:revoke'),
+  onClick: confirmRevoke,
+}]
+
 const oauthClientColumns = computed<TableColumn<OAuthClient>[]>(() => [
-  { accessorKey: 'clientName', header: '客户端名称', width: 180, fixed: 'left' },
   { accessorKey: 'clientId', header: 'Client ID', width: 180 },
   { id: 'grantTypes', header: '授权模式', width: 220 },
   { id: 'redirectUris', header: '回调地址', width: 260 },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
-  { id: 'operation', header: '操作', width: 160, align: 'center', fixed: 'right' },
+])
+
+const oauthClientUserColumn: UserColumn<OAuthClient> = { nameKey: 'clientName', header: '客户端名称', width: 180 }
+const oauthClientStatusColumn: StatusColumn<OAuthClient> = {
+  statusKey: 'status',
+  header: '状态',
+  statusMap: apiKeyStatusColumn.statusMap,
+}
+const oauthClientActions = computed<ActionMenuItem<OAuthClient>[]>(() => [
+  { label: '编辑', icon: 'morph:pencil', disabled: !policy.oauthServerEnabled || !auth('system:security:oauth:edit'), onClick: row => guardedOpenOAuthClient(row) },
+  { label: '停用', icon: 'morph:ban', danger: true, disabled: row => row.status !== 'ACTIVE' || !auth('system:security:oauth:edit'), onClick: confirmDisableOAuthClient },
+  { label: '启用', icon: 'morph:check', disabled: row => row.status === 'ACTIVE' || !policy.oauthServerEnabled || !auth('system:security:oauth:edit'), onClick: confirmEnableOAuthClient },
 ])
 
 const oauthProviderColumns = computed<TableColumn<OAuthProvider>[]>(() => [
-  { accessorKey: 'name', header: '提供商', width: 160, fixed: 'left' },
   { accessorKey: 'code', header: '编码', width: 140 },
   { accessorKey: 'clientId', header: 'Client ID', width: 180 },
   { accessorKey: 'authorizationUri', header: '授权地址', width: 260 },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
-  { id: 'operation', header: '操作', width: 160, align: 'center', fixed: 'right' },
+])
+
+const oauthProviderUserColumn: UserColumn<OAuthProvider> = { nameKey: 'name', header: '提供商', width: 160 }
+const oauthProviderStatusColumn: StatusColumn<OAuthProvider> = {
+  statusKey: 'status',
+  header: '状态',
+  statusMap: apiKeyStatusColumn.statusMap,
+}
+const oauthProviderActions = computed<ActionMenuItem<OAuthProvider>[]>(() => [
+  { label: '编辑', icon: 'morph:pencil', disabled: !policy.oauthClientEnabled || !auth('system:security:oauth:edit'), onClick: row => guardedOpenOAuthProvider(row) },
+  { label: '停用', icon: 'morph:ban', danger: true, disabled: row => row.status !== 'ACTIVE' || !auth('system:security:oauth:edit'), onClick: confirmDisableOAuthProvider },
+  { label: '启用', icon: 'morph:check', disabled: row => row.status === 'ACTIVE' || !policy.oauthClientEnabled || !auth('system:security:oauth:edit'), onClick: confirmEnableOAuthProvider },
 ])
 
 const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
@@ -288,10 +331,21 @@ const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
   { accessorKey: 'userId', header: '用户 ID', width: 140 },
   { accessorKey: 'credentialId', header: '凭据 ID', width: 260 },
   { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right' },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
-  { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
+
+const passkeyStatusColumn: StatusColumn<PasskeyCredential> = {
+  statusKey: 'status',
+  header: '状态',
+  statusMap: apiKeyStatusColumn.statusMap,
+}
+const passkeyActions: ActionMenuItem<PasskeyCredential>[] = [{
+  label: '吊销',
+  icon: 'morph:ban',
+  danger: true,
+  disabled: row => row.status !== 'ACTIVE' || !auth('system:security:passkey:revoke'),
+  onClick: confirmRevokePasskey,
+}]
 
 const authMethodOptions = [
   { label: 'client_secret_basic', value: 'CLIENT_SECRET_BASIC' },
@@ -813,393 +867,289 @@ function normalizeDateTime(value?: string) {
 
 <template>
   <div>
-    <YdPageHeader title="安全中心" class="mb-0">
-      <YdButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
-        <YdIcon name="morph:save" />
-        保存策略
-      </YdButton>
-    </YdPageHeader>
+    <YdPageHeader title="安全中心" class="mb-0" />
 
     <YdPageMain>
-      <div class="security-tabs">
-        <YdAction v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
-          <YdIcon :name="tab.icon" />
-          <span>{{ tab.label }}</span>
-        </YdAction>
-      </div>
-
-      <section v-if="activeTab === 'policy'" class="panel">
-        <div class="section-title">
-          <YdIcon name="morph:shield-check" />
-          安全策略
-        </div>
-        <div class="policy-grid">
-          <div v-for="item in policyCards" :key="item.key" class="policy-card">
-            <div class="policy-icon">
-              <YdIcon :name="item.icon" />
-            </div>
-            <div class="policy-body">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.desc }}</span>
-            </div>
-            <YdSwitch v-model="policy[item.key]" />
-          </div>
-        </div>
-        <div class="token-grid">
-          <YdFormItem label="访问令牌有效期（秒）">
-            <YdInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
-          </YdFormItem>
-          <YdFormItem label="刷新令牌有效期（秒）">
-            <YdInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
-          </YdFormItem>
-          <YdFormItem label="刷新令牌轮换">
-            <YdSwitch v-model="policy.refreshRotationEnabled" />
-          </YdFormItem>
-        </div>
-      </section>
-
-      <section v-if="activeTab === 'apiKey'" class="panel">
-        <YdAlert v-if="!policy.apiKeyEnabled" icon="morph:info" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
-        <div class="key-toolbar">
-          <div class="section-title">
-            <YdIcon name="morph:key" />
-            API Key
-          </div>
-          <div class="key-actions">
-            <YdButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
-              <YdIcon name="morph:key-round" />
-              创建
-            </YdButton>
-          </div>
-        </div>
-        <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-          
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[980px]"
-          column-visibility
-          border
-          stripe
-          :columns="apiKeyColumns"
-          :data="apiKeyRows"
-        >
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <YdInput v-model="search.keyword" clearable placeholder="名称 / 前缀" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
-                <div class="flex gap-2 md:justify-end">
-                  <YdButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</YdButton>
-                  <YdButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
+      <YdSettingsLayout
+        :model-value="activeTab"
+        :list="settingsTabs"
+        width-class="max-w-5xl"
+        @update:model-value="onTabChange"
+      >
+        <template #policy>
+          <YdSettingsSection
+            title="安全策略"
+            description="按需开启平台认证与访问控制能力；令牌有效期与轮换策略一并在此维护，保存后立即生效。"
+          >
+            <div class="policy-grid">
+              <div v-for="item in policyCards" :key="item.key" class="policy-card">
+                <div class="policy-icon">
+                  <YdIcon :name="item.icon" />
                 </div>
+                <div class="policy-body">
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.desc }}</span>
+                </div>
+                <YdSwitch v-model="policy[item.key]" />
               </div>
-            </YdSearchBar>
-          </template>
-          <template #cell-permissions="{ row }">
-            <div class="tag-row">
-              <YdTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
-                {{ permissionText(item) }}
-              </YdTag>
-              <YdTag v-if="row.original.permissions.length > 3" variant="secondary">
-                +{{ row.original.permissions.length - 3 }}
-              </YdTag>
             </div>
-          </template>
-          <template #cell-status="{ row }">
-            <YdTag :variant="statusVariant(row.original.status)">
-              {{ statusText(row.original.status) }}
-            </YdTag>
-          </template>
-          <template #cell-operation="{ row }">
-            <YdButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevoke(row.original)">
-              吊销
-            </YdButton>
-          </template>
+            <div class="token-grid">
+              <YdFormItem label="访问令牌有效期（秒）">
+                <YdInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
+              </YdFormItem>
+              <YdFormItem label="刷新令牌有效期（秒）">
+                <YdInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
+              </YdFormItem>
+              <YdFormItem label="刷新令牌轮换">
+                <YdSwitch v-model="policy.refreshRotationEnabled" />
+              </YdFormItem>
+            </div>
+            <template #footer>
+              <YdButton v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
+                <YdIcon name="morph:save" />
+                保存策略
+              </YdButton>
+            </template>
+          </YdSettingsSection>
+        </template>
 
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-base font-semibold break-all">{{ row.name }}</span>
-                  <YdTag :variant="statusVariant(row.status)">
-                    {{ statusText(row.status) }}
+        <template #apiKey>
+          <YdSettingsSection
+            title="API Key"
+            description="为外部系统签发访问密钥；权限范围不能超过创建人当前拥有的权限。"
+          >
+            <YdAlert v-if="!policy.apiKeyEnabled" icon="morph:info" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
+            <YdLoadingOverlay :loading="loading">
+              <YdResponsiveEnhancedTable
+                row-key="id"
+                table-root-class="rounded-lg overflow-hidden"
+                table-class="min-w-[980px]"
+                column-visibility
+                :user-column="apiKeyUserColumn"
+                :status-column="apiKeyStatusColumn"
+                :actions="apiKeyActions"
+                :columns="apiKeyColumns"
+                :data="apiKeyRows"
+              >
+                <template #toolbar>
+                  <YdSearchBar class="w-full">
+                    <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+                      <YdInput v-model="search.keyword" clearable placeholder="名称 / 前缀" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
+                      <div class="flex gap-2 md:justify-end">
+                        <YdButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">
+                          重置
+                        </YdButton>
+                        <YdButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
+                          <YdIcon name="morph:search" />
+                          筛选
+                        </YdButton>
+                        <YdButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
+                          <YdIcon name="morph:plus" />
+                          创建
+                        </YdButton>
+                      </div>
+                    </div>
+                  </YdSearchBar>
+                </template>
+                <template #cell-permissions="{ row }">
+                  <div class="tag-row">
+                    <YdTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
+                      {{ permissionText(item) }}
+                    </YdTag>
+                    <YdTag v-if="row.original.permissions.length > 3" variant="secondary">
+                      +{{ row.original.permissions.length - 3 }}
+                    </YdTag>
+                  </div>
+                </template>
+              </YdResponsiveEnhancedTable>
+            </YdLoadingOverlay>
+            <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
+          </YdSettingsSection>
+        </template>
+
+        <template #oauth>
+          <YdSettingsSection
+            title="OAuth"
+            description="作为服务端向第三方应用签发授权，或作为客户端接入外部身份提供商。"
+          >
+            <YdAlert v-if="!oauthPaneEnabled()" icon="morph:info" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+              <div class="flex flex-wrap gap-2">
+                <YdButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">
+                  服务端客户端
+                </YdButton>
+                <YdButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">
+                  外部提供商
+                </YdButton>
+              </div>
+              <YdButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
+                <YdIcon name="morph:plus" />
+                新增客户端
+              </YdButton>
+              <YdButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
+                <YdIcon name="morph:plus" />
+                新增提供商
+              </YdButton>
+            </div>
+
+            <YdResponsiveEnhancedTable
+              v-if="oauthPane === 'clients'"
+              row-key="id"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[1000px]"
+              column-visibility
+              :user-column="oauthClientUserColumn"
+              :status-column="oauthClientStatusColumn"
+              :actions="oauthClientActions"
+              :card-hidden-columns="['redirectUris']"
+              :columns="oauthClientColumns"
+              :data="oauthClients"
+            >
+              <template #cell-grantTypes="{ row }">
+                <div class="tag-row">
+                  <YdTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">
+                    {{ item }}
                   </YdTag>
                 </div>
-                <div class="flex flex-col gap-1 text-sm">
-                  <div v-if="row.maskedValue" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">密钥标识</span>
-                    <span class="break-all">{{ row.maskedValue }}</span>
-                  </div>
-                  <div v-if="row.permissions?.length" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">权限</span>
-                    <span class="break-all">{{ row.permissions.map((item: string) => permissionText(item)).join('、') }}</span>
-                  </div>
-                  <div v-if="row.lastUsedTime" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">最后使用</span>
-                    <span>{{ row.lastUsedTime }}</span>
-                  </div>
-                  <div v-if="row.expireTime" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">过期时间</span>
-                    <span>{{ row.expireTime }}</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <YdButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevoke(row)">
-                    吊销
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable></YdLoadingOverlay>
-        <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
-      </section>
-
-      <section v-if="activeTab === 'oauth'" class="panel">
-        <YdAlert v-if="!oauthPaneEnabled()" icon="morph:info" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
-        <div class="key-toolbar">
-          <div class="section-title">
-            <YdIcon name="morph:log-in" />
-            OAuth
-          </div>
-          <div class="key-actions">
-            <YdButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</YdButton>
-            <YdButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</YdButton>
-            <YdButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
-              <YdIcon name="morph:plus" />
-              新增客户端
-            </YdButton>
-            <YdButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
-              <YdIcon name="morph:plus" />
-              新增提供商
-            </YdButton>
-          </div>
-        </div>
-
-        <YdResponsiveTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
-          <template #cell-grantTypes="{ row }">
-            <div class="tag-row">
-              <YdTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">{{ item }}</YdTag>
-            </div>
-          </template>
-          <template #cell-redirectUris="{ row }">
-            <span class="line-clamp-1">{{ row.original.redirectUris?.join(', ') || '-' }}</span>
-          </template>
-          <template #cell-status="{ row }">
-            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
-          </template>
-          <template #cell-operation="{ row }">
-            <div class="table-actions">
-              <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">编辑</YdButton>
-              <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthClient(row.original)">停用</YdButton>
-              <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">启用</YdButton>
-            </div>
-          </template>
-
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-base font-semibold break-all">{{ row.clientName }}</span>
-                  <YdTag :variant="statusVariant(row.status)">
-                    {{ statusText(row.status) }}
-                  </YdTag>
-                </div>
-                <div class="flex flex-col gap-1 text-sm">
-                  <div v-if="row.clientId" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">Client ID</span>
-                    <span class="break-all">{{ row.clientId }}</span>
-                  </div>
-                  <div v-if="row.grantTypes?.length" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">授权模式</span>
-                    <span class="break-all">{{ row.grantTypes.join('、') }}</span>
-                  </div>
-                  <div v-if="row.redirectUris?.length" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">回调地址</span>
-                    <span class="break-all">{{ row.redirectUris.join('、') }}</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <YdButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row)">
+              </template>
+              <template #cell-redirectUris="{ row }">
+                <span class="line-clamp-1">{{ row.original.redirectUris?.join(', ') || '-' }}</span>
+              </template>
+              <template #cell-status="{ row }">
+                <YdTag :variant="statusVariant(row.original.status)">
+                  {{ statusText(row.original.status) }}
+                </YdTag>
+              </template>
+              <template #cell-operation="{ row }">
+                <div class="table-actions">
+                  <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">
                     编辑
                   </YdButton>
-                  <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthClient(row)">
+                  <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthClient(row.original)">
                     停用
                   </YdButton>
-                  <YdButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row)">
+                  <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">
                     启用
                   </YdButton>
                 </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable>
+              </template>
+            </YdResponsiveEnhancedTable>
 
-        <YdResponsiveTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
-          <template #cell-status="{ row }">
-            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
-          </template>
-          <template #cell-operation="{ row }">
-            <div class="table-actions">
-              <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">编辑</YdButton>
-              <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthProvider(row.original)">停用</YdButton>
-              <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">启用</YdButton>
-            </div>
-          </template>
-
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-base font-semibold break-all">{{ row.name }}</span>
-                  <YdTag :variant="statusVariant(row.status)">
-                    {{ statusText(row.status) }}
-                  </YdTag>
-                </div>
-                <div class="flex flex-col gap-1 text-sm">
-                  <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">编码</span>
-                    <span class="break-all">{{ row.code }}</span>
-                  </div>
-                  <div v-if="row.clientId" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">Client ID</span>
-                    <span class="break-all">{{ row.clientId }}</span>
-                  </div>
-                  <div v-if="row.authorizationUri" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">授权地址</span>
-                    <span class="break-all">{{ row.authorizationUri }}</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <YdButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row)">
+            <YdResponsiveEnhancedTable
+              v-else
+              row-key="id"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[960px]"
+              column-visibility
+              :user-column="oauthProviderUserColumn"
+              :status-column="oauthProviderStatusColumn"
+              :actions="oauthProviderActions"
+              :card-hidden-columns="['authorizationUri']"
+              :columns="oauthProviderColumns"
+              :data="oauthProviders"
+            >
+              <template #cell-status="{ row }">
+                <YdTag :variant="statusVariant(row.original.status)">
+                  {{ statusText(row.original.status) }}
+                </YdTag>
+              </template>
+              <template #cell-operation="{ row }">
+                <div class="table-actions">
+                  <YdButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">
                     编辑
                   </YdButton>
-                  <YdButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthProvider(row)">
+                  <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthProvider(row.original)">
                     停用
                   </YdButton>
-                  <YdButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row)">
+                  <YdButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">
                     启用
                   </YdButton>
                 </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable>
-      </section>
+              </template>
+            </YdResponsiveEnhancedTable>
+          </YdSettingsSection>
+        </template>
 
-      <section v-if="activeTab === 'external'" class="panel">
-        <div class="key-toolbar"><div class="section-title"><YdIcon name="morph:link" />第三方登录</div></div>
-        <YdAlert icon="morph:info" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
-        <YdAlert v-if="pluginManagedProviders.length" class="mt-3" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
-        <YdForm :model="externalLoginForm" layout="vertical" class="mt-4">
-          <div class="form-grid">
-            <YdFormItem label="提供方">
-              <YdSelect v-model="selectedHostProviderCode" :options="hostProviderOptions" class="w-full" @update:model-value="changeHostProvider" />
-            </YdFormItem>
-            <YdFormItem label="提供方编码">
-              <YdInput v-model="externalLoginForm.code" disabled />
-            </YdFormItem>
-            <YdFormItem label="名称">
-              <YdInput v-model="externalLoginForm.name" />
-            </YdFormItem>
-            <YdFormItem label="AppId">
-              <YdInput v-model="externalLoginForm.appId" />
-            </YdFormItem>
-            <YdFormItem label="AppKey">
-              <YdInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时留空不修改" />
-            </YdFormItem>
-          </div>
-          <YdFormItem label="接口地址">
-            <YdInput v-model="externalLoginForm.endpoint" placeholder="https://login.wwoyun.cn/connect.php" />
-          </YdFormItem>
-          <YdFormItem label="回调地址" required>
-            <YdInput v-model="externalLoginForm.callbackUrl" />
-          </YdFormItem>
-          <YdFormItem label="启用平台">
-            <YdMultiSelect v-model="selectedExternalTypes" :options="externalTypeOptions" />
-          </YdFormItem>
-          <YdFormItem label="状态">
-            <YdSwitch v-model="externalLoginForm.enabled" />
-          </YdFormItem>
-          <div class="flex justify-end">
-            <YdButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
-              <YdIcon name="morph:save" />
-              保存配置
-            </YdButton>
-          </div>
-        </YdForm>
-      </section>
-
-      <section v-if="activeTab === 'passkey'" class="panel">
-        <YdAlert v-if="!policy.passkeyEnabled" icon="morph:info" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
-        <div class="key-toolbar">
-          <div class="section-title">
-            <YdIcon name="morph:fingerprint" />
-            Passkey 凭据
-          </div>
-        </div>
-        <YdResponsiveTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <YdInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
-                <div class="flex gap-2 md:justify-end">
-                  <YdButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
-                </div>
+        <template #external>
+          <YdSettingsSection
+            title="第三方登录"
+            description="内置 Wwoyun 提供方，调用地址可按实际部署修改；插件托管的提供方在各自设置页配置。"
+          >
+            <YdAlert icon="morph:info" title="关闭状态开关即可从登录页拿掉入口" description="不必清空凭据；AppKey 已保存时留空表示不修改。" />
+            <YdAlert v-if="pluginManagedProviders.length" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
+            <YdForm :model="externalLoginForm" layout="vertical">
+              <div class="form-grid">
+                <YdFormItem label="提供方">
+                  <YdSelect v-model="selectedHostProviderCode" :options="hostProviderOptions" class="w-full" @update:model-value="changeHostProvider" />
+                </YdFormItem>
+                <YdFormItem label="提供方编码">
+                  <YdInput v-model="externalLoginForm.code" disabled />
+                </YdFormItem>
+                <YdFormItem label="名称">
+                  <YdInput v-model="externalLoginForm.name" />
+                </YdFormItem>
+                <YdFormItem label="AppId">
+                  <YdInput v-model="externalLoginForm.appId" />
+                </YdFormItem>
+                <YdFormItem label="AppKey">
+                  <YdInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时留空不修改" />
+                </YdFormItem>
               </div>
-            </YdSearchBar>
-          </template>
-          <template #cell-status="{ row }">
-            <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
-          </template>
-          <template #cell-operation="{ row }">
-            <YdButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevokePasskey(row.original)">
-              吊销
-            </YdButton>
-          </template>
+              <YdFormItem label="接口地址">
+                <YdInput v-model="externalLoginForm.endpoint" placeholder="https://login.wwoyun.cn/connect.php" />
+              </YdFormItem>
+              <YdFormItem label="回调地址" required>
+                <YdInput v-model="externalLoginForm.callbackUrl" />
+              </YdFormItem>
+              <YdFormItem label="启用平台">
+                <YdMultiSelect v-model="selectedExternalTypes" :options="externalTypeOptions" />
+              </YdFormItem>
+              <YdFormItem label="状态">
+                <YdSwitch v-model="externalLoginForm.enabled" />
+              </YdFormItem>
+            </YdForm>
+            <template #footer>
+              <YdButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
+                <YdIcon name="morph:save" />
+                保存配置
+              </YdButton>
+            </template>
+          </YdSettingsSection>
+        </template>
 
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-base font-semibold break-all">{{ row.deviceName || row.credentialId }}</span>
-                  <YdTag :variant="statusVariant(row.status)">
-                    {{ statusText(row.status) }}
-                  </YdTag>
-                </div>
-                <div class="flex flex-col gap-1 text-sm">
-                  <div v-if="row.userId" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">用户 ID</span>
-                    <span class="break-all">{{ row.userId }}</span>
+        <template #passkey>
+          <YdSettingsSection
+            title="Passkey"
+            description="平台内已绑定的无密码登录凭据；吊销后该设备需要重新绑定。"
+          >
+            <YdAlert v-if="!policy.passkeyEnabled" icon="morph:info" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
+            <YdResponsiveEnhancedTable
+              row-key="id"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[1080px]"
+              column-visibility
+              :status-column="passkeyStatusColumn"
+              :actions="passkeyActions"
+              :columns="passkeyColumns"
+              :data="passkeyRows"
+            >
+              <template #toolbar>
+                <YdSearchBar class="w-full">
+                  <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+                    <YdInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
+                    <div class="flex gap-2 md:justify-end">
+                      <YdButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
+                        <YdIcon name="morph:search" />
+                        筛选
+                      </YdButton>
+                    </div>
                   </div>
-                  <div v-if="row.credentialId" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">凭据 ID</span>
-                    <span class="break-all">{{ row.credentialId }}</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">签名次数</span>
-                    <span>{{ row.signCount }}</span>
-                  </div>
-                  <div v-if="row.lastUsedTime" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">最后使用</span>
-                    <span>{{ row.lastUsedTime }}</span>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <YdButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevokePasskey(row)">
-                    吊销
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable>
-      </section>
+                </YdSearchBar>
+              </template>
+            </YdResponsiveEnhancedTable>
+          </YdSettingsSection>
+        </template>
+      </YdSettingsLayout>
     </YdPageMain>
 
     <YdModal v-model="createVisible" title="创建 API Key" show-cancel-button class="sm:max-w-3xl" :confirm-loading="creating" @confirm="createApiKey">
@@ -1339,43 +1289,6 @@ function normalizeDateTime(value?: string) {
 </template>
 
 <style scoped>
-.security-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.security-tabs button {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-  color: var(--color-text-2);
-}
-
-.security-tabs button.active,
-.security-tabs button:hover {
-  border-color: var(--color-text-1);
-  color: var(--color-text-1);
-}
-
-.panel {
-  display: grid;
-  gap: 16px;
-}
-
-.section-title {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-weight: 600;
-}
-
 .policy-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1420,39 +1333,12 @@ function normalizeDateTime(value?: string) {
   gap: 12px;
 }
 
-.key-toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.key-actions,
 .table-actions,
 .tag-row {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-}
-
-.permission-panel {
-  display: grid;
-  gap: 12px;
-  max-height: 340px;
-  overflow: auto;
-}
-
-.permission-group {
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-}
-
-.permission-title {
-  margin-bottom: 8px;
-  font-weight: 600;
 }
 
 .permission-select-panel {
