@@ -49,7 +49,7 @@ public class AiCapabilityProvider implements CapabilityProvider {
                 CODE,
                 "AI 助手",
                 CapabilityType.AI,
-                "统一的 AI 能力：多供应商多模型文本生成、在线聊天（会话/历史/附件/多模态/每日额度）与页面构建，支持 OpenAI 兼容、Kimi、DeepSeek 等模型参数适配",
+                "统一的 AI 能力：聊天端点支持 Anthropic Messages / OpenAI Chat Completions / OpenAI Responses 三种协议，向量化与重排序各自独立端点；含在线聊天（会话/历史/附件/多模态/每日额度）与页面构建",
                 "i-ri:sparkling-2-line",
                 95,
                 defaultConfig,

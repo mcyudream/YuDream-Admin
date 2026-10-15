@@ -77,9 +77,33 @@ class AgentScopeModelsTest {
         assertSame(factory.resolve(lower), factory.resolve(upper));
     }
 
+    @Test
+    void buildsProtocolSpecificModelImplementations() {
+        Model anthropic = factory.resolve(resolved(AiProviderType.OPENAI_COMPATIBLE, "claude-model", null, "ANTH"));
+        Model responses = factory.resolve(resolved(AiProviderType.OPENAI_COMPATIBLE, "gpt-5", null, "RESPONSE"));
+        assertTrue(anthropic instanceof io.agentscope.extensions.model.anthropic.AnthropicChatModel);
+        assertTrue(responses instanceof io.agentscope.extensions.model.openaiofficial.OpenAIResponsesChatModel);
+        assertEquals("claude-model", anthropic.getModelName());
+        assertEquals("gpt-5", responses.getModelName());
+    }
+
+    @Test
+    void separatesCacheEntryPerProtocolForSameModelName() {
+        ResolvedAiModel chat = resolved(AiProviderType.OPENAI_COMPATIBLE, "shared-model", null, "CHAT");
+        ResolvedAiModel responses = resolved(AiProviderType.OPENAI_COMPATIBLE, "shared-model", null, "RESPONSE");
+        assertNotSame(factory.resolve(chat), factory.resolve(responses));
+    }
+
     private ResolvedAiModel resolved(AiProviderType type, String modelName, String proxyUrl) {
+        return resolved(type, modelName, proxyUrl, "CHAT");
+    }
+
+    private ResolvedAiModel resolved(AiProviderType type, String modelName, String proxyUrl, String protocol) {
         AiProviderEndpoint provider = new AiProviderEndpoint(
-                "p1", "测试供应商", type, "https://api.example.com/v1", null, "sk-test", proxyUrl,
+                "p1", "测试供应商", type,
+                online.yudream.base.domain.platform.ai.enumerate.AiEndpointUsage.CHAT,
+                online.yudream.base.domain.platform.ai.enumerate.AiProviderProtocol.from(protocol),
+                "https://api.example.com/v1", null, "sk-test", proxyUrl,
                 modelName, null, null, List.of(), List.of(), List.of(), true);
         AiModelEndpoint model = new AiModelEndpoint(
                 "m1", modelName, modelName, null, null, null, null, "chat", false);

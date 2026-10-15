@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import online.yudream.base.domain.platform.ai.enumerate.AiEndpointUsage;
 
 @Service
 public class PluginSemanticMemoryFrameworkService implements PluginSemanticMemoryService {
@@ -68,8 +69,8 @@ public class PluginSemanticMemoryFrameworkService implements PluginSemanticMemor
     public PluginSemanticMemoryStatus status() {
         if (!enabled(NEO4J_CAPABILITY)) return PluginSemanticMemoryStatus.unavailable("Neo4j capability is disabled");
         if (!enabled(AI_CAPABILITY)) return PluginSemanticMemoryStatus.unavailable("AI capability is disabled");
-        List<PluginSemanticMemoryModelOption> models = providers().stream()
-                .flatMap(provider -> provider.embeddingModels().stream()
+        List<PluginSemanticMemoryModelOption> models = embeddingProviders().stream()
+                .flatMap(provider -> provider.embeddingModelNames().stream()
                         .map(model -> new PluginSemanticMemoryModelOption(provider.code(), provider.displayName(), model, model)))
                 .toList();
         return models.isEmpty()
@@ -155,11 +156,11 @@ public class PluginSemanticMemoryFrameworkService implements PluginSemanticMemor
     }
 
     private List<Float> embed(String providerCode, String modelCode, String content) {
-        AiProviderEndpoint provider = providers().stream()
+        AiProviderEndpoint provider = embeddingProviders().stream()
                 .filter(item -> item.code().equalsIgnoreCase(providerCode))
-                .filter(item -> item.embeddingModels().contains(modelCode))
+                .filter(item -> item.embeddingModelNames().contains(modelCode))
                 .findFirst().orElseThrow();
-        Map<String, Object> response = RestClient.create().post().uri(provider.endpointBaseUrl() + "/embeddings")
+        Map<String, Object> response = RestClient.create().post().uri(provider.endpointUrl())
                 .contentType(MediaType.APPLICATION_JSON).header("Authorization", "Bearer " + provider.apiKey())
                 .body(Map.of("model", modelCode, "input", content)).retrieve().body(Map.class);
         Object data = response == null ? null : response.get("data");
@@ -170,8 +171,8 @@ public class PluginSemanticMemoryFrameworkService implements PluginSemanticMemor
     }
 
     private boolean available(String providerCode, String modelCode) {
-        return status().available() && providers().stream().anyMatch(item -> item.code().equalsIgnoreCase(providerCode)
-                && item.embeddingModels().contains(modelCode) && StringUtils.hasText(item.apiKey()));
+        return status().available() && embeddingProviders().stream().anyMatch(item -> item.code().equalsIgnoreCase(providerCode)
+                && item.embeddingModelNames().contains(modelCode) && StringUtils.hasText(item.apiKey()));
     }
 
     private boolean validRecord(PluginSemanticMemoryRecord record) {
@@ -188,10 +189,11 @@ public class PluginSemanticMemoryFrameworkService implements PluginSemanticMemor
         return capabilities.findByCode(code).map(item -> Boolean.TRUE.equals(item.getEnabled())).orElse(false);
     }
 
-    private List<AiProviderEndpoint> providers() {
+    /** 语义记忆只用向量化端点；聊天端点不参与 Embedding 解析。 */
+    private List<AiProviderEndpoint> embeddingProviders() {
         Map<String, String> config = capabilities.findByCode(AI_CAPABILITY)
                 .map(item -> item.getConfig() == null ? Map.<String, String>of() : item.getConfig()).orElse(Map.of());
-        return providerConfigParser.parse(config).stream().filter(AiProviderEndpoint::enabled).toList();
+        return providerConfigParser.endpoints(config, AiEndpointUsage.EMBEDDING);
     }
 
     private Connection connection() {

@@ -136,7 +136,7 @@ public class PluginAiFrameworkService implements PluginAiService {
     @Override
     public List<online.yudream.base.plugin.spi.system.ai.PluginAiProviderOption> providers() {
         Map<String, String> config = capabilityModuleRepo.findByCode("ai").map(item -> item.getConfig() == null ? Map.<String, String>of() : item.getConfig()).orElse(Map.of());
-        return providerConfigParser.parse(config).stream().filter(item -> item.enabled()).map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiProviderOption(item.code(), item.name(), item.models().stream().filter(model -> "chat".equalsIgnoreCase(model.kind())).map(model -> new online.yudream.base.plugin.spi.system.ai.PluginAiModelOption(model.optionCode(), model.name())).toList())).toList();
+        return providerConfigParser.parse(config).stream().filter(item -> item.enabled()).filter(item -> item.isChat()).map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiProviderOption(item.code(), item.name(), item.chatModels().stream().map(model -> new online.yudream.base.plugin.spi.system.ai.PluginAiModelOption(model.optionCode(), model.name())).toList())).toList();
     }
 
     @Override

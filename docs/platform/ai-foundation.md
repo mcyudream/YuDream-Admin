@@ -46,7 +46,11 @@ AI/Agent/Wiki 等 provider 和端点受项目配置限制，每个用例继续�
 
 ### 模型与网关
 
-- AI 配置**必须**是 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`；禁止拍平成 `baseUrl/apiKey/model` 字典。供应商差异经 `AiProviderAdapter.generateOptions(...)` 产出 AgentScope `GenerateOptions`（`additionalBodyParams` 注入 thinking、toolChoice、reasoningEffort）；Kimi/DeepSeek 等兼容供应商走官方 compat formatter，禁用「结构化输出与工具共存」的原生路径。
+- AI 配置**必须**是端点列表结构（`providers` 数组，每项是一个端点：用途 + 协议 + base URL、key、代理、模型清单）；前端传 `providerCode` + `modelCode`；禁止拍平成 `baseUrl/apiKey/model` 字典。供应商差异经 `AiProviderAdapter.generateOptions(...)` 产出 AgentScope `GenerateOptions`（`additionalBodyParams` 注入 thinking、toolChoice、reasoningEffort）；Kimi/DeepSeek 等兼容供应商走官方 compat formatter，禁用「结构化输出与工具共存」的原生路径。
+- **端点用途与协议是运行时契约，不是展示标签**：`usage` 取 `chat`/`embedding`/`rerank`；聊天端点 `protocol` 取 `ANTH`（Anthropic Messages）/`CHAT`（OpenAI Chat Completions）/`RESPONSE`（OpenAI Responses），向量化与重排序端点协议由用途确定为 `EMBEDDING`/`RERANK`。协议决定模型实现（`OpenAIChatModel`/`AnthropicChatModel`/`OpenAIResponsesChatModel`）与默认路径，**禁止**只改标签不换实现，也禁止把不支持某协议的端点静默按聊天协议调用。
+- **向量化与重排序是独立端点**：各自持有基址、路径、凭据与模型清单，不从聊天端点推导；同一供应商编码可跨用途复用（用途参与身份），同一用途下编码**必须**唯一。Wiki 知识库与插件语义记忆按 (usage, providerCode, modelCode) 解析，旧配置挂在聊天端点上的 `embeddingModels`/`rerankModels` 在解析时合成为同编码独立端点，前端保存时迁移为显式端点且不再写回旧字段。
+- 端点路径默认值：`/chat/completions`、`/responses`、`/v1/messages`、`/embeddings`、`/rerank`；粘贴完整端点地址时 `endpointBaseUrl()` 剥离路径再交给 SDK，SDK 自行拼接版本段。
+- 管理端「获取模型」走 `POST /api/platform/ai/endpoints/discover-models`（权限复用 `platform:capability:test`，要求 AI 能力已启用）：按协议请求 OpenAI 兼容 `/models` 或 Anthropic `/v1/models`，重排序等无列表接口的服务返回 `listed=false` 并提示手工登记；凭据只随本次请求使用，不落库、不写日志、不回显。出站目标只做输入合法性校验（http/https、主机存在、不携带用户凭据）——同一权限层已能通过聊天端点向相同地址发起生成，发现接口**不得**比实际调用更严格；需要限制内网时由部署侧 `yudream.security.outbound.allow-private-network` 统一收紧。
 - AI 底层由 AgentScope Java（`io.agentscope:agentscope-harness`）承载，**禁止**手搓底层：模型实例构建/连接复用（`AgentScopeModels`）、流式拆包、工具调用循环、结构化输出与降级、重试一律交给框架。依赖版本从 `pom.xml` 读取并核实真实 API，不以网页描述代替已发布制品。
 - Agent 路径（ReActAgent/HarnessAgent）的 system prompt **必须**经 `sysPrompt`/`onSystemPrompt` 注入，输入消息列表**禁止**携带 SYSTEM 消息；模型可见工具名一律 `ToolSchemas.safeName`。
 - 每次调用定制走 `RuntimeContext` + 中间件：`PerCallModelMiddleware`（逐请求 provider/model）、`PerCallSystemPromptMiddleware`、`PerCallToolFilterMiddleware`（按权限快照 schema 级过滤工具）。
@@ -67,7 +71,7 @@ AI/Agent/Wiki 等 provider 和端点受项目配置限制，每个用例继续�
 
 - Agent 应用是独立平台能力（显式 provider、双闸门、依赖 AI/Integration）；菜单与端点绑定 agent 而非仅 ai。执行流落库后由 `AgentTraceAppService` 统一查询/统计/导出/删除，日志菜单 `system:agent-trace`（`/api/platform/agent-traces`），不依赖开发模式。
 - Agent 调试前端经 fetch ReadableStream 消费 POST SSE，按 nodeId 映射节点状态；只打日志或等阻塞返回实现不了实时画布反馈。
-- 大模型节点持久化 `providerCode/modelCode` 与输入能力：llm/understand 只能引用已配置 chat 模型，Vision 模型才允许图片输入，禁止静默回落未配置的 Default AI；`providers.models[]` 每个模型的显式 `kind` 由目录与网关共同遵守，聊天生成只解析 `kind=chat`；内置 Agent 启动时修复历史非法模型引用（embedding/rerank/已删除），保留合法 chat 选择。向量/重排只由表内 kind 推导。
+- 大模型节点持久化 `providerCode/modelCode` 与输入能力：llm/understand 只能引用已配置 chat 模型，Vision 模型才允许图片输入，禁止静默回落未配置的 Default AI；模型 `kind` 与端点用途共同决定归类——聊天生成只解析 chat 端点且 `kind=chat` 的模型；内置 Agent 启动时修复历史非法模型引用（embedding/rerank/已删除），保留合法 chat 选择。向量/重排清单由各自独立端点的用途推导，不在聊天端点内二次推导。
 - 原生工具调用由具体聊天模型节点声明 `toolCodes`/`toolMode`，每次模型调用前解析为受作用域限制的 `AiAgentTool` 回调；应用级 toolCodes 仅是后端推导的授权并集；独立 tool 节点只作历史兼容迁移路径。
 - Python 自定义工具契约是 `def run(params: dict) -> dict`：stdin/stdout 是内部 IPC，不进工具编排 UI 与 payload；持久化输出 JSON 示例并拒绝非 dict 结果。
 - 工作流变量是动态 map：模板渲染把缺失字段当空值，可选模型字段用安全导航，可选意图元数据不能中止整个运行。

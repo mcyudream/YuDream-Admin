@@ -6,10 +6,12 @@ import io.agentscope.core.model.transport.HttpTransport;
 import io.agentscope.core.model.transport.HttpTransportConfig;
 import io.agentscope.core.model.transport.OkHttpTransport;
 import io.agentscope.core.model.transport.ProxyConfig;
+import io.agentscope.extensions.model.anthropic.AnthropicChatModel;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
 import io.agentscope.extensions.model.openai.compat.kimi.KimiFormatter;
 import io.agentscope.extensions.model.openai.formatter.OpenAIChatFormatter;
+import io.agentscope.extensions.model.openaiofficial.OpenAIResponsesChatModel;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.infra.platform.ai.service.AiClientProperties;
 import online.yudream.base.infra.platform.ai.service.provider.AiModelEndpoint;
@@ -24,15 +26,19 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * AgentScope {@link Model} 工厂：把平台 AI 供应商配置（AiProviderEndpoint/AiModelEndpoint）装配为
- * AgentScope 的 OpenAI 兼容模型实例，并按「供应商端点 + 模型」身份做 LRU 缓存复用连接。
- * Kimi/DeepSeek 等兼容供应商的协议细节（formatter、结构化输出与工具调用互斥）交给框架的 compat 适配。
+ * AgentScope {@link Model} 工厂：按端点协议选择模型实现，并按「协议 + 端点 + 模型」身份做 LRU 缓存复用连接。
+ * <ul>
+ *   <li>{@code CHAT}：OpenAI Chat Completions；Kimi/DeepSeek 等兼容供应商的协议细节交给框架 compat 适配。</li>
+ *   <li>{@code ANTH}：Anthropic Messages，路径与 x-api-key 鉴权由 anthropic SDK 负责。</li>
+ *   <li>{@code RESPONSE}：OpenAI Responses，/responses 路径由官方 SDK 负责。</li>
+ * </ul>
  */
 @Slf4j
 @Component
 public class AgentScopeModels {
 
     private static final int MAX_CACHED_MODELS = 16;
+    private static final String DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 
     private final AiClientProperties clientProperties;
     private final Map<String, Model> cache = new LinkedHashMap<>(16, 0.75f, true) {
@@ -56,10 +62,12 @@ public class AgentScopeModels {
         }
     }
 
-    /** 模型连接的缓存身份；Agent 在每次执行时绑定所选模型。 */
+    /** 模型连接的缓存身份；协议不同即不同实例，Agent 在每次执行时绑定所选模型。 */
     public static String identityOf(AiProviderEndpoint provider, AiModelEndpoint model) {
         return String.join("|",
                 String.valueOf(provider.type()),
+                String.valueOf(provider.usage()),
+                String.valueOf(provider.protocol()),
                 provider.endpointBaseUrl(),
                 provider.completionsPath(),
                 String.valueOf(provider.apiKey()),
@@ -68,6 +76,14 @@ public class AgentScopeModels {
     }
 
     private Model build(AiProviderEndpoint provider, AiModelEndpoint model) {
+        return switch (provider.protocol()) {
+            case ANTH -> anthropicChatModel(provider, model);
+            case RESPONSE -> responsesChatModel(provider, model);
+            default -> openAiCompatibleChatModel(provider, model);
+        };
+    }
+
+    private Model openAiCompatibleChatModel(AiProviderEndpoint provider, AiModelEndpoint model) {
         AiProviderType type = provider.type();
         OpenAIChatModel.Builder builder = OpenAIChatModel.builder()
                 .apiKey(provider.apiKey())
@@ -83,6 +99,38 @@ public class AgentScopeModels {
             builder.nativeStructuredOutputWithTools(false);
         }
         return builder.build();
+    }
+
+    private Model anthropicChatModel(AiProviderEndpoint provider, AiModelEndpoint model) {
+        AnthropicChatModel.Builder builder = AnthropicChatModel.builder()
+                .apiKey(provider.apiKey())
+                .baseUrl(anthropicBaseUrl(provider))
+                .modelName(model.modelName())
+                .stream(true);
+        ProxyConfig proxy = proxyConfig(provider.proxyUrl());
+        if (proxy != null) {
+            builder.proxy(proxy);
+        }
+        return builder.build();
+    }
+
+    private Model responsesChatModel(AiProviderEndpoint provider, AiModelEndpoint model) {
+        OpenAIResponsesChatModel.Builder builder = OpenAIResponsesChatModel.builder()
+                .apiKey(provider.apiKey())
+                .baseUrl(provider.endpointBaseUrl())
+                .modelName(model.modelName())
+                .stream(true);
+        ProxyConfig proxy = proxyConfig(provider.proxyUrl());
+        if (proxy != null) {
+            builder.proxy(proxy);
+        }
+        return builder.build();
+    }
+
+    /** Anthropic SDK 自行拼接版本路径，基址缺省时回落官方地址。 */
+    private String anthropicBaseUrl(AiProviderEndpoint provider) {
+        String baseUrl = provider.endpointBaseUrl();
+        return StringUtils.hasText(baseUrl) ? baseUrl : DEFAULT_ANTHROPIC_BASE_URL;
     }
 
     private HttpTransport transport(AiProviderEndpoint provider) {

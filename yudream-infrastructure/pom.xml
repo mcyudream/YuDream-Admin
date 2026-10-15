@@ -148,6 +148,15 @@
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-model-openai</artifactId>
         </dependency>
+        <!-- 端点协议扩展：Anthropic Messages（anth）与 OpenAI Responses（response），版本由 agentscope-bom 统一管理 -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-anthropic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai-official</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-agui</artifactId>

@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import online.yudream.base.domain.platform.ai.enumerate.AiEndpointUsage;
 
 @Service
 @RequiredArgsConstructor
@@ -42,13 +43,13 @@ public class AiProviderWikiRerankGateway implements WikiRerankGateway {
         }
         try {
             Map<String, String> config = capabilities.findByCode("ai").filter(module -> module.enabled()).map(module -> module.getConfig()).orElse(Map.of());
-            AiProviderEndpoint provider = providers.parse(config).stream().filter(AiProviderEndpoint::enabled).filter(item -> item.code().equalsIgnoreCase(providerCode)).findFirst().orElse(null);
+            AiProviderEndpoint provider = providers.find(config, AiEndpointUsage.RERANK, providerCode).orElse(null);
             if (provider == null) throw new BizException("重排 Provider 不存在或未启用：" + providerCode);
             if (!StringUtils.hasText(provider.apiKey())) throw new BizException("重排 Provider 未配置 API Key：" + providerCode);
-            if (provider.rerankModels().isEmpty()) throw new BizException("重排 Provider 未配置模型：" + providerCode);
-            String selectedModel = StringUtils.hasText(modelCode) ? modelCode : provider.rerankModels().getFirst();
-            if (!provider.rerankModels().contains(selectedModel)) throw new BizException("重排模型不可用：" + selectedModel);
-            Map<String, Object> response = RestClient.create().post().uri(provider.endpointBaseUrl() + "/rerank")
+            if (provider.rerankModelNames().isEmpty()) throw new BizException("重排 Provider 未配置模型：" + providerCode);
+            String selectedModel = StringUtils.hasText(modelCode) ? modelCode : provider.rerankModelNames().getFirst();
+            if (!provider.rerankModelNames().contains(selectedModel)) throw new BizException("重排模型不可用：" + selectedModel);
+            Map<String, Object> response = RestClient.create().post().uri(provider.endpointUrl())
                     .contentType(MediaType.APPLICATION_JSON).header("Authorization", "Bearer " + provider.apiKey())
                     .body(Map.of("model", selectedModel, "query", query, "documents", candidates.stream().map(WikiSearchHit::content).toList(), "top_n", candidates.size()))
                     .retrieve().body(Map.class);

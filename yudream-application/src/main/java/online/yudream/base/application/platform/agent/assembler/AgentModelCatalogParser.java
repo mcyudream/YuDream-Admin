@@ -35,14 +35,24 @@ public class AgentModelCatalogParser {
                 String providerName = provider.path("name").asText(providerCode);
                 String defaultModel = provider.path("defaultModel").asText();
                 boolean configured = StringUtils.hasText(provider.path("apiKey").asText());
-                append(result, provider.path("models"), providerCode, providerName, "chat", defaultModel, configured);
-                append(result, provider.path("embeddingModels"), providerCode, providerName, "embedding", defaultModel, configured);
-                append(result, provider.path("rerankModels"), providerCode, providerName, "rerank", defaultModel, configured);
+                // 端点用途决定模型归类：向量化/重排序端点不再把模型混入聊天清单。
+                String usage = normalizedUsage(provider.path("usage").asText(""));
+                append(result, provider.path("models"), providerCode, providerName, usage, defaultModel, configured);
+                if ("chat".equals(usage)) {
+                    // 旧配置把 embeddingModels/rerankModels 挂在聊天端点上，继续读取以保持兼容。
+                    append(result, provider.path("embeddingModels"), providerCode, providerName, "embedding", defaultModel, configured);
+                    append(result, provider.path("rerankModels"), providerCode, providerName, "rerank", defaultModel, configured);
+                }
             }
             return List.copyOf(result);
         } catch (Exception exception) {
             throw new BizException("AI 模型配置格式无效");
         }
+    }
+
+    private String normalizedUsage(String configuredUsage) {
+        String usage = StringUtils.hasText(configuredUsage) ? configuredUsage.trim().toLowerCase() : "chat";
+        return List.of("chat", "embedding", "rerank").contains(usage) ? usage : "chat";
     }
 
     private void append(

@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import online.yudream.base.domain.platform.ai.enumerate.AiEndpointUsage;
 
 @Service
 @RequiredArgsConstructor
@@ -29,16 +30,14 @@ public class AiProviderWikiEmbeddingGateway implements WikiEmbeddingGateway {
                 .filter(module -> module.enabled())
                 .map(module -> module.getConfig())
                 .orElseThrow(() -> new BizException("AI 能力未启用"));
-        AiProviderEndpoint provider = providerConfigParser.parse(config).stream()
-                .filter(AiProviderEndpoint::enabled)
-                .filter(item -> item.code().equalsIgnoreCase(providerCode))
-                .findFirst().orElseThrow(() -> new BizException("Embedding Provider 不存在或未启用"));
-        if (!provider.embeddingModels().contains(modelCode)) {
+        AiProviderEndpoint provider = providerConfigParser.find(config, AiEndpointUsage.EMBEDDING, providerCode)
+                .orElseThrow(() -> new BizException("Embedding Provider 不存在或未启用"));
+        if (!provider.embeddingModelNames().contains(modelCode)) {
             throw new BizException("所选模型不是该 Provider 的 Embedding 模型");
         }
         if (!StringUtils.hasText(provider.apiKey())) throw new BizException("Embedding Provider 未配置 API Key");
         Map<String, Object> response = RestClient.create().post()
-                .uri(provider.endpointBaseUrl() + "/embeddings")
+                .uri(provider.endpointUrl())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + provider.apiKey())
                 .body(Map.of("model", modelCode, "input", texts))
