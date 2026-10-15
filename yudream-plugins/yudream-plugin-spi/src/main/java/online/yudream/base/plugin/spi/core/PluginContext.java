@@ -3,6 +3,7 @@ package online.yudream.base.plugin.spi.core;
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
+import online.yudream.base.plugin.spi.guide.PluginGuide;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.http.PluginStreamingHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
@@ -77,6 +78,20 @@ public interface PluginContext {
      * 随插件 disable/unload 自动移除，无需手工注销。
      */
     void registerGlobalWidget(PluginGlobalWidget widget);
+
+    /**
+     * 注册新手引导（SPI 2.36.0 起）：声明式分步引导，宿主在用户进入匹配页面且未完成时
+     * 自动播放，也可由全局 AI 前端工具触发。步骤 target 使用 {@code [data-tour="..."]}
+     * 稳定选择器；注册随插件 disable/unload 自动移除，无需手工注销。
+     *
+     * <p>为保持既有第三方 {@code PluginContext} 实现类的二进制兼容，本方法以 default
+     * 形式声明；仅宿主实现覆写。在未实现该契约的宿主上调用将抛出
+     * {@link UnsupportedOperationException}。</p>
+     */
+    default void registerGuide(PluginGuide guide) {
+        throw new UnsupportedOperationException(
+                "当前宿主未实现插件新手引导契约（需要 SPI >= 2.36.0 的宿主支持）：registerGuide");
+    }
 
     /**
      * 注册界面主题：一个插件最多注册一个主题；同一 scope 同时只有一个主题插件

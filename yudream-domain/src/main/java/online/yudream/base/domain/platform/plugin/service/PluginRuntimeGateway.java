@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpStreamingDisp
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
@@ -59,6 +60,11 @@ public interface PluginRuntimeGateway {
 
     /** 全部已启用插件声明的全局挂件（登录态控制台布局常驻挂载）。 */
     default List<PluginGlobalWidgetInfo> globalWidgets() {
+        return List.of();
+    }
+
+    /** 全部已启用插件声明的新手引导（宿主按页面自动播放，AI 前端工具可触发）。 */
+    default List<PluginGuideInfo> guides() {
         return List.of();
     }
 

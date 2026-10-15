@@ -4,6 +4,8 @@ import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpStreamingDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGuideDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGuideStepDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
@@ -25,6 +27,8 @@ import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideStepInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
@@ -197,11 +201,34 @@ public class PluginAssembler {
     }
 
     public static PluginFrontendManifestDTO toManifestDTO(List<PluginFrontendModuleInfo> modules,
-                                                          List<PluginGlobalWidgetInfo> globalWidgets) {
+                                                          List<PluginGlobalWidgetInfo> globalWidgets,
+                                                          List<PluginGuideInfo> guides) {
         return PluginFrontendManifestDTO.builder()
                 .sdkVersion("1.3.0")
                 .modules(modules == null ? List.of() : modules.stream().map(PluginAssembler::toRuntimeDTO).toList())
                 .globalWidgets(globalWidgets == null ? List.of() : globalWidgets.stream().map(PluginAssembler::toDTO).toList())
+                .guides(guides == null ? List.of() : guides.stream().map(PluginAssembler::toDTO).toList())
+                .build();
+    }
+
+    public static PluginGuideDTO toDTO(PluginGuideInfo guide) {
+        return PluginGuideDTO.builder()
+                .pluginCode(guide.pluginCode())
+                .code(guide.code())
+                .title(guide.title())
+                .routePath(guide.routePath())
+                .permission(guide.permission())
+                .sort(guide.sort())
+                .steps(guide.steps() == null ? List.of() : guide.steps().stream().map(PluginAssembler::toDTO).toList())
+                .build();
+    }
+
+    public static PluginGuideStepDTO toDTO(PluginGuideStepInfo step) {
+        return PluginGuideStepDTO.builder()
+                .target(step.target())
+                .title(step.title())
+                .content(step.content())
+                .placement(step.placement())
                 .build();
     }
 

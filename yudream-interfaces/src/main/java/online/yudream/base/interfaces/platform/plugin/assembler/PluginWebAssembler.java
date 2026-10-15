@@ -10,6 +10,8 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifes
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGuideDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGuideStepDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
@@ -43,6 +45,8 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifest
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendRouteRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginGlobalWidgetRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginGuideRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginGuideStepRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanEntryRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanRes;
@@ -402,6 +406,30 @@ public class PluginWebAssembler {
                 .modules(dto.getModules().stream().map(PluginWebAssembler::toRes).toList())
                 .globalWidgets(dto.getGlobalWidgets() == null ? List.of() : dto.getGlobalWidgets().stream()
                         .map(PluginWebAssembler::toRes).toList())
+                .guides(dto.getGuides() == null ? List.of() : dto.getGuides().stream()
+                        .map(PluginWebAssembler::toRes).toList())
+                .build();
+    }
+
+    public static PluginGuideRes toRes(PluginGuideDTO dto) {
+        return PluginGuideRes.builder()
+                .pluginCode(dto.getPluginCode())
+                .code(dto.getCode())
+                .title(dto.getTitle())
+                .routePath(dto.getRoutePath())
+                .permission(dto.getPermission())
+                .sort(dto.getSort())
+                .steps(dto.getSteps() == null ? List.of() : dto.getSteps().stream()
+                        .map(PluginWebAssembler::toRes).toList())
+                .build();
+    }
+
+    public static PluginGuideStepRes toRes(PluginGuideStepDTO dto) {
+        return PluginGuideStepRes.builder()
+                .target(dto.getTarget())
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .placement(dto.getPlacement())
                 .build();
     }
 

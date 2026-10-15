@@ -20,6 +20,8 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCapabilityAssetIn
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideStepInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
@@ -512,6 +514,23 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .sorted(Comparator.comparingInt(PluginGlobalWidgetInfo::sort)
                         .thenComparing(PluginGlobalWidgetInfo::pluginCode)
                         .thenComparing(PluginGlobalWidgetInfo::code))
+                .toList();
+    }
+
+    @Override
+    public List<PluginGuideInfo> guides() {
+        return holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .flatMap(entry -> entry.getValue().getContext().guides().stream()
+                        .map(guide -> new PluginGuideInfo(entry.getKey(), guide.code(),
+                                guide.title(), guide.routePath(), guide.permission(), guide.sort(),
+                                guide.steps().stream()
+                                        .map(step -> new PluginGuideStepInfo(step.target(), step.title(),
+                                                step.content(), step.placement()))
+                                        .toList())))
+                .sorted(Comparator.comparingInt(PluginGuideInfo::sort)
+                        .thenComparing(PluginGuideInfo::pluginCode)
+                        .thenComparing(PluginGuideInfo::code))
                 .toList();
     }
 

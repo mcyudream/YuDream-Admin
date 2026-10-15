@@ -19,6 +19,7 @@ import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGuideInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
 import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
@@ -670,7 +671,9 @@ public class PluginAppService {
                 .toList();
         // 全局挂件需要登录态交互与权限过滤，匿名访客不下发
         List<PluginGlobalWidgetInfo> widgets = onlyPublicRoutes ? List.of() : pluginRuntimeGateway.globalWidgets();
-        return PluginAssembler.toManifestDTO(runtimeModules, widgets);
+        // 新手引导同样需要登录态与权限过滤，匿名访客不下发
+        List<PluginGuideInfo> guides = onlyPublicRoutes ? List.of() : pluginRuntimeGateway.guides();
+        return PluginAssembler.toManifestDTO(runtimeModules, widgets, guides);
     }
 
     @Transactional(readOnly = true)

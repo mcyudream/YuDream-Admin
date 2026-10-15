@@ -6,6 +6,8 @@ import online.yudream.base.plugin.spi.annotation.PluginConfigEntry;
 import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
 import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.annotation.PluginGlobalWidget;
+import online.yudream.base.plugin.spi.annotation.PluginGuide;
+import online.yudream.base.plugin.spi.annotation.PluginGuideStep;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginStreamingHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
@@ -42,6 +44,7 @@ class PluginAnnotationRegistrar {
         registerCapabilities(pluginClass, context);
         registerDashboardCards(pluginClass, context);
         registerGlobalWidgets(pluginClass, context);
+        registerGuides(pluginClass, context);
         registerTheme(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
@@ -162,6 +165,28 @@ class PluginAnnotationRegistrar {
                     widget.component(),
                     widget.permission(),
                     widget.sort()
+            ));
+        }
+    }
+
+    private void registerGuides(Class<?> pluginClass, PluginContextImpl context) {
+        for (PluginGuide guide : pluginClass.getAnnotationsByType(PluginGuide.class)) {
+            java.util.List<online.yudream.base.plugin.spi.guide.PluginGuideStep> steps = new java.util.ArrayList<>();
+            for (PluginGuideStep step : guide.steps()) {
+                steps.add(new online.yudream.base.plugin.spi.guide.PluginGuideStep(
+                        step.target(),
+                        step.title(),
+                        step.content(),
+                        step.placement()
+                ));
+            }
+            context.registerGuide(new online.yudream.base.plugin.spi.guide.PluginGuide(
+                    guide.code(),
+                    guide.title(),
+                    guide.routePath(),
+                    guide.permission(),
+                    guide.sort(),
+                    steps
             ));
         }
     }

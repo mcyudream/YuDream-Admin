@@ -28,4 +28,8 @@ public class PluginFrontendManifestDTO implements Serializable {
     /** 已启用插件声明的全局挂件；匿名访客下发时恒为空。 */
     @Builder.Default
     private List<PluginGlobalWidgetDTO> globalWidgets = new ArrayList<>();
+
+    /** 已启用插件声明的新手引导；匿名访客下发时恒为空。 */
+    @Builder.Default
+    private List<PluginGuideDTO> guides = new ArrayList<>();
 }

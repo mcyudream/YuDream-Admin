@@ -9,6 +9,8 @@ import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
+import online.yudream.base.plugin.spi.guide.PluginGuide;
+import online.yudream.base.plugin.spi.guide.PluginGuideStep;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.http.PluginStreamingHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
@@ -48,6 +50,7 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
     private final List<PluginDashboardCard> dashboardCards = new ArrayList<>();
     private final List<PluginGlobalWidget> globalWidgets = new ArrayList<>();
+    private final List<PluginGuide> guides = new ArrayList<>();
     private PluginTheme theme;
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final List<PluginHttpEndpointInfo> httpEndpoints = new ArrayList<>();
@@ -60,6 +63,7 @@ public class PluginContextImpl implements PluginContext {
     private final Set<String> capabilityKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> dashboardCardKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> globalWidgetKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> guideKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendModuleKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
@@ -208,6 +212,36 @@ public class PluginContextImpl implements PluginContext {
         String key = requireText(widget.code(), "插件全局挂件编码不能为空");
         ensureUnique(globalWidgetKeys, key, "插件全局挂件重复：" + key);
         globalWidgets.add(widget);
+    }
+
+    /** 引导步骤目标仅允许 data-tour 稳定标识，禁止任意选择器进入宿主 DOM。 */
+    private static final java.util.regex.Pattern GUIDE_TARGET_PATTERN =
+            java.util.regex.Pattern.compile("^\\[data-tour=\"[a-z0-9:._-]{1,80}\"\\]$");
+    private static final Set<String> GUIDE_PLACEMENTS = Set.of("top", "bottom", "left", "right");
+
+    @Override
+    public void registerGuide(PluginGuide guide) {
+        String key = requireText(guide.code(), "插件引导编码不能为空");
+        requireText(guide.title(), "插件引导标题不能为空");
+        if (!StringUtils.hasText(guide.routePath()) || !guide.routePath().startsWith("/")) {
+            throw new BizException("插件引导页面路径必须以 / 开头：" + guide.code());
+        }
+        if (guide.steps().isEmpty()) {
+            throw new BizException("插件引导至少声明一个步骤：" + guide.code());
+        }
+        for (PluginGuideStep step : guide.steps()) {
+            if (!StringUtils.hasText(step.content())) {
+                throw new BizException("插件引导步骤说明不能为空：" + guide.code());
+            }
+            if (StringUtils.hasText(step.target()) && !GUIDE_TARGET_PATTERN.matcher(step.target().trim()).matches()) {
+                throw new BizException("插件引导步骤目标仅支持 [data-tour=\"...\"] 选择器：" + guide.code());
+            }
+            if (StringUtils.hasText(step.placement()) && !GUIDE_PLACEMENTS.contains(step.placement())) {
+                throw new BizException("插件引导步骤方位仅支持 top/bottom/left/right：" + guide.code());
+            }
+        }
+        ensureUnique(guideKeys, key, "插件引导重复：" + key);
+        guides.add(guide);
     }
 
     @Override
@@ -455,6 +489,10 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(globalWidgets);
     }
 
+    public List<PluginGuide> guides() {
+        return List.copyOf(guides);
+    }
+
     public Optional<PluginTheme> theme() {
         return Optional.ofNullable(theme);
     }
@@ -486,6 +524,7 @@ public class PluginContextImpl implements PluginContext {
         capabilities.clear();
         dashboardCards.clear();
         globalWidgets.clear();
+        guides.clear();
         theme = null;
         frontendModules.clear();
         httpEndpoints.clear();
@@ -498,6 +537,7 @@ public class PluginContextImpl implements PluginContext {
         capabilityKeys.clear();
         dashboardCardKeys.clear();
         globalWidgetKeys.clear();
+        guideKeys.clear();
         frontendModuleKeys.clear();
         frontendRouteKeys.clear();
     }

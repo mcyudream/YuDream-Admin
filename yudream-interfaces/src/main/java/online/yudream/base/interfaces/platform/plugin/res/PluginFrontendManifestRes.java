@@ -26,4 +26,7 @@ public class PluginFrontendManifestRes implements Serializable {
 
     @Builder.Default
     private List<PluginGlobalWidgetRes> globalWidgets = new ArrayList<>();
+
+    @Builder.Default
+    private List<PluginGuideRes> guides = new ArrayList<>();
 }

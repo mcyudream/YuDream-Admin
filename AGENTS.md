@@ -49,6 +49,7 @@
 
 - 后端 AI 底座使用 AgentScope Java Harness，AI 持久运行/工具/额度规则见 `docs/platform/ai-foundation.md`。
 - 插件持久 AI 运行契约见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；该版本在对应工作项中只完成本仓提交，未获发布授权前不得推 Nexus 或让插件仓消费。
+- 插件新手引导契约见 `docs/plugin-system/spi-2.36.0-guides.md`（SPI 2.36.0 本仓已升版）；与 2.35.0 同样未获发布授权，不得推 Nexus 或让插件仓消费。
 - 宿主前端 YD 零违规门禁以已提交基线为准；禁止从工作区生成基线或恢复历史例外。
 - 双仓同步地图：`docs/dev/repo-sync.md`；待同步事项以该文件为准。
 
