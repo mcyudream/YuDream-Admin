@@ -12,9 +12,9 @@ const props = defineProps<ToasterProps>()
     :class="cn('toaster group', props.class)"
     :style="{
       '--normal-bg': 'oklch(var(--popover))',
-      '--normal-text': 'oklchvar(--popover-foreground))',
-      '--normal-border': 'oklchvar(--border))',
-      '--border-radius': 'oklchvar(--radius))',
+      '--normal-text': 'oklch(var(--popover-foreground))',
+      '--normal-border': 'oklch(var(--border))',
+      '--border-radius': 'oklch(var(--radius))',
     }"
     v-bind="props"
   >
