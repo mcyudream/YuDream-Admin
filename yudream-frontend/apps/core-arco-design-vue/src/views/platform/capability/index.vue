@@ -377,12 +377,28 @@ const metricLabels: Record<string, string> = {
   exchange: '交换机',
   nodes: '节点数',
   documents: '文档数',
+  swaggerUiPath: 'Swagger UI 路径',
+  openApiPath: 'OpenAPI 描述路径',
+  renderer: '渲染引擎',
+  pageType: '页面类型',
+  baseUrl: '服务地址',
+  reachable: '服务可达',
+  runtime: '运行时',
+  pythonCommand: 'Python 命令',
+  designer: '表单设计器',
+  mailboxId: '收件箱标识',
+  host: '主机',
+  uri: '连接地址',
+  database: '数据库',
+  virtualHost: 'Virtual Host',
+  routingKey: '路由键',
+  timeout: '连接超时（毫秒）',
 }
 
 interface MetricEntry {
   key: string
   label: string
-  type: 'tags' | 'boolean' | 'text' | 'number' | 'link'
+  type: 'tags' | 'boolean' | 'text' | 'number' | 'link' | 'path'
   tags: string[]
   text: string
   number: number
@@ -435,8 +451,11 @@ function metricEntries(item?: CapabilityItem): MetricEntry[] {
       return { key, label, icon, type: 'text' as const, tags: [], text: text || '-', number: 0, ok: true }
     }
     const text = value === null || value === undefined || value === '' ? '-' : String(value)
-    const isLink = /^(?:https?:)?\/\//.test(text) || text.startsWith('/')
-    return { key, label, icon, type: (isLink ? 'link' : 'text') as 'link' | 'text', tags: [], text, number: 0, ok: text !== '-' }
+    // 只有完整 URL 才做外链；站内路径用等宽文本 + 复制，点开没有意义。
+    const isUrl = /^(?:https?:)?\/\//.test(text)
+    const isPath = !isUrl && /^\/[\w./-]+$/.test(text)
+    const type = isUrl ? 'link' as const : isPath ? 'path' as const : 'text' as const
+    return { key, label, icon, type, tags: [], text, number: 0, ok: text !== '-' }
   })
 }
 
@@ -835,7 +854,7 @@ function parseJsonConfig() {
               </div>
 
               <template v-if="metricEntries(selected).length">
-                <div class="health-overview">
+                <div v-if="healthNumbers.length || aiModelBreakdown.sum" class="health-overview">
                   <div
                     v-if="aiModelBreakdown.sum"
                     class="health-donut"
@@ -883,6 +902,10 @@ function parseJsonConfig() {
                       <a v-else-if="metric.type === 'link'" class="health-facts__link" :href="metric.text" target="_blank" rel="noopener">
                         <YdIcon name="morph:external-link" />{{ metric.text }}
                       </a>
+                      <template v-else-if="metric.type === 'path'">
+                        <code class="health-facts__path">{{ metric.text }}</code>
+                        <YdCopyButton :text="metric.text" label="" />
+                      </template>
                       <span v-else>{{ metric.text }}</span>
                     </div>
                   </li>
@@ -1038,6 +1061,7 @@ function parseJsonConfig() {
 .health-facts__value { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-width:0; color:var(--color-text-1); font-size:14px; font-weight:600; }
 .health-facts__muted { color:var(--color-text-3); font-weight:400; }
 .health-facts__link { display:inline-flex; gap:6px; align-items:center; color:var(--color-text-1); font-size:13px; overflow-wrap:anywhere; text-decoration:underline; text-decoration-color:var(--color-border-3); text-underline-offset:3px; }
+.health-facts__path { padding:3px 8px; border-radius:6px; background:var(--color-fill-2); color:var(--color-text-2); font-size:12px; overflow-wrap:anywhere; }
 
 .health-empty { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding:18px; border:1px dashed var(--color-border-2); border-radius:12px; background:var(--color-fill-1); }
 .health-empty strong { color:var(--color-text-1); font-size:14px; }
