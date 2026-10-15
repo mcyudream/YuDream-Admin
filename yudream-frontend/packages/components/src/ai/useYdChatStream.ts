@@ -1199,7 +1199,8 @@ export function createYdChatStream(options: UseYdChatStreamOptions) {
     if (!id || messages.value.some(message => message.id === `input:${id}`)) {
       return
     }
-    const optimistic = messages.value.findLast(message => message.role === 'user' && message.content === text && message.id?.startsWith('user-'))
+    // 用 filter().at(-1) 取最后一条匹配，避免 findLast 抬高消费端 lib 要求（插件 tsconfig 为 ES2022）
+    const optimistic = messages.value.filter(message => message.role === 'user' && message.content === text && message.id?.startsWith('user-')).at(-1)
     if (optimistic) {
       optimistic.id = `input:${id}`
     }

@@ -21,6 +21,13 @@ trap 'rm -rf "$PACK_DIR" "$EXTRACT_DIR"' EXIT INT TERM
 
 mkdir -p "$PACK_DIR"
 
+echo "[verify-contract-package-tarballs] checking contract sources compile for plugin consumers"
+# 契约包以源码发布，插件用 @vue/tsconfig/tsconfig.dom.json（lib ES2022）做类型检查：
+# 这里先按同样条件编译一次，避免 ES2023+ 内置 API 或重复导出只在下游构建时才暴露
+pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/plugin-sdk run build
+pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/components exec vue-tsc -p tsconfig.consumer-lib.json --noEmit
+pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/dataviz exec vue-tsc -p tsconfig.consumer-lib.json --noEmit
+
 echo "[verify-contract-package-tarballs] packing @yudream/plugin-sdk"
 pnpm --config.engine-strict=false --dir yudream-frontend run check:ui-docs
 pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/plugin-sdk pack --pack-destination "$PACK_DIR" >/dev/null
