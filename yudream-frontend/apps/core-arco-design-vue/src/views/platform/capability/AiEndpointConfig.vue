@@ -2,8 +2,8 @@
 /**
  * AI 端点配置：聊天 / 向量化 / 重排序三类独立端点的分层编辑。
  *
- * - 左栏按用途分组列出端点，右栏只编辑当前端点；
- * - 连接 / 模型 / 高级兼容分区，低频字段折叠，避免一屏铺满密集表单；
+ * - 同级用途切换与端点选择器，避免嵌套固定侧栏；
+ * - 连接 / 模型 / 高级兼容分区，模型参数单独编辑，避免密集表单；
  * - 「获取模型」按端点协议请求远端模型列表，勾选后合并到当前端点，不覆盖已登记模型。
  */
 import type { AiDiscoveredModelCandidate, AiEndpointDraft } from './ai-endpoints'
@@ -26,31 +26,39 @@ import {
   protocolOptionsFor,
 } from './ai-presets'
 
-const endpoints = defineModel<AiEndpointDraft[]>('endpoints', { required: true })
-const defaultProvider = defineModel<string>('defaultProvider', { required: true })
-const defaultModel = defineModel<string>('defaultModel', { required: true })
-
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   /** 能力未启用时后端拒绝模型发现，前端同步禁用并说明原因。 */
   capabilityEnabled?: boolean
 }>(), {
   capabilityEnabled: false,
 })
 
+const endpoints = defineModel<AiEndpointDraft[]>('endpoints', { required: true })
+const defaultProvider = defineModel<string>('defaultProvider', { required: true })
+const defaultModel = defineModel<string>('defaultModel', { required: true })
 const toast = useYdToast()
 
-const activeIndex = ref(0)
+const activeUsage = ref<AiEndpointUsage>('chat')
+const activeEndpoint = shallowRef<AiEndpointDraft>()
 const presetPickerUsage = ref<AiEndpointUsage | null>(null)
 const discoverOpen = ref(false)
 const discoverLoading = ref(false)
 const discoverListed = ref(true)
 const discoverMessage = ref('')
 const discoverCandidates = ref<AiDiscoveredModelCandidate[]>([])
+const discoverOwner = shallowRef<AiEndpointDraft>()
+let discoverSequence = 0
+const modelEditing = ref(false)
+const modelIndex = ref(-1)
+const modelDraft = ref(createAiModel())
 
-const active = computed(() => {
-  const index = Math.min(Math.max(activeIndex.value, 0), Math.max(endpoints.value.length - 1, 0))
-  return endpoints.value[index]
-})
+const endpointsForUsage = computed(() => endpointsByUsage(endpoints.value, activeUsage.value))
+const active = computed(() => endpointsForUsage.value.find(item => item === activeEndpoint.value)
+  ?? endpointsForUsage.value[0])
+const activeUsageOptions = computed(() => AI_USAGE_ORDER.map(usage => ({
+  label: AI_USAGE_LABELS[usage],
+  value: usage,
+})))
 const chatEndpoints = computed(() => endpointsByUsage(endpoints.value, 'chat'))
 const defaultEndpoint = computed(() => chatEndpoints.value.find(item => item.code === defaultProvider.value))
 const defaultModelOptions = computed(() => modelOptionsOf(defaultEndpoint.value))
@@ -62,6 +70,18 @@ const activePresetOptions = computed(() =>
   [{ label: '自定义', value: '' }, ...presetsFor(active.value?.usage ?? 'chat').map(preset => ({ label: preset.label, value: preset.id }))])
 const selectedCandidates = computed(() => discoverCandidates.value.filter(item => item.selected))
 const modelCount = computed(() => active.value?.models.length ?? 0)
+const registeredCount = computed(() => discoverCandidates.value.filter(item => modelRegistered(item.code)).length)
+
+watch(active, () => {
+  discoverOpen.value = false
+  modelEditing.value = false
+})
+
+watch(endpointsForUsage, (list) => {
+  if (!activeEndpoint.value || !list.includes(activeEndpoint.value)) {
+    activeEndpoint.value = list[0]
+  }
+}, { immediate: true })
 
 watch(chatEndpoints, (list) => {
   if (!list.some(item => item.code === defaultProvider.value)) {
@@ -69,8 +89,7 @@ watch(chatEndpoints, (list) => {
   }
 }, { deep: true, immediate: true })
 
-watch(defaultEndpoint, (endpoint) => {
-  const options = modelOptionsOf(endpoint)
+watch(defaultModelOptions, (options) => {
   if (!options.some(option => option.value === defaultModel.value)) {
     defaultModel.value = options[0]?.value ?? ''
   }
@@ -85,8 +104,13 @@ function endpointTitle(endpoint: AiEndpointDraft) {
   return endpoint.name || endpoint.code || `未命名${AI_USAGE_LABELS[endpoint.usage]}`
 }
 
-function selectEndpoint(endpoint: AiEndpointDraft) {
-  activeIndex.value = endpoints.value.indexOf(endpoint)
+function selectEndpointByCode(value: unknown) {
+  discoverSequence += 1
+  discoverOpen.value = false
+  discoverLoading.value = false
+  discoverCandidates.value = []
+  modelEditing.value = false
+  activeEndpoint.value = endpointsForUsage.value.find(item => item.code === value)
 }
 
 function addEndpointFromPreset(presetId: string) {
@@ -97,7 +121,8 @@ function addEndpointFromPreset(presetId: string) {
   const draft = createEndpointDraft(usage, presetId)
   draft.code = uniqueCode(usage, presetId || usage)
   endpoints.value.push(draft)
-  activeIndex.value = endpoints.value.length - 1
+  activeUsage.value = usage
+  activeEndpoint.value = endpoints.value[endpoints.value.length - 1]
   presetPickerUsage.value = null
   if (presetId === 'custom-chat' || presetId === 'custom-embedding' || presetId === 'custom-rerank' || !presetId) {
     toast.info('请补齐端点编码、API 地址与凭据')
@@ -124,7 +149,7 @@ function removeEndpoint() {
   }
   const index = endpoints.value.indexOf(endpoint)
   endpoints.value.splice(index, 1)
-  activeIndex.value = Math.max(0, Math.min(index, endpoints.value.length - 1))
+  activeEndpoint.value = endpointsForUsage.value[0]
 }
 
 function changeProtocol(value: unknown) {
@@ -139,11 +164,45 @@ function changePreset(value: unknown) {
   }
 }
 
-function addModel() {
-  active.value?.models.push({
-    ...createAiModel('', ''),
-    kind: active.value.usage,
-  })
+function editModel(index = -1) {
+  modelIndex.value = index
+  modelDraft.value = index < 0 ? createAiModel() : { ...active.value!.models[index] }
+  modelEditing.value = true
+}
+
+function saveModel() {
+  const endpoint = active.value
+  if (!endpoint || !modelDraft.value.model.trim()) {
+    toast.error('请填写模型标识')
+    return
+  }
+  const previous = modelIndex.value >= 0 ? endpoint.models[modelIndex.value] : undefined
+  const draft = { ...modelDraft.value, kind: endpoint.usage }
+  draft.model = draft.model.trim()
+  if (!previous || previous.code === previous.model) {
+    draft.code = draft.model
+  }
+  if (!previous || previous.name === previous.model) {
+    draft.name = draft.model
+  }
+  draft.name ||= draft.model
+  if (endpoint.models.some((model, index) => index !== modelIndex.value && model.model.trim().toLowerCase() === draft.model.toLowerCase())) {
+    toast.error('此模型已登记')
+    return
+  }
+  if (modelIndex.value < 0) {
+    endpoint.models.push(draft)
+  }
+  else {
+    endpoint.models[modelIndex.value] = draft
+  }
+  if (!endpoint.defaultModel || endpoint.defaultModel === previous?.code) {
+    endpoint.defaultModel = draft.code
+  }
+  if (endpoint.usage === 'chat' && defaultProvider.value === endpoint.code && defaultModel.value === previous?.code) {
+    defaultModel.value = draft.code
+  }
+  modelEditing.value = false
 }
 
 function removeModel(index: number) {
@@ -151,9 +210,14 @@ function removeModel(index: number) {
   if (!endpoint) {
     return
   }
+  const wasDefault = endpoint.defaultModel === endpoint.models[index]?.code
+  const removedCode = endpoint.models[index]?.code
   endpoint.models.splice(index, 1)
-  if (!endpoint.models.some(model => model.code === endpoint.defaultModel)) {
+  if (wasDefault) {
     endpoint.defaultModel = endpoint.models[0]?.code ?? ''
+  }
+  if (endpoint.usage === 'chat' && defaultProvider.value === endpoint.code && defaultModel.value === removedCode) {
+    defaultModel.value = endpoint.defaultModel
   }
 }
 
@@ -167,6 +231,8 @@ async function openDiscovery() {
   if (!endpoint) {
     return
   }
+  const sequence = ++discoverSequence
+  discoverOwner.value = endpoint
   discoverOpen.value = true
   discoverLoading.value = true
   discoverMessage.value = ''
@@ -181,6 +247,9 @@ async function openDiscovery() {
       apiKey: endpoint.apiKey,
       proxyUrl: endpoint.proxyUrl,
     })
+    if (sequence !== discoverSequence || active.value !== endpoint) {
+      return
+    }
     discoverListed.value = res.data.listed
     discoverMessage.value = res.data.message || ''
     discoverCandidates.value = res.data.models.map(model => ({
@@ -191,11 +260,16 @@ async function openDiscovery() {
     }))
   }
   catch {
+    if (sequence !== discoverSequence || active.value !== endpoint) {
+      return
+    }
     discoverListed.value = false
     discoverMessage.value = '获取模型失败，请检查端点地址、凭据与网络后重试'
   }
   finally {
-    discoverLoading.value = false
+    if (sequence === discoverSequence) {
+      discoverLoading.value = false
+    }
   }
 }
 
@@ -207,7 +281,7 @@ function toggleAllCandidates(selected: boolean) {
 
 function confirmDiscovery() {
   const endpoint = active.value
-  if (!endpoint) {
+  if (!endpoint || endpoint !== discoverOwner.value) {
     return
   }
   const added = mergeDiscoveredModels(endpoint, discoverCandidates.value)
@@ -219,8 +293,12 @@ function confirmDiscovery() {
 <template>
   <div class="ai-config">
     <div class="ai-config__defaults">
-      <label class="ai-field">
-        <span>默认聊天端点</span>
+      <div class="ai-config__purpose-control">
+        <span class="ai-config__eyebrow">端点类型</span>
+        <YdSegmented v-model="activeUsage" :options="activeUsageOptions" aria-label="AI 端点用途" />
+      </div>
+      <label v-if="activeUsage === 'chat'" class="ai-field ai-config__default-endpoint">
+        <span>聊天默认端点</span>
         <YdSelect
           v-model="defaultProvider"
           :options="chatEndpoints.map(item => ({ label: endpointTitle(item), value: item.code }))"
@@ -228,64 +306,55 @@ function confirmDiscovery() {
           class="w-full"
         />
       </label>
-      <label class="ai-field">
-        <span>默认模型</span>
+      <label v-if="activeUsage === 'chat'" class="ai-field ai-config__default-model">
+        <span>聊天默认模型</span>
         <YdSelect v-model="defaultModel" :options="defaultModelOptions" placeholder="选择默认模型" class="w-full" />
       </label>
       <p class="ai-config__defaults-hint">
-        默认端点与模型用于对话与工具调用；向量化、重排序端点由知识库等使用方按编码单独选择。
+        {{ activeUsage === 'chat'
+          ? '默认端点和模型用于未指定目标的聊天请求；向量化与重排序由各自使用方单独选择。'
+          : AI_USAGE_HINTS[activeUsage] }}
       </p>
     </div>
 
-    <div class="ai-config__body">
-      <aside class="ai-config__nav">
-        <template v-for="usage in AI_USAGE_ORDER" :key="usage">
-          <div class="ai-config__group">
-            <span>{{ AI_USAGE_LABELS[usage] }}</span>
-            <YdTag variant="secondary">{{ endpointsByUsage(endpoints, usage).length }}</YdTag>
-          </div>
-          <YdButton
-            v-for="endpoint in endpointsByUsage(endpoints, usage)"
-            :key="`${usage}-${endpoint.code}-${endpoint.name}`"
-            variant="ghost"
-            type="button"
-            class="ai-endpoint"
-            :class="{ 'is-active': active === endpoint }"
-            :aria-pressed="active === endpoint"
-            @click="selectEndpoint(endpoint)"
-          >
-            <YdIcon :name="endpoint.icon" />
-            <span class="ai-endpoint__name">{{ endpointTitle(endpoint) }}</span>
-            <small>{{ protocolLabel(endpoint.protocol) }}</small>
-          </YdButton>
-          <YdButton size="sm" variant="outline" class="ai-config__add" @click="presetPickerUsage = usage">
-            <YdIcon name="morph:plus" />
-            添加{{ AI_USAGE_LABELS[usage] }}
-          </YdButton>
-        </template>
-      </aside>
+    <div v-if="endpointsForUsage.length" class="ai-config__endpoint-bar">
+      <div class="ai-config__endpoint-picker">
+        <span class="ai-config__eyebrow">当前{{ AI_USAGE_LABELS[activeUsage] }}</span>
+        <YdSelect
+          :model-value="active?.code ?? ''"
+          :options="endpointsForUsage.map(item => ({ label: endpointTitle(item), value: item.code }))"
+          :placeholder="`选择${AI_USAGE_LABELS[activeUsage]}`"
+          class="w-full"
+          @update:model-value="selectEndpointByCode"
+        />
+        <span class="ai-config__endpoint-count">{{ endpointsForUsage.length }} 个端点</span>
+      </div>
+      <YdButton size="sm" variant="outline" @click="presetPickerUsage = activeUsage">
+        <YdIcon name="morph:plus" />
+        添加端点
+      </YdButton>
+    </div>
 
-      <section v-if="active" class="ai-editor">
+    <div class="ai-config__editor-region">
+      <section v-if="active" class="ai-editor" :data-usage="active.usage">
         <header class="ai-editor__head">
-          <div class="ai-editor__title">
+          <div class="ai-editor__identity">
             <YdIcon :name="active.icon" class="ai-editor__icon" />
-            <div>
+            <div class="ai-editor__name">
               <strong>{{ endpointTitle(active) }}</strong>
-              <div class="ai-editor__meta">
-                <YdTag variant="secondary">{{ AI_USAGE_LABELS[active.usage] }}</YdTag>
-                <YdTag variant="secondary">{{ protocolLabel(active.protocol) }}</YdTag>
-                <YdTag :variant="active.enabled ? 'default' : 'secondary'">
-                  {{ active.enabled ? '已启用' : '已停用' }}
-                </YdTag>
-              </div>
+              <span>{{ active.baseUrl || '尚未设置 API 地址' }}</span>
             </div>
           </div>
           <div class="ai-editor__tools">
-            <span class="ai-editor__switch-label">启用</span>
-            <YdSwitch v-model="active.enabled" />
-            <YdButton size="sm" variant="ghost" title="删除端点" @click="removeEndpoint">
-              <YdIcon name="morph:trash-2" />
-            </YdButton>
+            <YdTag variant="secondary">
+              {{ protocolLabel(active.protocol) }}
+            </YdTag>
+            <YdSwitch v-model="active.enabled" aria-label="启用端点" />
+            <YdPopconfirm title="移除此端点？" description="保存配置后生效；取消配置编辑可撤销。" confirm-variant="destructive" @confirm="removeEndpoint">
+              <YdButton size="sm" variant="ghost" title="移除端点" aria-label="移除端点">
+                <YdIcon name="morph:trash-2" />
+              </YdButton>
+            </YdPopconfirm>
           </div>
         </header>
 
@@ -357,65 +426,43 @@ function confirmDiscovery() {
                 <YdIcon name="morph:cloud-download" />
                 获取模型
               </YdButton>
-              <YdButton size="sm" variant="outline" @click="addModel">
+              <YdButton size="sm" variant="outline" @click="editModel()">
                 <YdIcon name="morph:plus" />
                 添加模型
               </YdButton>
             </div>
           </div>
 
-          <p v-if="!capabilityEnabled" class="ai-editor__note">
-            能力未启用时无法请求远端模型列表；可先手工登记模型，启用后再获取。
-          </p>
+          <YdAlert v-if="!capabilityEnabled" class="ai-editor__note">
+            AI 能力尚未启用。可以先整理并保存端点；启用能力后即可获取远端模型列表。
+          </YdAlert>
 
-          <div class="ai-model-list">
-            <div v-for="(model, modelIndex) in active.models" :key="modelIndex" class="ai-model-row" :data-usage="active.usage">
-              <label class="ai-field">
-                <span>显示名称</span>
-                <YdInput v-model="model.name" size="sm" placeholder="GPT-4o mini" @blur="model.code ||= model.name" />
-              </label>
-              <label class="ai-field">
-                <span>模型名</span>
-                <YdInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" />
-              </label>
-              <template v-if="active.usage === 'chat'">
-                <label class="ai-field ai-field--narrow">
-                  <span>温度</span>
-                  <YdInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" />
-                </label>
-                <label class="ai-field ai-field--narrow">
-                  <span>推理力度</span>
-                  <YdInput v-model="model.reasoningEffort" size="sm" placeholder="high" />
-                </label>
-                <div class="ai-field ai-field--switch">
-                  <span>思考</span>
-                  <YdSwitch v-model="model.thinkingEnabled" />
-                </div>
-                <div class="ai-field ai-field--switch">
-                  <span>视觉</span>
-                  <YdSwitch v-model="model.vision" />
-                </div>
-              </template>
+          <div v-if="active.models.length" class="ai-model-list">
+            <div v-for="(model, rowIndex) in active.models" :key="rowIndex" class="ai-model-row">
+              <YdIcon :name="active.icon" class="ai-model-row__icon" />
+              <div class="ai-model-row__identity">
+                <strong>{{ model.name || model.model }}</strong>
+                <span>{{ model.model }}</span>
+              </div>
+              <div v-if="active.usage === 'chat'" class="ai-model-row__badges">
+                <YdTag v-if="model.vision" variant="secondary">
+                  视觉
+                </YdTag>
+                <YdTag v-if="model.thinkingEnabled" variant="secondary">
+                  思考
+                </YdTag>
+              </div>
               <div class="ai-model-row__op">
-                <YdButton size="sm" variant="ghost" title="删除模型" @click="removeModel(modelIndex)">
+                <YdButton size="sm" variant="ghost" @click="editModel(rowIndex)">
+                  编辑
+                </YdButton>
+                <YdButton size="sm" variant="ghost" :aria-label="`移除 ${model.name || model.model}`" @click="removeModel(rowIndex)">
                   <YdIcon name="morph:trash-2" />
                 </YdButton>
               </div>
             </div>
-            <div v-if="!active.models.length" class="ai-editor__empty">
-              还没有模型。用「获取模型」从远端拉取，或手工添加。
-            </div>
           </div>
-
-          <label v-if="active.usage === 'chat' && active.models.length" class="ai-field ai-field--inline">
-            <span>默认模型</span>
-            <YdSelect v-model="active.defaultModel" :options="modelOptionsOf(active)" class="w-full" />
-          </label>
-          <p class="ai-field__hint">
-            {{ active.usage === 'chat'
-              ? '默认模型用于未指定模型的对话请求；思考与推理力度按模型能力填写。'
-              : '该端点的模型清单只服务本用途，与聊天端点各自独立。' }}
-          </p>
+          <YdEmpty v-else title="尚未登记模型" description="获取远端列表，或手动填写模型标识。" />
         </div>
 
         <details class="ai-editor__advanced">
@@ -436,10 +483,16 @@ function confirmDiscovery() {
           </div>
         </details>
       </section>
-
-      <section v-else class="ai-editor ai-editor--empty">
-        还没有端点。左侧选择用途后「添加端点」，或直接使用预设快速开始。
-      </section>
+      <YdEmpty
+        v-else
+        title="尚未配置此类端点"
+        :description="`添加${AI_USAGE_LABELS[activeUsage]}后，可在此配置地址、凭据和模型。`"
+      >
+        <YdButton size="sm" variant="outline" @click="presetPickerUsage = activeUsage">
+          <YdIcon name="morph:plus" />
+          添加{{ AI_USAGE_LABELS[activeUsage] }}
+        </YdButton>
+      </YdEmpty>
     </div>
 
     <YdModal
@@ -466,6 +519,41 @@ function confirmDiscovery() {
       </div>
     </YdModal>
 
+    <YdModal v-model="modelEditing" :title="modelIndex < 0 ? '添加模型' : '编辑模型'" :footer="false" content-class="sm:max-w-lg">
+      <div class="ai-model-editor">
+        <label class="ai-field">
+          <span>模型标识（必填）</span>
+          <YdInput v-model="modelDraft.model" placeholder="服务商提供的 model ID" />
+        </label>
+        <label class="ai-field">
+          <span>显示名称</span>
+          <YdInput v-model="modelDraft.name" placeholder="便于识别的名称" />
+        </label>
+        <template v-if="active?.usage === 'chat'">
+          <div class="ai-model-editor__switches">
+            <label class="ai-model-editor__switch"><YdSwitch v-model="modelDraft.vision" />支持视觉</label>
+            <label class="ai-model-editor__switch"><YdSwitch v-model="modelDraft.thinkingEnabled" />启用思考</label>
+          </div>
+          <details class="ai-editor__advanced">
+            <summary>模型高级参数</summary>
+            <div class="ai-model-editor__advanced">
+              <label class="ai-field"><span>温度</span><YdInput v-model="modelDraft.temperature" type="number" placeholder="继承端点温度" /></label>
+              <label class="ai-field"><span>推理力度</span><YdSelect v-model="modelDraft.reasoningEffort" :options="[{ label: '未指定', value: '' }, { label: '低', value: 'low' }, { label: '中', value: 'medium' }, { label: '高', value: 'high' }]" class="w-full" /></label>
+              <label class="ai-field"><span>额外请求体（JSON）</span><YdTextarea v-model="modelDraft.extraBody" :rows="3" input-class="font-mono" /></label>
+            </div>
+          </details>
+        </template>
+        <div class="ai-model-editor__footer">
+          <YdButton variant="outline" @click="modelEditing = false">
+            取消
+          </YdButton>
+          <YdButton @click="saveModel">
+            保存模型
+          </YdButton>
+        </div>
+      </div>
+    </YdModal>
+
     <YdModal
       v-model="discoverOpen"
       title="获取模型"
@@ -478,7 +566,7 @@ function confirmDiscovery() {
         </p>
         <div v-if="discoverCandidates.length" class="ai-discover__tools">
           <span class="ai-discover__count">
-            共 {{ discoverCandidates.length }} 个，已登记 {{ discoverCandidates.length - selectedCandidates.length }} 个
+            共 {{ discoverCandidates.length }} 个，已登记 {{ registeredCount }} 个
           </span>
           <YdButton size="sm" variant="link" @click="toggleAllCandidates(true)">
             全选
@@ -493,14 +581,16 @@ function confirmDiscovery() {
               <strong>{{ candidate.name }}</strong>
               <span class="ai-discover__code">{{ candidate.code }}</span>
             </YdCheckbox>
-            <YdTag v-if="modelRegistered(candidate.code)" variant="secondary">已登记</YdTag>
+            <YdTag v-if="modelRegistered(candidate.code)" variant="secondary">
+              已登记
+            </YdTag>
           </li>
         </ul>
         <div class="ai-discover__footer">
           <YdButton variant="outline" @click="discoverOpen = false">
             取消
           </YdButton>
-          <YdButton :disabled="discoverLoading || !discoverCandidates.length" :loading="discoverLoading" @click="confirmDiscovery">
+          <YdButton :disabled="discoverLoading || !selectedCandidates.length" :loading="discoverLoading" @click="confirmDiscovery">
             登记所选（{{ selectedCandidates.length }}）
           </YdButton>
         </div>
@@ -511,18 +601,37 @@ function confirmDiscovery() {
 
 <style scoped>
 .ai-config {
+  container-type: inline-size;
   display: grid;
-  gap: 14px;
+  gap: 22px;
+  min-width: 0;
+}
+
+.ai-config__eyebrow {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-config__purpose-control {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
 }
 
 .ai-config__defaults {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   background: var(--color-fill-1);
+}
+
+.ai-config__purpose-control {
+  grid-column: 1 / -1;
 }
 
 .ai-config__defaults-hint {
@@ -533,96 +642,59 @@ function confirmDiscovery() {
   line-height: 1.6;
 }
 
-.ai-config__body {
-  display: grid;
-  grid-template-columns: minmax(200px, 250px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.ai-config__nav {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-  padding: 10px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-2);
-}
-
-.ai-config__group {
+.ai-config__endpoint-bar {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 4px 2px 2px;
-  color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 700;
 }
 
-.ai-config__add {
-  justify-content: center;
-  margin-bottom: 4px;
-}
-
-.ai-endpoint {
+.ai-config__endpoint-picker {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: 8px;
+  flex: 1 1 260px;
+  grid-template-columns: minmax(0, 320px) auto;
+  gap: 10px;
   align-items: center;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--color-text-2);
-  text-align: left;
+  min-width: 0;
 }
 
-.ai-endpoint small {
-  grid-column: 2;
+.ai-config__endpoint-picker .ai-config__eyebrow {
+  grid-column: 1 / -1;
+}
+
+.ai-config__endpoint-count {
   color: var(--color-text-3);
-  font-size: 11px;
-}
-
-.ai-endpoint.is-active {
-  border-color: var(--color-border-3);
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-}
-
-.ai-endpoint__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px;
   white-space: nowrap;
+}
+
+.ai-config__editor-region {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 
 .ai-editor {
   display: grid;
   min-width: 0;
   gap: 14px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   background: var(--color-bg-2);
 }
 
-.ai-editor--empty {
-  color: var(--color-text-3);
-  font-size: 13px;
-}
-
-.ai-editor__head {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.ai-editor__title {
-  display: flex;
-  min-width: 0;
+.ai-editor__identity {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
   gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-editor__name {
+  min-width: 0;
 }
 
 .ai-editor__icon {
@@ -634,16 +706,23 @@ function confirmDiscovery() {
   background: var(--color-fill-2);
 }
 
-.ai-editor__title strong {
+.ai-editor__name strong {
+  display: block;
+  overflow: hidden;
   color: var(--color-text-1);
   font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ai-editor__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+.ai-editor__name span {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-editor__tools {
@@ -732,29 +811,27 @@ function confirmDiscovery() {
 
 .ai-model-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 88px 104px 64px 64px 40px;
-  gap: 10px;
-  align-items: end;
-  padding: 10px 12px;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   background: var(--color-bg-1);
 }
 
-.ai-model-row[data-usage='embedding'],
-.ai-model-row[data-usage='rerank'] {
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 40px;
-}
-
-.ai-field--switch {
-  align-items: center;
-  justify-items: start;
-}
-
-.ai-model-row__op {
-  display: flex;
-  justify-content: flex-end;
-}
+.ai-model-row__icon { width: 24px; height: 24px; }
+.ai-model-row__identity { display: grid; gap: 2px; min-width: 0; }
+.ai-model-row__identity strong { color: var(--color-text-1); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.ai-model-row__identity span { color: var(--color-text-3); font-size: 12px; overflow-wrap: anywhere; }
+.ai-model-row__badges, .ai-model-row__op { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ai-model-row__op { justify-content: flex-end; }
+.ai-model-editor { display: grid; gap: 16px; }
+.ai-model-editor__switches { display: flex; flex-wrap: wrap; gap: 18px; }
+.ai-model-editor__switch { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-2); font-size: 13px; }
+.ai-model-editor__advanced { display: grid; gap: 12px; padding: 0 14px 14px; }
+.ai-model-editor__footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
 .ai-editor__empty {
   padding: 18px;
@@ -870,40 +947,20 @@ function confirmDiscovery() {
   justify-content: flex-end;
 }
 
-@media (max-width: 900px) {
-  .ai-config__body {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-editor__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-field--inline {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-model-row,
-  .ai-model-row[data-usage='embedding'],
-  .ai-model-row[data-usage='rerank'] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ai-model-row__op {
-    grid-column: 2;
-  }
+@container (max-width: 650px) {
+  .ai-config__defaults,
+  .ai-editor__grid { grid-template-columns: minmax(0, 1fr); }
+  .ai-config__purpose-control,
+  .ai-config__defaults-hint { grid-column: 1; }
+  .ai-field--inline { grid-template-columns: minmax(0, 1fr); }
+  .ai-model-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .ai-model-row__badges { grid-column: 2; grid-row: 2; }
+  .ai-model-row__op { grid-column: 3; grid-row: 1 / span 2; }
 }
 
-@media (max-width: 640px) {
-  .ai-model-row,
-  .ai-model-row[data-usage='embedding'],
-  .ai-model-row[data-usage='rerank'] {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-model-row__op {
-    grid-column: 1;
-    justify-content: flex-start;
-  }
+@container (max-width: 390px) {
+  .ai-config__endpoint-picker { grid-template-columns: minmax(0, 1fr); }
+  .ai-config__endpoint-picker .ai-config__eyebrow { grid-column: 1; }
+  .ai-model-row__op { flex-direction: column; align-items: flex-end; }
 }
 </style>

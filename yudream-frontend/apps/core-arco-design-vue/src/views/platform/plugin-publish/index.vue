@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import type { TableColumn } from '@yudream/components'
 import type { PluginMarketPublication, PluginPublicationStatus } from '@/api/modules/platform-plugin-market-source'
-import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
+import apiMarketSource, { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
 import { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
-import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 import { buildCiTemplateFiles } from './ci-templates'
 
 interface PluginGroup {
@@ -17,7 +17,16 @@ const toast = useYdToast()
 const { auth } = useAppAuth()
 
 const loading = ref(false)
+const loadFailed = ref(false)
+const publishHelpOpen = ref(false)
 const publications = ref<PluginMarketPublication[]>([])
+const versionColumns: TableColumn<PluginMarketPublication>[] = [
+  { accessorKey: 'pluginVersion', header: '版本', width: 120 },
+  { id: 'status', header: '状态', width: 180 },
+  { id: 'size', header: '大小', width: 100 },
+  { id: 'created', header: '提交时间', width: 190 },
+  { id: 'operation', header: '操作', width: 220, fixed: 'right' },
+]
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const statusFilter = ref<PluginPublicationStatus | ''>('')
 const reviewRequired = ref(true)
@@ -88,6 +97,7 @@ onMounted(load)
 
 async function load() {
   loading.value = true
+  loadFailed.value = false
   try {
     const [pageRes, reviewRes] = await Promise.all([
       apiMarketSource.publications({
@@ -103,6 +113,7 @@ async function load() {
     reviewRequired.value = reviewRes.data
   }
   catch {
+    loadFailed.value = true
     toast.error('加载我的插件失败')
   }
   finally {
@@ -336,118 +347,151 @@ const uploadHint = computed(() => {
       <template #description>
         管理你发布到本机市场源的插件：上传新版本、编辑分类标签，或通过 API Key 走流水线发布。
       </template>
+      <YdButton variant="outline" @click="openCiTemplates">
+        <YdIcon name="morph:code" />
+        CI 模板
+      </YdButton>
       <YdButton v-auth="'platform:plugin-market-source:upload'" @click="openUpload()">
         <YdIcon name="morph:upload" />
         上传插件
       </YdButton>
     </YdPageHeader>
     <YdPageMain>
-      <div class="mb-4 grid gap-3 md:grid-cols-2">
-        <div class="rounded-lg border p-3 text-sm">
-          <div class="font-medium">发布提示</div>
-          <p class="mt-1 text-secondary-foreground/60">{{ uploadHint }}</p>
-          <p class="mt-1 text-xs text-secondary-foreground/60">
-            {code}@{version} 不可覆盖。升版请上传新 JAR；分类与标签可事后编辑。
-          </p>
-        </div>
-        <div class="rounded-lg border p-3 text-sm">
-          <div class="font-medium">流水线发布</div>
-          <p class="mt-1 text-secondary-foreground/60">
-            用 API Key（勾选 upload）走同一发布端点。点「查看 CI 模板」可复制完整
-            <code>.gitlab-ci.yml</code>
-            、
-            <code>publish:market</code>
-            片段、上传脚本和
-            <code>release/plugins.txt</code>
-            。
-          </p>
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <code class="min-w-0 break-all text-xs">{{ publicV2Url }}</code>
-            <YdButton variant="link" size="sm" @click="copyPublicUrl">复制 v2 基址</YdButton>
-            <YdButton variant="outline" size="sm" @click="openCiTemplates">
-              <YdIcon name="morph:code" />
-              查看 CI 模板
+      <div class="text-sm mb-3 px-3 py-2 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-fill-1)] flex flex-wrap gap-2 items-center">
+        <YdIcon name="morph:info" class="shrink-0" />
+        <span class="flex-1 min-w-0">{{ uploadHint }} 同一插件版本不可覆盖。</span>
+      </div>
+      <YdCollapsible v-model="publishHelpOpen" class="mb-3 border border-[var(--color-border-2)] rounded-lg">
+        <template #trigger="{ open }">
+          <span class="text-sm px-3 py-2 text-left flex gap-2 w-full items-center justify-between">
+            <span>流水线发布说明与源地址</span>
+            <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" />
+          </span>
+        </template>
+        <div class="text-sm text-secondary-foreground/60 px-3 py-3 border-t border-[var(--color-border-2)] space-y-2">
+          <p>用具备 upload 权限的 API Key 走同一发布端点；升版上传新 JAR，分类与标签可事后编辑。</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <code class="text-xs min-w-0 break-all">{{ publicV2Url }}</code>
+            <YdButton variant="link" size="sm" @click="copyPublicUrl">
+              复制 v2 基址
             </YdButton>
           </div>
+          <p>CI 模板包含 .gitlab-ci.yml、publish:market、上传脚本和 release/plugins.txt，可在页首查看并复制。</p>
         </div>
+      </YdCollapsible>
+
+      <div class="mb-3 flex flex-wrap gap-2 items-center justify-between">
+        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-full sm:w-44" aria-label="筛选发布状态" @update:model-value="onStatusChange" />
+        <span class="text-xs text-secondary-foreground/60">共 {{ pagination.total }} 条发布记录</span>
       </div>
 
-      <div class="mb-3 flex flex-wrap items-center gap-2">
-        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
-      </div>
-
-      <YdLoadingOverlay :loading="loading"><div  class="block w-full">
-        <div v-if="!groups.length && !loading" class="rounded-lg border p-10 text-center text-sm text-secondary-foreground/60">
-          还没有你的发布物。点击右上角上传插件 JAR。
-        </div>
-        <div v-else class="grid gap-3">
+      <YdLoadingOverlay :loading="loading">
+        <YdEmpty v-if="!loading && loadFailed" title="发布记录加载失败" description="请检查网络后重试。" illustration="error">
+          <template #action>
+            <YdButton variant="outline" size="sm" @click="load">
+              重新加载
+            </YdButton>
+          </template>
+        </YdEmpty>
+        <YdEmpty v-else-if="!loading && !groups.length" :title="statusFilter ? '当前状态没有发布记录' : '还没有发布物'" :description="statusFilter ? '切换状态筛选查看其他版本。' : '上传插件 JAR，开始发布第一个版本。'" :illustration="statusFilter ? 'no-result' : 'empty'">
+          <template #action>
+            <YdButton v-if="!statusFilter" v-auth="'platform:plugin-market-source:upload'" size="sm" @click="openUpload()">
+              上传插件
+            </YdButton>
+          </template>
+        </YdEmpty>
+        <div v-else class="gap-3 grid">
           <YdCard v-for="group in groups" :key="group.code" class="w-full">
-            <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-wrap gap-3 items-start justify-between">
               <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap gap-2 items-center">
                   <span class="text-base font-semibold">{{ group.displayName }}</span>
-                  <YdTag variant="secondary">{{ group.code }}</YdTag>
-                  <YdTag v-if="group.latest.category" variant="secondary">{{ group.latest.category }}</YdTag>
+                  <YdTag variant="secondary">
+                    {{ group.code }}
+                  </YdTag>
+                  <YdTag v-if="group.latest.category" variant="secondary">
+                    {{ group.latest.category }}
+                  </YdTag>
                 </div>
-                <div class="mt-1 text-sm text-secondary-foreground/60">
+                <div class="text-sm text-secondary-foreground/60 mt-1">
                   最新 {{ group.latest.pluginVersion }} · {{ publicationStatusText(group.latest.status) }} · {{ formatTime(group.latest.createTime) }}
                 </div>
                 <div v-if="group.latest.tags?.length" class="mt-2 flex flex-wrap gap-1">
-                  <YdTag v-for="tag in group.latest.tags" :key="tag" variant="secondary">{{ tag }}</YdTag>
+                  <YdTag v-for="tag in group.latest.tags" :key="tag" variant="secondary">
+                    {{ tag }}
+                  </YdTag>
                 </div>
               </div>
               <YdButton v-auth="'platform:plugin-market-source:upload'" variant="outline" size="sm" @click="openUpload(group)">
                 升版上传
               </YdButton>
             </div>
-            <div class="mt-3 overflow-x-auto">
-              <table class="w-full min-w-[720px] text-left text-sm">
-                <thead class="text-secondary-foreground/60">
-                  <tr>
-                    <th class="py-2 font-normal">版本</th>
-                    <th class="py-2 font-normal">状态</th>
-                    <th class="py-2 font-normal">大小</th>
-                    <th class="py-2 font-normal">提交时间</th>
-                    <th class="py-2 font-normal">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in group.versions" :key="row.id" class="border-t">
-                    <td class="py-2">{{ row.pluginVersion }}</td>
-                    <td class="py-2">
-                      <YdTag :variant="publicationStatusVariant(row.status)">{{ publicationStatusText(row.status) }}</YdTag>
-                      <div v-if="row.reviewNote" class="mt-1 max-w-[240px] truncate text-xs text-secondary-foreground/60" :title="row.reviewNote">
-                        {{ row.reviewNote }}
-                      </div>
-                    </td>
-                    <td class="py-2">{{ formatSize(row.sizeBytes) }}</td>
-                    <td class="py-2">{{ formatTime(row.createTime) }}</td>
-                    <td class="py-2">
-                      <div class="flex flex-wrap gap-2">
-                        <YdButton variant="link" size="sm" :disabled="actingPublicationId === row.id" @click="openEdit(row)">
-                          编辑
-                        </YdButton>
-                        <YdButton
-                          v-if="row.status === 'PUBLISHED'"
-                          variant="destructive"
-                          size="sm"
-                          :disabled="actingPublicationId === row.id"
-                          @click="confirmUnpublish(row)"
-                        >
-                          下架
-                        </YdButton>
-                        <YdButton variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
-                          删除
-                        </YdButton>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <YdResponsiveTable
+              row-key="id"
+              table-root-class="mt-3 rounded-lg overflow-hidden"
+              table-class="min-w-[720px]"
+              border
+              :columns="versionColumns"
+              :data="group.versions"
+            >
+              <template #cell-status="{ row }">
+                <YdTag :variant="publicationStatusVariant(row.original.status)">
+                  {{ publicationStatusText(row.original.status) }}
+                </YdTag>
+                <div v-if="row.original.reviewNote" class="text-xs text-secondary-foreground/60 mt-1 max-w-[240px] truncate" :title="row.original.reviewNote">
+                  {{ row.original.reviewNote }}
+                </div>
+              </template>
+              <template #cell-size="{ row }">
+                {{ formatSize(row.original.sizeBytes) }}
+              </template>
+              <template #cell-created="{ row }">
+                {{ formatTime(row.original.createTime) }}
+              </template>
+              <template #cell-operation="{ row }">
+                <div class="flex flex-wrap gap-2">
+                  <YdButton variant="link" size="sm" :disabled="actingPublicationId === row.original.id" @click="openEdit(row.original)">
+                    编辑
+                  </YdButton>
+                  <YdButton v-if="row.original.status === 'PUBLISHED'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmUnpublish(row.original)">
+                    下架
+                  </YdButton>
+                  <YdButton variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmDelete(row.original)">
+                    删除
+                  </YdButton>
+                </div>
+              </template>
+              <template #card="{ row }">
+                <YdCard class="w-full">
+                  <div class="flex gap-2 items-center justify-between">
+                    <strong class="break-all">{{ row.pluginVersion }}</strong>
+                    <YdTag :variant="publicationStatusVariant(row.status)">
+                      {{ publicationStatusText(row.status) }}
+                    </YdTag>
+                  </div>
+                  <p v-if="row.reviewNote" class="text-xs text-secondary-foreground/60 mt-2 break-all">
+                    {{ row.reviewNote }}
+                  </p>
+                  <div class="text-xs text-secondary-foreground/60 mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>大小 {{ formatSize(row.sizeBytes) }}</span><span>提交 {{ formatTime(row.createTime) }}</span>
+                  </div>
+                  <div class="mt-3 pt-3 border-t border-[var(--color-border-2)] flex flex-wrap gap-2">
+                    <YdButton variant="link" size="sm" :disabled="actingPublicationId === row.id" @click="openEdit(row)">
+                      编辑
+                    </YdButton>
+                    <YdButton v-if="row.status === 'PUBLISHED'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmUnpublish(row)">
+                      下架
+                    </YdButton>
+                    <YdButton variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
+                      删除
+                    </YdButton>
+                  </div>
+                </YdCard>
+              </template>
+            </YdResponsiveTable>
           </YdCard>
         </div>
-      </div></YdLoadingOverlay>
+      </YdLoadingOverlay>
 
       <YdPagination
         v-model:page="pagination.page"
@@ -462,15 +506,17 @@ const uploadHint = computed(() => {
       <YdModal v-model="uploadVisible" title="上传插件" show-cancel-button class="sm:max-w-xl" :confirm-loading="uploading" @confirm="submitUpload">
         <YdForm :model="uploadForm" layout="vertical">
           <YdFormItem label="插件 JAR">
-            <YdFilePicker ref="fileInput" accept=".jar" label="选择插件 JAR" class="hidden" @select="onUploadFileChange"><template #default /></YdFilePicker>
-            <div class="flex items-center gap-2">
+            <YdFilePicker ref="fileInput" accept=".jar" label="选择插件 JAR" class="hidden" @select="onUploadFileChange">
+              <template #default />
+            </YdFilePicker>
+            <div class="flex gap-2 items-center">
               <YdButton variant="outline" @click="fileInput?.open()">
                 <YdIcon name="morph:file-plus" />
                 选择文件
               </YdButton>
-              <span class="min-w-0 break-all text-sm text-secondary-foreground/60">{{ uploadFile?.name || '未选择' }}</span>
+              <span class="text-sm text-secondary-foreground/60 min-w-0 break-all">{{ uploadFile?.name || '未选择' }}</span>
             </div>
-            <div class="mt-1 text-xs text-secondary-foreground/60">
+            <div class="text-xs text-secondary-foreground/60 mt-1">
               元数据从 JAR 内 plugin.yml 自动解析。{{ uploadHint }}
             </div>
           </YdFormItem>
@@ -484,7 +530,7 @@ const uploadHint = computed(() => {
             <YdInput v-model="uploadForm.license" placeholder="如 MIT、Apache-2.0" />
           </YdFormItem>
           <YdFormItem label="兼容性 JSON（可选）">
-            <YdTextarea v-model="uploadForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
+            <YdTextarea v-model="uploadForm.compatibility" :rows="3" placeholder="{&quot;host&quot;:&quot;>=2.16.0&quot;}" />
           </YdFormItem>
           <YdFormItem label="发布说明（可选）">
             <YdTextarea v-model="uploadForm.releaseNotes" :rows="4" placeholder="本版本更新内容；换行会合并为空格" />
@@ -494,7 +540,7 @@ const uploadHint = computed(() => {
 
       <YdModal v-model="editVisible" title="编辑发布物" show-cancel-button class="sm:max-w-xl" :confirm-loading="editSaving" @confirm="submitEdit">
         <YdForm :model="editForm" layout="vertical">
-          <div class="mb-2 text-xs text-secondary-foreground/60">
+          <div class="text-xs text-secondary-foreground/60 mb-2">
             {{ editingPublication?.code }}@{{ editingPublication?.pluginVersion }} · 编辑展示信息与分类标签，不重置审核状态。
           </div>
           <YdFormItem label="显示名称">
@@ -516,7 +562,7 @@ const uploadHint = computed(() => {
             <YdTextarea v-model="editForm.releaseNotes" :rows="4" placeholder="本版本更新内容" />
           </YdFormItem>
           <YdFormItem label="兼容性 JSON（可选）">
-            <YdTextarea v-model="editForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
+            <YdTextarea v-model="editForm.compatibility" :rows="3" placeholder="{&quot;host&quot;:&quot;>=2.16.0&quot;}" />
           </YdFormItem>
         </YdForm>
       </YdModal>
@@ -528,7 +574,7 @@ const uploadHint = computed(() => {
         maximizable
         :footer="false"
       >
-        <div class="space-y-3 text-sm">
+        <div class="text-sm space-y-3">
           <p class="text-secondary-foreground/60">
             把下列文件放进插件仓对应路径。CI 变量
             <code>YUDREAM_MARKET_URL</code>
@@ -544,23 +590,29 @@ const uploadHint = computed(() => {
             <code>release/plugins.txt</code>
             批量上传最终 JAR。
           </p>
-          <div class="flex flex-wrap items-center gap-2">
-            <code class="min-w-0 break-all text-xs">YUDREAM_MARKET_URL={{ marketOrigin }}</code>
-            <YdButton variant="link" size="sm" @click="copyMarketOrigin">复制变量值</YdButton>
+          <div class="flex flex-wrap gap-2 items-center">
+            <code class="text-xs min-w-0 break-all">YUDREAM_MARKET_URL={{ marketOrigin }}</code>
+            <YdButton variant="link" size="sm" @click="copyMarketOrigin">
+              复制变量值
+            </YdButton>
             <YdButton variant="outline" size="sm" @click="copyCurrentCiTemplate">
               <YdIcon name="morph:copy" />
               复制当前文件
             </YdButton>
-            <YdButton variant="outline" size="sm" @click="copyAllCiTemplates">复制全部文件</YdButton>
+            <YdButton variant="outline" size="sm" @click="copyAllCiTemplates">
+              复制全部文件
+            </YdButton>
           </div>
           <YdTabs v-model="ciTemplateTab" :list="ciTemplateTabList" class="w-full" list-class="flex-wrap justify-start" content-class="mt-3">
             <template v-for="file in ciTemplateFiles" :key="file.id" #[file.id]>
               <div class="space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap gap-2 items-center">
                   <code class="text-xs">{{ file.filename }}</code>
                   <span class="text-xs text-secondary-foreground/60">{{ file.description }}</span>
                 </div>
-                <pre class="max-h-[60vh] overflow-auto rounded-lg border bg-[var(--color-fill-1)] p-3 text-xs leading-5 text-[var(--color-text-1)] whitespace-pre">{{ file.content }}</pre>
+                <div class="max-h-[60vh] overflow-auto">
+                  <YdCode :code="file.content" :language="file.filename.endsWith('.yml') ? 'yaml' : file.filename.endsWith('.sh') ? 'bash' : 'plaintext'" :title="file.filename" />
+                </div>
               </div>
             </template>
           </YdTabs>

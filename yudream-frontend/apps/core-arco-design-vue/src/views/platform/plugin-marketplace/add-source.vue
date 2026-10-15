@@ -82,7 +82,7 @@ async function save() {
       <template #description>
         订阅远程插件市场。不需要启用「插件市场源」能力；该能力只提供本机源与公开社区。
       </template>
-      <YdButton variant="outline" @click="back">
+      <YdButton variant="ghost" @click="back">
         <YdIcon name="morph:arrow-left" />
         返回插件市场
       </YdButton>
@@ -93,8 +93,12 @@ async function save() {
     </YdPageHeader>
     <YdPageMain>
       <YdCard class="max-w-3xl">
+        <div class="text-sm text-secondary-foreground/60 mb-4 px-3 py-2 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-fill-1)] flex gap-2 items-start">
+          <YdIcon name="morph:info" class="mt-0.5 shrink-0" />
+          <span>填写远程源地址后先测试连接；添加后可在市场源管理中同步目录。</span>
+        </div>
         <YdForm :model="form" layout="vertical">
-          <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
             <YdFormItem label="市场源标识" required>
               <YdInput v-model="form.code" placeholder="小写字母、数字或连字符，如 company-mirror" />
             </YdFormItem>
@@ -106,7 +110,7 @@ async function save() {
             <YdSelect v-model="form.type" :options="sourceTypeOptions" />
           </YdFormItem>
           <YdFormItem :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'" required>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2 sm:flex-nowrap">
               <YdInput
                 v-model="form.rootUrl"
                 :placeholder="form.type === 'V2_API' ? 'https://example.com/api/public/plugin-market' : 'https://example.com/market/index.json'"
@@ -116,14 +120,14 @@ async function save() {
                 测试连接
               </YdButton>
             </div>
-            <div v-if="testMessage" class="mt-1 flex items-center gap-1">
+            <div v-if="testMessage" class="mt-1 flex gap-1 items-center">
               <YdTag :variant="testOk ? 'default' : 'destructive'">
                 {{ testOk ? '成功' : '失败' }}
               </YdTag>
               <span class="text-xs text-secondary-foreground/60">{{ testMessage }}</span>
             </div>
           </YdFormItem>
-          <div class="grid grid-cols-1 gap-x-4 md:grid-cols-[1fr_140px]">
+          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-[1fr_140px]">
             <YdFormItem label="访问令牌（可选）">
               <YdInput v-model="form.token" type="password" placeholder="私有源的 Bearer 令牌" />
             </YdFormItem>

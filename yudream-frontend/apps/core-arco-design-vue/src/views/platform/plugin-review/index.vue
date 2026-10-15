@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
 import type { PluginMarketPublication, PluginPublicationChannel, PluginPublicationStatus } from '@/api/modules/platform-plugin-market-source'
-import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
-import apiMarketSource from '@/api/modules/platform-plugin-market-source'
+import apiMarketSource, { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
 
 const modal = useYdModal()
 const toast = useYdToast()
 
 const loading = ref(false)
+const loadFailed = ref(false)
 const publications = ref<PluginMarketPublication[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const statusFilter = ref<PluginPublicationStatus | ''>('PENDING')
@@ -34,6 +34,7 @@ onMounted(load)
 
 async function load() {
   loading.value = true
+  loadFailed.value = false
   try {
     const [pageRes, reviewRes] = await Promise.all([
       apiMarketSource.publications({
@@ -48,6 +49,7 @@ async function load() {
     reviewRequired.value = reviewRes.data
   }
   catch {
+    loadFailed.value = true
     toast.error('加载审核列表失败')
   }
   finally {
@@ -150,14 +152,16 @@ function formatTime(value?: string) {
       </template>
     </YdPageHeader>
     <YdPageMain>
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+      <div class="mb-3 px-3 py-2 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-fill-1)] flex flex-wrap gap-3 items-center justify-between">
         <div class="text-sm">
-          <div class="font-medium">发布需审核</div>
-          <div class="mt-1 text-xs text-secondary-foreground/60">
+          <div class="font-medium">
+            发布需审核
+          </div>
+          <div class="text-xs text-secondary-foreground/60 mt-1">
             开启后新上传进入待审核；关闭后界面与流水线发布直接对外可见。持有跳过审核权限的作者仍可直接发布。
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2 items-center">
           <span class="text-sm text-secondary-foreground/60">{{ reviewRequired ? '已开启' : '已关闭' }}</span>
           <YdSwitch
             v-auth="'platform:plugin-market-source:edit'"
@@ -168,17 +172,27 @@ function formatTime(value?: string) {
         </div>
       </div>
 
-      <div class="mb-3 flex items-center gap-2">
-        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-40" @update:model-value="onStatusChange" />
+      <div class="mb-3 flex flex-wrap gap-2 items-center justify-between">
+        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-full sm:w-44" aria-label="筛选审核状态" @update:model-value="onStatusChange" />
+        <span class="text-xs text-secondary-foreground/60">共 {{ pagination.total }} 条记录</span>
       </div>
 
-      <YdLoadingOverlay :loading="loading"><div  class="block w-full">
+      <YdLoadingOverlay :loading="loading">
+        <YdEmpty v-if="!loading && loadFailed" title="审核列表加载失败" description="请检查网络后重试。" illustration="error">
+          <template #action>
+            <YdButton variant="outline" size="sm" @click="load">
+              重新加载
+            </YdButton>
+          </template>
+        </YdEmpty>
+        <YdEmpty v-else-if="!loading && !publications.length" :title="statusFilter === 'PENDING' ? '暂无待审核发布物' : '当前状态没有发布物'" :description="statusFilter === 'PENDING' ? '新的发布申请会出现在这里。' : '切换状态筛选查看其他记录。'" :illustration="statusFilter === 'PENDING' ? 'empty' : 'no-result'" />
         <YdResponsiveTable
+          v-else
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
           table-class="min-w-[980px]"
-          border
-          stripe
+
+          stripe border
           :columns="columns"
           :data="publications"
         >
@@ -189,18 +203,20 @@ function formatTime(value?: string) {
             </div>
           </template>
           <template #cell-channel="{ row }">
-            <YdTag variant="secondary">{{ channelText(row.original.channel) }}</YdTag>
+            <YdTag variant="secondary">
+              {{ channelText(row.original.channel) }}
+            </YdTag>
           </template>
           <template #cell-pubStatus="{ row }">
             <YdTag :variant="publicationStatusVariant(row.original.status)">
               {{ publicationStatusText(row.original.status) }}
             </YdTag>
-            <div v-if="row.original.reviewNote" class="mt-1 max-w-[160px] truncate text-xs text-secondary-foreground/60" :title="row.original.reviewNote">
+            <div v-if="row.original.reviewNote" class="text-xs text-secondary-foreground/60 mt-1 max-w-[160px] truncate" :title="row.original.reviewNote">
               {{ row.original.reviewNote }}
             </div>
           </template>
           <template #cell-pubOperation="{ row }">
-            <div class="flex justify-center gap-2">
+            <div class="flex gap-2 justify-center">
               <template v-if="row.original.status === 'PENDING'">
                 <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmAccept(row.original)">
                   通过
@@ -228,31 +244,31 @@ function formatTime(value?: string) {
           <template #card="{ row }">
             <YdCard class="w-full">
               <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex gap-2 items-center justify-between">
                   <span class="text-base font-semibold break-all">{{ row.displayName || row.code }} {{ row.pluginVersion }}</span>
                   <YdTag :variant="publicationStatusVariant(row.status)">
                     {{ publicationStatusText(row.status) }}
                   </YdTag>
                 </div>
-                <div class="flex flex-col gap-1 text-sm">
+                <div class="text-sm flex flex-col gap-1">
                   <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">通道</span>
+                    <span class="text-secondary-foreground/60 shrink-0">通道</span>
                     <span>{{ channelText(row.channel) }}</span>
                   </div>
                   <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">分类</span>
+                    <span class="text-secondary-foreground/60 shrink-0">分类</span>
                     <span>{{ row.category || '—' }}</span>
                   </div>
                   <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">提交时间</span>
+                    <span class="text-secondary-foreground/60 shrink-0">提交时间</span>
                     <span>{{ formatTime(row.createTime) }}</span>
                   </div>
                   <div v-if="row.reviewNote" class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">备注</span>
+                    <span class="text-secondary-foreground/60 shrink-0">备注</span>
                     <span class="break-all">{{ row.reviewNote }}</span>
                   </div>
                 </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
+                <div class="pt-3 border-t flex flex-wrap gap-2">
                   <template v-if="row.status === 'PENDING'">
                     <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.id" @click="confirmAccept(row)">
                       通过
@@ -279,7 +295,7 @@ function formatTime(value?: string) {
             </YdCard>
           </template>
         </YdResponsiveTable>
-      </div></YdLoadingOverlay>
+      </YdLoadingOverlay>
 
       <YdPagination
         v-model:page="pagination.page"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import type { TableColumn, YdFilePickerInstance } from '@yudream/components'
 import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
-import type { YdFilePickerInstance } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import { refreshPluginThemes } from '@/plugins/theme-runtime'
@@ -32,7 +32,15 @@ const dependentsDialogOpen = ref(false)
 const dependentsInfo = ref<PluginDependents | null>(null)
 const dependentsAction = ref<'unload' | 'delete'>('unload')
 
-const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
+const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
+const detailOpen = ref(false)
+const columns: TableColumn<PluginModule>[] = [
+  { accessorKey: 'name', header: '插件', minWidth: 300 },
+  { accessorKey: 'version', header: '版本', width: 125 },
+  { accessorKey: 'status', header: '运行状态', width: 130 },
+  { id: 'update', header: '更新', width: 155 },
+  { id: 'actions', header: '操作', width: 160 },
+]
 const filterOptions: { label: string, value: PluginFilterStatus }[] = [
   { label: '全部状态', value: 'all' },
   { label: '可更新', value: 'update' },
@@ -48,7 +56,7 @@ const filteredRows = computed(() => {
     const matchesKeyword = !value || [item.name, item.code, item.version, item.description]
       .some(field => field?.toLowerCase().includes(value))
     const matchesStatus = filterStatus.value === 'all'
-      || filterStatus.value === 'update' && Boolean(updatePlanFor(item.code))
+      || (filterStatus.value === 'update' && Boolean(updatePlanFor(item.code)))
       || item.status === filterStatus.value
     return matchesKeyword && matchesStatus
   })
@@ -77,6 +85,12 @@ watch([keyword, filterStatus], () => {
 })
 watch(filteredRows, clampPage, { immediate: true })
 watch(() => pagination.size, clampPage)
+watch([pagedRows, selectedCode], () => {
+  if (detailOpen.value && !pagedRows.value.some(item => item.code === selectedCode.value)) {
+    detailOpen.value = false
+    selectedCode.value = ''
+  }
+}, { flush: 'sync' })
 
 function clampPage() {
   pagination.total = filteredRows.value.length
@@ -123,7 +137,7 @@ const pluginIconFallbacks: Record<string, string> = {
   'yudream-alipay': 'i-ri:alipay-line',
   'authlib-injector': 'morph:shield',
   'mc-wiki': 'morph:book-open',
-  mcguess: 'morph:messages-square',
+  'mcguess': 'morph:messages-square',
   'minecraft-server': 'morph:server',
   'project-progress': 'morph:list-todo',
   'qq-binding': 'morph:link',
@@ -451,16 +465,9 @@ async function openPluginPage(code: string) {
   }
 }
 
-/** 窄屏：选中插件后展示详情面板，返回按钮回到列表。 */
-const mobileShowingDetail = ref(false)
-
 function selectPlugin(item: PluginModule) {
   selectedCode.value = item.code
-  mobileShowingDetail.value = true
-}
-
-function backToList() {
-  mobileShowingDetail.value = false
+  detailOpen.value = true
 }
 
 /** 卸载/删除依赖方弹窗确认：级联执行并自动恢复软依赖方。 */
@@ -488,12 +495,9 @@ function replaceItem(item: PluginModule) {
 }
 
 function syncSelectedCode() {
-  if (!rows.value.length) {
+  if (selectedCode.value && !rows.value.some(item => item.code === selectedCode.value)) {
+    detailOpen.value = false
     selectedCode.value = ''
-    return
-  }
-  if (!rows.value.some(item => item.code === selectedCode.value)) {
-    selectedCode.value = rows.value[0].code
   }
 }
 
@@ -538,7 +542,9 @@ function actionText(action: string) {
             <YdIcon name="morph:cloud-upload" />
             上传 JAR
           </YdButton>
-          <YdFilePicker ref="uploadInput" accept=".jar,application/java-archive" label="选择插件 JAR" @select="uploadJar"><template #default /></YdFilePicker>
+          <YdFilePicker ref="uploadInput" accept=".jar,application/java-archive" label="选择插件 JAR" @select="uploadJar">
+            <template #default />
+          </YdFilePicker>
           <YdButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
             <YdIcon name="morph:circle-arrow-up" />
             检查更新
@@ -551,7 +557,9 @@ function actionText(action: string) {
         <div class="plugin-filters">
           <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
           <YdSelect v-model="filterStatus" :options="filterOptions" class="plugin-status-filter" />
-          <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</YdButton>
+          <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">
+            重置筛选
+          </YdButton>
         </div>
       </div>
 
@@ -567,62 +575,115 @@ function actionText(action: string) {
         </div>
       </div>
 
-      <div class="plugin-layout" :class="{ 'is-detail-open': mobileShowingDetail }">
-        <div class="plugin-browser">
-          <div class="plugin-browser-header">
-            <span class="plugin-result-count">共 {{ pagination.total }} 个插件</span>
+      <div class="plugin-browser">
+        <div class="plugin-browser-header">
+          <div>
+            <h2>已发现的插件</h2>
+            <p>共 {{ pagination.total }} 个插件，可查看运行状态和更新计划。</p>
           </div>
-          <div v-if="pagedRows.length" class="plugin-list">
-            <YdButton
-              v-for="item in pagedRows"
-              :key="item.code"
-              variant="ghost"
-              class="plugin-item"
-              :class="{ active: selected?.code === item.code }"
-              type="button"
-              :aria-pressed="selected?.code === item.code"
-              @click="selectPlugin(item)"
-            >
-              <YdIcon :name="pluginIcon(item)" class="plugin-item-icon" />
-              <div class="plugin-item-body">
-                <div class="plugin-item-title">
-                  <strong>{{ item.name }}</strong>
-                  <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
-                </div>
-                <span class="plugin-item-code">{{ item.code }} · {{ item.version || '未知版本' }}</span>
-                <span v-if="updatePlanFor(item.code)" class="plugin-item-update">
-                  可更新至 {{ updatePlanFor(item.code)?.toVersion }}
-                </span>
-              </div>
-            </YdButton>
-          </div>
-          <div v-else-if="!loading" class="empty-state">
-            <template v-if="rows.length">暂无符合当前筛选条件的插件。<YdButton variant="link" @click="resetFilters">重置筛选</YdButton></template>
-            <template v-else>暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。</template>
-          </div>
-          <YdPagination
-            v-if="pagination.total > pagination.size"
-            v-model:page="pagination.page"
-            v-model:size="pagination.size"
-            :total="pagination.total"
-            class="plugin-pagination"
-          />
         </div>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveTable
+            row-key="code"
+            :columns="columns"
+            :data="pagedRows"
+            :empty-text="rows.length ? '暂无符合当前筛选条件的插件' : '暂无插件；将 JAR 放入 plugins 目录后扫描目录'"
+            table-root-class="plugin-table-root"
+            table-class="plugin-table"
+            stripe
+          >
+            <template #cell-name="{ row }">
+              <div class="plugin-identity">
+                <YdIcon :name="pluginIcon(row.original)" class="plugin-identity-icon" />
+                <div class="plugin-identity-text">
+                  <strong>{{ row.original.name }}</strong>
+                  <span class="plugin-code">{{ row.original.code }}</span>
+                  <span class="plugin-description">{{ row.original.description || '暂无描述' }}</span>
+                </div>
+              </div>
+            </template>
+            <template #cell-version="{ row }">
+              {{ row.original.version || '未知版本' }}
+            </template>
+            <template #cell-status="{ row }">
+              <YdTag :variant="statusVariant(row.original.status)">
+                {{ statusText(row.original.status) }}
+              </YdTag>
+            </template>
+            <template #cell-update="{ row }">
+              <YdTag v-if="updatePlanFor(row.original.code)?.blockedReason" variant="destructive">
+                更新受阻
+              </YdTag>
+              <YdTag v-else-if="updatePlanFor(row.original.code)" variant="secondary">
+                可更新至 {{ updatePlanFor(row.original.code)?.toVersion }}
+              </YdTag>
+              <span v-else class="plugin-muted">—</span>
+            </template>
+            <template #cell-actions="{ row }">
+              <YdButton size="sm" variant="outline" @click="selectPlugin(row.original)">
+                查看详情
+              </YdButton>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="plugin-mobile-card">
+                <div class="plugin-card-heading">
+                  <div class="plugin-identity">
+                    <YdIcon :name="pluginIcon(row)" class="plugin-identity-icon" />
+                    <div class="plugin-identity-text">
+                      <strong>{{ row.name }}</strong>
+                      <span class="plugin-code">{{ row.code }}</span>
+                    </div>
+                  </div>
+                  <YdTag :variant="statusVariant(row.status)">
+                    {{ statusText(row.status) }}
+                  </YdTag>
+                </div>
+                <p class="plugin-card-description">
+                  {{ row.description || '暂无描述' }}
+                </p>
+                <div class="plugin-card-meta">
+                  <span>版本 {{ row.version || '未知版本' }}</span>
+                  <YdTag v-if="updatePlanFor(row.code)?.blockedReason" variant="destructive">
+                    更新受阻
+                  </YdTag>
+                  <YdTag v-else-if="updatePlanFor(row.code)" variant="secondary">
+                    可更新至 {{ updatePlanFor(row.code)?.toVersion }}
+                  </YdTag>
+                </div>
+                <YdButton size="sm" variant="outline" @click="selectPlugin(row)">
+                  查看详情
+                </YdButton>
+              </YdCard>
+            </template>
+          </YdResponsiveTable>
+        </YdLoadingOverlay>
+        <div v-if="!loading && !pagedRows.length && rows.length" class="plugin-empty-action">
+          <YdButton variant="link" @click="resetFilters">
+            重置筛选
+          </YdButton>
+        </div>
+        <YdPagination
+          v-if="pagination.total > pagination.size"
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          class="plugin-pagination"
+        />
+      </div>
 
-        <section v-if="selected" class="plugin-detail" :class="{ 'is-mobile-open': mobileShowingDetail }">
+      <YdDrawer v-model="detailOpen" :title="selected?.name || '插件详情'" :footer="false" content-class="w-full max-w-full sm:w-[760px] sm:max-w-[760px]">
+        <section v-if="selected" class="plugin-detail">
           <div class="detail-header">
             <div class="plugin-detail-title">
-              <YdButton variant="ghost" size="sm" class="detail-back" @click="backToList">
-                <YdIcon name="morph:arrow-left" />
-                返回列表
-              </YdButton>
               <YdIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
               <div>
                 <h2>{{ selected.name }}</h2>
                 <p>{{ selected.description || '-' }}</p>
               </div>
             </div>
-            <YdTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</YdTag>
+            <YdTag :variant="statusVariant(selected.status)">
+              {{ statusText(selected.status) }}
+            </YdTag>
           </div>
 
           <div class="detail-grid">
@@ -646,11 +707,15 @@ function actionText(action: string) {
           </div>
 
           <div v-if="updatePlanFor(selected.code)" class="update-panel" :class="{ blocked: updatePlanFor(selected.code)?.blockedReason }">
-            <div class="section-title">更新计划（只读）</div>
+            <div class="section-title">
+              更新计划（只读）
+            </div>
             <p>版本变化：{{ updatePlanFor(selected.code)?.fromVersion || '-' }} → {{ updatePlanFor(selected.code)?.toVersion || '-' }}</p>
             <p>变更类型：{{ updatePlanFor(selected.code)?.changeType || '-' }}</p>
             <p>需要重启：{{ updatePlanFor(selected.code)?.requiresRestart ? '是' : '否' }}</p>
-            <p v-if="updatePlanFor(selected.code)?.blockedReason">阻断原因：{{ updatePlanFor(selected.code)?.blockedReason }}</p>
+            <p v-if="updatePlanFor(selected.code)?.blockedReason">
+              阻断原因：{{ updatePlanFor(selected.code)?.blockedReason }}
+            </p>
 
             <div v-if="updatePlanFor(selected.code)?.requiredDependencies?.length" class="plan-section">
               <strong>必需依赖</strong>
@@ -673,31 +738,47 @@ function actionText(action: string) {
             <div v-if="updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-section">
               <strong>受影响的已启用插件</strong>
               <div class="dependency-list">
-                <YdTag v-for="code in updatePlanFor(selected.code)?.affectedEnabledPlugins" :key="code" variant="secondary">{{ code }}</YdTag>
+                <YdTag v-for="code in updatePlanFor(selected.code)?.affectedEnabledPlugins" :key="code" variant="secondary">
+                  {{ code }}
+                </YdTag>
               </div>
             </div>
 
             <div v-if="updatePlanFor(selected.code)?.warnings?.length" class="plan-section">
               <strong>警告</strong>
               <ul class="warning-list">
-                <li v-for="warning in updatePlanFor(selected.code)?.warnings" :key="warning">{{ warning }}</li>
+                <li v-for="warning in updatePlanFor(selected.code)?.warnings" :key="warning">
+                  {{ warning }}
+                </li>
               </ul>
             </div>
 
-            <div class="detail-actions">
+            <div v-if="!updatePlanFor(selected.code)?.blockedReason" class="detail-actions">
               <YdButton
+                v-if="!updatePlanFor(selected.code)?.blockedReason"
                 v-auth="'platform:plugin:manage'"
-                :disabled="!canConfirmUpdate(selected, updatePlanFor(selected.code))"
                 :loading="actionLoading === `${selected.code}:update`"
+                :disabled="Boolean(actionLoading)"
                 @click="confirmUpdate(selected)"
               >
                 <YdIcon name="morph:circle-arrow-up" />
                 确认更新
               </YdButton>
+            </div>
+            <p v-if="!updatePlanFor(selected.code)?.blockedReason && (selected.enabled || updatePlanFor(selected.code)?.affectedEnabledPlugins?.length)" class="plan-warning">
+              确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。
+            </p>
+          </div>
+
+          <div v-if="selected.rollbackAvailable" class="detail-actions-group">
+            <div class="section-title">
+              可用备份
+            </div>
+            <div class="detail-actions">
               <YdButton
                 v-auth="'platform:plugin:manage'"
                 variant="outline"
-                :disabled="!selected.rollbackAvailable || Boolean(actionLoading)"
+                :disabled="Boolean(actionLoading)"
                 :loading="actionLoading === `${selected.code}:rollback`"
                 @click="confirmRollback(selected)"
               >
@@ -705,11 +786,12 @@ function actionText(action: string) {
                 回滚到 {{ selected.rollbackVersion || '备份版本' }}
               </YdButton>
             </div>
-            <p v-if="selected.enabled || updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-warning">确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。</p>
           </div>
 
           <div v-if="selected.dependencies?.length" class="dependency-panel">
-            <div class="section-title">插件依赖</div>
+            <div class="section-title">
+              插件依赖
+            </div>
             <div class="dependency-list">
               <YdTag v-for="dependency in selected.dependencies" :key="dependency" variant="secondary">
                 {{ dependency }}
@@ -722,60 +804,64 @@ function actionText(action: string) {
           </div>
 
           <div class="detail-actions-group">
-            <div class="section-title">生命周期动作</div>
+            <div class="section-title">
+              生命周期动作
+            </div>
             <div class="detail-actions">
-            <YdButton
-              variant="outline"
-              :loading="actionLoading === `${selected.code}:open`"
-              @click="openPluginPage(selected.code)"
-            >
-              <YdIcon name="morph:external-link" />
-              打开插件页面
-            </YdButton>
-            <YdButton
-              v-auth="'platform:plugin:manage'"
-              variant="outline"
-              :disabled="selected.loaded"
-              :loading="actionLoading === `${selected.code}:load`"
-              @click="runAction(selected.code, 'load')"
-            >
-              <YdIcon name="morph:cloud-download" />
-              加载
-            </YdButton>
-            <YdButton
-              v-auth="'platform:plugin:manage'"
-              :disabled="selected.enabled"
-              :loading="actionLoading === `${selected.code}:enable`"
-              @click="runAction(selected.code, 'enable')"
-            >
-              <YdIcon name="morph:circle-play" />
-              启用
-            </YdButton>
-            <YdButton
-              v-auth="'platform:plugin:manage'"
-              variant="outline"
-              :disabled="!selected.enabled"
-              :loading="actionLoading === `${selected.code}:disable`"
-              @click="runAction(selected.code, 'disable')"
-            >
-              <YdIcon name="morph:circle-pause" />
-              禁用
-            </YdButton>
-            <YdButton
-              v-auth="'platform:plugin:manage'"
-              variant="outline"
-              :disabled="selected.enabled || !selected.loaded"
-              :loading="actionLoading === `${selected.code}:unload`"
-              @click="runAction(selected.code, 'unload')"
-            >
-              <YdIcon name="i-ri:eject-line" />
-              卸载
-            </YdButton>
+              <YdButton
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:open`"
+                @click="openPluginPage(selected.code)"
+              >
+                <YdIcon name="morph:external-link" />
+                打开插件页面
+              </YdButton>
+              <YdButton
+                v-if="!selected.loaded"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:load`"
+                @click="runAction(selected.code, 'load')"
+              >
+                <YdIcon name="morph:cloud-download" />
+                加载
+              </YdButton>
+              <YdButton
+                v-if="!selected.enabled"
+                v-auth="'platform:plugin:manage'"
+                :loading="actionLoading === `${selected.code}:enable`"
+                @click="runAction(selected.code, 'enable')"
+              >
+                <YdIcon name="morph:circle-play" />
+                启用
+              </YdButton>
+              <YdButton
+                v-if="selected.enabled"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:disable`"
+                @click="runAction(selected.code, 'disable')"
+              >
+                <YdIcon name="morph:circle-pause" />
+                禁用
+              </YdButton>
+              <YdButton
+                v-if="!selected.enabled && selected.loaded"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:unload`"
+                @click="runAction(selected.code, 'unload')"
+              >
+                <YdIcon name="i-ri:eject-line" />
+                卸载
+              </YdButton>
             </div>
           </div>
 
           <div class="detail-actions-group detail-actions-group--danger">
-            <div class="section-title">危险操作</div>
+            <div class="section-title">
+              危险操作
+            </div>
             <div class="detail-actions">
               <YdButton
                 v-auth="'platform:plugin:manage'"
@@ -792,7 +878,7 @@ function actionText(action: string) {
             </div>
           </div>
         </section>
-      </div>
+      </YdDrawer>
 
       <EnableDependencyDialog
         v-model="enableDialogOpen"
@@ -815,18 +901,20 @@ function actionText(action: string) {
 .plugin-toolbar,
 .plugin-toolbar-actions,
 .plugin-filters,
-.plugin-browser-header,
-.plugin-item-title,
-.plugin-item-tags {
+.detail-header,
+.detail-actions,
+.plugin-identity,
+.plugin-card-heading,
+.plugin-card-meta {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: 12px;
 }
 
 .plugin-toolbar {
   flex-wrap: wrap;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 
 .plugin-toolbar-actions,
@@ -834,360 +922,120 @@ function actionText(action: string) {
   flex-wrap: wrap;
 }
 
-.plugin-search {
-  width: min(100%, 340px);
-}
-
-.plugin-status-filter {
-  width: 140px;
-}
-
-.plugin-layout {
-  display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.plugin-browser,
-.plugin-detail {
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.plugin-browser {
-  padding: 14px;
-}
-
-.plugin-browser-header {
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.plugin-result-count,
-.plugin-item-code {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.plugin-list {
-  display: grid;
-  gap: 6px;
-}
-
-.plugin-item {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--color-text-1);
-  text-align: left;
-}
-
-.plugin-item.active,
-.plugin-item:hover {
-  border-color: var(--color-border-3);
-  background: var(--color-fill-2);
-}
-
-.plugin-item-body {
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: 5px;
-}
-
-.plugin-item-title {
-  min-width: 0;
-  justify-content: space-between;
-}
-
-.plugin-item-title strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plugin-item-update {
-  color: rgb(var(--success-6));
-  font-size: 12px;
-}
-
-.plugin-pagination {
-  margin-top: 16px;
-}
-
-.plugin-detail {
-  min-width: 0;
-  padding: 16px;
-}
-
-.detail-back {
-  display: none;
-}
-
-.detail-actions-group {
-  display: grid;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-.detail-actions-group--danger .section-title {
-  color: rgb(var(--danger-6));
-}
-
-.detail-danger-hint {
-  flex: 1 1 240px;
-  margin: 0;
-  color: var(--color-text-3);
-  font-size: 12px;
-  line-height: 1.6;
-}
+.plugin-search { width: min(100%, 340px); }
+.plugin-status-filter { width: 150px; }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 
 .summary-item {
   display: flex;
-  gap: 12px;
   align-items: center;
-  padding: 12px;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
 }
 
 .summary-icon {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: none;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-fill-2);
   color: var(--color-text-2);
-  font-size: 19px;
+  font-size: 20px;
 }
 
-.summary-body {
-  display: grid;
-  gap: 4px;
-}
-
+.summary-body { display: grid; gap: 3px; }
 .summary-body span,
-.detail-grid span {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
+.detail-grid span,
+.plugin-muted { color: var(--color-text-3); font-size: 12px; }
 .summary-body strong,
-.detail-grid strong {
-  color: var(--color-text-1);
-  font-weight: 700;
-}
+.detail-grid strong { color: var(--color-text-1); font-weight: 700; }
 
-.plugin-detail-title {
-  display: flex;
-  gap: 12px;
+.plugin-browser {
   min-width: 0;
-  align-items: flex-start;
+  padding: 20px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
 }
 
-.plugin-item-icon,
-.plugin-detail-icon {
-  width: 22px;
-  height: 22px;
-  flex: none;
-}
+.plugin-browser-header { margin-bottom: 16px; }
+.plugin-browser-header h2 { margin: 0 0 4px; color: var(--color-text-1); font-size: 16px; }
+.plugin-browser-header p { margin: 0; color: var(--color-text-3); font-size: 13px; }
+.plugin-browser :deep(.plugin-table-root) { overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 8px; }
+.plugin-browser :deep(.plugin-table) { width: 100%; }
 
-.plugin-detail-icon {
+.plugin-identity { min-width: 0; align-items: flex-start; }
+.plugin-identity-icon {
   width: 36px;
   height: 36px;
-  padding: 6px;
-  border-radius: 6px;
+  flex: none;
+  padding: 7px;
+  border-radius: 8px;
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+}
+.plugin-identity-text { display: grid; min-width: 0; gap: 3px; }
+.plugin-identity-text strong { color: var(--color-text-1); font-weight: 600; }
+.plugin-code, .plugin-description { color: var(--color-text-3); font-size: 12px; overflow-wrap: anywhere; }
+.plugin-description { max-width: 520px; line-height: 1.5; }
+.plugin-pagination { margin-top: 20px; }
+.plugin-empty-action { display: flex; justify-content: center; padding-top: 8px; }
+
+.plugin-mobile-card { width: 100%; }
+.plugin-card-heading { align-items: flex-start; justify-content: space-between; }
+.plugin-card-heading .plugin-identity { flex: 1; }
+.plugin-card-description { margin: 12px 0; color: var(--color-text-2); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.plugin-card-meta { flex-wrap: wrap; margin-bottom: 14px; color: var(--color-text-3); font-size: 12px; }
+
+.plugin-detail { min-width: 0; padding: 6px 4px 24px; }
+.detail-header { align-items: flex-start; justify-content: space-between; }
+.plugin-detail-title { display: flex; min-width: 0; align-items: flex-start; gap: 12px; }
+.plugin-detail-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 8px;
+  border-radius: 8px;
   background: var(--color-fill-2);
 }
+.detail-header h2 { margin: 0 0 4px; color: var(--color-text-1); font-size: 18px; }
+.detail-header p { margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 20px; }
+.detail-grid > div { display: grid; min-width: 0; gap: 6px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.detail-grid strong { overflow-wrap: anywhere; }
+.detail-git-link { justify-self: start; max-width: 100%; padding: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 
+.update-panel, .dependency-panel, .detail-actions-group, .error-panel { margin-top: 20px; }
+.update-panel { padding: 16px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.update-panel.blocked { border-color: var(--color-border-3); }
+.update-panel p { margin: 6px 0 0; color: var(--color-text-2); line-height: 1.6; }
+.plan-section { margin-top: 16px; }
+.plan-section strong { display: block; margin-bottom: 8px; }
+.plan-warning { color: var(--color-text-2); font-size: 13px; }
+.warning-list { margin: 0; padding-left: 20px; color: var(--color-text-2); }
+.section-title { margin-bottom: 8px; color: var(--color-text-1); font-weight: 700; }
+.dependency-list, .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail-actions { margin-top: 16px; }
+.detail-actions-group { padding-top: 18px; border-top: 1px solid var(--color-border-2); }
+.detail-danger-hint { flex: 1 1 240px; margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
+.error-panel { padding: 12px 14px; border: 1px solid var(--color-border-3); border-radius: 8px; background: var(--color-bg-1); color: var(--color-text-1); overflow-wrap: anywhere; }
 
-
-.detail-header {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
+@media (max-width: 768px) {
+  .plugin-toolbar, .plugin-toolbar-actions, .plugin-filters, .detail-header { align-items: stretch; flex-direction: column; }
+  .plugin-search, .plugin-status-filter { width: 100%; }
+  .plugin-browser { padding: 14px; }
+  .plugin-pagination { overflow-x: auto; }
 }
-
-.detail-header h2 {
-  margin: 0 0 4px;
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.detail-header p {
-  margin: 0;
-  color: var(--color-text-3);
-  font-size: 13px;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.detail-grid div {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.detail-git-link {
-  justify-self: start;
-  max-width: 100%;
-  padding: 0;
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dependency-panel,
-.update-panel,
-.detail-actions {
-  margin-top: 16px;
-}
-
-.update-panel {
-  padding: 12px;
-  border: 1px solid rgb(var(--success-6));
-  border-radius: 6px;
-  background: rgb(var(--success-1));
-  color: rgb(var(--success-6));
-}
-
-.update-panel.blocked {
-  border-color: rgb(var(--danger-6));
-  background: rgb(var(--danger-1));
-  color: rgb(var(--danger-6));
-}
-
-.update-panel p {
-  margin: 4px 0 0;
-}
-
-.plan-section {
-  margin-top: 12px;
-}
-
-.plan-section strong {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.plan-warning {
-  color: rgb(var(--warning-6));
-  font-weight: 700;
-}
-
-.warning-list {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.section-title {
-  margin-bottom: 8px;
-  color: var(--color-text-1);
-  font-weight: 700;
-}
-
-.dependency-list,
-.detail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.error-panel {
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: 1px solid rgb(var(--danger-6));
-  border-radius: 6px;
-  background: rgb(var(--danger-1));
-  color: rgb(var(--danger-6));
-}
-
-.empty-state {
-  padding: 32px 12px;
-  color: var(--color-text-3);
-  text-align: center;
-}
-
-.ok {
-  color: rgb(var(--success-6));
-}
-
-.bad {
-  color: rgb(var(--danger-6));
-}
-
-@media (max-width: 900px) {
-  .plugin-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .plugin-detail {
-    display: none;
-  }
-
-  .plugin-detail.is-mobile-open {
-    display: block;
-  }
-
-  .plugin-layout.is-detail-open .plugin-browser {
-    display: none;
-  }
-
-  .detail-back {
-    display: inline-flex;
-    margin-bottom: 4px;
-  }
-
-  .plugin-detail-title {
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 640px) {
-  .plugin-toolbar,
-  .plugin-toolbar-actions,
-  .plugin-filters,
-  .detail-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .plugin-search,
-  .plugin-status-filter {
-    width: 100%;
-  }
-
-  .plugin-pagination {
-    overflow-x: auto;
-  }
-}
-
 </style>

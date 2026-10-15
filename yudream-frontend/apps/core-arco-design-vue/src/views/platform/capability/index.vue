@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
 import type { AiEndpointDraft } from './ai-endpoints'
+import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
 import apiCapability from '@/api/modules/platform-capability'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
-import AiEndpointConfig from './AiEndpointConfig.vue'
 import { createEndpointDraft, firstChatEndpoint, modelOptionsOf, parseEndpointDrafts, serializeEndpointDrafts, validateEndpointDrafts } from './ai-endpoints'
+import AiEndpointConfig from './AiEndpointConfig.vue'
 
 interface CapabilityGroup {
   type: CapabilityType
@@ -25,10 +25,10 @@ const router = useRouter()
 const appFeatureStore = useAppFeatureStore()
 
 const loading = ref(false)
+const saving = ref(false)
 const actionLoading = ref('')
 const rows = ref<CapabilityItem[]>([])
 const selectedCode = ref('')
-/** 内联配置编辑是否展开 */
 const configEditing = ref(false)
 const editingCapabilityCode = ref('')
 const configText = ref('{}')
@@ -39,6 +39,7 @@ const testMessage = ref('平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
 let websocket: WebSocket | null = null
+let sseAbort: AbortController | null = null
 
 const groups: CapabilityGroup[] = [
   { type: 'REALTIME', title: '实时通信', icon: 'morph:activity' },
@@ -113,6 +114,16 @@ async function toggleCapability(item: CapabilityItem) {
   }
 }
 
+function selectCapability(item: CapabilityItem) {
+  if (saving.value) {
+    return
+  }
+  if (configEditing.value) {
+    cancelConfig()
+  }
+  selectedCode.value = item.code
+}
+
 function openConfig(item: CapabilityItem) {
   selectedCode.value = item.code
   configDraft.value = { ...(item.config || {}) }
@@ -146,12 +157,21 @@ async function saveConfig() {
   if (!config) {
     return
   }
+  saving.value = true
+  try {
     const res = await apiCapability.updateConfig(editingCapabilityCode.value, config)
     replaceItem(res.data)
     configEditing.value = false
     editingCapabilityCode.value = ''
     toast.success('配置已保存')
   }
+  catch {
+    toast.error('保存失败，请检查配置并重试')
+  }
+  finally {
+    saving.value = false
+  }
+}
 
 async function testCapability(item: CapabilityItem) {
   actionLoading.value = `${item.code}:test`
@@ -219,8 +239,6 @@ async function connectSse() {
     }
   }
 }
-
-let sseAbort: AbortController | null = null
 
 function closeSse() {
   sseAbort?.abort()
@@ -310,16 +328,16 @@ function dependencyStatus(item?: CapabilityItem) {
 
 function fieldsOf(code?: string): CapabilityConfigField[] {
   const map: Record<string, CapabilityConfigField[]> = {
-    sse: [
+    'sse': [
       { key: 'timeout', label: '连接超时（毫秒）', placeholder: '300000', type: 'number' },
     ],
-    neo4j: [
+    'neo4j': [
       { key: 'uri', label: 'Neo4j URI', placeholder: 'bolt://localhost:7687' },
       { key: 'username', label: '用户名', placeholder: 'neo4j' },
       { key: 'password', label: '密码', placeholder: '留空不修改', type: 'password' },
       { key: 'database', label: '数据库', placeholder: 'neo4j' },
     ],
-    rabbitmq: [
+    'rabbitmq': [
       { key: 'host', label: '主机', placeholder: 'localhost' },
       { key: 'port', label: '端口', placeholder: '35672', type: 'number' },
       { key: 'username', label: '用户名', placeholder: 'guest' },
@@ -344,7 +362,7 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'password', label: '密码或授权码', placeholder: '留空不修改', type: 'password' },
       { key: 'folder', label: '文件夹', placeholder: 'INBOX' },
     ],
-    form: [
+    'form': [
       { key: 'maxUploadSizeMb', label: '上传文件大小上限（MB）', placeholder: '100', type: 'number' },
     ],
   }
@@ -368,6 +386,7 @@ function normalizedConfig() {
       toast.error('默认模型必须属于默认聊天端点')
       return null
     }
+    endpoint.defaultModel = defaultModel
     return {
       // 能力配置整体替换，必须带上配额、附件等既有键，避免保存端点时丢失。
       ...(selected.value.config || {}),
@@ -390,7 +409,6 @@ function parseJsonConfig() {
     return null
   }
 }
-
 </script>
 
 <template>
@@ -403,7 +421,7 @@ function parseJsonConfig() {
 
     <YdPageMain>
       <div class="capability-toolbar">
-        <YdInput v-model="testMessage" placeholder="测试消息内容" class="min-w-0 flex-1" />
+        <YdInput v-model="testMessage" placeholder="测试消息内容" class="flex-1 min-w-0" />
       </div>
 
       <div class="summary-grid">
@@ -423,7 +441,9 @@ function parseJsonConfig() {
           <template v-for="group in groups" :key="group.type">
             <div v-if="itemsByType(group.type).length" class="section-title">
               <span><YdIcon :name="group.icon" /> {{ group.title }}</span>
-              <YdTag variant="secondary">{{ itemsByType(group.type).length }}</YdTag>
+              <YdTag variant="secondary">
+                {{ itemsByType(group.type).length }}
+              </YdTag>
             </div>
             <YdButton
               v-for="item in itemsByType(group.type)"
@@ -433,180 +453,214 @@ function parseJsonConfig() {
               :class="{ active: selected?.code === item.code }"
               type="button"
               :aria-pressed="selected?.code === item.code"
-              @click="selectedCode = item.code"
+              @click="selectCapability(item)"
             >
               <YdIcon :name="item.icon || 'morph:puzzle'" />
               <span>{{ item.name }}</span>
-              <YdTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</YdTag>
+              <YdTag :variant="statusVariant(item.status)">
+                {{ statusText(item.status) }}
+              </YdTag>
             </YdButton>
           </template>
         </section>
 
         <section v-if="selected" class="capability-detail">
-          <div class="detail-header">
-            <div class="detail-title">
-              <div class="detail-icon">
-                <YdIcon :name="selected.icon || 'morph:puzzle'" />
+          <template v-if="configEditing">
+            <div class="detail-header">
+              <div class="detail-title">
+                <div class="detail-icon">
+                  <YdIcon :name="selected.icon || 'morph:puzzle'" />
+                </div>
+                <div>
+                  <h2>配置 {{ selected.name }}</h2>
+                  <p>{{ typeText(selected.type) }} · {{ statusText(selected.status) }}</p>
+                </div>
               </div>
-              <div>
-                <h2>{{ selected.name }}</h2>
-                <p>{{ selected.description }}</p>
-              </div>
-            </div>
-            <div class="detail-actions">
-              <YdButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
-                <YdIcon name="morph:settings-2" />
-                配置
-              </YdButton>
-              <YdButton
-                v-auth="'platform:capability:test'"
-                variant="outline"
-                :disabled="!selected.enabled"
-                :loading="actionLoading === `${selected.code}:test`"
-                @click="testCapability(selected)"
-              >
-                <YdIcon name="morph:send" />
-                测试
-              </YdButton>
-              <YdButton
-                v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
-                :variant="selected.enabled ? 'destructive' : 'default'"
-                :disabled="!selected.enabled && !canEnableSelected"
-                :loading="actionLoading === `${selected.code}:toggle`"
-                @click="toggleCapability(selected)"
-              >
-                <YdIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
-                {{ selected.enabled ? '禁用' : '启用' }}
-              </YdButton>
-            </div>
-          </div>
-
-          <!-- 内联配置编辑（替代弹窗） -->
-          <div v-if="configEditing" class="inline-config">
-            <div class="inline-config__head">
-              <span class="inline-config__title">编辑配置</span>
-              <div class="inline-config__actions">
-                <YdButton size="sm" variant="ghost" @click="cancelConfig">
+              <div class="detail-actions">
+                <YdButton variant="ghost" @click="cancelConfig">
                   取消
                 </YdButton>
-                <YdButton size="sm" @click="saveConfig">
+                <YdButton :loading="saving" @click="saveConfig">
                   <YdIcon name="morph:check" />
                   保存配置
                 </YdButton>
               </div>
             </div>
 
-            <!-- AI 能力：端点目录（聊天 / 向量化 / 重排序）与分层配置 -->
-            <AiEndpointConfig
-              v-if="isAiConfig"
-              v-model:endpoints="aiEndpoints"
-              v-model:default-provider="configDraft.defaultProvider"
-              v-model:default-model="configDraft.defaultModel"
-              :capability-enabled="Boolean(selected?.enabled)"
-            />
+            <div class="config-body">
+              <!-- AI 能力：端点用途切换（聊天 / 向量化 / 重排序）与端点编辑 -->
+              <AiEndpointConfig
+                v-if="isAiConfig"
+                v-model:endpoints="aiEndpoints"
+                v-model:default-provider="configDraft.defaultProvider"
+                v-model:default-model="configDraft.defaultModel"
+                :capability-enabled="Boolean(selected?.enabled)"
+              />
 
-            <!-- 其他结构化配置 -->
-            <div v-else-if="usesStructuredConfig" class="config-form">
-              <label v-for="field in configFields" :key="field.key" class="config-field">
-                <span>{{ field.label }}</span>
-                <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">
-                  已配置，留空不修改
-                </small>
-                <YdTextarea
-                  v-if="field.type === 'textarea'"
-                  v-model="configDraft[field.key]"
-                  rows="5"
-                  input-class="font-mono"
-                  :placeholder="field.placeholder"
-                />
-                <YdInput
-                  v-else
-                  v-model="configDraft[field.key]"
-                  :type="field.type || 'text'"
-                  :placeholder="field.placeholder"
-                />
-              </label>
+              <!-- 其他结构化配置 -->
+              <div v-else-if="usesStructuredConfig" class="config-form">
+                <label v-for="field in configFields" :key="field.key" class="config-field">
+                  <span>{{ field.label }}</span>
+                  <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">
+                    已配置，留空不修改
+                  </small>
+                  <YdTextarea
+                    v-if="field.type === 'textarea'"
+                    v-model="configDraft[field.key]"
+                    rows="5"
+                    input-class="font-mono"
+                    :placeholder="field.placeholder"
+                  />
+                  <YdInput
+                    v-else
+                    v-model="configDraft[field.key]"
+                    :type="field.type || 'text'"
+                    :placeholder="field.placeholder"
+                  />
+                </label>
+              </div>
+              <YdTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
             </div>
-            <YdTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
-          </div>
 
-          <div class="detail-grid">
-            <div class="info-cell">
-              <span>类型</span>
-              <strong>{{ typeText(selected.type) }}</strong>
+            <div class="config-footer">
+              <YdButton variant="ghost" @click="cancelConfig">
+                取消
+              </YdButton>
+              <YdButton :loading="saving" @click="saveConfig">
+                <YdIcon name="morph:check" />
+                保存配置
+              </YdButton>
             </div>
-            <div class="info-cell">
-              <span>状态</span>
-              <YdTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</YdTag>
-            </div>
-            <div class="info-cell">
-              <span>编码</span>
-              <code>{{ selected.code }}</code>
-            </div>
-            <div class="info-cell">
-              <span>检查时间</span>
-              <strong>{{ selected.checkedAt || '-' }}</strong>
-            </div>
-          </div>
+          </template>
 
-          <div v-if="dependencyRows.length" class="dependency-panel">
-            <div class="section-title">
-              <span>依赖能力</span>
-              <YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
-                {{ missingDependencies.length ? '未满足' : '已满足' }}
-              </YdTag>
-            </div>
-            <div class="dependency-list">
-              <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
-                <div>
-                  <strong>{{ dependency.name }}</strong>
-                  <code>{{ dependency.code }}</code>
+          <template v-else>
+            <div class="detail-header">
+              <div class="detail-title">
+                <div class="detail-icon">
+                  <YdIcon :name="selected.icon || 'morph:puzzle'" />
                 </div>
-                <YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
-                  {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
+                <div>
+                  <h2>{{ selected.name }}</h2>
+                  <p>{{ selected.description }}</p>
+                </div>
+              </div>
+              <div class="detail-actions">
+                <YdButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
+                  <YdIcon name="morph:settings-2" />
+                  配置
+                </YdButton>
+                <YdButton
+                  v-auth="'platform:capability:test'"
+                  variant="outline"
+                  :disabled="!selected.enabled"
+                  :loading="actionLoading === `${selected.code}:test`"
+                  @click="testCapability(selected)"
+                >
+                  <YdIcon name="morph:send" />
+                  测试
+                </YdButton>
+                <YdButton
+                  v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
+                  :variant="selected.enabled ? 'destructive' : 'default'"
+                  :disabled="!selected.enabled && !canEnableSelected"
+                  :loading="actionLoading === `${selected.code}:toggle`"
+                  @click="toggleCapability(selected)"
+                >
+                  <YdIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
+                  {{ selected.enabled ? '禁用' : '启用' }}
+                </YdButton>
+              </div>
+            </div>
+
+            <div class="detail-grid">
+              <div class="info-cell">
+                <span>类型</span>
+                <strong>{{ typeText(selected.type) }}</strong>
+              </div>
+              <div class="info-cell">
+                <span>状态</span>
+                <YdTag :variant="statusVariant(selected.status)">
+                  {{ statusText(selected.status) }}
                 </YdTag>
               </div>
-            </div>
-            <p v-if="missingDependencies.length" class="dependency-tip">
-              当前能力需要先启用依赖能力：{{ missingDependencies.map(item => item.name).join('、') }}
-            </p>
-          </div>
-
-          <div class="health-panel">
-            <div class="section-title">
-              <span>健康信息</span>
-              <YdTag :variant="statusVariant(selected.status)">{{ selected.healthMessage || '-' }}</YdTag>
-            </div>
-            <div v-if="metricEntries(selected).length" class="metric-grid">
-              <div v-for="[key, value] in metricEntries(selected)" :key="key" class="metric-item">
-                <span>{{ key }}</span>
-                <strong>{{ value }}</strong>
+              <div class="info-cell">
+                <span>编码</span>
+                <code>{{ selected.code }}</code>
+              </div>
+              <div class="info-cell">
+                <span>检查时间</span>
+                <strong>{{ selected.checkedAt || '-' }}</strong>
               </div>
             </div>
-            <div v-else class="empty-state">
-              暂无运行指标
-            </div>
-          </div>
 
-          <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
-            <div class="section-title">
-              <span>连接调试</span>
+            <div v-if="dependencyRows.length" class="dependency-panel">
+              <div class="section-title">
+                <span>依赖能力</span>
+                <YdTag :variant="missingDependencies.length ? 'destructive' : 'default'">
+                  {{ missingDependencies.length ? '未满足' : '已满足' }}
+                </YdTag>
+              </div>
+              <div class="dependency-list">
+                <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
+                  <div>
+                    <strong>{{ dependency.name }}</strong>
+                    <code>{{ dependency.code }}</code>
+                  </div>
+                  <YdTag :variant="dependency.enabled ? 'default' : 'secondary'">
+                    {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
+                  </YdTag>
+                </div>
+              </div>
+              <p v-if="missingDependencies.length" class="dependency-tip">
+                当前能力需要先启用依赖能力：{{ missingDependencies.map(item => item.name).join('、') }}
+              </p>
             </div>
-            <div v-if="selected.code === 'sse'" class="debug-row">
-              <span>SSE：{{ sseStatus }}</span>
-              <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">连接</YdButton>
-              <YdButton size="sm" variant="ghost" @click="closeSse">断开</YdButton>
+
+            <div class="health-panel">
+              <div class="section-title">
+                <span>健康信息</span>
+                <YdTag :variant="statusVariant(selected.status)">
+                  {{ selected.healthMessage || '-' }}
+                </YdTag>
+              </div>
+              <div v-if="metricEntries(selected).length" class="metric-grid">
+                <div v-for="[key, value] in metricEntries(selected)" :key="key" class="metric-item">
+                  <span>{{ key }}</span>
+                  <strong>{{ value }}</strong>
+                </div>
+              </div>
+              <div v-else class="empty-state">
+                暂无运行指标
+              </div>
             </div>
-            <div v-if="selected.code === 'websocket'" class="debug-row">
-              <span>WebSocket：{{ wsStatus }}</span>
-              <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">连接</YdButton>
-              <YdButton size="sm" variant="ghost" @click="closeWs">断开</YdButton>
+
+            <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
+              <div class="section-title">
+                <span>连接调试</span>
+              </div>
+              <div v-if="selected.code === 'sse'" class="debug-row">
+                <span>SSE：{{ sseStatus }}</span>
+                <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">
+                  连接
+                </YdButton>
+                <YdButton size="sm" variant="ghost" @click="closeSse">
+                  断开
+                </YdButton>
+              </div>
+              <div v-if="selected.code === 'websocket'" class="debug-row">
+                <span>WebSocket：{{ wsStatus }}</span>
+                <YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">
+                  连接
+                </YdButton>
+                <YdButton size="sm" variant="ghost" @click="closeWs">
+                  断开
+                </YdButton>
+              </div>
             </div>
-          </div>
+          </template>
         </section>
       </div>
     </YdPageMain>
-
   </div>
 </template>
 
@@ -871,32 +925,20 @@ function parseJsonConfig() {
   line-height: 1.5;
 }
 
-/* 内联配置编辑 */
-.inline-config {
+/* 配置视图：替换只读详情，长表单底部操作常驻可达 */
+.config-body {
+  display: grid;
+  gap: 16px;
   margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--color-border-3);
-  border-radius: 8px;
-  background: var(--color-bg-1);
 }
 
-.inline-config__head {
+.config-footer {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.inline-config__title {
-  color: var(--color-text-1);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.inline-config__actions {
-  display: inline-flex;
   gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-2);
 }
 
 @media (max-width: 900px) {
@@ -914,6 +956,12 @@ function parseJsonConfig() {
     justify-content: flex-start;
   }
 
-}
+  .config-footer {
+    justify-content: stretch;
+  }
 
+  .config-footer > * {
+    flex: 1;
+  }
+}
 </style>
