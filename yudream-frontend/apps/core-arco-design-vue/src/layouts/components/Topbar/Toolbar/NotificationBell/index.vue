@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
         </YdButton>
       </div>
     </template>
-    <YdButton type="button" variant="ghost" size="icon" class="relative flex-center size-10 rounded-lg" title="通知中心" aria-label="通知中心">
+    <YdButton type="button" variant="ghost" size="icon" class="relative flex-center size-10 rounded-lg" title="通知中心" aria-label="通知中心" data-tour="topbar-notification">
       <YdIcon name="morph:bell" class="text-lg" />
       <span
         v-if="unread > 0"

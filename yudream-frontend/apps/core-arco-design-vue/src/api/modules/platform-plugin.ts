@@ -131,10 +131,30 @@ export interface PluginGlobalWidget {
   sort?: number
 }
 
+export interface PluginGuideStep {
+  /** 目标元素选择器，约定 [data-tour="..."] 形式；为空时该步骤居中展示。 */
+  target?: string
+  title?: string
+  content: string
+  placement?: 'top' | 'bottom' | 'left' | 'right'
+}
+
+export interface PluginGuide {
+  pluginCode: string
+  code: string
+  title: string
+  /** 引导自动播放的页面路径。 */
+  routePath: string
+  permission?: string
+  sort?: number
+  steps: PluginGuideStep[]
+}
+
 export interface PluginFrontendManifest {
   sdkVersion: string
   modules: PluginFrontendModule[]
   globalWidgets?: PluginGlobalWidget[]
+  guides?: PluginGuide[]
 }
 
 export type PluginThemeScope = 'SITE' | 'ADMIN'

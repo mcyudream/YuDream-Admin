@@ -116,6 +116,7 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
+  const useTourStore: typeof import('../store/modules/tour').useTourStore
   const useYdChat: typeof import('@yudream/components').useYdChat
   const useYdChatConfig: typeof import('@yudream/components').useYdChatConfig
   const useYdChatStream: typeof import('@yudream/components').useYdChatStream
@@ -147,4 +148,7 @@ declare global {
   // @ts-ignore
   export type { RouteAuthValue, AuthRouteNode } from '../store/modules/app/route-auth'
   import('../store/modules/app/route-auth')
+  // @ts-ignore
+  export type { TourStepDefinition, TourDefinition } from '../store/modules/tour'
+  import('../store/modules/tour')
 }

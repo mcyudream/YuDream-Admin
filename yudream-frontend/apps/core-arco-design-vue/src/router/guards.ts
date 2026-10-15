@@ -318,6 +318,16 @@ function setupOther(router: Router) {
   })
 }
 
+// 新手引导：进入匹配页面且当前用户未完成时自动播放（声明式注册，宿主统一驱动）
+function setupTourTrigger(router: Router) {
+  router.afterEach((to) => {
+    if (to.meta?.public) {
+      return
+    }
+    useTourStore().handleRouteChange(to.path)
+  })
+}
+
 export default function setupGuards(router: Router) {
   setupRoutes(router)
   setupRedirectAuthChildrenRoute(router)
@@ -326,4 +336,5 @@ export default function setupGuards(router: Router) {
   setupTitle(router)
   setupKeepAlive(router)
   setupOther(router)
+  setupTourTrigger(router)
 }

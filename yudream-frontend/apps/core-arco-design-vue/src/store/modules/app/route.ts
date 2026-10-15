@@ -226,12 +226,14 @@ export const useAppRouteStore = defineStore(
     async function loadPluginRuntimeManifest() {
       try {
         const res = await apiPlugin.frontendManifest()
+        useTourStore().setPluginGuides(res.data.guides || [])
         return {
           modules: indexPluginRuntimeModules(res.data.modules || []),
           sdkVersion: res.data.sdkVersion,
         }
       }
       catch {
+        useTourStore().setPluginGuides([])
         return {
           modules: new Map<string, PluginFrontendModule>(),
           sdkVersion: undefined,
