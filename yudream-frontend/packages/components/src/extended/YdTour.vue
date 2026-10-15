@@ -118,14 +118,23 @@ function update(withScroll: boolean) {
     spot.value = undefined
   }
   void positionPopover(element?.getBoundingClientRect())
+  // 兜底二次定位：步骤切换当帧模板引用可能未就绪导致首轮测量静默放弃
+  window.requestAnimationFrame(() => {
+    if (props.open) {
+      void positionPopover(resolveStepElement(currentStep.value)?.getBoundingClientRect())
+    }
+  })
   emit('step-change', index.value)
   popover.value?.focus({ preventScroll: true })
 }
 
-async function positionPopover(targetRect: DOMRect | undefined) {
+async function positionPopover(targetRect: DOMRect | undefined, attempt = 0) {
   await nextTick()
   const node = popover.value
   if (!node) {
+    if (attempt < 2) {
+      await positionPopover(targetRect, attempt + 1)
+    }
     return
   }
   const width = node.offsetWidth
