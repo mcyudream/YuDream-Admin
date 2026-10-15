@@ -35,28 +35,26 @@ useHotkeyBindings({
       <YdScrollArea :scrollbar="false" mask gradient-color="var(--g-main-sidebar-bg)" class="menu overscroll-contain flex-1">
         <!-- 侧边栏模式（含主导航） -->
         <div
-          v-if="appSettingsStore.settings.menu.mode === 'side' || (appSettingsStore.mode === 'mobile' && appSettingsStore.settings.menu.mode !== 'single')" class="py-1 flex flex-col w-full transition-all of-hidden -mt-2"
+          v-if="appSettingsStore.settings.menu.mode === 'side' || (appSettingsStore.mode === 'mobile' && appSettingsStore.settings.menu.mode !== 'single')" class="main-menu-list flex flex-col w-full"
+          role="navigation" aria-label="一级菜单"
         >
           <template v-for="(item, index) in appMenuStore.allMenus" :key="index">
             <div
-              class="menu-item px-2 py-1 transition-all relative" :class="{
+              class="menu-item" :class="{
                 active: index === appMenuStore.actived,
               }"
             >
-              <YdTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="right">
-                <YdButton
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  :aria-label="generateTitle(item.meta?.title)"
-                  :aria-pressed="index === appMenuStore.actived"
-                  class="group menu-item-container text-[var(--g-main-sidebar-menu-color)] py-4 border-0 rounded-lg bg-transparent flex gap-1 h-full w-full cursor-pointer items-center justify-center relative hover-(text-[var(--g-main-sidebar-menu-hover-color)] bg-[var(--g-main-sidebar-menu-hover-bg)]) px-2!" :class="{
-                    'text-[var(--g-main-sidebar-menu-active-color)]! bg-[var(--g-main-sidebar-menu-active-bg)]!': index === appMenuStore.actived,
-                  }" @click="switchTo(index)"
-                >
-                  <YdIcon :name="item.meta?.icon || 'morph:folder'" class="menu-item-container-icon" aria-hidden="true" />
-                </YdButton>
-              </YdTooltip>
+              <YdButton
+                variant="ghost"
+                size="icon"
+                type="button"
+                :aria-label="generateTitle(item.meta?.title)"
+                :aria-pressed="index === appMenuStore.actived"
+                class="menu-item-container" @click="switchTo(index)"
+              >
+                <YdIcon :name="item.meta?.icon || 'morph:folder'" class="menu-item-container-icon" aria-hidden="true" />
+                <span class="menu-item-label" aria-hidden="true">{{ generateTitle(item.meta?.title) }}</span>
+              </YdButton>
             </div>
           </template>
         </div>
@@ -88,21 +86,33 @@ useHotkeyBindings({
   }
 
   .menu {
+    min-height: 0;
+
+    :deep(.main-menu-list) {
+      gap: 4px;
+      padding: 8px 0;
+    }
+
     :deep(.menu-item) {
+      position: relative;
+      padding: 0 6px;
+
       .menu-item-container {
-        aspect-ratio: 1 / 1;
-        padding-block: 8px;
+        position: relative;
+        display: flex;
+        width: 100%;
+        height: 56px;
+        padding: 0;
+        align-items: center;
+        justify-content: center;
         color: var(--g-main-sidebar-menu-color);
+        background-color: transparent;
+        border: 0;
         border-radius: var(--yd-control-radius);
-        transition: background-color var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast), scale var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+        transition: background-color var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast), scale var(--yd-motion-duration-fast) var(--yd-motion-ease);
 
         &:active {
           scale: var(--yd-motion-press);
-        }
-
-        &:focus-visible {
-          outline: 2px solid currentcolor;
-          outline-offset: -3px;
         }
 
         &:hover {
@@ -110,16 +120,47 @@ useHotkeyBindings({
           background-color: var(--g-main-sidebar-menu-hover-bg);
         }
 
+        &:focus-visible {
+          outline: 2px solid currentcolor;
+          outline-offset: -3px;
+        }
+
         .menu-item-container-icon {
           flex-shrink: 0;
-          font-size: 26px !important;
+          font-size: 20px !important;
           transition: translate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+        }
+
+        /* 悬停或选中时在图标下方显示模块名，取代悬浮提示 */
+        .menu-item-label {
+          position: absolute;
+          inset-inline: 4px;
+          inset-block-end: 5px;
+          overflow: hidden;
+          font-size: 11px;
+          font-weight: 500;
+          line-height: 15px;
+          text-align: center;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          opacity: 0;
+          transition: opacity var(--yd-motion-duration-fast);
         }
       }
 
+      &:hover .menu-item-container-icon,
+      &.active .menu-item-container-icon {
+        translate: 0 -6px;
+      }
+
+      &:hover .menu-item-label,
+      &.active .menu-item-label {
+        opacity: 1;
+      }
+
       &.active .menu-item-container {
-        color: var(--g-main-sidebar-menu-active-color) !important;
-        background-color: var(--g-main-sidebar-menu-active-bg) !important;
+        color: var(--g-sub-sidebar-menu-active-color);
+        background-color: var(--g-sub-sidebar-menu-active-bg);
       }
     }
   }
@@ -134,11 +175,5 @@ useHotkeyBindings({
 .main-sidebar-enter-from,
 .main-sidebar-leave-to {
   transform: translateX(calc(var(--g-main-sidebar-width) * -1));
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .menu-item-container:hover .menu-item-container-icon {
-    translate: 0 var(--yd-motion-lift);
-  }
 }
 </style>

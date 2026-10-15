@@ -15,6 +15,8 @@ const route = useRoute()
 
 const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
+const { generateTitle } = useAppMenu()
+const activeModuleTitle = computed(() => generateTitle(appMenuStore.allMenus[appMenuStore.actived]?.meta?.title))
 
 const isCollapse = computed(() => appSettingsStore.settings.menu.subMenuCollapse)
 
@@ -48,10 +50,11 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
     >
       <Component :is="useSlots('sub-sidebar-top')" />
       <Logo
-        v-if="['side', 'single'].includes(appSettingsStore.settings.menu.mode) || appSettingsStore.mode === 'mobile'" :show-logo="appSettingsStore.settings.menu.mode === 'single'" class="sidebar-logo" :class="{
-          single: appSettingsStore.settings.menu.mode === 'single',
-        }"
+        v-if="appSettingsStore.settings.menu.mode === 'single'" show-logo class="sidebar-logo single"
       />
+      <div v-else-if="appSettingsStore.settings.menu.mode === 'side' || appSettingsStore.mode === 'mobile'" class="module-title" :title="activeModuleTitle">
+        {{ activeModuleTitle }}
+      </div>
       <Component :is="useSlots('sub-sidebar-after-logo')" />
       <YdScrollArea :scrollbar="false" mask class="overscroll-contain flex-1">
         <TransitionGroup :name="transitionName">
@@ -98,8 +101,26 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
   box-shadow: 1px 0 0 0 oklch(var(--border));
   transition: inset-inline-start var(--yd-motion-duration-slow) var(--yd-motion-ease), width var(--yd-motion-duration-slow) var(--yd-motion-ease), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
 
+  .module-title {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: var(--g-sidebar-logo-height);
+    padding: 0 16px;
+    overflow: hidden;
+    color: var(--g-sub-sidebar-menu-color);
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &.is-collapse {
     width: var(--g-sub-sidebar-collapse-width);
+
+    .module-title {
+      display: none;
+    }
 
     .sidebar-logo {
       &:not(.single) {
