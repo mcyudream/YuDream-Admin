@@ -25,6 +25,8 @@ public class DeptManageDTO implements Serializable {
     private String name;
     private String description;
     private String avatar;
+    /** 主色 #rrggbb 小写 hex，可空（null=未设置）。 */
+    private String color;
     private Long leaderId;
     private String leaderName;
     private String phone;

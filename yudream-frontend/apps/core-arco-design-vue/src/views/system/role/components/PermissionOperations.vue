@@ -6,6 +6,7 @@ import type { UserManageItem } from '@/api/modules/system-user'
 import { useYdToast } from '@yudream/components'
 import apiPermission from '@/api/modules/system-permission'
 import apiUser from '@/api/modules/system-user'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 import { permissionCategoryOf } from '@/utils/permission-catalog'
 import { permissionOperationError, rolePermissionChange, userRoleDelta } from './permission-operations'
 import PermissionDetails from './PermissionDetails.vue'
@@ -171,7 +172,10 @@ async function assignUserRoles(id: string) {
   try {
     const response = await apiUser.detail(id)
     if (request === userRequest && userVisible.value) {
-      userSnapshot.value = response.data
+      userSnapshot.value = {
+        ...response.data,
+        avatar: response.data.avatar ? toBackendAssetUrl(response.data.avatar) : response.data.avatar,
+      }
       selectedUserRoles.value = [...response.data.roleIds]
     }
   }
@@ -297,9 +301,12 @@ defineExpose({ inspectPermission, grantPermission, revokePermission, assignUserR
       正在读取用户角色与部门…
     </p>
     <div v-else-if="userSnapshot" class="flex flex-col gap-4">
-      <p class="font-semibold">
-        {{ userSnapshot.nickname || userSnapshot.username }} <span class="text-xs text-secondary-foreground/70">{{ userSnapshot.username }}</span>
-      </p>
+      <div class="flex gap-2 items-center">
+        <YdAvatar :src="userSnapshot.avatar || ''" :fallback="userSnapshot.nickname || userSnapshot.username" class="shrink-0" />
+        <p class="font-semibold">
+          {{ userSnapshot.nickname || userSnapshot.username }} <span class="text-xs text-secondary-foreground/70">{{ userSnapshot.username }}</span>
+        </p>
+      </div>
       <p class="text-sm text-secondary-foreground/70">
         只可新增用户已有部门内的启用角色。原有历史或暂不可用角色保留，只有明确取消选择才会撤销。
       </p>

@@ -19,7 +19,6 @@ import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
-import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 
@@ -74,16 +73,21 @@ public class UserAssembler {
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap) {
-        return toManageDTO(user, roleMap, deptMap, List.of(), null);
+        return toManageDTO(user, roleMap, deptMap, List.of(), null, null);
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
                                             List<MessagingIdentity> identities) {
-        return toManageDTO(user, roleMap, deptMap, identities, null);
+        return toManageDTO(user, roleMap, deptMap, identities, null, null);
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
                                             List<MessagingIdentity> identities, String avatar) {
+        return toManageDTO(user, roleMap, deptMap, identities, avatar, null);
+    }
+
+    public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
+                                            List<MessagingIdentity> identities, String avatar, String defaultDeptAvatar) {
         List<Long> deptIds = user.getDepts().stream().map(d -> d.id().getValue()).toList();
         return UserManageDTO.builder()
                 .id(user.getId())
@@ -100,6 +104,7 @@ public class UserAssembler {
                 .deptIds(deptIds)
                 .deptNames(deptIds.stream().map(deptMap::get).filter(d -> d != null).map(Dept::getName).toList())
                 .defaultDeptId(user.getDefaultDeptID() == null ? null : user.getDefaultDeptID().getValue())
+                .defaultDeptAvatar(defaultDeptAvatar)
                 .tags(user.listTags().stream()
                         .filter(tag -> tag != null)
                         .map(tag -> UserTagDTO.builder()
@@ -179,7 +184,7 @@ public class UserAssembler {
                 .systemRole(role.isSystemRole())
                 .systemType(role.getSystemType())
                 .icon(role.getIcon())
-                .color(role.getColor() == null ? RoleColor.INFO.getCode() : role.getColor().getCode())
+                .color(role.getColor())
                 .permissions(role.getPermissions() == null ? new ArrayList<>() : role.getPermissions().stream().map(PermissionID::getCode).toList())
                 .permissionCount(role.getPermissions() == null ? 0 : role.getPermissions().size())
                 .status(role.getStatus())
@@ -193,6 +198,7 @@ public class UserAssembler {
                 .id(dept.getId())
                 .name(dept.getName())
                 .description(dept.getDescription())
+                .color(dept.getColor())
                 .leaderId(dept.getLeader() == null ? null : dept.getLeader().getValue())
                 .leaderName(leader == null ? null : leader.getNickname())
                 .phone(dept.getPhone() == null ? null : dept.getPhone().getValue())

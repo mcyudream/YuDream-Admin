@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { DeptManageItem, DeptPayload, DeptStatus } from '@/api/modules/system-dept'
 import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
-import apiDept from '@/api/modules/system-dept'
+import apiDept, { DEPT_COLOR_PRESETS } from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiUser from '@/api/modules/system-user'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { deptFallbackIcon } from '@/utils/dept-visual'
+import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -23,6 +25,7 @@ const avatarUploading = ref(false)
 const form = reactive<DeptPayload>({
   name: '',
   description: '',
+  color: DEPT_COLOR_PRESETS[0],
   leaderId: undefined,
   phone: '',
   parentId: undefined,
@@ -38,6 +41,7 @@ const deptOptions = computed(() => flattenDepts(rows.value)
   .filter(item => String(item.id) !== String(editing.value?.id ?? ''))
   .map(item => ({ label: item.name, value: item.id })))
 const leaderColumns: TableColumn<UserPickerRow>[] = [
+  { id: 'leaderAvatar', header: '', width: 56 },
   { accessorKey: 'nickname', header: '姓名', minWidth: 140 },
   { accessorKey: 'username', header: '账号', minWidth: 160 },
 ]
@@ -56,7 +60,12 @@ const leaderInitialLabels = computed<Record<string, string>>(() => {
 async function fetchLeaders(query: YdTablePickerQuery): Promise<YdTablePickerResult<UserPickerRow>> {
   const result = (await apiUser.page({ page: query.page, size: query.size, keyword: query.keyword })).data
   return {
-    list: result.records.map((user: UserManageItem) => ({ id: String(user.id), username: user.username, nickname: user.nickname || user.username })),
+    list: result.records.map((user: UserManageItem) => ({
+      id: String(user.id),
+      username: user.username,
+      nickname: user.nickname || user.username,
+      avatar: user.avatar ? toBackendAssetUrl(user.avatar) : undefined,
+    })),
     total: result.total,
   }
 }
@@ -68,7 +77,20 @@ const sortOrderValue = computed({
 })
 const { auth } = useAppAuth()
 
-const deptUserColumn: UserColumn<DeptManageItem> = { nameKey: 'name', emailKey: 'leaderName', avatarKey: 'avatar', header: '部门', width: 240 }
+/** 部门身份列：上传头像优先，未上传时按名称关键词回退 Morphicons 图标（底色取部门主色）。 */
+function deptAvatarFallback(row: DeptManageItem) {
+  const name = (row.name || '').trim()
+  return name ? name.slice(0, 2) : '部门'
+}
+
+/** 负责人选择器无头像时的首字兜底（中文取前 2 字，拉丁取首字母）。 */
+function leaderAvatarFallback(user?: UserPickerRow) {
+  const name = (user?.nickname || user?.username || '').trim()
+  if (!name) {
+    return '?'
+  }
+  return name.charCodeAt(0) < 128 ? name.slice(0, 1).toUpperCase() : name.slice(0, 2)
+}
 
 const deptStatusColumn: StatusColumn<DeptManageItem> = {
   statusKey: 'status',
@@ -89,7 +111,7 @@ const deptActions: ActionMenuItem<DeptManageItem>[] = [
 ]
 
 const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
-  { accessorKey: 'name', header: '部门名称', width: 220, fixed: 'left' },
+  { id: 'name', header: '部门名称', width: 220, fixed: 'left' },
   { accessorKey: 'leaderName', header: '负责人', width: 140 },
   { accessorKey: 'phone', header: '电话', width: 140 },
   { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center' },
@@ -134,6 +156,7 @@ function openCreate(parent?: DeptManageItem) {
   Object.assign(form, {
     name: '',
     description: '',
+    color: DEPT_COLOR_PRESETS[0],
     leaderId: undefined,
     phone: '',
     parentId: parent?.id,
@@ -149,6 +172,7 @@ function openEdit(row: DeptManageItem) {
   Object.assign(form, {
     name: row.name,
     description: row.description,
+    color: normalizeEntityColor(row.color) ?? DEPT_COLOR_PRESETS[0],
     leaderId: row.leaderId,
     phone: row.phone,
     parentId: row.parentId,
@@ -276,7 +300,6 @@ function importDepts() {
 
           column-visibility tree
           :default-expanded="true"
-          :user-column="deptUserColumn"
           :status-column="deptStatusColumn"
           :actions="deptActions"
           :card-hidden-columns="['systemDept', 'phone']"
@@ -300,6 +323,21 @@ function importDepts() {
               </div>
             </YdSearchBar>
           </template>
+          <template #cell-name="{ row }">
+            <div class="flex gap-2 min-w-0 items-center">
+              <YdAvatar
+                v-if="row.original.avatar"
+                :src="row.original.avatar"
+                :fallback="deptAvatarFallback(row.original)"
+                :alt="row.original.name"
+                class="shrink-0 size-9"
+              />
+              <span v-else class="dept-chip" :style="entityTintStyle(row.original.color)" aria-hidden="true">
+                <YdIcon :name="deptFallbackIcon(row.original.name)" />
+              </span>
+              <span class="font-medium truncate">{{ row.original.name }}</span>
+            </div>
+          </template>
           <template #cell-systemDept="{ row }">
             <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
               {{ row.original.systemDept ? '系统部门' : '普通部门' }}
@@ -313,12 +351,15 @@ function importDepts() {
       <YdForm :model="form" layout="vertical">
         <YdFormItem v-if="editing" label="部门头像">
           <div class="flex flex-wrap gap-3 items-center">
-            <YdAvatar :src="formAvatar" :fallback="form.name || '部门'" class="size-12" />
+            <YdAvatar v-if="formAvatar" :src="formAvatar" :fallback="form.name || '部门'" class="size-12" />
+            <span v-else class="dept-chip dept-chip--lg" :style="entityTintStyle(form.color)" aria-hidden="true">
+              <YdIcon :name="deptFallbackIcon(form.name)" />
+            </span>
             <YdButton v-auth="'system:dept:edit'" variant="outline" size="sm" :loading="avatarUploading" @click="pickDeptAvatar">
               <YdIcon name="morph:cloud-upload" />
               上传头像
             </YdButton>
-            <span class="text-xs text-muted-foreground">仅支持图片文件，无头像时展示部门名称首字</span>
+            <span class="text-xs text-muted-foreground">仅支持图片文件；无头像时按部门名称展示兜底图标，可搭配部门主色</span>
             <YdFilePicker ref="avatarInput" accept="image/*" label="选择部门头像" class="hidden" @select="uploadDeptAvatar">
               <template #default />
             </YdFilePicker>
@@ -347,7 +388,21 @@ function importDepts() {
                 :initial-labels="leaderInitialLabels"
                 title="选择部门负责人"
                 placeholder="请选择负责人"
-              />
+              >
+                <template #cell-leaderAvatar="{ row }">
+                  <YdAvatar :src="row.original.avatar || ''" :fallback="leaderAvatarFallback(row.original)" class="size-8" />
+                </template>
+              </YdTablePicker>
+            </YdFormItem>
+          </div>
+          <div>
+            <YdFormItem label="部门主色" extra="用于部门图标底色与列表标识；保存为 #RRGGBB 小写 hex">
+              <div class="flex gap-2 w-full items-center">
+                <YdColorPicker v-model="form.color" :presets="DEPT_COLOR_PRESETS" aria-label="选择部门主色" class="flex-1" />
+                <span class="dept-chip shrink-0" :style="entityTintStyle(form.color)" aria-hidden="true">
+                  <YdIcon :name="deptFallbackIcon(form.name)" />
+                </span>
+              </div>
             </YdFormItem>
           </div>
           <div>
@@ -373,3 +428,27 @@ function importDepts() {
     </YdModal>
   </div>
 </template>
+
+<style scoped>
+/*
+  部门图标兜底色块：底色与前景色来自部门主色（内联 style 只承载数据色），
+  未设色时回退中性语义变量；列表身份列与表单预览共用同一套取色助手。
+*/
+.dept-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 10px;
+}
+
+.dept-chip--lg {
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+}
+</style>

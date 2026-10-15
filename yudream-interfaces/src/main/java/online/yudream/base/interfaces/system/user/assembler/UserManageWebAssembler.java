@@ -139,6 +139,7 @@ public class UserManageWebAssembler {
         cmd.setPhone(request.getPhone());
         cmd.setParentId(request.getParentId());
         cmd.setSortOrder(request.getSortOrder());
+        cmd.setColor(request.getColor());
         return cmd;
     }
 
@@ -151,6 +152,7 @@ public class UserManageWebAssembler {
         cmd.setPhone(request.getPhone());
         cmd.setParentId(request.getParentId());
         cmd.setSortOrder(request.getSortOrder());
+        cmd.setColor(request.getColor());
         cmd.setStatus(request.getStatus());
         return cmd;
     }
@@ -191,6 +193,7 @@ public class UserManageWebAssembler {
                 .deptIds(dto.getDeptIds())
                 .deptNames(dto.getDeptNames())
                 .defaultDeptId(dto.getDefaultDeptId())
+                .defaultDeptAvatar(dto.getDefaultDeptAvatar())
                 .tags(dto.getTags() == null ? List.of() : dto.getTags().stream()
                         .map(tag -> UserTagRes.builder()
                                 .namespace(tag.getNamespace())
@@ -252,6 +255,7 @@ public class UserManageWebAssembler {
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .avatar(dto.getAvatar())
+                .color(dto.getColor())
                 .leaderId(dto.getLeaderId())
                 .leaderName(dto.getLeaderName())
                 .phone(dto.getPhone())

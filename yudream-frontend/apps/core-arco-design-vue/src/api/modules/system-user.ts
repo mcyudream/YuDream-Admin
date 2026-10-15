@@ -26,6 +26,8 @@ export interface UserManageItem {
   deptIds: IdValue[]
   deptNames: string[]
   defaultDeptId?: IdValue
+  /** 默认部门头像 URL，可空（未上传时前端按部门名回退图标）。 */
+  defaultDeptAvatar?: string
   tags?: UserTagItem[]
   fields?: Record<string, Record<string, string>>
   messagingIdentities?: MessagingIdentity[]
@@ -43,6 +45,7 @@ export interface UserPickerRow {
   id: IdValue
   username: string
   nickname?: string
+  avatar?: string
 }
 export interface UserPageParams {
   page: number

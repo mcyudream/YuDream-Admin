@@ -2,11 +2,12 @@
 import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { ChatQuotaReservation } from '@/api/modules/platform-chat'
 import type { UserPickerRow } from '@/api/modules/system-user'
-import { YdAlert, YdButton, YdCard, YdForm, YdFormItem, YdInput, YdNumberField, YdResponsiveTable, YdSelect, YdTablePicker } from '@yudream/components'
+import { YdAlert, YdAvatar, YdButton, YdCard, YdForm, YdFormItem, YdInput, YdNumberField, YdResponsiveTable, YdSelect, YdTablePicker } from '@yudream/components'
 import { computed, ref, watch } from 'vue'
 import { listUnresolvedChatQuota, reconcileChatQuota } from '@/api/modules/platform-chat'
 import apiUser from '@/api/modules/system-user'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 
 const account = useAppAccountStore()
 const { auth } = useAppAuth()
@@ -32,10 +33,30 @@ const columns: TableColumn<ChatQuotaReservation>[] = [
   { accessorKey: 'runId', header: '运行记录', width: 160 },
   { id: 'actions', header: '操作', width: 110 },
 ]
-const userColumns: TableColumn<UserPickerRow>[] = [{ accessorKey: 'username', header: '用户名' }, { accessorKey: 'nickname', header: '昵称' }]
+const userColumns: TableColumn<UserPickerRow>[] = [
+  { id: 'userAvatar', header: '', width: 56 },
+  { accessorKey: 'username', header: '用户名' },
+  { accessorKey: 'nickname', header: '昵称' },
+]
+/** 选择账号时无头像则用首字兜底（中文取前 2 字，拉丁取首字母）。 */
+function userAvatarFallback(user?: UserPickerRow) {
+  const name = (user?.nickname || user?.username || '').trim()
+  if (!name) {
+    return '?'
+  }
+  return name.charCodeAt(0) < 128 ? name.slice(0, 1).toUpperCase() : name.slice(0, 2)
+}
 async function fetchUsers(query: YdTablePickerQuery): Promise<YdTablePickerResult<UserPickerRow>> {
   const result = (await apiUser.page({ page: query.page, size: query.size, keyword: query.keyword })).data
-  return { list: result.records.map(user => ({ id: user.id, username: user.username, nickname: user.nickname || user.username })), total: result.total }
+  return {
+    list: result.records.map(user => ({
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname || user.username,
+      avatar: user.avatar ? toBackendAssetUrl(user.avatar) : undefined,
+    })),
+    total: result.total,
+  }
 }
 async function load() {
   if (!canView.value || !userId.value) {
@@ -100,7 +121,11 @@ watch([userId, canView], () => {
     </p>
     <YdAlert v-if="failure" variant="destructive" :title="failure" />
     <YdSelect v-model="scope" :options="[{ label: '当前账号', value: 'current' }, { label: '系统任务', value: 'system' }, ...(canSelectUser ? [{ label: '选择账号', value: 'user' }] : [])]" aria-label="用量账号范围" />
-    <YdTablePicker v-if="scope === 'user' && canSelectUser" v-model="userSelection" :columns="userColumns" :fetcher="fetchUsers" row-key="id" label-key="nickname" :multiple="false" title="选择用量账号" placeholder="请选择账号" />
+    <YdTablePicker v-if="scope === 'user' && canSelectUser" v-model="userSelection" :columns="userColumns" :fetcher="fetchUsers" row-key="id" label-key="nickname" :multiple="false" title="选择用量账号" placeholder="请选择账号">
+      <template #cell-userAvatar="{ row }">
+        <YdAvatar :src="row.original.avatar || ''" :fallback="userAvatarFallback(row.original)" class="size-8" />
+      </template>
+    </YdTablePicker>
     <div class="yd-quota-reconciliation__filters flex flex-wrap gap-2">
       <YdInput v-model="usageDate" type="date" aria-label="账期日期" />
       <YdButton variant="outline" :loading="loading" @click="load">

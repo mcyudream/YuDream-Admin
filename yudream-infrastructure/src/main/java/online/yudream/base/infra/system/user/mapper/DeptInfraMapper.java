@@ -22,6 +22,7 @@ public class DeptInfraMapper {
         deptDO.setLeaderId(dept.getLeader() == null ? null : dept.getLeader().getValue());
         deptDO.setPhone(dept.getPhone() == null ? null : dept.getPhone().getValue());
         deptDO.setAvatarFileId(dept.getAvatarFileId());
+        deptDO.setColor(dept.getColor());
         deptDO.setParentId(dept.getParentId() == null ? null : dept.getParentId().getValue());
         deptDO.setSortOrder(dept.getSortOrder());
         deptDO.setDeptType(dept.getDeptType());
@@ -41,6 +42,7 @@ public class DeptInfraMapper {
                 .leader(deptDO.getLeaderId() == null ? null : UserID.of(deptDO.getLeaderId()))
                 .phone(deptDO.getPhone() == null ? null : Phone.fromTrusted(deptDO.getPhone()))
                 .avatarFileId(deptDO.getAvatarFileId())
+                .color(deptDO.getColor())
                 .parentId(deptDO.getParentId() == null ? null : DeptID.of(deptDO.getParentId()))
                 .sortOrder(deptDO.getSortOrder())
                 .deptType(deptDO.getDeptType())

@@ -4,11 +4,26 @@ import systemClient from './system-client'
 
 export type DeptStatus = 'ACTIVE' | 'DEPRECATED'
 
+/**
+ * 部门主色推荐预设（首选中性色，未显式选择时保持克制）。
+ * 仅作 YdColorPicker 的快速预设，取值不受限；保存一律为 `#RRGGBB` 小写 hex。
+ */
+export const DEPT_COLOR_PRESETS: string[] = [
+  '#64748b',
+  '#0ea5e9',
+  '#16a34a',
+  '#d97706',
+  '#dc2626',
+  '#7c3aed',
+]
+
 export interface DeptManageItem {
   id: IdValue
   name: string
   description?: string
   avatar?: string
+  /** 部门主色，`#RRGGBB` 小写 hex，可空（未设置表示用默认）。 */
+  color?: string
   leaderId?: IdValue
   leaderName?: string
   phone?: string
@@ -31,6 +46,8 @@ export interface DeptTreeParams {
 export interface DeptPayload {
   name: string
   description?: string
+  /** 部门主色，`#RRGGBB` 小写 hex，可空（未设置表示用默认）。 */
+  color?: string
   leaderId?: IdValue
   phone?: string
   parentId?: IdValue

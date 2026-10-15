@@ -3,22 +3,18 @@ import systemClient from './system-client'
 
 export type RoleStatus = 'ACTIVE' | 'DEPRECATED'
 export type RoleLevel = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'GUEST'
-/** 角色代表色固定键；与后端领域枚举同源，禁止任意 hex/色值。 */
-export type RoleColor = 'info' | 'success' | 'warning' | 'danger' | 'emphasis' | 'neutral'
 
-export interface RoleColorOption {
-  label: string
-  value: RoleColor
-}
-
-/** 角色代表色选项：表单选择与列表渲染共用同一固定键集合。 */
-export const ROLE_COLORS: RoleColorOption[] = [
-  { label: '信息', value: 'info' },
-  { label: '成功', value: 'success' },
-  { label: '警告', value: 'warning' },
-  { label: '危险', value: 'danger' },
-  { label: '强调', value: 'emphasis' },
-  { label: '中性', value: 'neutral' },
+/**
+ * 角色代表色推荐预设（首选中性色，便于「未显式选择」时保持克制）。
+ * 仅作 YdColorPicker 的快速预设，取值不受限；保存一律为 `#RRGGBB` 小写 hex。
+ */
+export const ROLE_COLOR_PRESETS: string[] = [
+  '#64748b',
+  '#2563eb',
+  '#16a34a',
+  '#d97706',
+  '#dc2626',
+  '#7c3aed',
 ]
 
 export type IdValue = string
@@ -50,8 +46,8 @@ export interface RoleManageItem {
   systemType?: string
   /** Morphicons 名称（形如 morph:shield），可空。 */
   icon?: string
-  /** 代表色，缺省 info。 */
-  color?: RoleColor
+  /** 代表色，`#RRGGBB` 小写 hex，可空（未设置表示用默认）。 */
+  color?: string
   permissions: string[]
   permissionCount: number
   status: RoleStatus
@@ -75,8 +71,8 @@ export interface RolePayload {
   status?: RoleStatus
   /** Morphicons 名称（形如 morph:shield），可空。 */
   icon?: string
-  /** 代表色固定键，缺省 info。 */
-  color?: RoleColor
+  /** 代表色，`#RRGGBB` 小写 hex，可空（未设置表示用默认）。 */
+  color?: string
   permissions: string[]
 }
 

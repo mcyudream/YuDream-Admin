@@ -2,9 +2,9 @@ package online.yudream.base.infra.system.user.mapper;
 
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.user.aggregate.Role;
-import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
+import online.yudream.base.domain.system.user.valobj.RoleColor;
 import online.yudream.base.infra.system.user.dataobj.RoleDO;
 
 import java.util.Collections;
@@ -28,7 +28,7 @@ public class RoleInfraMapper {
         roleDO.setSystemRole(role.isSystemRole());
         roleDO.setSystemType(role.getSystemType());
         roleDO.setIcon(role.getIcon());
-        roleDO.setColor(role.getColor() == null ? null : role.getColor().getCode());
+        roleDO.setColor(role.getColor());
         roleDO.setPermissions(role.getPermissions() == null ? Collections.emptyList() :
                 role.getPermissions().stream().map(PermissionID::getCode).collect(Collectors.toList()));
         roleDO.setStatus(role.getStatus());
@@ -49,7 +49,8 @@ public class RoleInfraMapper {
                 .systemRole(roleDO.isSystemRole())
                 .systemType(roleDO.getSystemType())
                 .icon(roleDO.getIcon())
-                .color(RoleColor.from(roleDO.getColor()))
+                // 旧数据可能仍是 info/success 等语义键，统一经 RoleColor 规范化为 hex
+                .color(RoleColor.normalize(roleDO.getColor()))
                 .permissions(Optional.ofNullable(roleDO.getPermissions()).orElse(Collections.emptyList()).stream()
                         .map(PermissionID::of)
                         .collect(Collectors.toList()))

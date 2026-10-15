@@ -134,6 +134,7 @@ public class MonitorWebAssembler {
                 .userId(dto.getUserId())
                 .username(dto.getUsername())
                 .nickname(dto.getNickname())
+                .avatar(dto.getAvatar())
                 .email(dto.getEmail())
                 .timeout(dto.getTimeout())
                 .activeTimeout(dto.getActiveTimeout())

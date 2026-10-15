@@ -30,6 +30,8 @@ export interface OnlineUser {
   userId?: string
   username?: string
   nickname?: string
+  /** 用户头像 URL，可空（无头像时前端按用户名首字兜底）。 */
+  avatar?: string
   email?: string
   timeout?: number
   activeTimeout?: number
@@ -187,22 +189,22 @@ export interface ResourceMetricPoint {
 }
 
 export default {
-  redis: (params?: { pattern?: string; limit?: number }) => {
+  redis: (params?: { pattern?: string, limit?: number }) => {
     return systemClient.get<unknown, ApiResponse<RedisMonitor>>('api/system/monitor/redis', { params })
   },
-  onlineUsers: (params?: { keyword?: string; limit?: number }) => {
+  onlineUsers: (params?: { keyword?: string, limit?: number }) => {
     return systemClient.get<unknown, ApiResponse<OnlineUser[]>>('api/system/monitor/online-users', { params })
   },
   kickoutOnlineUser: (token: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/system/monitor/online-users/${encodeURIComponent(token)}`)
   },
-  apiLogs: (params?: { keyword?: string; success?: boolean; page?: number; size?: number }) => {
+  apiLogs: (params?: { keyword?: string, success?: boolean, page?: number, size?: number }) => {
     return systemClient.get<unknown, ApiResponse<PageResult<ApiLog>>>('api/system/monitor/api-logs', { params })
   },
   clearApiLogs: () => {
     return systemClient.delete<unknown, ApiResponse<number>>('api/system/monitor/api-logs')
   },
-  loginLogs: (params?: { keyword?: string; success?: boolean; page?: number; size?: number }) => {
+  loginLogs: (params?: { keyword?: string, success?: boolean, page?: number, size?: number }) => {
     return systemClient.get<unknown, ApiResponse<PageResult<LoginLog>>>('api/system/monitor/login-logs', { params })
   },
   clearLoginLogs: () => {

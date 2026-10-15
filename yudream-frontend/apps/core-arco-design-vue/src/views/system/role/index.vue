@@ -2,14 +2,15 @@
 import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
-import type { IdValue, PermissionItem, RoleColor, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
+import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
 import type { UserManageItem } from '@/api/modules/system-user'
 import { useYdModal, useYdToast } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
-import apiRole, { ROLE_COLORS } from '@/api/modules/system-role'
+import apiRole, { ROLE_COLOR_PRESETS } from '@/api/modules/system-role'
 
+import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 import { permissionOperationError } from './components/permission-operations'
 import PermissionConstellation from './components/PermissionConstellation.vue'
@@ -57,7 +58,7 @@ const form = reactive<RolePayload>({
   level: 'USER',
   status: 'ACTIVE',
   icon: undefined,
-  color: 'info',
+  color: ROLE_COLOR_PRESETS[0],
   permissions: [],
 })
 
@@ -75,13 +76,13 @@ const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ labe
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
 const roleUserColumn: UserColumn<RoleManageItem> = { nameKey: 'name', emailKey: 'code', header: '角色', width: 220 }
 
-/** 代表色键回落：缺省或非法值统一按 info 渲染，与后端领域枚举默认值一致。 */
-function roleColorOf(color?: string): RoleColor {
-  return ROLE_COLORS.some(item => item.value === color) ? color as RoleColor : 'info'
+/** 代表色取色：接口返回的 hex 归一化后直接驱动色块与列表标识；未设置时用中性色。 */
+function roleAccentColor(color?: string) {
+  return normalizeEntityColor(color)
 }
 
-function roleColorLabel(color?: string): string {
-  return ROLE_COLORS.find(item => item.value === roleColorOf(color))?.label ?? '信息'
+function roleAccentLabel(color?: string): string {
+  return roleAccentColor(color) ?? '未设置'
 }
 
 const roleStatusColumn: StatusColumn<RoleManageItem> = {
@@ -354,7 +355,7 @@ function openCreate() {
     level: 'USER' as RoleLevel,
     status: 'ACTIVE' as RoleStatus,
     icon: undefined,
-    color: 'info' as RoleColor,
+    color: ROLE_COLOR_PRESETS[0],
     permissions: [],
   })
   formVisible.value = true
@@ -373,7 +374,7 @@ function openEdit(row: RoleManageItem) {
     level: row.level,
     status: row.status,
     icon: row.icon,
-    color: roleColorOf(row.color),
+    color: roleAccentColor(row.color) ?? ROLE_COLOR_PRESETS[0],
     permissions: [...row.permissions],
   })
   formVisible.value = true
@@ -512,10 +513,10 @@ function importRoles() {
             </YdSearchBar>
           </template>
           <template #cell-visual="{ row }">
-            <span class="role-chip" :class="`role-chip--${roleColorOf(row.original.color)}`">
+            <span class="role-chip" :style="entityTintStyle(row.original.color)">
               <YdIcon v-if="row.original.icon" :name="row.original.icon" aria-hidden="true" />
               <span v-else class="role-chip__dot" aria-hidden="true" />
-              <span class="sr-only">代表色：{{ roleColorLabel(row.original.color) }}</span>
+              <span class="sr-only">代表色：{{ roleAccentLabel(row.original.color) }}</span>
             </span>
           </template>
           <template #cell-systemRole="{ row }">
@@ -629,10 +630,10 @@ function importRoles() {
             </YdFormItem>
           </div>
           <div>
-            <YdFormItem label="代表色">
+            <YdFormItem label="代表色" extra="支持自由取色；留空场景按中性色渲染，保存为 #RRGGBB 小写 hex">
               <div class="flex gap-2 w-full items-center">
-                <YdSelect v-model="form.color" :options="ROLE_COLORS" class="flex-1" />
-                <span class="role-chip shrink-0" :class="`role-chip--${roleColorOf(form.color)}`" aria-hidden="true">
+                <YdColorPicker v-model="form.color" :presets="ROLE_COLOR_PRESETS" aria-label="选择角色代表色" class="flex-1" />
+                <span class="role-chip shrink-0" :style="entityTintStyle(form.color)" aria-hidden="true">
                   <YdIcon v-if="form.icon" :name="form.icon" />
                   <span v-else class="role-chip__dot" />
                 </span>
@@ -656,8 +657,8 @@ function importRoles() {
 
 <style scoped>
 /*
-  角色标识色块：代表色只消费 YD 语义令牌，不引用品牌色阶。
-  单一 class→var 映射表同时驱动图标与色块（均取 currentColor），列表与表单预览共用。
+  角色标识色块：底色与前景色来自接口返回的代表色（内联 style 只承载数据色）。
+  列表标识列与表单预览共用同一套取色助手 entityTintStyle，未设色时回退中性语义变量。
 */
 .role-chip {
   display: inline-flex;
@@ -668,33 +669,7 @@ function importRoles() {
   height: 28px;
   font-size: 16px;
   line-height: 1;
-  color: var(--color-text-3);
-  background: color-mix(in srgb, currentcolor 16%, transparent);
   border-radius: 8px;
-}
-
-.role-chip--info {
-  color: var(--yd-status-info);
-}
-
-.role-chip--success {
-  color: var(--yd-status-success);
-}
-
-.role-chip--warning {
-  color: var(--yd-status-warning);
-}
-
-.role-chip--danger {
-  color: var(--yd-status-danger);
-}
-
-.role-chip--emphasis {
-  color: var(--yd-emphasis);
-}
-
-.role-chip--neutral {
-  color: var(--color-text-3);
 }
 
 .role-chip__dot {

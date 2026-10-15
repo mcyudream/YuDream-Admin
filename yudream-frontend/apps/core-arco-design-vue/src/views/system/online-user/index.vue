@@ -19,6 +19,7 @@ const { auth } = useAppAuth()
 const sessionUserColumn: UserColumn<OnlineUser> = {
   nameKey: 'username',
   emailKey: 'email',
+  avatarKey: 'avatar',
   header: '用户',
   width: 220,
 }
@@ -29,16 +30,16 @@ const sessionActions: ActionMenuItem<OnlineUser>[] = [
 ]
 
 const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
-  { accessorKey: 'username', header: '\u7528\u6237\u540D', width: 140 },
-  { accessorKey: 'nickname', header: '\u6635\u79F0', width: 140 },
-  { accessorKey: 'email', header: '\u90AE\u7BB1', width: 220 },
-  { accessorKey: 'device', header: '\u8BBE\u5907', width: 120 },
-  { id: 'timeout', header: '\u4F1A\u8BDD\u5269\u4F59\u65F6\u95F4', width: 150 },
-  { id: 'token', header: '\u4F1A\u8BDD\u6807\u8BC6', width: 260 },
-  { id: 'operation', header: '\u64CD\u4F5C', width: 120, align: 'center', fixed: 'right' },
+  { accessorKey: 'username', header: '用户名', width: 140 },
+  { accessorKey: 'nickname', header: '昵称', width: 140 },
+  { accessorKey: 'email', header: '邮箱', width: 220 },
+  { accessorKey: 'device', header: '设备', width: 120 },
+  { id: 'timeout', header: '会话剩余时间', width: 150 },
+  { id: 'token', header: '会话标识', width: 260 },
+  { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
 
-const onlineCountText = computed(() => `\u5F53\u524D\u5728\u7EBF ${rows.value.length} \u4EBA`)
+const onlineCountText = computed(() => `当前在线 ${rows.value.length} 人`)
 
 onMounted(load)
 
@@ -64,7 +65,8 @@ function withCurrentSessionFallback(data: OnlineUser[]) {
     token: appAccountStore.token,
     username: appAccountStore.account,
     nickname: appAccountStore.account,
-    device: '\u5F53\u524D\u6D4F\u89C8\u5668',
+    avatar: appAccountStore.avatar || undefined,
+    device: '当前浏览器',
     timeout: undefined,
   }]
 }
@@ -79,7 +81,7 @@ function ttlText(value?: number) {
     return '-'
   }
   if (value < 0) {
-    return '\u6C38\u4E45'
+    return '永久'
   }
   if (value < 60) {
     return `${value}s`
@@ -99,11 +101,11 @@ function shortToken(token?: string) {
 
 function confirmKickout(row: OnlineUser) {
   modal.confirm({
-    title: '\u786E\u8BA4\u4E0B\u7EBF',
-    content: `\u786E\u8BA4\u5F3A\u5236\u4E0B\u7EBF ${row.username || row.userId || row.token} \uFF1F`,
+    title: '确认下线',
+    content: `确认强制下线 ${row.username || row.userId || row.token} ？`,
     onConfirm: async () => {
       await apiMonitor.kickoutOnlineUser(row.token)
-      toast.success('\u5DF2\u4E0B\u7EBF')
+      toast.success('已下线')
       await load()
     },
   })
@@ -139,10 +141,10 @@ async function exportOnlineUsers() {
           <template #toolbar>
             <YdSearchBar class="w-full">
               <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <YdInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
+                <YdInput v-model="keyword" clearable placeholder="用户名 / 昵称 / 会话标识" @keydown.enter="load" @clear="load" />
                 <div class="flex gap-2 md:justify-end">
                   <YdButton variant="outline" @click="resetSearch">
-                    &#37325;&#32622;
+                    重置
                   </YdButton>
                 </div>
               </div>
@@ -150,7 +152,7 @@ async function exportOnlineUsers() {
           </template>
           <template #empty>
             <div class="empty-state">
-              &#26242;&#26080;&#22312;&#32447;&#20250;&#35805;&#65292;&#35831;&#30830;&#35748;&#24050;&#37325;&#21551;&#21518;&#31471;&#24182;&#37325;&#26032;&#30331;&#24405;
+              暂无在线会话，请确认已重启后端并重新登录
             </div>
           </template>
           <template #cell-timeout="{ row }">

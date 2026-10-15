@@ -364,7 +364,8 @@ public class UserManageAppService {
         Map<Long, List<MessagingIdentity>> identities =
                 messagingIdentityAppService.listByUsers(users.stream().map(User::getId).toList());
         return users.stream().map(user -> UserAssembler.toManageDTO(user, roleMap, deptMap,
-                identities.getOrDefault(user.getId(), List.of()), fileAppService.fileUrl(user.getAvatarFileId()))).toList();
+                identities.getOrDefault(user.getId(), List.of()), fileAppService.fileUrl(user.getAvatarFileId()),
+                defaultDeptAvatar(user, deptMap))).toList();
     }
 
     private UserManageDTO toDTO(User user) {
@@ -374,7 +375,16 @@ public class UserManageAppService {
         Map<Long, Dept> deptMap = deptRepo.findByIds(deptIds).stream()
                 .collect(Collectors.toMap(Dept::getId, Function.identity()));
         return UserAssembler.toManageDTO(user, roleMap, deptMap, messagingIdentityAppService.listByUser(user.getId()),
-                fileAppService.fileUrl(user.getAvatarFileId()));
+                fileAppService.fileUrl(user.getAvatarFileId()), defaultDeptAvatar(user, deptMap));
+    }
+
+    /** 默认部门头像 URL：默认部门缺失或未上传头像时为 null。 */
+    private String defaultDeptAvatar(User user, Map<Long, Dept> deptMap) {
+        if (user.getDefaultDeptID() == null) {
+            return null;
+        }
+        Dept dept = deptMap.get(user.getDefaultDeptID().getValue());
+        return dept == null ? null : fileAppService.fileUrl(dept.getAvatarFileId());
     }
 
     private Email toEmail(String email) {

@@ -13,7 +13,6 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.DeptStatus;
-import online.yudream.base.domain.system.user.enumerate.SystemDeptType;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.valobj.DeptID;
@@ -108,16 +107,8 @@ public class DeptManageAppService {
     public DeptManageDTO create(DeptCreateCmd cmd) {
         ensureParentExists(cmd.getParentId());
         ensureNameUnique(null, cmd.getName(), cmd.getParentId());
-        Dept dept = Dept.builder()
-                .name(cmd.getName())
-                .description(cmd.getDescription())
-                .leader(toUserID(cmd.getLeaderId()))
-                .phone(toPhone(cmd.getPhone()))
-                .parentId(toDeptID(cmd.getParentId()))
-                .sortOrder(cmd.getSortOrder() == null ? 0 : cmd.getSortOrder())
-                .deptType(SystemDeptType.NORMAL)
-                .status(DeptStatus.ACTIVE)
-                .build();
+        Dept dept = Dept.create(null, cmd.getName(), cmd.getDescription(), toUserID(cmd.getLeaderId()),
+                toPhone(cmd.getPhone()), toDeptID(cmd.getParentId()), cmd.getSortOrder(), cmd.getColor());
         return toDTO(deptRepo.save(dept), Map.of());
     }
 
@@ -128,6 +119,7 @@ public class DeptManageAppService {
         ensureNoParentCycle(dept.getId(), cmd.getParentId());
         ensureNameUnique(dept.getId(), cmd.getName(), cmd.getParentId());
         dept.updateBasic(cmd.getName(), cmd.getDescription(), toUserID(cmd.getLeaderId()), toPhone(cmd.getPhone()), toDeptID(cmd.getParentId()), cmd.getSortOrder());
+        dept.updateColor(cmd.getColor());
         if (cmd.getStatus() == DeptStatus.ACTIVE) {
             dept.activate();
         } else if (cmd.getStatus() == DeptStatus.DEPRECATED) {
@@ -239,6 +231,7 @@ public class DeptManageAppService {
                 .name(dept.getName())
                 .description(dept.getDescription())
                 .avatar(fileAppService.fileUrl(dept.getAvatarFileId()))
+                .color(dept.getColor())
                 .leaderId(dept.getLeader() == null ? null : dept.getLeader().getValue())
                 .leaderName(leader == null ? null : leader.getNickname())
                 .phone(dept.getPhone() == null ? null : dept.getPhone().getValue())

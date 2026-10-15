@@ -4,12 +4,13 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.system.user.enumerate.RoleColor;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
+import online.yudream.base.domain.system.user.valobj.RoleColor;
+import online.yudream.base.domain.system.user.valobj.RoleColorDefaults;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ public class Role extends BaseDomain {
     private boolean systemRole;
     private SystemRoleType systemType;
     private String icon;              // Morphicons 名称（形如 morph:shield），可空
-    private RoleColor color;          // 代表色，固定语义枚举，默认 info
+    private String color;             // 代表色 #rrggbb 小写 hex，可空（null=未设置）
     private List<PermissionID> permissions = new ArrayList<>();
     private RoleStatus status;
 
@@ -46,25 +47,27 @@ public class Role extends BaseDomain {
         r.systemRole = true;
         r.systemType = type;
         r.icon = null;
-        r.color = RoleColor.INFO;
+        r.color = RoleColorDefaults.forCode(type.getCode());
         r.status = RoleStatus.ACTIVE;
         return r;
     }
 
     // 创建普通角色
     public static Role create(String name, String code, DeptID deptId, RoleLevel level) {
-        return create(name, code, deptId, level, null, RoleColor.INFO);
+        return create(name, code, deptId, level, null, null);
     }
 
-    // 创建普通角色（含视觉标识）
-    public static Role create(String name, String code, DeptID deptId, RoleLevel level, String icon, RoleColor color) {
+    // 创建普通角色（含视觉标识）：color 为空时按 code 语义补默认色
+    public static Role create(String name, String code, DeptID deptId, RoleLevel level, String icon, String color) {
         Role r = new Role();
         r.name = name;
         r.code = code;
         r.deptId = deptId;
         r.level = level;
         r.systemRole = false;
-        r.applyAppearance(icon, color);
+        r.icon = normalizeIcon(icon);
+        String normalized = RoleColor.normalize(color);
+        r.color = normalized == null ? RoleColorDefaults.forCode(code) : normalized;
         r.status = RoleStatus.ACTIVE;
         return r;
     }
@@ -85,14 +88,29 @@ public class Role extends BaseDomain {
         this.level = level;
     }
 
-    /** 更新角色视觉标识：图标可空，代表色为空时回落默认 info。 */
-    public void updateAppearance(String icon, RoleColor color) {
-        applyAppearance(icon, color);
+    /** 更新角色视觉标识：图标可空；代表色为空表示未设置。 */
+    public void updateAppearance(String icon, String color) {
+        this.icon = normalizeIcon(icon);
+        this.color = RoleColor.normalize(color);
     }
 
-    private void applyAppearance(String icon, RoleColor color) {
-        this.icon = icon == null || icon.isBlank() ? null : icon.trim();
-        this.color = color == null ? RoleColor.INFO : color;
+    /** 启动回填：仅在代表色未设置时补默认色，返回是否发生变化。 */
+    public boolean fillColorIfAbsent(String color) {
+        String normalized = RoleColor.normalize(color);
+        if (normalized == null || !isColorUnset()) {
+            return false;
+        }
+        this.color = normalized;
+        return true;
+    }
+
+    /** 代表色是否未设置（null 或空白串）。 */
+    public boolean isColorUnset() {
+        return color == null || color.isBlank();
+    }
+
+    private static String normalizeIcon(String icon) {
+        return icon == null || icon.isBlank() ? null : icon.trim();
     }
 
     public void replacePermissions(List<PermissionID> permissions) {

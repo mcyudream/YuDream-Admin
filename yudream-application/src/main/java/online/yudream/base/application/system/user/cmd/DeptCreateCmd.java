@@ -16,4 +16,5 @@ public class DeptCreateCmd implements Serializable {
     private String phone;
     private Long parentId;
     private Integer sortOrder;
+    private String color;
 }

@@ -10,6 +10,8 @@ import apiRole from '@/api/modules/system-role'
 import apiUser from '@/api/modules/system-user'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { deptFallbackIcon } from '@/utils/dept-visual'
+import { entityTagStyle, entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -27,6 +29,8 @@ const loading = ref(false)
 const rows = ref<UserManageItem[]>([])
 const roles = ref<OptionItem[]>([])
 const depts = ref<DeptManageItem[]>([])
+/** 角色名 → 代表色映射：用户列表按角色名渲染彩色标签（接口只给 roleNames）。 */
+const roleColorByName = shallowRef<Map<string, string>>(new Map())
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive<{ keyword: string, roleId?: IdValue, deptId?: IdValue, emailVerified?: EmailVerifiedFilter, status?: UserStatus }>({
   keyword: '',
@@ -125,6 +129,7 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
 
 onMounted(async () => {
   await Promise.all([loadOptions(), loadUsers()])
+  void loadRoleColors()
   await openLinkedUser()
 })
 
@@ -169,6 +174,80 @@ async function loadOptions() {
   depts.value = deptRes.data
 }
 
+/** 角色名 → 代表色：分页拉全量角色后建映射，带短 TTL 缓存避免每次进页重复请求。 */
+const ROLE_COLOR_CACHE_TTL = 30_000
+let roleColorCache: { at: number, map: Map<string, string> } | undefined
+
+async function loadRoleColors() {
+  try {
+    if (!roleColorCache || Date.now() - roleColorCache.at > ROLE_COLOR_CACHE_TTL) {
+      const map = new Map<string, string>()
+      const size = 200
+      for (let page = 1; page <= 20; page++) {
+        const res = await apiRole.page({ page, size })
+        for (const role of res.data.records) {
+          const color = normalizeEntityColor(role.color)
+          if (color) {
+            map.set(role.name, color)
+          }
+        }
+        if (res.data.records.length < size || page * size >= res.data.total) {
+          break
+        }
+      }
+      roleColorCache = { at: Date.now(), map }
+    }
+    roleColorByName.value = roleColorCache.map
+  }
+  catch {
+    // 无角色查看权限或接口失败时保持空映射，标签按中性色渲染
+    roleColorByName.value = new Map()
+  }
+}
+
+/** 部门 ID → 部门数据；用户列表的部门 chip 用它取主色与上传头像。 */
+const deptById = computed(() => {
+  const map = new Map<string, DeptManageItem>()
+  for (const item of flattenDepts(depts.value)) {
+    map.set(String(item.id), item)
+  }
+  return map
+})
+
+function roleColorOf(name: string) {
+  return roleColorByName.value.get(name)
+}
+
+function roleTagStyle(name: string) {
+  return entityTagStyle(roleColorOf(name))
+}
+
+function deptOf(deptId: IdValue) {
+  return deptById.value.get(String(deptId))
+}
+
+/** 部门头像：默认部门优先用接口给的 defaultDeptAvatar，其余部门取部门树里的上传头像。 */
+function deptAvatarOf(row: UserManageItem, deptId: IdValue) {
+  if (sameId(deptId, row.defaultDeptId) && row.defaultDeptAvatar) {
+    return toBackendAssetUrl(row.defaultDeptAvatar)
+  }
+  const dept = deptOf(deptId)
+  return dept?.avatar ? toBackendAssetUrl(dept.avatar) : ''
+}
+
+function deptChipStyle(deptId: IdValue) {
+  return entityTintStyle(deptOf(deptId)?.color)
+}
+
+function deptChipIcon(deptId: IdValue, deptName?: string) {
+  return deptFallbackIcon(deptName || deptOf(deptId)?.name)
+}
+
+function deptChipFallback(deptId: IdValue, deptName?: string) {
+  const name = (deptName || deptOf(deptId)?.name || '').trim()
+  return name ? name.slice(0, 2) : '部门'
+}
+
 async function loadUsers() {
   loading.value = true
   try {
@@ -184,6 +263,7 @@ async function loadUsers() {
     rows.value = res.data.records.map(item => ({
       ...item,
       avatar: item.avatar ? toBackendAssetUrl(item.avatar) : item.avatar,
+      defaultDeptAvatar: item.defaultDeptAvatar ? toBackendAssetUrl(item.defaultDeptAvatar) : item.defaultDeptAvatar,
     }))
     pagination.total = res.data.total
   }
@@ -615,14 +695,33 @@ function importUsers() {
           </template>
           <template #cell-deptNames="{ row }">
             <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
-              <YdTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
+              <YdTag
+                v-for="(deptId, index) in row.original.deptIds"
+                :key="deptId"
+                :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'"
+              >
+                <YdAvatar
+                  v-if="deptAvatarOf(row.original, deptId)"
+                  :src="deptAvatarOf(row.original, deptId)"
+                  :fallback="deptChipFallback(deptId, row.original.deptNames?.[index])"
+                  :alt="row.original.deptNames?.[index] || deptId"
+                  class="shrink-0 size-4"
+                />
+                <span v-else class="dept-chip" :style="deptChipStyle(deptId)" aria-hidden="true">
+                  <YdIcon :name="deptChipIcon(deptId, row.original.deptNames?.[index])" />
+                </span>
                 {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
               </YdTag>
             </div>
             <span v-else>-</span>
           </template>
           <template #cell-roleNames="{ row }">
-            {{ row.original.roleNames?.join('、') || '-' }}
+            <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1">
+              <YdTag v-for="name in row.original.roleNames" :key="name" :style="roleTagStyle(name)">
+                {{ name }}
+              </YdTag>
+            </div>
+            <span v-else>-</span>
           </template>
           <template #cell-emailVerified="{ row }">
             <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
@@ -767,3 +866,21 @@ function importUsers() {
     </YdModal>
   </div>
 </template>
+
+<style scoped>
+/*
+  部门 chip 内的兜底图标：部门没有上传头像时按名称映射 Morphicons，
+  底色与图标色取部门主色（内联 style 只承载数据色），未设色回退中性语义变量。
+*/
+.dept-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 4px;
+}
+</style>

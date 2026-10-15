@@ -37,7 +37,7 @@ public class RoleDO extends BaseDO {
     /** Morphicons 名称（形如 morph:shield），可空。 */
     private String icon;
 
-    /** 代表色键（info/success/warning/danger/emphasis/neutral）。 */
+    /** 代表色 #rrggbb 小写 hex，可空（null=未设置）。 */
     private String color;
 
     private List<String> permissions;

@@ -30,6 +30,8 @@ public class UserManageRes {
     @Builder.Default
     private List<String> deptNames = new ArrayList<>();
     private Long defaultDeptId;
+    /** 默认部门头像 URL，可空。 */
+    private String defaultDeptAvatar;
     @Builder.Default
     private List<UserTagRes> tags = new ArrayList<>();
     @Builder.Default

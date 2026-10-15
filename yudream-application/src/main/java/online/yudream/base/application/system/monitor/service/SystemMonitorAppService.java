@@ -1,6 +1,7 @@
 package online.yudream.base.application.system.monitor.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
@@ -26,6 +27,7 @@ public class SystemMonitorAppService {
     private final LoginLogRepo loginLogRepo;
     private final OnlineUserGateway onlineUserGateway;
     private final UserRepo userRepo;
+    private final FileAppService fileAppService;
 
     public void recordApiLog(ApiLogDTO log) {
         apiLogRepo.save(log);
@@ -54,7 +56,30 @@ public class SystemMonitorAppService {
     }
 
     public List<OnlineUserDTO> onlineUsers(String keyword, int limit) {
-        return onlineUserGateway.list(keyword, limit);
+        List<OnlineUserDTO> users = onlineUserGateway.list(keyword, limit);
+        enrichOnlineUserAvatars(users);
+        return users;
+    }
+
+    /** 会话用户头像：按 userId 批量补齐，取不到给 null，不影响在线列表本身。 */
+    private void enrichOnlineUserAvatars(List<OnlineUserDTO> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = users.stream()
+                .map(OnlineUserDTO::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<Long, User> userMap = userRepo.findByIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity(), (left, right) -> left));
+        for (OnlineUserDTO user : users) {
+            User entity = userMap.get(user.getUserId());
+            user.setAvatar(entity == null ? null : fileAppService.fileUrl(entity.getAvatarFileId()));
+        }
     }
 
     public void kickout(String token) {

@@ -18,5 +18,6 @@ public class DeptUpdateCmd implements Serializable {
     private String phone;
     private Long parentId;
     private Integer sortOrder;
+    private String color;
     private DeptStatus status;
 }
