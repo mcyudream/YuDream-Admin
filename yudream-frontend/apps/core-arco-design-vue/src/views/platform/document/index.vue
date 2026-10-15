@@ -556,22 +556,23 @@ function tabIcon(value: string | number) {
 
     <YdPageMain>
       <div class="doc-toolbar">
-        <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
-          <template #option="{ option }">
-            <span class="doc-tab">
-              <YdIcon :name="tabIcon(option.value)" />
-              {{ option.label }}
-            </span>
-          </template>
-        </YdSegmented>
         <YdListToolbar
           v-model:keyword="search.keyword"
-          class="doc-toolbar__search"
+          title="文档中心"
           placeholder="模板名称 / 编码 / 文件名"
-          :search-width="360"
           @search="load"
           @clear="load"
         >
+          <template #views>
+            <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
+              <template #option="{ option }">
+                <span class="doc-tab">
+                  <YdIcon :name="tabIcon(option.value)" />
+                  {{ option.label }}
+                </span>
+              </template>
+            </YdSegmented>
+          </template>
           <template #actions>
             <YdButton variant="outline" @click="resetSearch">
               重置
@@ -590,10 +591,6 @@ function tabIcon(value: string | number) {
             <h2>{{ activeTab === 'templates' ? '模板列表' : '生成记录' }}</h2>
             <span class="doc-list__count">共 {{ pagination.total }} 条</span>
           </div>
-          <YdButton variant="ghost" size="sm" :loading="loading" @click="load">
-            <YdIcon name="morph:refresh-cw" />
-            刷新
-          </YdButton>
         </header>
 
         <YdLoadingOverlay :loading="loading">
@@ -926,11 +923,6 @@ function tabIcon(value: string | number) {
   gap: 10px;
   align-items: center;
   margin-bottom: 14px;
-}
-
-.doc-toolbar__search {
-  flex: 0 1 auto;
-  min-width: 220px;
 }
 
 .doc-tab {

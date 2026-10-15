@@ -724,20 +724,19 @@ function parseJsonConfig() {
         v-model:keyword="keyword"
         v-model:status="selectedStatus"
         class="capability-toolbar"
+        title="能力目录"
         placeholder="搜索名称或编码"
         :status-items="statusChips"
-        :search-width="300"
       >
+        <template #views>
+          <span class="capability-toolbar__summary">{{ filteredRows.length }} / {{ rows.length }} 项能力</span>
+        </template>
         <template #filters>
-          <YdFilterSelect v-model="selectedType" :options="typeOptions" :width="168" placeholder="全部类别" />
-          <YdButton v-if="keyword || selectedType !== 'ALL' || selectedStatus !== 'ALL'" variant="ghost" @click="clearFilters">
-            重置
-          </YdButton>
+          <YdFilterSelect v-model="selectedType" :options="typeOptions" :width="200" placeholder="全部类别" />
         </template>
         <template #actions>
-          <YdButton variant="outline" :loading="loading" aria-label="刷新能力状态" @click="load">
-            <YdIcon name="morph:refresh-cw" />
-            刷新
+          <YdButton variant="ghost" @click="clearFilters">
+            重置
           </YdButton>
         </template>
       </YdListToolbar>
