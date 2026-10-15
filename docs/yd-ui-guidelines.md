@@ -167,7 +167,7 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 
 ## 5. 数据、流程与全状态
 
-组件选择不能替代业务状态建模。数据区至少明确初次加载、已有数据刷新、正常结果、初始为空、搜索无结果、错误和无权限。错误应提供原因与可行恢复操作；不得用空态掩盖请求失败，刷新不应无条件清空已读内容。
+组件选择不能替代业务状态建模。数据区至少明确初次加载、已有数据刷新、正常结果、初始为空、搜索无结果、错误和无权限。错误应提供原因与可行恢复操作；不得用空态掩盖请求失败，刷新不应无条件清空已读内容。这些状态用 `YdEmpty`（初始为空、搜索无结果）、`YdResult`（错误、无权限、结果页）与组件自身的加载态表达，不在页面手写状态容器；需要插画时只从 `YdStateIllustration` 的命名场景选择。
 
 `YdSteps` 表示步骤位置；`YdTimeline` 表示历史；`YdMultiStepLoader` 表示当前顺序执行动作。需要非线性分支编辑的流程，必须使用专门的 YD 工作流适配器。禁止为追求统一外观把可编辑流程画布换成静态步骤条。
 
@@ -211,7 +211,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
 | 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdMockupBrowser`、`YdMockupWindow`、`YdTour`、`YdPopconfirm` |
 | 文件 | `YdFilePicker`、`YdFileUpload`、`YdImageUpload`、`YdImagePreview`、`YdCropper` |
-| 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdResult`、`YdProgress`、`YdImageCaptcha` |
+| 反馈 | `YdAlert`、`YdToast`、`YdEmpty`、`YdResult`、`YdStateIllustration`、`YdProgress`、`YdImageCaptcha` |
 | 流程与任务 | `YdSteps`、`YdTimeline`、`YdLoading`、`YdLoadingOverlay`、`YdSkeleton`、`YdMultiStepLoader`、`YdCountdown` |
 | 辅助标识 | `YdWatermark` |
 | 内容工具 | `YdCode`、`YdCodePreview`、`YdCodeEditor`、`YdMarkdownEditor`、`YdPageBuilder`、`YdQrcode`、`YdStorageBox` |
@@ -226,6 +226,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 - `YdFab` 用 `v-model:open` 控制开合，动作配置支持图标、标签、禁用态；扇形最多四个动作，超过改用纵向布局。Escape/外点/焦点离开收起，动作由调用方处理。
 - `YdStats` 提供指标组合布局，卡片间使用主题间距；`YdStat` 以具名插槽承载图表和动作，数字动画通过 `YdCountTo` / `YdAnimatedCountTo` 组合。它们与 `YdDigitalCard` 的带强调边框单卡视觉用途不同。
+- `YdEmpty` 与 `YdResult` 承载空态与结果状态，插画位由 `YdStateIllustration` 提供 `empty`/`no-result`/`error`/`forbidden`/`success`/`warning` 六个命名场景。默认仍是 56px 图标盒，显式选择场景或传 `#illustration` 插槽才渲染插画；插画是纯装饰（`aria-hidden`、不可聚焦），颜色只取中性语义变量与 `--yd-status-*`，随三套外观、明暗与减少动效偏好变化。它不替代状态文案与恢复动作，业务也不得因此自建插画素材库。
 - `YdColorPicker`、`YdTreeSelect` 的面板传送到 body，必须由共享弹层样式承载，不允许把面板样式留在会被裁切的容器里。
 - `YdImageCaptcha` 只有 `mode="remote"` 接入服务端挑战与校验并拿到一次性票据；`demo` 模式是本地绘制，禁止用于认证、防刷或风控。
 - `YdList` / `YdListRow` 只用于非表格内容行；需要字段对齐、排序、分页或批量选择时使用表格组件。

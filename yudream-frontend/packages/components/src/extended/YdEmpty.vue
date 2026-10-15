@@ -1,17 +1,28 @@
 <script setup lang="ts">
+import type { YdStateIllustrationName } from './YdStateIllustration.vue'
+import { computed } from 'vue'
 import FaIcon from '../basic/icon/index.vue'
+import YdStateIllustration from './YdStateIllustration.vue'
 import './extended.css'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   icon?: string
   title?: string
   description?: string
-}>(), { icon: 'morph:inbox', title: '暂无内容' })
+  illustration?: YdStateIllustrationName | false
+  illustrationSize?: 'sm' | 'md' | 'lg'
+}>(), { icon: 'morph:inbox', title: '暂无内容', illustration: false, illustrationSize: 'md' })
+
+const illustrationName = computed(() => props.illustration === false ? undefined : props.illustration)
 </script>
 
 <template>
-  <div class="yd-empty yd-pad">
-    <div class="yd-empty-icon">
+  <div class="yd-empty yd-pad" :class="{ 'yd-empty--illustration': illustrationName || $slots.illustration }">
+    <template v-if="$slots.illustration || illustrationName">
+      <slot v-if="$slots.illustration" name="illustration" />
+      <YdStateIllustration v-else-if="illustrationName" :name="illustrationName" :size="illustrationSize" />
+    </template>
+    <div v-else class="yd-empty-icon">
       <slot name="icon">
         <FaIcon :name="icon" />
       </slot>
@@ -36,6 +47,10 @@ withDefaults(defineProps<{
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.yd-empty--illustration {
+  gap: 16px;
 }
 
 .yd-empty-icon {

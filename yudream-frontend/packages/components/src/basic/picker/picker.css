@@ -1,0 +1,130 @@
+@layer yudream-base {
+  .yd-picker {
+    min-width: 12rem;
+  }
+
+  .yd-picker-separator {
+    flex: none;
+    padding-inline: 0.25rem;
+    font-size: var(--yd-control-font-size);
+    color: oklch(var(--muted-foreground));
+  }
+
+  .yd-picker-addon {
+    gap: 0.25rem;
+  }
+
+  .yd-picker-clear {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: oklch(var(--muted-foreground));
+    border-radius: 9999px;
+  }
+
+  .yd-picker-clear:hover {
+    color: oklch(var(--accent-foreground));
+    background: oklch(var(--accent));
+  }
+
+  .yd-picker-icon {
+    flex: none;
+    color: oklch(var(--muted-foreground));
+  }
+
+  .yd-picker-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .yd-picker-panel-main {
+    display: flex;
+    min-width: 0;
+  }
+
+  .yd-picker-time {
+    display: flex;
+    flex: none;
+    gap: var(--yd-content-gap);
+    padding: var(--yd-surface-padding);
+    padding-left: 0;
+    border-left: 1px solid oklch(var(--border));
+  }
+
+  .yd-picker-time-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .yd-picker-time-label {
+    padding-left: 0.4rem;
+    font-size: 12px;
+    color: oklch(var(--muted-foreground));
+  }
+
+  .yd-picker-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--yd-surface-padding) var(--yd-surface-padding);
+  }
+
+  .yd-time-columns {
+    display: flex;
+    gap: 2px;
+  }
+
+  .yd-time-column {
+    display: flex;
+    flex-direction: column;
+    max-height: 12rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .yd-time-option {
+    flex: none;
+    min-width: 2.75rem;
+    height: 1.75rem;
+    padding: 0 0.4rem;
+    font-size: var(--yd-control-font-size);
+    border-radius: var(--yd-control-radius);
+    transition: background var(--yd-motion-duration-fast);
+  }
+
+  .yd-time-option:hover:not(:disabled) {
+    background: oklch(var(--accent));
+  }
+
+  .yd-time-option--selected {
+    color: oklch(var(--primary-foreground));
+    background: oklch(var(--primary));
+  }
+
+  .yd-time-option:disabled {
+    text-decoration: line-through;
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  @media (width <= 768px) {
+    .yd-picker-panel-main {
+      flex-direction: column;
+    }
+
+    .yd-picker-time {
+      padding-left: var(--yd-surface-padding);
+      border-top: 1px solid oklch(var(--border));
+      border-left: 0;
+    }
+
+    .yd-time-column {
+      max-height: 8rem;
+    }
+  }
+}

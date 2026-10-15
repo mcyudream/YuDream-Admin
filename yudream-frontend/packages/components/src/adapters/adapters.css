@@ -68,6 +68,16 @@
   transition: background var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
 }
 
+.yd-settings-layout [role="tablist"],
+.yd-settings-layout [role="tab"] {
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-settings-layout [role="tab"] {
+  font-size: var(--yd-control-font-size);
+  transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
+}
+
 .yd-popover,
 .yd-modal,
 .yd-drawer,

@@ -44,15 +44,15 @@ const props = [
   ['<code>v-model</code>', '<code>(string | number)[] | undefined</code>', '—', '绑定值 <code>[开始, 结束]</code>，字符串格式由 <code>valueFormat</code> 决定'],
   ['<code>mode</code>', "<code>'date' | 'week' | 'month' | 'quarter' | 'year'</code>", "<code>'date'</code>", '选择器粒度'],
   ['<code>showTime</code>', '<code>boolean</code>', '<code>false</code>', '是否带时间选择；开启后 <code>valueFormat</code> 默认变为 <code>YYYY-MM-DD HH:mm:ss</code>'],
-  ['<code>valueFormat</code>', '<code>string</code>', '<code>YYYY-MM-DD</code>', '绑定值格式（dayjs 格式串）'],
-  ['<code>format</code>', '<code>string</code>', '—', '输入框展示格式，缺省与 <code>valueFormat</code> 一致'],
+  ['<code>valueFormat</code>', '<code>string</code>', '按模式与 <code>showTime</code> 决定', '绑定值格式（dayjs 格式串）；可传 <code>timestamp</code> / <code>Date</code>'],
+  ['<code>format</code>', '<code>string</code>', '按模式与 <code>showTime</code> 决定', '输入框展示格式，同时决定时间列粒度'],
   ['<code>placeholder</code>', '<code>string[]</code>', "<code>['开始日期', '结束日期']</code>", '起止两个输入框的占位文本'],
   ['<code>disabled / readonly / error</code>', '<code>boolean</code>', '<code>false</code>', '禁用、只读与错误态'],
   ['<code>allowClear</code>', '<code>boolean</code>', '<code>true</code>', '是否显示清空按钮'],
-  ['<code>dayStartOfWeek</code>', '<code>0 | 1</code>', '—', '一周起始日：<code>0</code> 周日、<code>1</code> 周一'],
+  ['<code>dayStartOfWeek</code>', '<code>0 | 1 | 2 | 3 | 4 | 5 | 6</code>', '<code>1</code>', '一周起始日：<code>0</code> 周日、<code>1</code> 周一'],
   ['<code>disabledDate</code>', '<code>(current?: Date) =&gt; boolean</code>', '—', '禁用指定日期'],
-  ['<code>disabledTime</code>', "<code>(current: Date, type: 'start' | 'end') =&gt; DisabledTimeProps</code>", '—', '按起/止分别禁用时间（配合 <code>showTime</code>）'],
-  ['<code>shortcuts</code>', '<code>ShortcutType[]</code>', '—', '快捷范围（如「近 7 天」「本月」）'],
+  ['<code>disabledTime</code>', "<code>(current: Date, type: 'start' | 'end') =&gt; YdPickerDisabledTime</code>", '—', '按起/止分别禁用时间（配合 <code>showTime</code>）'],
+  ['<code>shortcuts</code>', '<code>YdPickerShortcut[]</code>', '—', '快捷范围（如「近 7 天」「本月」）'],
   ['<code>shortcutsPosition</code>', "<code>'left' | 'bottom' | 'right'</code>", '—', '快捷选项面板位置'],
   ['<code>popupContainer</code>', '<code>string | HTMLElement</code>', '—', '弹层挂载容器'],
 ]
@@ -68,7 +68,7 @@ const emits = [
 
 # YdRangePicker 日期范围选择器
 
-Fa 风格的起止日期（时间）选择输入框，基于 Arco RangePicker 封装并统一为组件库主题 token 外观。绑定值为 `[开始, 结束]` 的**格式化字符串数组**，与搜索栏/查询 DTO 的起止字段直接对接。
+系统风格的起止日期（时间）选择输入框，基于 YD 系统日历面板（Reka）实现并统一为组件库主题 token 外观。绑定值为 `[开始, 结束]` 的**格式化字符串数组**，与搜索栏/查询 DTO 的起止字段直接对接。
 
 ## 基础用法
 

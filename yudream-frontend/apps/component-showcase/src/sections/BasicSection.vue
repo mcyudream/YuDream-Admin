@@ -155,4 +155,46 @@ function closeTag(id: number) {
       <YdAvatar src="" fallback="Fa" class="size-12" />
     </div>
   </DemoCard>
+
+  <DemoCard title="YdButtonGroup" description="按钮组：orientation 控制方向，separator 显示分割线">
+    <div class="flex flex-wrap items-center gap-6">
+      <YdButtonGroup>
+        <YdButton variant="outline" size="sm">
+          日
+        </YdButton>
+        <YdButton variant="outline" size="sm">
+          周
+        </YdButton>
+        <YdButton size="sm">
+          月
+        </YdButton>
+      </YdButtonGroup>
+      <YdButtonGroup orientation="vertical" separator>
+        <YdButton variant="ghost" size="icon-sm" aria-label="加粗">
+          <YdIcon name="morph:bold" />
+        </YdButton>
+        <YdButton variant="ghost" size="icon-sm" aria-label="斜体">
+          <YdIcon name="morph:italic" />
+        </YdButton>
+        <YdButton variant="ghost" size="icon-sm" aria-label="下划线">
+          <YdIcon name="morph:underline" />
+        </YdButton>
+      </YdButtonGroup>
+    </div>
+  </DemoCard>
+
+  <DemoCard title="YdLabel" description="表单标签：required 显示必填标识">
+    <div class="gap-4 grid max-w-md">
+      <div class="gap-2 grid">
+        <YdLabel for="demo-username">用户名</YdLabel>
+        <YdInput id="demo-username" placeholder="请输入用户名" />
+      </div>
+      <div class="gap-2 grid">
+        <YdLabel for="demo-email" required>
+          邮箱地址
+        </YdLabel>
+        <YdInput id="demo-email" type="email" placeholder="请输入邮箱" />
+      </div>
+    </div>
+  </DemoCard>
 </template>

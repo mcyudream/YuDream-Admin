@@ -8,7 +8,7 @@ const open = defineModel<boolean>('open', { default: false })
 </script>
 
 <template>
-  <FaPopover v-if="picker" :open="open && !disabled" align="start" @update:open="open = !disabled && $event">
+  <FaPopover v-if="picker" :open="open && !disabled" align="start" class="p-0 border-0 min-w-0 shadow-none z-2000" @update:open="open = !disabled && $event">
     <FaButton type="button" variant="outline" :disabled="disabled" class="yd-control" aria-haspopup="dialog">
       <FaIcon name="morph:calendar-days" />{{ label }}
     </FaButton>

@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import type { DateValue } from '@internationalized/date'
 import type { Component } from 'vue'
-import type { YdCalendarMode, YdCalendarProps, YdCalendarValue } from './calendar'
-import { getLocalTimeZone, parseTime, toCalendarDateTime, today } from '@internationalized/date'
+import type { YdCalendarMode, YdCalendarProps, YdCalendarValue, YdCalendarWeekStart } from './calendar'
+import { getLocalTimeZone, parseTime, toCalendarDate, toCalendarDateTime, today } from '@internationalized/date'
 import * as Reka from 'reka-ui'
 import { computed, getCurrentInstance, ref, shallowRef, watch } from 'vue'
 import FaButton from '../basic/button/index.vue'
-import { calendarDateBlocked, calendarLabel, calendarTime, calendarValueAllowed, firstCalendarDate, isDateRange, normalizeCalendarTime, normalizeCalendarValue } from './calendar'
+import { calendarDateBlocked, calendarLabel, calendarPeriod, calendarQuarterStart, calendarTime, calendarValueAllowed, calendarWeekEnd, calendarWeekStart, firstCalendarDate, isDateRange, normalizeCalendarTime, normalizeCalendarValue } from './calendar'
 import CalendarFrame from './CalendarFrame.vue'
 import './extended.css'
 
-const props = withDefaults(defineProps<YdCalendarProps & { mode?: YdCalendarMode, range?: boolean, drillDown?: boolean, withTime?: boolean, defaultTime?: string, modelControlled?: boolean }>(), {
+const props = withDefaults(defineProps<YdCalendarProps & { mode?: YdCalendarMode, range?: boolean, drillDown?: boolean, withTime?: boolean, defaultTime?: string, modelControlled?: boolean, surface?: boolean, shortcutsPosition?: 'left' | 'bottom' | 'right' | 'top' }>(), {
   mode: 'date',
   locale: 'zh-CN',
   weekStartsOn: 1,
   fixedWeeks: true,
   defaultTime: '00:00:00',
+  surface: true,
+  shortcutsPosition: 'top',
   disabled: undefined,
   readonly: undefined,
   multiple: undefined,
@@ -70,8 +72,9 @@ watch(() => props.disabled, (disabled) => {
   }
 })
 const multiple = computed(() => !props.range && (props.multiple ?? Array.isArray(value.value)))
-const selectingPeriod = computed(() => props.drillDown && view.value !== 'date')
-const family = computed(() => view.value === 'date' ? (props.range ? 'RangeCalendar' : 'Calendar') : view.value === 'month' ? (props.range && !selectingPeriod.value ? 'MonthRangePicker' : 'MonthPicker') : (props.range && !selectingPeriod.value ? 'YearRangePicker' : 'YearPicker'))
+const weekStartsOn = computed<YdCalendarWeekStart>(() => props.weekStartsOn ?? 1)
+const selectingPeriod = computed(() => props.drillDown && view.value !== 'date' && view.value !== 'week')
+const family = computed(() => view.value === 'date' || view.value === 'week' ? (props.range ? 'RangeCalendar' : 'Calendar') : view.value === 'month' ? (props.range && !selectingPeriod.value ? 'MonthRangePicker' : 'MonthPicker') : (props.range && !selectingPeriod.value ? 'YearRangePicker' : 'YearPicker'))
 function primitive(suffix: string): Component {
   return (Reka as unknown as Record<string, Component>)[family.value + suffix]
 }
@@ -99,8 +102,8 @@ const rootProps = computed(() => {
     ...(!props.range || selectingPeriod.value ? { multiple: !selectingPeriod.value && multiple.value } : { allowNonContiguousRanges: props.allowNonContiguousRanges }),
   }
   // Read current props inside callbacks: the date family's state retains its initial matcher.
-  if (view.value === 'date') {
-    return { ...common, weekStartsOn: props.weekStartsOn, fixedWeeks: props.fixedWeeks, numberOfMonths: props.numberOfMonths ?? (props.range ? 2 : 1), pagedNavigation: props.pagedNavigation, isDateDisabled: (date: DateValue) => calendarDateBlocked(date, 'date', props, false), isDateUnavailable: (date: DateValue) => !!props.isDateUnavailable?.(date), ...(props.range ? { maximumDays: props.maximumDays } : {}) }
+  if (view.value === 'date' || view.value === 'week') {
+    return { ...common, weekStartsOn: props.weekStartsOn, fixedWeeks: props.fixedWeeks, numberOfMonths: props.numberOfMonths ?? (props.range ? 2 : 1), pagedNavigation: props.pagedNavigation, isDateDisabled: (date: DateValue) => calendarDateBlocked(date, view.value, props, false), isDateUnavailable: (date: DateValue) => !!props.isDateUnavailable?.(date), ...(props.range ? { maximumDays: props.maximumDays } : {}) }
   }
   if (view.value === 'month') {
     return { ...common, isMonthDisabled: (date: DateValue) => calendarDateBlocked(date, 'month', props, false), isMonthUnavailable: (date: DateValue) => !!props.isMonthUnavailable?.(date), ...(props.range && !selectingPeriod.value ? { maximumMonths: props.maximumMonths } : {}) }
@@ -126,7 +129,7 @@ function update(next: YdCalendarValue): boolean {
   if (props.readonly) {
     return false
   }
-  next = normalizeCalendarValue(next, props.mode)
+  next = normalizeCalendarValue(next, props.mode, weekStartsOn.value)
   if (!calendarValueAllowed(next, props.mode, props, props.range)) {
     // Range primitives keep internal endpoints. Reset them when a guarded change is rejected.
     rootRevision.value++
@@ -156,7 +159,7 @@ function update(next: YdCalendarValue): boolean {
   return true
 }
 function shortcut(next: YdCalendarValue) {
-  next = normalizeCalendarValue(next, props.mode)
+  next = normalizeCalendarValue(next, props.mode, weekStartsOn.value)
   if (!calendarValueAllowed(next, props.mode, props, props.range)) {
     return
   }
@@ -180,19 +183,82 @@ function grids(grid: { value: DateValue, rows: DateValue[][] } | { value: DateVa
   return Array.isArray(grid) ? grid : [grid]
 }
 function cellProps(date: DateValue, month: DateValue) {
-  return view.value === 'date' ? { day: date, month } : view.value === 'month' ? { month: date } : { year: date }
+  return view.value === 'date' || view.value === 'week' ? { day: date, month } : view.value === 'month' ? { month: date } : { year: date }
+}
+
+/** Highlight the whole week row once a week (or week range) is selected. */
+function inWeekHighlight(date: DateValue): boolean {
+  if (view.value !== 'week' || multiple.value) {
+    return false
+  }
+  const day = toCalendarDate(date)
+  const current = value.value
+  if (props.range) {
+    if (!isDateRange(current) || !current.start) {
+      return false
+    }
+    const first = calendarWeekStart(current.start, weekStartsOn.value)
+    const last = current.end ? calendarWeekEnd(current.end, weekStartsOn.value) : calendarWeekEnd(current.start, weekStartsOn.value)
+    return day.compare(first) >= 0 && day.compare(last) <= 0
+  }
+  if (Array.isArray(current) || isDateRange(current) || !current) {
+    return false
+  }
+  return day.compare(calendarWeekStart(current, weekStartsOn.value)) >= 0 && day.compare(calendarWeekEnd(current, weekStartsOn.value)) <= 0
+}
+
+const quarterYear = computed(() => toCalendarDate(anchor.value).year)
+const quarterPending = shallowRef<DateValue | undefined>()
+watch([() => props.modelValue, () => props.mode, () => open.value], () => {
+  quarterPending.value = undefined
+})
+function quarterPeriods(): DateValue[] {
+  const year = toCalendarDate(anchor.value).year
+  return [1, 2, 3, 4].map(index => calendarQuarterStart(toCalendarDate(anchor.value).set({ year, month: (index - 1) * 3 + 1, day: 1 })))
+}
+function quarterSelected(period: DateValue): boolean {
+  const current = value.value
+  const candidates = isDateRange(current) ? [current.start, current.end] : Array.isArray(current) ? current : current ? [current] : []
+  return [...candidates, quarterPending.value].some(item => !!item && calendarPeriod(item, 'quarter', weekStartsOn.value).compare(period) === 0)
+}
+function quarterBlocked(period: DateValue): boolean {
+  return calendarDateBlocked(period, 'quarter', props, false)
+}
+function selectQuarter(period: DateValue) {
+  if (props.disabled || props.readonly || quarterBlocked(period)) {
+    return
+  }
+  if (!props.range) {
+    update(period)
+    return
+  }
+  const start = quarterPending.value ?? (isDateRange(value.value) ? value.value.start : undefined)
+  if (!start) {
+    quarterPending.value = period
+    updateAnchor(period)
+    return
+  }
+  const ordered = start.compare(period) <= 0 ? { start, end: period } : { start: period, end: start }
+  quarterPending.value = undefined
+  if (!update(ordered)) {
+    quarterPending.value = period
+  }
+  updateAnchor(period)
+}
+function shiftQuarterYear(offset: number) {
+  updateAnchor(toCalendarDate(anchor.value).set({ year: toCalendarDate(anchor.value).year + offset, month: 1, day: 1 }))
 }
 </script>
 
 <template>
   <CalendarFrame v-model:open="open" :picker="picker" :disabled="disabled" :label="formatValue?.(value) || calendarLabel(value) || pickerPlaceholder || '选择日期'">
-    <div class="yd-calendar yd-surface">
+    <div class="yd-calendar" :class="[{ 'yd-surface': surface }, shortcutsPosition !== 'top' && `yd-calendar--shortcuts-${shortcutsPosition}`]">
       <div v-if="shortcuts?.length" class="yd-calendar-shortcuts">
         <FaButton v-for="item in shortcuts" :key="item.text" type="button" variant="outline" size="sm" :disabled="disabled || readonly || item.disabled" @click="shortcut(typeof item.value === 'function' ? item.value() : item.value)">
           {{ item.text }}
         </FaButton>
       </div>
-      <component :is="primitive('Root')" :key="`${family}-${rootRevision}`" v-bind="rootProps" v-slot="{ grid, weekDays, date }" @update:model-value="update" @update:placeholder="updateAnchor">
+      <component :is="primitive('Root')" v-if="view !== 'quarter'" :key="`${family}-${rootRevision}`" v-bind="rootProps" v-slot="{ grid, weekDays, date }" @update:model-value="update" @update:placeholder="updateAnchor">
         <component :is="primitive('Header')" class="yd-calendar-nav">
           <component :is="primitive('Prev')" aria-label="上一页">
             ‹
@@ -209,7 +275,7 @@ function cellProps(date: DateValue, month: DateValue) {
         </component>
         <div class="yd-calendar-months">
           <component :is="primitive('Grid')" v-for="month in grids(grid)" :key="month.value.toString()">
-            <component :is="primitive('GridHead')" v-if="view === 'date'">
+            <component :is="primitive('GridHead')" v-if="view === 'date' || view === 'week'">
               <component :is="primitive('GridRow')">
                 <component :is="primitive('HeadCell')" v-for="day in weekDays" :key="day">
                   {{ day }}
@@ -219,13 +285,29 @@ function cellProps(date: DateValue, month: DateValue) {
             <component :is="primitive('GridBody')">
               <component :is="primitive('GridRow')" v-for="(row, index) in month.rows" :key="index">
                 <component :is="primitive('Cell')" v-for="day in row" :key="day.toString()" :date="day">
-                  <component :is="primitive('CellTrigger')" v-bind="cellProps(day, month.value)" class="yd-calendar-cell" />
+                  <component :is="primitive('CellTrigger')" v-bind="cellProps(day, month.value)" class="yd-calendar-cell" :class="{ 'yd-calendar-cell--week': inWeekHighlight(day) }" />
                 </component>
               </component>
             </component>
           </component>
         </div>
       </component>
+      <div v-else class="yd-calendar-quarters">
+        <div class="yd-calendar-nav">
+          <button type="button" aria-label="上一年" :disabled="disabled" @click="shiftQuarterYear(-1)">
+            ‹
+          </button>
+          <span class="yd-calendar-heading">{{ quarterYear }}年</span>
+          <button type="button" aria-label="下一年" :disabled="disabled" @click="shiftQuarterYear(1)">
+            ›
+          </button>
+        </div>
+        <div class="yd-calendar-quarter-grid">
+          <button v-for="period in quarterPeriods()" :key="period.toString()" type="button" class="yd-calendar-cell yd-calendar-quarter" :class="{ 'yd-calendar-quarter--selected': quarterSelected(period) }" :disabled="disabled || quarterBlocked(period)" @click="selectQuarter(period)">
+            {{ Math.floor((period.month - 1) / 3) + 1 }}季度
+          </button>
+        </div>
+      </div>
       <label v-if="withTime && !multiple && !range" class="yd-row yd-muted">时间<input :value="time" type="time" step="1" class="yd-control" :disabled="disabled || readonly || !value" @change="updateTime"></label>
     </div>
   </CalendarFrame>

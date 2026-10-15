@@ -15,15 +15,6 @@
     "lint": "vue-tsc -b"
   },
   "dependencies": {
-    "@codemirror/autocomplete": "catalog:",
-    "@codemirror/commands": "catalog:",
-    "@codemirror/lang-css": "catalog:",
-    "@codemirror/lang-html": "catalog:",
-    "@codemirror/lang-javascript": "catalog:",
-    "@codemirror/lang-json": "catalog:",
-    "@codemirror/language": "catalog:",
-    "@codemirror/state": "catalog:",
-    "@codemirror/view": "catalog:",
     "@fantastic-admin/composables": "workspace:*",
     "@fantastic-admin/settings": "workspace:*",
     "@fantastic-admin/types": "workspace:*",

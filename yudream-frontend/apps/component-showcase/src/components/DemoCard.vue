@@ -9,9 +9,11 @@ const props = withDefaults(defineProps<{
   code?: string
   /** 是否默认展开代码 */
   codeOpen?: boolean
+  kind?: string
 }>(), {
   code: '',
   codeOpen: false,
+  kind: '组件',
 })
 
 const toast = useYdToast()
@@ -33,7 +35,7 @@ async function copyCode() {
     <header class="demo-card__head">
       <div class="demo-card__title-row">
         <code class="demo-card__title">{{ title }}</code>
-        <span class="demo-card__badge">组件</span>
+        <span class="demo-card__badge">{{ kind }}</span>
       </div>
       <p v-if="description" class="demo-card__desc">
         {{ description }}

@@ -1,7 +1,7 @@
 {
   "name": "@yudream/components",
   "type": "module",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "files": [
     "src",
     "resolver.ts"
@@ -20,6 +20,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
+    "./map": "./src/map/index.ts",
     "./examples": "./src/examples.ts",
     "./resolver": "./resolver.ts",
     "./appearance.css": "./src/theme/appearance.css"
@@ -30,9 +31,13 @@
     "unplugin-auto-import": "catalog:",
     "unplugin-vue-components": "catalog:",
     "vite": "catalog:",
-    "vue": "catalog:"
+    "vue": "catalog:",
+    "leaflet": "catalog:"
   },
   "peerDependenciesMeta": {
+    "leaflet": {
+      "optional": true
+    },
     "unplugin-auto-import": {
       "optional": true
     },
@@ -42,15 +47,6 @@
   },
   "dependencies": {
     "@arco-design/web-vue": "catalog:arco-design-vue",
-    "@codemirror/autocomplete": "catalog:",
-    "@codemirror/commands": "catalog:",
-    "@codemirror/lang-css": "catalog:",
-    "@codemirror/lang-html": "catalog:",
-    "@codemirror/lang-javascript": "catalog:",
-    "@codemirror/lang-json": "catalog:",
-    "@codemirror/language": "catalog:",
-    "@codemirror/state": "catalog:",
-    "@codemirror/view": "catalog:",
     "@iconify/vue": "catalog:",
     "@internationalized/date": "catalog:",
     "@lucide/vue": "catalog:",
@@ -64,6 +60,7 @@
     "axios": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "dayjs": "catalog:",
     "echarts": "catalog:",
     "es-toolkit": "catalog:",
     "filesize": "catalog:",
@@ -71,6 +68,7 @@
     "highlight.js": "catalog:",
     "lucide": "catalog:",
     "md-editor-v3": "catalog:",
+    "monaco-editor": "catalog:",
     "morphicons": "catalog:",
     "qrcode": "catalog:",
     "reka-ui": "catalog:",
@@ -79,9 +77,12 @@
     "vue-input-otp": "catalog:",
     "vue-sonner": "catalog:",
     "xss": "catalog:",
-    "grapesjs": "catalog:"
+    "grapesjs": "catalog:",
+    "cropperjs": "catalog:"
   },
   "devDependencies": {
+    "@types/leaflet": "catalog:",
+    "leaflet": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

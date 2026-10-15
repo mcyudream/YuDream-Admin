@@ -1,41 +1,22 @@
 /* eslint-disable test/no-import-node-test */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { applyExternalCodeEditorValue, canFormatCodeEditor, destroyCodeEditorView, formatCodeEditorJson, resolveCodeEditorInteractivity, resolveYdEditorFieldAttrs, ydCodeEditorThemeStyles } from './code-editor-model'
+import { buildYdMonacoThemeColors, canFormatCodeEditor, formatCodeEditorJson, resolveCodeEditorInteractivity, resolveYdEditorFieldAttrs, resolveYdMonacoLanguageId, resolveYdMonacoThemeName, withYdColorAlpha } from './code-editor-model'
 import { resolveYdMarkdownEditorTheme } from './markdown-editor.types'
 
-function fakeView(initial: string) {
-  let value = initial
-  let dispatches = 0
-  let destroys = 0
-  return {
-    get value() { return value },
-    get dispatches() { return dispatches },
-    get destroys() { return destroys },
-    state: {
-      get doc() {
-        return {
-          get length() { return value.length },
-          toString: () => value,
-        }
-      },
-    },
-    dispatch({ changes }: { changes: { from: number, to: number, insert: string } }) {
-      value = `${value.slice(0, changes.from)}${changes.insert}${value.slice(changes.to)}`
-      dispatches += 1
-    },
-    destroy() { destroys += 1 },
-  }
+const palette = {
+  background: '#ffffff',
+  foreground: '#1d2129',
+  gutterBackground: '#f7f8fa',
+  lineNumber: '#86909c',
+  lineHighlight: '#f2f3f5',
+  cursor: '#165dff',
+  selection: '#165dff59',
+  inactiveSelection: '#165dff33',
+  selectionHighlight: '#165dff40',
+  findMatch: '#165dff66',
+  whitespace: '#86909c80',
 }
-
-test('外部模型变化只在文档不同时提交一次，并写入完整受控值', () => {
-  const view = fakeView('{"a":1}')
-  assert.equal(applyExternalCodeEditorValue(view, '{"a":1}'), false)
-  assert.equal(view.dispatches, 0)
-  assert.equal(applyExternalCodeEditorValue(view, '{"a":2}'), true)
-  assert.equal(view.value, '{"a":2}')
-  assert.equal(view.dispatches, 1)
-})
 
 test('JSON 格式化只处理有效 JSON，且只允许可编辑 JSON 模式', () => {
   assert.equal(formatCodeEditorJson('{"a":1}'), '{\n  "a": 1\n}')
@@ -52,18 +33,38 @@ test('只读与禁用语义分别暴露给编辑能力和无障碍状态', () =>
   assert.deepEqual(resolveCodeEditorInteractivity(false, false), { editable: true, ariaReadonly: 'false', ariaDisabled: 'false' })
 })
 
-test('销毁编辑器实例时释放底层 view 并清空实例引用', () => {
-  const view = fakeView('')
-  assert.equal(destroyCodeEditorView(view), null)
-  assert.equal(view.destroys, 1)
-  assert.equal(destroyCodeEditorView(null), null)
-})
-
-test('Markdown 明暗主题跟随宿主，CodeMirror 颜色读取主题变量', () => {
+test('Markdown 与 Monaco 明暗主题跟随宿主，主题名固定且成对', () => {
   assert.equal(resolveYdMarkdownEditorTheme(false), 'light')
   assert.equal(resolveYdMarkdownEditorTheme(true), 'dark')
-  assert.equal(ydCodeEditorThemeStyles['&'].backgroundColor, 'var(--color-bg-1)')
-  assert.equal(ydCodeEditorThemeStyles['.cm-gutters'].color, 'var(--color-text-3)')
+  assert.equal(resolveYdMonacoThemeName(false), 'yd-light')
+  assert.equal(resolveYdMonacoThemeName(true), 'yd-dark')
+})
+
+test('宿主语言标识映射到 Monaco 语言 id，纯文本落到 plaintext', () => {
+  assert.equal(resolveYdMonacoLanguageId('text'), 'plaintext')
+  assert.equal(resolveYdMonacoLanguageId('json'), 'json')
+  assert.equal(resolveYdMonacoLanguageId('css'), 'css')
+  assert.equal(resolveYdMonacoLanguageId('html'), 'html')
+  assert.equal(resolveYdMonacoLanguageId('javascript'), 'javascript')
+})
+
+test('选区配色只叠加主色透明度，且绝不写 selectionForeground', () => {
+  assert.equal(withYdColorAlpha('#165dff', 0.35), '#165dff59')
+  assert.equal(withYdColorAlpha('#165dff', 0.2), '#165dff33')
+  assert.equal(withYdColorAlpha('#165dFF', 1), '#165dffff')
+  assert.equal(withYdColorAlpha('#165dff80', 0.5), '#165dff80')
+  assert.equal(withYdColorAlpha('rgb(var(--primary-6))', 0.35), 'rgb(var(--primary-6))')
+  const colors = buildYdMonacoThemeColors(palette)
+  assert.equal(colors['editor.selectionBackground'], '#165dff59')
+  assert.equal(colors['editor.selectionHighlightBackground'], '#165dff40')
+  assert.equal(colors['editor.inactiveSelectionBackground'], '#165dff33')
+  assert.equal(colors['editor.background'], '#ffffff')
+  assert.equal(colors['editor.foreground'], '#1d2129')
+  assert.equal(colors['editorGutter.background'], '#f7f8fa')
+  assert.equal(colors['editorLineNumber.foreground'], '#86909c')
+  assert.equal(colors['editor.lineHighlightBackground'], '#f2f3f5')
+  assert.equal(colors['editorWhitespace.foreground'], '#86909c80')
+  assert.equal(Object.keys(colors).includes('editor.selectionForeground'), false)
 })
 
 test('表单绑定的 id、错误状态和说明文本到达实际编辑输入且合并错误文案', () => {

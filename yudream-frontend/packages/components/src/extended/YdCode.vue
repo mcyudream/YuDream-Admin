@@ -10,8 +10,9 @@ const props = withDefaults(defineProps<{
   title?: string
   copyable?: boolean
   lineNumbers?: boolean
+  prefixes?: string[]
 }>(), { language: 'plaintext', copyable: true })
-const highlighted = computed(() => hljs.highlight(props.code, { language: hljs.getLanguage(props.language) ? props.language : 'plaintext', ignoreIllegals: true }).value)
+const highlightedLines = computed(() => props.code.split('\n').map(line => hljs.highlight(line, { language: hljs.getLanguage(props.language) ? props.language : 'plaintext', ignoreIllegals: true }).value))
 </script>
 
 <template>
@@ -20,7 +21,10 @@ const highlighted = computed(() => hljs.highlight(props.code, { language: hljs.g
       <span>{{ title || language }}</span><YdCopyButton v-if="copyable" :text="code" />
     </header>
     <div class="yd-code-body">
-      <pre v-if="lineNumbers" aria-hidden="true" class="yd-muted yd-line-numbers">{{ code.split('\n').map((_, i) => i + 1).join('\n') }}</pre><pre><code :class="`language-${language}`" v-html="highlighted" /></pre>
+      <div v-for="(line, index) in code.split('\n')" :key="`${line}-${index}`" class="yd-code-line">
+        <span v-if="lineNumbers || prefixes?.[index]" class="yd-code-prefix">{{ prefixes?.[index] ?? index + 1 }}</span>
+        <pre><code :class="`language-${language}`" v-html="highlightedLines[index]" /></pre>
+      </div>
     </div>
   </section>
 </template>
@@ -43,7 +47,11 @@ header {
   background: oklch(var(--muted) / 35%);
 }
 
+.yd-code-line { display: flex; min-width: max-content; }
+.yd-code-prefix { width: 2.5rem; flex: 0 0 auto; padding: 16px 0 16px 12px; color: oklch(var(--muted-foreground)); text-align: center; }
+
 pre {
+  display: block;
   padding: 16px;
   margin: 0;
   font-family: ui-monospace, monospace;

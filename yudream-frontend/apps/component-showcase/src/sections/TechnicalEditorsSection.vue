@@ -30,14 +30,14 @@ const editorRules = { required: true, message: '请填写内容', trigger: 'blur
     <DemoCard title="只读与错误状态" description="展示只读预览、主题和可访问的错误关联。">
       <YdMarkdownEditor :model-value="readOnlyMarkdown" readonly error="此内容由发布流程锁定。" aria-label="锁定的 Markdown 内容" height="260px" />
     </DemoCard>
-    <DemoCard title="CodeMirror 代码编辑器" description="JSON、HTML、CSS、JavaScript 语法、补全、只读状态和实例格式化方法。">
+    <DemoCard title="Monaco 代码编辑器" description="JSON、HTML、CSS、JavaScript 语法、补全、只读状态和实例格式化方法。">
       <div class="mb-2 flex justify-end">
         <YdButton size="sm" variant="outline" @click="jsonEditor?.format()">
           格式化 JSON
         </YdButton>
       </div>
       <YdForm :model="formModel">
-        <YdFormItem field="json" label="JSON 配置" extra="标签点击应聚焦 CodeMirror 的可编辑内容。" :rules="editorRules">
+        <YdFormItem field="json" label="JSON 配置" extra="标签点击应聚焦 Monaco 的可编辑内容。" :rules="editorRules">
           <template #default="{ fieldProps }">
             <YdCodeEditor v-bind="fieldProps" ref="jsonEditor" v-model="formModel.json" language="json" aria-label="JSON 代码编辑器" height="260px" />
           </template>

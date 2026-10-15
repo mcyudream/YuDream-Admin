@@ -24,15 +24,15 @@ const props = [
   ['<code>v-model</code>', '<code>string | number | undefined</code>', '—', '绑定值，字符串格式由 <code>valueFormat</code> 决定'],
   ['<code>mode</code>', "<code>'date' | 'week' | 'month' | 'quarter' | 'year'</code>", "<code>'date'</code>", '选择器粒度'],
   ['<code>showTime</code>', '<code>boolean</code>', '<code>false</code>', '是否带时间选择；开启后 <code>valueFormat</code> 默认变为 <code>YYYY-MM-DD HH:mm:ss</code>'],
-  ['<code>valueFormat</code>', '<code>string</code>', '<code>YYYY-MM-DD</code>', '绑定值格式（dayjs 格式串）；传时间戳可用 <code>x</code>（毫秒）'],
-  ['<code>format</code>', '<code>string</code>', '—', '输入框展示格式，缺省与 <code>valueFormat</code> 一致'],
+  ['<code>valueFormat</code>', '<code>string</code>', '按模式与 <code>showTime</code> 决定', '绑定值格式（dayjs 格式串）；可传 <code>timestamp</code> / <code>Date</code>'],
+  ['<code>format</code>', '<code>string</code>', '按模式与 <code>showTime</code> 决定', '输入框展示格式，同时决定时间列粒度'],
   ['<code>placeholder</code>', '<code>string</code>', "<code>'请选择日期'</code>", '占位文本'],
   ['<code>disabled / readonly / error</code>', '<code>boolean</code>', '<code>false</code>', '禁用、只读与错误态'],
   ['<code>allowClear</code>', '<code>boolean</code>', '<code>true</code>', '是否显示清空按钮'],
-  ['<code>dayStartOfWeek</code>', '<code>0 | 1</code>', '—', '一周起始日：<code>0</code> 周日、<code>1</code> 周一'],
+  ['<code>dayStartOfWeek</code>', '<code>0 | 1 | 2 | 3 | 4 | 5 | 6</code>', '<code>1</code>', '一周起始日：<code>0</code> 周日、<code>1</code> 周一'],
   ['<code>disabledDate</code>', '<code>(current?: Date) =&gt; boolean</code>', '—', '禁用指定日期'],
-  ['<code>disabledTime</code>', '<code>(current?: Date) =&gt; DisabledTimeProps</code>', '—', '禁用指定时间（配合 <code>showTime</code>）'],
-  ['<code>shortcuts</code>', '<code>ShortcutType[]</code>', '—', '快捷选项（如「今天」「昨天」）'],
+  ['<code>disabledTime</code>', '<code>(current?: Date) =&gt; YdPickerDisabledTime</code>', '—', '禁用指定时间（配合 <code>showTime</code>）'],
+  ['<code>shortcuts</code>', '<code>YdPickerShortcut[]</code>', '—', '快捷选项（如「今天」「昨天」）'],
   ['<code>shortcutsPosition</code>', "<code>'left' | 'bottom' | 'right' | 'top'</code>", '—', '快捷选项面板位置'],
   ['<code>popupContainer</code>', '<code>string | HTMLElement</code>', '—', '弹层挂载容器，用于局部滚动或弹窗内场景'],
 ]
@@ -48,7 +48,7 @@ const emits = [
 
 # YdDatePicker 日期选择器
 
-Fa 风格的日期/日期时间选择输入框，基于 Arco DatePicker 封装并统一为组件库主题 token 外观。绑定值直接是**格式化字符串**（默认 `YYYY-MM-DD`），与后端 DTO 的日期字段直接对接，无需手动 `dayjs` 转换。
+系统风格的日期/日期时间选择输入框，基于 YD 系统日历面板（Reka）实现并统一为组件库主题 token 外观。绑定值直接是**格式化字符串**（默认 `YYYY-MM-DD`），与后端 DTO 的日期字段直接对接，无需手动 `dayjs` 转换。
 
 ## 基础用法
 
@@ -66,7 +66,7 @@ Fa 风格的日期/日期时间选择输入框，基于 Arco DatePicker 封装�
 
 ## 选择粒度
 
-`mode` 支持 `week` / `month` / `quarter` / `year`；切换粒度后记得同步调整 `valueFormat`（如月份用 `YYYY-MM`）：
+`mode` 支持 `week` / `month` / `quarter` / `year`。各模式默认 `valueFormat`：`week` → `YYYY-MM-DD`（取值是周起始日）、`month` → `YYYY-MM`、`quarter` → `YYYY-MM`（取值是季度首月 1 日）、`year` → `YYYY`；`disabledDate` 在 `week` / `month` / `quarter` / `year` 下仅当整周 / 整月 / 整季 / 整年全部禁用时才不可选：
 
 <Demo title="mode" :source="srcMode">
   <p style="margin: 0; color: var(--color-text-3, var(--vp-c-text-2)); font-size: 13px;">示例见上方交互演示的「月份」行。</p>

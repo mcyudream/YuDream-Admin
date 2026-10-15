@@ -97,7 +97,8 @@
   color: oklch(var(--popover-foreground));
   background: oklch(var(--popover));
   border: 1px solid oklch(var(--border));
-  border-radius: var(--yd-surface-radius);
+  /* 弹层圆角对齐控件圆角：弹层内是输入框与选项行，用卡片级圆角会显得过圆。 */
+  border-radius: var(--yd-control-radius);
   box-shadow: var(--yd-surface-shadow-hover);
   transform-origin: var(--reka-popper-transform-origin);
   animation: yd-collection-enter var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
@@ -155,7 +156,8 @@
 .yd-collection-option[data-selected] {
   font-weight: 600;
   color: var(--yd-emphasis);
-  background: oklch(var(--primary) / 10%);
+  background: oklch(var(--primary) / 6%);
+  box-shadow: inset 0 0 0 1px oklch(var(--primary) / 14%);
 }
 
 .yd-collection-option[data-disabled],
@@ -361,67 +363,16 @@
   transition: background var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast);
 }
 
-.yd-tree .arco-tree-node-title:hover {
-  background: oklch(var(--accent));
-}
-
-.yd-tree .arco-tree-node-selected .arco-tree-node-title {
-  font-weight: 600;
-  color: var(--yd-emphasis);
-  background: oklch(var(--primary) / 10%);
-}
 
 .yd-tree .arco-tree-node-disabled {
   opacity: 0.4;
 }
 
-.yd-tree .arco-tree-node-disabled .arco-tree-node-title {
-  color: oklch(var(--muted-foreground));
-  cursor: not-allowed;
-  background: transparent;
-}
 
-.yd-tree .arco-tree-node-switcher {
-  color: oklch(var(--muted-foreground));
-}
 
-.yd-tree .arco-tree-node-icon-hover::before {
-  background: oklch(var(--accent));
-  border-radius: var(--yd-control-radius);
-}
 
-.yd-tree .arco-tree-node:focus-visible {
-  outline: 2px solid oklch(var(--ring));
-  outline-offset: 2px;
-}
 
-.yd-tree .arco-checkbox-icon {
-  background: oklch(var(--background));
-  border-color: oklch(var(--border));
-  border-radius: calc(var(--yd-control-radius) * 0.45);
-}
 
-.yd-tree .arco-checkbox-checked .arco-checkbox-icon,
-.yd-tree .arco-checkbox-indeterminate .arco-checkbox-icon {
-  color: oklch(var(--primary-foreground));
-  background: oklch(var(--primary));
-  border-color: var(--yd-emphasis);
-}
-
-.yd-tree .arco-checkbox:hover .arco-checkbox-icon {
-  border-color: oklch(var(--ring));
-}
-
-.yd-tree .arco-checkbox:focus-within .arco-checkbox-icon {
-  box-shadow: 0 0 0 3px oklch(var(--ring) / 15%);
-}
-
-.yd-tree .arco-checkbox-disabled .arco-checkbox-icon {
-  color: oklch(var(--muted-foreground));
-  background: oklch(var(--muted));
-  border-color: oklch(var(--border));
-  opacity: 0.5;
-}
 
 .yd-mention {
   position: relative;
@@ -479,12 +430,6 @@
   }
 }
 
-/* 显式覆盖组合状态，避免基础库后加载时恢复自身色板。 */
-.yd-tree .arco-tree-node-selected .arco-tree-node-title:hover {
-  color: var(--yd-emphasis);
-  background: oklch(var(--primary) / 10%);
-}
-
 .yd-tree--checkable .arco-tree-node-disabled-selectable:not(.arco-tree-node-disabled) .arco-tree-node-title {
   color: oklch(var(--foreground));
   cursor: pointer;
@@ -512,7 +457,8 @@
 .yd-tree--checkable .yd-tree-check-title[data-state='checked'] {
   color: var(--yd-emphasis);
   font-weight: 600;
-  background: oklch(var(--primary) / 10%);
+  background: oklch(var(--primary) / 6%);
+  box-shadow: inset 0 0 0 1px oklch(var(--primary) / 14%);
 }
 
 .yd-tree--checkable .yd-tree-check-title[data-state='indeterminate'] {
@@ -534,11 +480,87 @@
   cursor: not-allowed;
   background: transparent;
 }
+}
+
+/*
+ * 未分层覆盖：Arco 的样式没有分层，层间优先级高于选择器特异性，
+ * yudream-base 层内的 Arco 内部状态声明会被 Arco 默认色板压制。
+ * 这些树/级联的内部状态必须在层外重新声明，才能保持 YD 语义色。
+ */
+.yd-tree .arco-tree-node-title:hover {
+  background: oklch(var(--accent));
+}
+
+/* Arco 对节点标题设有未分层圆角（2px 级），层内的控件圆角会被压掉，必须在此重新声明。 */
+.yd-tree .arco-tree-node-title {
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-tree .arco-tree-node-selected .arco-tree-node-title {
+  font-weight: 600;
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 6%);
+  box-shadow: inset 0 0 0 1px oklch(var(--primary) / 14%);
+}
+
+.yd-tree .arco-tree-node-selected .arco-tree-node-title:hover {
+  color: var(--yd-emphasis);
+  background: oklch(var(--primary) / 10%);
+  box-shadow: inset 0 0 0 1px oklch(var(--primary) / 20%);
+}
+
+.yd-tree .arco-tree-node-disabled .arco-tree-node-title {
+  color: oklch(var(--muted-foreground));
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.yd-tree .arco-tree-node-switcher {
+  color: oklch(var(--muted-foreground));
+}
+
+.yd-tree .arco-tree-node-icon-hover::before {
+  background: oklch(var(--accent));
+  border-radius: var(--yd-control-radius);
+}
+
+.yd-tree .arco-tree-node:focus-visible {
+  outline: 2px solid oklch(var(--ring));
+  outline-offset: 2px;
+}
+
+.yd-tree .arco-checkbox-icon {
+  background: oklch(var(--background));
+  border-color: oklch(var(--border));
+  border-radius: calc(var(--yd-control-radius) * 0.45);
+}
+
+.yd-tree .arco-checkbox-checked .arco-checkbox-icon,
+.yd-tree .arco-checkbox-indeterminate .arco-checkbox-icon {
+  color: oklch(var(--primary-foreground));
+  background: oklch(var(--primary));
+  border-color: var(--yd-emphasis);
+}
 
 .yd-tree .arco-checkbox-checked:hover .arco-checkbox-icon,
 .yd-tree .arco-checkbox-indeterminate:hover .arco-checkbox-icon {
   background: oklch(var(--primary));
   border-color: var(--yd-emphasis);
+}
+
+.yd-tree .arco-checkbox:hover .arco-checkbox-icon {
+  border-color: oklch(var(--ring));
+}
+
+.yd-tree .arco-checkbox:focus-within .arco-checkbox-icon {
+  box-shadow: 0 0 0 3px oklch(var(--ring) / 15%);
+}
+
+.yd-tree .arco-checkbox-disabled .arco-checkbox-icon {
+  color: oklch(var(--muted-foreground));
+  background: oklch(var(--muted));
+  border-color: oklch(var(--border));
+  opacity: 0.5;
 }
 
 .yd-tree .arco-checkbox-disabled.arco-checkbox-checked:hover .arco-checkbox-icon,
@@ -562,5 +584,4 @@
 .yd-cascader-popup .arco-radio-disabled.arco-radio-checked:hover .arco-radio-icon {
   background: oklch(var(--muted));
   border-color: oklch(var(--border));
-}
 }

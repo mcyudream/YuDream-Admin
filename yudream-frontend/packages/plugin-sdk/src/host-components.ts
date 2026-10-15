@@ -170,6 +170,7 @@ export const YdSparkline = components.YdSparkline
 export const YdSpotlightCard = components.YdSpotlightCard
 export const YdSteps = components.YdSteps
 export const YdStorageBox = components.YdStorageBox
+export const YdStateIllustration = components.YdStateIllustration
 export const YdTextHighlight = components.YdTextHighlight
 export const YdTextShiny = components.YdTextShiny
 export const YdTimeAgo = components.YdTimeAgo

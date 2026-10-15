@@ -279,8 +279,8 @@ const actions: ActionMenuItem<User>[] = [
 
 ## 与 YdResponsiveTable 的关系
 
-两者都是「桌面表格 + 移动卡片」：`YdResponsiveTable` 面向任意 TanStack 列配置，卡片必须自绘 `#card`；`YdResponsiveEnhancedTable` 面向图文并茂的增强表格，卡片可按桌面列自动生成，并按需叠加用户列、状态徽章与操作下拉。管理列表需要在卡片上完整还原业务渲染时用前者，主人力列表用后者。
+两者都是「桌面表格 + 移动卡片」：`YdResponsiveTable` 面向任意 TanStack 列配置，卡片必须自绘 `#card`；`YdResponsiveEnhancedTable` 面向图文并茂的增强表格，卡片可按桌面列自动生成，并按需叠加用户列、状态徽章与操作下拉。管理列表需要在卡片上完整还原业务渲染时用前者，人员列表用后者。
 
 ## 示例
 
-完整示例请查看：`apps/core-arco-design-vue/src/views/demo/responsive-enhanced-table.vue`
+完整示例见组件预览站的增强表格分组（`apps/component-showcase/src/sections/EnhancedTableSection.vue`）；宿主的数据备份、安全中心等设置页也按此组件接入响应式卡片。

@@ -53,7 +53,7 @@ const name = ref('')
 
 `YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。此入口目前仅存在于工作区，待统一发布验签后插件才能使用。
 
-`YdCodeEditor` 使用 CodeMirror 6 承载 JSON、HTML、CSS 和 JavaScript 编辑，可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁 EditorView。此入口同样只存在于当前工作区。
+`YdCodeEditor` 使用 Monaco Editor 承载 JSON、HTML、CSS 和 JavaScript 编辑，编辑器内核与各语言 worker 都按需异步加载，只有渲染该组件时才下载对应分块。主题跟随宿主明暗模式：从 `--color-bg-1`、`--color-text-1`、`--color-fill-1` 与 `--primary-6` 等根变量解析实色后写入 Monaco 主题；选区使用主色半透明背景且不覆盖文字前景色，选中文字保持语法高亮可读。可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁编辑器实例并释放补全注册与主题监听。此入口同样只存在于当前工作区。
 
 `YdPageBuilder` 在共享组件内部异步创建并销毁 GrapesJS。`builderProjectJson` 是首选恢复来源，缺失或无效时回退 `htmlContent` / `cssContent`；三个模型以 `update:*` 与 `change(snapshot)` 同步。受控父级回显不会重新载入项目，外部模型变更才更新编辑器。`setup(editor)` 在初始内容加载前注册业务块/类型，`upload(files)` 注入业务媒体上传并返回 `{ src, type?, name? }`；引擎选项在初始化时传入。`ready` 提供有类型的 editor facade，支持快照、加载项目、设置 HTML/CSS 和释放实例。调用 facade 的 `dispose()` 后，该 facade 的属性与所有方法均抛出 `Error`，包括 `getSnapshot()`，以免把已销毁引擎伪装成有效快照；通过组件 ref 调用 `dispose()` 后先前发出的 facade 同样失效。未完成的媒体上传仅会回调启动时对应且仍存活的编辑器实例，卸载后上传错误不会继续发出 `error` 事件。`readOnly` 与 `disabled` 冻结画布交互，但不限制宿主通过 facade 加载受控内容；`error` 报告解析、初始化与有效实例上的上传错误。CMS 主题、AI、API 与媒体权限逻辑继续留在宿主。该入口已包含在验签通过的 components 1.6.0 中。
 
@@ -128,7 +128,7 @@ ADMIN 主题插件经既有 `@PluginTheme(scopes = ADMIN)` 和声明式 `style.c
 | `FaCombobox` | `YdCombobox` | 单选搜索、分组、禁用项、清除、加载态与虚拟列表。当前模型为单个字符串 / 数字。 |
 | `FaCountTo` | `YdCountTo` | RAF 数字补间、小数位、分隔符、前后缀、延迟；各预设保持补间，减少动效偏好调整节奏；提供开始 / 完成事件和 start/reset/stop 方法。 |
 | `FaDigitalCard` | `YdDigitalCard` | 标题、值、提示、图标、描述、趋势及自定义值插槽；计数和趋势图通过组合其他 YD 组件提供。 |
-| `FaEmpty` | `YdEmpty` | 图标、标题、描述与操作插槽；默认中性空态，不包含插画素材库。 |
+| `FaEmpty` | `YdEmpty`、`YdStateIllustration` | 图标、标题、描述与操作插槽；默认中性空态。可选 `illustration` 命名场景（`empty` / `no-result` / `error` / `forbidden` / `success` / `warning`）或 `#illustration` 自定义插画。只提供状态插画，仍不是通用插画素材库。 |
 | `FaFlipCard` | `YdFlipCard` | X/Y 轴卡片翻转，鼠标、触摸按钮与键盘入口；隐藏面不可交互。无受控 flipped 模型。 |
 | `FaFlipWords` | `YdFlipWords` | 词语定时轮换；可调毫秒间隔，页面隐藏时暂停。减少动效偏好柔化切换，保留轮换。 |
 | `FaGlowyCard` | `YdGlowyCard`、`YdGlowyCardWrapper` | 独立卡片指针光晕；Wrapper 向后代共享颜色、半径、光晕尺寸和边宽，不实现全局跨卡片指针轨迹。 |
@@ -217,6 +217,8 @@ const max = parseDate('2026-12-31')
 事件为 `update:modelValue`、`change`、`update:placeholder`、`update:open`、`complete`。`change` 包括有效的范围中间状态；`complete` 只在非空单值 / 多值或两个端点完整的有效范围上发出。YdDate 的年 / 月下钻只调整视图，最后选日才改变 model。传入外部不合法 model 会保留原值并由底层展示无效状态；限制阻止的是新的用户选择，不擅自改写业务状态。
 
 这些日历与既有 `YdDatePicker` / `YdRangePicker` 的模型契约不同，迁移时显式转换。存入 API 或 StorageBox 时使用 `date.toString()`；取回后使用 `parseDate` / `parseDateTime` 恢复日期实例。
+
+`YdDatePicker` / `YdRangePicker` / `YdTimePicker` 使用系统风格的日历面板与时间列（Reka 交互基础 + 根部令牌绘制），不再渲染 Arco 控件。展示格式按模式与 `showTime` 回落：日期 `YYYY-MM-DD`（带时间 `YYYY-MM-DD HH:mm:ss`）、周 `gggg-wo`、月 `YYYY-MM`、季 `YYYY-[Q]Q`、年 `YYYY`；绑定值格式默认为日期与日期时间同展示格式、周 `YYYY-MM-DD`、月/季 `YYYY-MM`、年 `YYYY`，并支持 `timestamp` 与 `Date`。周模式取值是所选周的起始日（受 `dayStartOfWeek` 控制），季度模式取值是季度首月 1 日；`disabledDate` 在日期模式逐日判断，周/月/季/年模式仅当整周/整月/整季/整年全部日期都被禁用时该单元格才不可选。`showTime` 采用「确定」确认写入，确认时发 `change` 与 `ok`；时间列粒度由展示格式决定，`YdTimePicker` 的 12 小时制由 `use12Hours` 控制，始终「确定」后写入绑定值。输入框可直接按展示格式输入并回车/失焦写入，解析失败回退当前值。弹层 z-index 为 3000，可直接用于 FaModal / FaDrawer。
 
 ## 核心 API 与组合示例
 
@@ -424,6 +426,30 @@ const filters = ref({ keyword: '', status: 'enabled' })
 | `YdTour` | `v-model:open`、`steps: YdTourStep[]`、`initialStep`、`mask`（遮罩是否拦截交互，默认 true）、`zIndex`（默认 3000）；步骤 `{ target?: string \| (() => HTMLElement \| null), title?, content, placement?: top/bottom/left/right }`；事件 `finish`、`skip`、`step-change(index)`；ref 方法 `next/prev/skip/goTo(index)`，ref 值 `current` |
 
 `target` 推荐稳定的 `[data-tour="标识"]` 选择器；目标缺失或不可见时该步骤自动降级为居中展示，不中断流程。键盘 Esc 跳过，←/→ 切换步骤；组件负责目标滚动入视口、窗口/滚动重定位与焦点恢复。步骤文案必须自含完整说明，不能依赖被高亮元素自身的 tooltip。宿主声明式引导运行时（内置与插件 manifest 引导）统一由宿主 tour runner 驱动本组件，业务页面只在需要自定义引导时直接使用。
+
+### 增强管理组件与可选地图
+
+| 入口 | 核心参数 / 内容 |
+| --- | --- |
+| `YdPopconfirm` | 默认插槽为触发器；`title`、`description`、`confirmText`、`cancelText`、`confirmVariant`、`disabled`、`loading`；`v-model:open`；事件 `confirm` / `cancel` |
+| `YdSkeleton` | `variant=text/circle/rect/button/image`、`animated`、`count`、`width`、`height`、`radius` |
+| `YdWatermark` | `content:string|string[]`、`width`、`height`、`rotate`、`opacity`、`fontSize`、`color`、`zIndex`、`fullscreen`；默认槽为标记内容。仅为可见追溯提示，不提供访问控制或防截屏保证 |
+| `YdBreadcrumb` | `items:{label,to?,disabled?}[]`、`separator`、`ariaLabel`；支持 `#item` 插槽 |
+| `YdSegmented` | `v-model`、`options:{label,value,disabled?}[]`、`disabled`、`block`、`size`；键盘方向切换与 `change` 事件 |
+| `YdColorPicker` | 字符串模型；`format=hex/rgb/hsl/oklch`、`showAlpha`、`presets`、`disabled`；可编辑文本输入并校验后提交；面板传送到 body，支持外点与 Escape 关闭 |
+| `YdResult` | `status=success/info/warning/error/403/404/500`、`title`、`description`；`illustration=auto|<命名场景>|false`（默认按状态映射，`info` 回落图标盒）、`illustrationSize=sm/md/lg`；支持 illustration/icon/action/default 插槽 |
+| `YdStateIllustration` | `name=empty/no-result/error/forbidden/success/warning`（必填）、`size=sm/md/lg`（默认 120px）、`animated`；纯装饰元素，固定 `aria-hidden` 且不可聚焦，颜色只取中性语义变量与 `--yd-status-*` |
+| `YdTreeSelect` | `data:YdTreeNode[]`，字符串 key 模型；`multiple`、`checkable`、`filterable`、`disabled`、`placeholder`、`clearable`；下拉沿用共享集合弹层外观，最小宽度对齐触发器 |
+| `YdCropper` | `src`、`aspectRatio`、`outputType`、`quality`、`outputWidth`、`v-model:open`；动态加载 CropperJS，确认时发出 `File` 与 `Blob`，不负责上传 |
+| `YdCountdown` | `deadline`（epoch 毫秒、Date 或日期字符串）、`format`（DD/HH/mm/ss）、`autoStart`；按绝对截止时间计算，ref 提供 start/stop/reset |
+| `YdImageCaptcha` | `mode=demo/remote`；demo 沿用 `length`、`noise`、`caseSensitive` 本地绘制。remote 需 `requestChallenge()` 返回 `{ id, image, expiresAt? }`、`verifyChallenge({ challengeId, code })` 返回 `{ valid, token? }`，组件负责加载/刷新/失败重试并向 `verify` 发出完整结果；ref 提供 `verify()` / `refresh()`。只有 remote 模式连接服务端签发的一次性票据，demo 仅为界面演示 |
+| `YdInfiniteScroll` | 默认槽为列表内容；`load`、`hasMore`、`distance`、`root`、`immediate`；v-model loading/finished；错误可重试，ref 提供 reset/check |
+| `YdAnchor` | `items:{id,title,disabled?}[]`、`container`、`offset`、`smooth`；v-model:active，滚动 spy 与真实片段链接，ref 提供 scrollTo/refresh |
+| `@yudream/components/map` 的 `YdMap` | 必须从子路径显式导入；Leaflet 是 optional peer，仅挂载时加载；调用方提供 `tileUrl` 和 `attribution`，地图瓦片服务、许可和访问密钥由调用方负责 |
+
+`YdEmpty` 默认渲染 56px 图标盒，显式传 `illustration` 或 `#illustration` 才换成插画，既有页面无需改动。状态插画只有六个命名场景，随明暗、三套外观与减少动效偏好变化，不是可换皮肤的资源库；业务需要自有画面时用 `#illustration` 插槽传自绘 SVG，并自行负责配色令牌化与暗色适配。
+
+`YdInfiniteScroll` 仅用于天然连续的信息流，管理列表默认仍采用服务端分页。`YdTreeSelect` 面向表单字段，不取代权限管理的 `YdTree`。Leaflet 地图未进入主入口/resolver/插件共享桥；普通组件消费者不需要安装地图依赖。
 
 ## 实时预览与验证
 

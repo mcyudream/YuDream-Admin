@@ -192,6 +192,7 @@ const YD_COMPONENT_NAMES = [
   'YdStats',
   'YdSteps',
   'YdStorageBox',
+  'YdStateIllustration',
   'YdTextHighlight',
   'YdTextShiny',
   'YdTimeAgo',

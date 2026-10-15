@@ -7,6 +7,8 @@ export interface YdStepItem {
   title: string
   description?: string
   disabled?: boolean
+  status?: 'error' | 'process' | 'wait' | 'finish'
+  icon?: string
 }
 withDefaults(defineProps<{
   steps: YdStepItem[]
@@ -28,12 +30,12 @@ function select(index: number) {
 
 <template>
   <ol class="yd-steps" :class="{ vertical }">
-    <li v-for="(step, index) in steps" :key="step.id" :data-active="index === model" :aria-current="index === model ? 'step' : undefined">
-      <component :is="clickable ? 'button' : 'div'" :type="clickable ? 'button' : undefined" :disabled="step.disabled" class="yd-step-heading yd-focus" @click="clickable && !step.disabled && select(index)">
-        <span class="yd-step-number"><FaIcon v-if="index < model || (index === model && status === 'finish')" name="morph:check" /><FaIcon v-else-if="index === model && status === 'error'" name="morph:x" /><span v-else>{{ index + 1 }}</span></span>
+    <li v-for="(step, index) in steps" :key="step.id" :data-active="index === model" :data-status="step.status ?? (index < model ? 'finish' : index === model ? status : 'wait')" :aria-current="index === model ? 'step' : undefined">
+      <component :is="clickable ? 'button' : 'div'" :type="clickable ? 'button' : undefined" :disabled="step.disabled" class="yd-step-heading yd-focus" :data-status="step.status ?? (index < model ? 'finish' : index === model ? status : 'wait')" @click="clickable && !step.disabled && select(index)">
+        <span class="yd-step-number"><FaIcon v-if="step.icon" :name="step.icon" /><FaIcon v-else-if="(step.status ?? (index < model ? 'finish' : index === model ? status : 'wait')) === 'finish'" name="morph:check" /><FaIcon v-else-if="(step.status ?? (index === model ? status : 'wait')) === 'error'" name="morph:x" /><span v-else>{{ index + 1 }}</span></span>
         <span><strong>{{ step.title }}</strong><small v-if="step.description" class="yd-muted">{{ step.description }}</small></span>
       </component>
-      <slot :name="step.id" :step="step" :index="index" :active="index === model" :finished="index < model || (index === model && status === 'finish')" :status="index < model ? 'finish' : index === model ? status : 'wait'" />
+      <slot :name="step.id" :step="step" :index="index" :active="index === model" :finished="(step.status ?? (index < model ? 'finish' : index === model ? status : 'wait')) === 'finish'" :status="step.status ?? (index < model ? 'finish' : index === model ? status : 'wait')" />
     </li>
   </ol>
 </template>
@@ -76,6 +78,10 @@ li {
   color: oklch(var(--primary-foreground));
   background: oklch(var(--primary));
 }
+
+[data-status="finish"] .yd-step-number { color: oklch(var(--success-foreground)); background: oklch(var(--success)); }
+[data-status="error"] .yd-step-number { color: oklch(var(--destructive-foreground)); background: oklch(var(--destructive)); }
+[data-status="wait"] .yd-step-number { color: oklch(var(--muted-foreground)); }
 
 small {
   display: block;

@@ -15,7 +15,7 @@
 
 ## 2. 组件变更同步清单（每次增改废弃必做）
 
-1. 根导出、resolver、SDK host-components 桥、实时预览、组件文档同步更新。
+1. 根导出、resolver、SDK host-components 桥、实时预览、组件文档同步更新。**每次组件库新增或修改组件，都必须在 `apps/component-showcase` 同步对应示例；涉及外观或交互变化时更新示例以反映变更，不能只在新建组件时补预览。**
 2. 同一工作项更新：`docs/yd-ui-guidelines.md` 选型文档、检查映射、受影响的 AGENTS/docs/dev 条目与插件仓副本。
 3. 完成前运行严格 UI 检查和目标 typecheck/build，验收三套外观 × 浅/深模式及窄屏。
 4. **不得**通过 eslint-disable、全局忽略、未发布依赖或虚假版本掩盖缺口。
@@ -30,12 +30,13 @@
 - 后台内置灵动/雅致/紧凑预设存 `settings.appearance`（既有 appSettings JSON，宿主 normalizer 兼容旧值）。三套外观均保留已启用的功能动画：灵动完整；雅致与紧凑的减少动态效果偏好仅柔化动作、速度与装饰密度，**禁止**统一冻结动画；GridStack 只动画内部卡片。
 - 插件主题声明的 `style.css` 资产可按其唯一 scope 声明 `--primary-N`：SITE 使用明确 SITE 锚点，ADMIN 限 `:root`/`.dark`；变量消费仍禁止。未能证明 SITE/ADMIN 双 scope 资产隔离时扫描器 fail-closed。详见 `docs/yd-ui-guidelines.md`。
 - 宿主主题变量是 OKLCH 三通道，插件 CSS 用 `hsl()` 会纯黑。
+- YD 组件样式默认放在 `@layer yudream-base` 层内，便于插件未分层样式覆盖；但 Arco 等基础库的样式未分层，**层间优先级高于选择器特异性**：覆盖基础库内部状态（树节点选中、勾选框、级联单选）的规则必须写在 `@layer` 之外并注明原因，否则会被基础库色板压制，出现非 YD 风格（如 Arco 蓝）。
 
 ## 4. 组件选型速查
 
 普通业务优先基础 YD；阶段用 `YdSteps`、异步进度 `YdMultiStepLoader`/`YdProgress`、履历 `YdTimeline`；层级 `YdTree`；少量选项 `YdSelect`、搜索单选 `YdCombobox`、级联 `YdCascader`、远程分页资源 `YdTablePicker`；短任务 `YdModal`、上下文详情 `YdDrawer`、轻量锚点信息 `YdPopover`、独立长流程用路由页；Coding 会话 `YdAgentWorkbench`。装饰动效仅用于迎宾、重点提示或可视化，不遮挡表单、表格、错误和危险确认。
 
-- 后台管理列表用 `YdResponsiveTable` + `#card` 窄屏视图，不另造双端分页/选中逻辑，不以装饰卡片替代管理表格；系统可查询的内部 ID 用带标签选择器，长 ID 保持字符串。
+- 后台管理列表优先 `YdResponsiveEnhancedTable`（桌面增强表格 + 768px 以下自动卡片，`#cell-*` 插槽与 `cardHiddenColumns` 裁剪两端一致）；需要完全自绘卡片时用 `YdResponsiveTable` + `#card`。不另造双端分页/选中逻辑，不以装饰卡片替代管理表格；系统可查询的内部 ID 用带标签选择器，长 ID 保持字符串。
 - 移动端断点统一 768px；`YdPageMain` 手机端已全出血，页面不重复加外边距。
 - `FaInput/FaTextarea/FaSelect` 不渲染 label 属性：业务表单**必须**显式 label/字段标题并提供 placeholder 或帮助文本。
 - `YdSelect` 按真实模型回显：空值不回落第一项；multiple 全部标签在触发器内展示并可取消；`allowSearch` 默认关、开启仅本地过滤不清已选；保留分组/禁用/标量/数组与字符串长 ID；远程分页用 `YdTablePicker`。详见 `docs/yd-select-components.md`。

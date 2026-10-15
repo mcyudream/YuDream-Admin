@@ -31,6 +31,17 @@ const demoImages = [
   'https://fantastic-admin.hurui.me/logo.svg',
   'https://fantastic-mobile.hurui.me/logo.png',
 ]
+
+const stateScenes = [
+  { name: 'empty', label: '初始为空', hint: '等待第一条内容' },
+  { name: 'no-result', label: '筛选无结果', hint: '提示调整条件' },
+  { name: 'error', label: '执行失败', hint: '原因与重试' },
+  { name: 'forbidden', label: '无权限', hint: '说明所需权限' },
+  { name: 'success', label: '成功完成', hint: '结果与下一步' },
+  { name: 'warning', label: '需要关注', hint: '保留现场与选择' },
+] as const
+
+const resultStates = ['success', 'info', 'warning', 'error', '403', '404', '500'] as const
 </script>
 
 <template>
@@ -116,6 +127,72 @@ const demoImages = [
       </aside>
     </div>
   </DemoCard>
+
+  <DemoCard title="YdAlert" description="持续可见的提示：icon / title / description，variant destructive 表达风险与错误">
+    <div class="gap-3 grid max-w-2xl">
+      <YdAlert
+        icon="morph:circle-info"
+        title="平台能力未启用"
+        description="当前工作区未启用备份能力，请先在「能力管理」中开启后再试。"
+      />
+      <YdAlert
+        icon="morph:circle-check"
+        title="配置已保存"
+      >
+        <template #description>
+          变更将在下一次发布时生效，可前往
+          <YdButton variant="link" size="sm" class="!h-auto !px-0.5">
+            发布记录
+          </YdButton>
+          查看进度。
+        </template>
+      </YdAlert>
+      <YdAlert
+        icon="morph:circle-alert"
+        variant="destructive"
+        title="删除后不可恢复"
+        description="该操作会同时清理关联的离线副本，请先确认备份已完成。"
+      />
+    </div>
+  </DemoCard>
+
+  <DemoCard title="YdStateIllustration" description="六个命名状态场景，颜色随明暗与三套外观变化；插画是装饰元素，不替代状态文案">
+    <div class="state-grid">
+      <div v-for="scene in stateScenes" :key="scene.name" class="state-tile">
+        <YdStateIllustration :name="scene.name" size="sm" />
+        <strong>{{ scene.label }}</strong>
+        <span>{{ scene.hint }}</span>
+      </div>
+    </div>
+  </DemoCard>
+
+  <DemoCard title="YdEmpty" description="默认 56px 图标盒保持既有外观；传 illustration 或 #illustration 插槽才换成插画">
+    <div class="feedback-layout">
+      <div class="state-empties">
+        <YdEmpty title="还没有成员" description="邀请第一位成员后，这里会显示成员列表。" />
+        <YdEmpty illustration="empty" title="还没有成员" description="邀请第一位成员后，这里会显示成员列表。">
+          <template #action>
+            <YdButton size="sm">
+              邀请成员
+            </YdButton>
+          </template>
+        </YdEmpty>
+      </div>
+      <aside class="feedback-note">
+        <div class="feedback-note__heading">
+          <YdTag variant="secondary">两种写法</YdTag>
+          <span>默认 / 插画</span>
+        </div>
+        <p>初始为空用 empty，筛选无结果用 no-result；失败与无权限属于 YdResult，不要用空态掩盖请求失败。</p>
+      </aside>
+    </div>
+  </DemoCard>
+
+  <DemoCard title="YdResult" description="整页结果与 403 / 404 / 500 状态；illustration 默认按状态映射，info 回落图标盒">
+    <div class="result-grid">
+      <YdResult v-for="state in resultStates" :key="state" :status="state" illustration-size="sm" />
+    </div>
+  </DemoCard>
 </template>
 
 <style scoped>
@@ -149,6 +226,51 @@ const demoImages = [
   color: var(--color-text-2);
   font-size: 12px;
   line-height: 1.65;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--yd-content-gap);
+}
+
+.state-tile {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: var(--yd-content-gap);
+  text-align: center;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-control-radius);
+}
+
+.state-tile strong {
+  color: var(--color-text-1);
+  font-size: 13px;
+}
+
+.state-tile span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.state-empties {
+  display: grid;
+  gap: var(--yd-content-gap);
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--yd-content-gap);
+}
+
+.result-grid :deep(.yd-result) {
+  padding: var(--yd-content-gap);
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-control-radius);
 }
 
 @media (width <= 720px) {

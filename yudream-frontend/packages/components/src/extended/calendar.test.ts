@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 // eslint-disable-next-line test/no-import-node-test
 import test from 'node:test'
 import { CalendarDate, CalendarDateTime } from '@internationalized/date'
-import { calendarDateBlocked, calendarRangeSize, calendarTime, calendarValueAllowed, firstCalendarDate, normalizeCalendarTime, normalizeCalendarValue } from './calendar'
+import { calendarDateBlocked, calendarPeriod, calendarQuarterStart, calendarRangeSize, calendarTime, calendarValueAllowed, calendarWeekEnd, calendarWeekStart, firstCalendarDate, normalizeCalendarTime, normalizeCalendarValue } from './calendar'
 
 function day(year: number, month: number, date = 1) {
   return new CalendarDate(year, month, date)
@@ -69,4 +69,35 @@ test('month/year normalization removes unrelated day and time; time fallback nev
   assert.equal(normalizeCalendarTime('bad', '08:20'), '08:20:00')
   assert.equal(normalizeCalendarTime('bad', 'also bad'), '00:00:00')
   assert.equal(normalizeCalendarTime('24:61'), '00:00:00')
+})
+
+test('week mode snaps selections to the configured week start', () => {
+  // 2026-10-15 是周四
+  assert.equal(calendarWeekStart(day(2026, 10, 15), 1).toString(), '2026-10-12')
+  assert.equal(calendarWeekStart(day(2026, 10, 15), 0).toString(), '2026-10-11')
+  assert.equal(calendarWeekEnd(day(2026, 10, 15), 1).toString(), '2026-10-18')
+  assert.equal(calendarPeriod(day(2026, 10, 15), 'week', 1).toString(), '2026-10-12')
+  assert.equal(normalizeCalendarValue(day(2026, 10, 15), 'week', 1)?.toString(), '2026-10-12')
+  assert.deepEqual(normalizeCalendarValue({ start: day(2026, 10, 15), end: day(2026, 10, 20) }, 'week', 1), { start: day(2026, 10, 12), end: day(2026, 10, 19) })
+  assert.equal(calendarRangeSize(day(2026, 10, 12), day(2026, 10, 26), 'week', 1), 3)
+  assert.equal(calendarValueAllowed({ start: day(2026, 10, 12), end: day(2026, 10, 26) }, 'week', { maximumDays: 2 }, true), false)
+  // 与月/年一致：周单元格与 [min, max] 相交即可选
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { maxValue: day(2026, 10, 12) }), false)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { maxValue: day(2026, 10, 11) }), true)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { minValue: day(2026, 10, 18) }), false)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { minValue: day(2026, 11, 1) }), true)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { minValue: day(2026, 10, 12), maxValue: day(2026, 10, 18) }), false)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'week', { isDateDisabled: date => date.day === 12 }), true)
+})
+
+test('quarter mode normalizes to the first month and counts whole quarters', () => {
+  assert.equal(calendarQuarterStart(day(2026, 10, 15)).toString(), '2026-10-01')
+  assert.equal(calendarQuarterStart(day(2026, 7, 31)).toString(), '2026-07-01')
+  assert.equal(calendarPeriod(day(2026, 12, 31), 'quarter').toString(), '2026-10-01')
+  assert.deepEqual(normalizeCalendarValue({ start: day(2026, 7, 31), end: day(2026, 10, 5) }, 'quarter'), { start: day(2026, 7, 1), end: day(2026, 10, 1) })
+  assert.equal(calendarRangeSize(day(2026, 1, 1), day(2026, 10, 1), 'quarter'), 4)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'quarter', { isQuarterDisabled: date => date.month === 10 }), true)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'quarter', { maxValue: day(2026, 9, 30) }), true)
+  assert.equal(calendarDateBlocked(day(2026, 10, 15), 'quarter', { maxValue: day(2026, 10, 31) }), false)
+  assert.equal(calendarValueAllowed({ start: day(2026, 4, 1), end: day(2026, 10, 1) }, 'quarter', { isQuarterDisabled: date => date.month === 7 }, true), false)
 })
