@@ -66,6 +66,8 @@ const YD_COMPONENT_NAMES = [
   'YdForm',
   'YdFormItem',
   'YdInputTag',
+  'YdListToolbar',
+  'YdFilterSelect',
   'YdRate',
   'YdUiProvider',
   'YdAgentWorkbench',

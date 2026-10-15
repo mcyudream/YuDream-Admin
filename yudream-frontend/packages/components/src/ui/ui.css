@@ -142,4 +142,163 @@
 .yd-rate-star:disabled {
   cursor: default;
 }
+
+/* 列表页工具栏：统一搜索限宽、状态计数筛选与两端对齐操作区，避免各页各写一套 */
+.yd-list-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yd-content-gap, 16px);
+  min-width: 0;
+}
+
+.yd-list-toolbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.yd-list-toolbar__filters {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.yd-list-toolbar__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.yd-list-toolbar__search-wrap {
+  display: flex;
+  flex: 1 1 200px;
+  min-width: 140px;
+  max-width: 320px;
+}
+
+.yd-list-toolbar__status {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding-bottom: 7px;
+}
+
+.yd-list-toolbar__chip {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
+  background: var(--color-bg-1);
+  color: var(--color-text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease, transform .16s cubic-bezier(.32, .72, 0, 1);
+}
+
+.yd-list-toolbar__chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-3);
+  background: var(--color-fill-1);
+}
+
+.yd-list-toolbar__chip.is-active {
+  border-color: var(--color-text-2);
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+}
+
+.yd-list-toolbar__chip strong {
+  color: var(--color-text-1);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.yd-list-toolbar__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--color-text-3);
+  opacity: .5;
+}
+
+.yd-list-toolbar__chip[data-tone='ok'] .yd-list-toolbar__dot {
+  color: var(--yd-emphasis, var(--color-text-1));
+  opacity: 1;
+  animation: yd-list-toolbar-pulse 2.4s ease-in-out infinite;
+}
+
+.yd-list-toolbar__chip[data-tone='bad'] .yd-list-toolbar__dot {
+  color: var(--color-danger-6);
+  opacity: 1;
+}
+
+/* 比例条贴在状态行底部：视觉保留但不占高度 */
+.yd-list-toolbar__ratio {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  overflow: hidden;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-fill-2);
+}
+
+.yd-list-toolbar__ratio > span {
+  display: block;
+  height: 100%;
+  background: var(--yd-emphasis, var(--color-text-1));
+  transition: width .45s cubic-bezier(.32, .72, 0, 1);
+}
+
+.yd-list-toolbar__ratio > span[data-tone='muted'] {
+  background: var(--color-text-3);
+  opacity: .4;
+}
+
+.yd-list-toolbar__ratio > span[data-tone='bad'] {
+  background: var(--color-danger-6);
+}
+
+@keyframes yd-list-toolbar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+    opacity: .6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yd-list-toolbar__chip {
+    transition: none;
+  }
+
+  .yd-list-toolbar__chip:hover {
+    transform: none;
+  }
+
+  .yd-list-toolbar__chip[data-tone='ok'] .yd-list-toolbar__dot {
+    animation: none;
+  }
+}
 }

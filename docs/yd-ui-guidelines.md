@@ -12,7 +12,7 @@
 
 允许原生结构与内容元素，例如 `main`、`section`、`div`、`span`、`p`、`ol`、`img`，以及有真实 `href` 的内容链接。禁止用带 `@click` 的结构元素模拟按钮、选择器或菜单。组件内部可以使用原生控件、Fa、Reka、Arco；框架主题运行时、根 provider 和路由布局的基础装配属于实现边界，不能据此在业务区继续引入裸控件。
 
-代码编辑器、Markdown 编辑器、图表引擎、流程画布和可视化构建器属于专门技术能力。它们应被 YD 适配器封装；适配器负责公开模型、事件、主题、尺寸、键盘、清理与错误状态。业务仍从 YD 入口调用。`YdCode` 是代码展示，`YdGraphCanvas` 是关系图，不能当作可编辑代码工具或工作流编辑器的替代品。
+代码编辑器、Markdown 编辑器、图表引擎、流程画布和可视化构建器属于专门技术能力。它们应被 YD 适配器封装；适配器负责公开模型、事件、主题、尺寸、键盘、清理与错误状态。业务仍从 YD 入口调用。Wiki 作者可使用 `YdMarkdownEditor` 已公开的格式工具栏、插入入口与只读预览；Wiki 内链、保存/发布、脏状态、冲突处理和访问控制仍由宿主业务管理。`YdCode` 是代码展示，`YdGraphCanvas` 是关系图，不能当作可编辑代码工具或工作流编辑器的替代品。
 
 `YdPageBuilder` 是 GrapesJS 的公开技术适配入口，受控管理 `htmlContent`、`cssContent`、`builderProjectJson` 与只读/禁用状态；GrapesJS 选项、初始 setup、上传回调和 editor facade 有类型边界。CMS 页面只把业务 blocks、主题配置和授权上传回调注入适配器，不能在业务组件中自行初始化/销毁引擎。
 
@@ -40,12 +40,12 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 | 用户任务 | 首选组件 | 使用判断 |
 | --- | --- | --- |
-| 普通管理页面 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdSearchBar` | 一个清晰标题、查询区、数据区和主操作;不要多层空卡片套卡片 |
+| 普通管理页面 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdListToolbar` | 一个清晰标题、查询区、数据区和主操作;不要多层空卡片套卡片；列表页筛选区统一用 `YdListToolbar`（内置限宽搜索、计数即筛选的状态胶囊、左右分区插槽），下拉筛选用 `YdFilterSelect` 指定宽度，不要各页自建工具栏 |
 | 内容行列表 | `YdList`、`YdListRow` | 活动、通知、收藏等非表格内容；管理数据使用 `YdResponsiveTable` / `YdEnhancedTable` |
 | 统计指标块 | `YdStats`、`YdStat` | 展示标题、数值、说明与图表/操作；动效数字可组合 `YdAnimatedCountTo` |
 | 页面角落快捷操作 | `YdFab` | 少量高频动作可用图标与短标签；不替代表单提交、批量操作或危险确认 |
 | 静态浏览器/窗口预览 | `YdMockupBrowser`、`YdMockupWindow` | 外框中的导航/窗口状态只驱动插槽演示，不访问 URL 或系统窗口 |
-| 表格数据管理 | `YdResponsiveTable`、`YdPagination` | 桌面列表与移动卡片共同设计;通过 `#card` 保留字段和操作 |
+| 表格数据管理 | `YdResponsiveEnhancedTable`、`YdPagination` | 有行级操作的后台管理列表使用增强响应式表格：名称身份列固定左侧、唯一操作菜单列固定右侧，行操作合并进该菜单；桌面与移动卡片共享行操作配置。只读或需要完全自绘卡片的列表可用 `YdResponsiveTable` + `#card` |
 | 图文并茂数据列表 | `YdEnhancedTable`、`YdResponsiveEnhancedTable` | 用户列表、成员管理等需要身份列+状态徽章+操作下拉;响应式版本在 768px 以下自动切卡片并复用 `#cell-*` 渲染,管理列表默认选它 |
 | 桌面专属、内部小型表格 | `YdTable` | 不代替业务列表的移动端方案;列与插槽遵循 TanStack 契约 |
 | 只读详情 | `YdDescriptions`、`YdTag`、`YdBadge` | 属性值与状态；避免用可编辑输入框展示不可编辑内容 |
@@ -205,7 +205,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup`、`YdSegmented` |
 | 层级与专用选择 | `YdTree`、`YdTreeSelect`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
-| 查询与分页 | `YdSearchBar`、`YdPagination` |
+| 查询与分页 | `YdListToolbar`、`YdFilterSelect`、`YdSearchBar`、`YdPagination` |
 | 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
@@ -234,8 +234,8 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 - `YdMockupBrowser` 地址输入、前后退、刷新只更新本地 `v-model:url` 和事件；`YdMockupWindow` 的最小化/最大化/关闭通过 `v-model` 状态表达，不访问外网或操作系统窗口。
 - `YdCode` 保持高亮、复制与 `lineNumbers`；新增 `prefixes` 可为每行提供终端提示符或结果标记。
 - `YdSteps` 的 `steps` 项可提供独立 `status` 与 `icon`，否则继续按 `v-model` 和全局 `status` 推导；`YdTimeline` 支持方向、紧凑布局、可选日期、图标及自定义 marker/content 插槽。
-- `YdSettingsLayout` 默认整块内容居中限宽（`align="center"`，`widthClass` 可覆盖），宽屏为左侧吸顶分区导航 + 右侧内容；窄屏**不**退化为横向标签，而是渲染分区选择器切换分区。宿主设置类页面（系统设置、安全中心、主题配置、数据备份）统一由它承载分区；页面已有 `YdPageHeader` 时不再传 `title`/`description`，避免双标题。
-- `YdResponsiveEnhancedTable` 是 `YdEnhancedTable` 的响应式版本：窄屏按桌面可见列生成卡片，`#cell-{id}` 插槽与列的 `cell` 渲染函数在卡片中复用，可用 `cardHiddenColumns` 隐藏宽列；`actions` 支持函数 `label`（启用/停用）与行级 `visible`。管理列表的桌面表格 + 移动卡片优先使用它，需要完全自绘卡片时用 `YdResponsiveTable` 的 `#card`。
+- `YdSettingsLayout` 默认整块内容居中限宽（`align="center"`，`widthClass` 可覆盖），宽屏为左侧吸顶分区导航 + 右侧内容；窄屏**不**退化为横向标签，而是渲染分区选择器切换分区。宿主设置类页面统一用 `surface` 模式：页面根节点铺白底（`min-h-full bg-card`）、不再套 `YdPageMain` 卡片，分区导航吸顶、页面自身滚动；**保存类操作统一放 `YdPageHeader`**（多分区按当前分区切换按钮），分区内不再出现「页底保存」按钮，`#footer` 只留给对话框式确认。宿主设置类页面（系统设置、安全中心、主题配置、数据备份）统一由它承载分区；页面已有 `YdPageHeader` 时不再传 `title`/`description`，避免双标题。
+- `YdResponsiveEnhancedTable` 是 `YdEnhancedTable` 的响应式版本：窄屏按桌面可见列生成卡片，`#cell-{id}` 插槽与列的 `cell` 渲染函数在卡片中复用，可用 `cardHiddenColumns` 隐藏宽列；`actions` 支持函数 `label`（启用/停用）与行级 `visible`。**有行级管理操作的列表统一优先使用该组件：名称身份列固定左侧，内置唯一“操作”下拉列固定右侧；所有行级操作集中在 `actions`，危险动作仍必须进入现有确认流程。** 不再同时声明 `operation` 普通列或在移动卡片重复绘制同一组操作。`YdPagination`、筛选和加载状态仍由页面组合。只读列表可使用 `YdResponsiveTable`；必须完全自绘移动卡片时也可使用其 `#card`，但不能因此重复创建桌面/移动两套业务行为。
 
 下表是能力缺口，不是可用组件目录。完成封装、公开导出和验证后，再更新为实际组件名称。
 
@@ -284,6 +284,6 @@ Arco Week/Month/Quarter/Year Picker 迁移到 `YdDatePicker` 时，应显式设�
 - 同一任务在灵动、雅致、紧凑及明暗主题下都有可读文本、边框、焦点和状态；主题插件继承不破坏布局与功能。
 - 通用交互全部来自 YD；组件缺口先封装，不在页面重造控件或裸用第三方控件。
 - 键盘可完成选择、输入、弹层打开/关闭与任务操作；输入法组合不误发送；移动端不依赖悬停。
-- 业务列表按 768px 断点使用 `YdResponsiveEnhancedTable`（或 `YdResponsiveTable #card`）双端视图，页面不重复手写双端列表或给全出血页面增加外边距。
+- 后台管理列表按 768px 断点优先使用 `YdResponsiveEnhancedTable`：名称列固定左、唯一操作菜单列固定右，所有行操作合并入菜单，桌面与移动卡片共用操作定义；只读列表或确需完全自绘卡片时可用 `YdResponsiveTable`。不重复手写双端列表或双端操作行为。
 - 已启用动画在所有外观中保持功能，装饰不会抢夺交互；加载、取消、失败与重试来自真实业务状态。
 - 规范、目录、组件、resolver、SDK、预览与扫描规则保持同一事实，不存在文档承诺但没有实现的组件。

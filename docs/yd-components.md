@@ -51,7 +51,7 @@ const name = ref('')
 
 搜索型受控多选使用 `YdMultiSelect`，`modelValue` 为 `string[]`，选项为 `{ label, value, disabled? }[]`；支持本地搜索、标签删除、`maxTagCount`、`option` / `empty` 插槽及键盘选择。文件输入控件仅需触发系统选择并接收 `File[]` 时使用 `YdFilePicker`；`directory` 会设置浏览器的 `webkitdirectory`，选择结果仍是原生 `File[]`，每个 `File.webkitRelativePath` 保留浏览器给出的目录相对路径。组合式入口 `useYdFilePicker(options?)` 提供 `open(options?)`（返回 `Promise<File[]>`）、`cancel()` 与 `dispose()`；再次 `open()` 会先以空数组结算并清理上次选择器，Vue effect scope 销毁时也会结算待处理 promise 并移除临时 input。SSR 下 `open()` 返回空数组，不访问 DOM。完整上传队列继续使用 `YdFileUpload`。
 
-`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()` 和根元素引用，卸载时释放主题与可访问性观察器。该入口已包含在验签通过的 components 1.8.1 中。
+`YdMarkdownEditor` 承载 md-editor-v3 的编辑与预览能力，使用受控 `modelValue`，可配置语言、高度、只读、禁用、错误状态和主题。只读预览使用可聚焦的具名 region，保留正文链接与标题语义。共享包装器通过保留的 `markdownItConfig` 引擎钩子，仅为带 `yd-markdown-editor-` 前缀的内部 editor ID 启用原始 HTML 解析；输出仍经过 `sanitizeYdMarkdownHtml`，其它 md-editor 实例保持 `html: false`。业务不能直接覆盖引擎配置；需要额外 Markdown 能力时应由 YD 包装器补充受控扩展。`toolbars`/`toolbarsExclude` 使用公开 `YdMarkdownToolbar[]`，并支持 `showToolbarName`、`catalogLayout` 与 `catalogMaxDepth`；工具栏保存事件只发出 `save(markdown)`，不代替业务的持久化。`catalogChange` 返回标题、层级和行号，不暴露 Markdown-it token；`insert(selected => ({ targetValue, select? }))` 只在可编辑状态插入内容，适合 Wiki 内链等业务内容。`imageUpload(files, callback)` 由调用方注入，让上传协议和业务 API 留在宿主应用；组件将 callback 限制为每次上传最多完成一次。`readonly`/`disabled` 状态变化会使进行中的上传结果失效，卸载后不再调用 editor callback 或发出上传错误事件。`linkClick` 提供 `href`、锚点与原始点击事件供宿主处理；组件暴露 `focus()`、`blur()`、`insert()` 和根元素引用，卸载时释放主题与可访问性观察器。工具栏与插入能力仍在本地工作区验证，尚未发布新组件契约；此前验签通过的是 components 1.8.1 的基础能力。
 
 `YdCodeEditor` 使用 Monaco Editor 承载 JSON、HTML、CSS 和 JavaScript 编辑，编辑器内核与各语言 worker 都按需异步加载，只有渲染该组件时才下载对应分块。主题跟随宿主明暗模式：从 `--color-bg-1`、`--color-text-1`、`--color-fill-1` 与 `--primary-6` 等根变量解析实色后写入 Monaco 主题；选区使用主色半透明背景且不覆盖文字前景色，选中文字保持语法高亮可读。可受控更新、切换只读/禁用、提供补全项并报告错误状态。ref 提供 `focus()`、`blur()`、`format()`（仅 JSON）与 `resetToDefault()`；切换语言、只读、行号或补全时保留现有编辑状态，卸载时销毁编辑器实例并释放补全注册与主题监听。该入口已包含在验签通过的 components 1.8.1 中（Monaco 内核自 1.8.0 起替换原 CodeMirror 实现）。
 
@@ -365,7 +365,7 @@ type 可选 plane/chase/bounce/wave/pulse/flow/swing/circle/circle-fade/grid/fol
 | `YdCode` | code、language、title、copyable 默认 true、lineNumbers；高亮器转义输入代码，组件不执行代码 |
 | `YdCodePreview` | code、language 默认 xml、title；默认插槽直接承载已编写的 Vue 示例 |
 | `YdCodeEditor` | `modelValue`、`defaultValue`、`language: json/html/css/javascript/text`、`completions`、`placeholder`、`height`、`readonly`、`disabled`、`lineNumbers`、`error`；`update:modelValue`、`focus`、`blur`、`formatError`；ref `focus()` / `blur()` / `format()` / `resetToDefault()` / `element` |
-| `YdMarkdownEditor` | `modelValue`、`placeholder`、`height`、`language`、`previewTheme`、`codeTheme`、`readonly`、`disabled`、`error`、`ariaLabel`；`update:modelValue`、`uploadError`、`linkClick(YdMarkdownLinkClick)`；`imageUpload(files, callback)` 注入图片上传；ref `focus()` / `blur()` / `element` |
+| `YdMarkdownEditor` | `modelValue`、`placeholder`、`height`、`language`、`previewTheme`、`codeTheme`、`readonly`、`disabled`、`error`、`ariaLabel`、`toolbars(YdMarkdownToolbar[])`、`toolbarsExclude`、`showToolbarName`、`catalogLayout`、`catalogMaxDepth`；`update:modelValue`、`uploadError`、`linkClick(YdMarkdownLinkClick)`、`catalogChange(YdMarkdownHeading[])`、`save(markdown)`；`imageUpload(files, callback)` 注入图片上传；ref `focus()` / `blur()` / `insert(generate)` / `element` |
 | `YdLinkPreview` | url、title、description、image、target；默认槽是链接内容，`#preview` 可完全替换预览卡 |
 | `YdQrcode` | value、size 默认180且限制64..2048、margin 默认4、errorCorrectionLevel 默认M、foreground/background、label；ready(dataUrl)、error(Error)；ref.download(filename?) / refresh() / dataUrl |
 | `YdStorageBox<T>` | uniqueKey、boxId、data:T、title、limit 默认20；takeOut(data)、error(error)；默认槽可替换打开按钮 |
@@ -445,9 +445,13 @@ const filters = ref({ keyword: '', status: 'enabled' })
 | `YdImageCaptcha` | `mode=demo/remote`；demo 沿用 `length`、`noise`、`caseSensitive` 本地绘制。remote 需 `requestChallenge()` 返回 `{ id, image, expiresAt? }`、`verifyChallenge({ challengeId, code })` 返回 `{ valid, token? }`，组件负责加载/刷新/失败重试并向 `verify` 发出完整结果；ref 提供 `verify()` / `refresh()`。只有 remote 模式连接服务端签发的一次性票据，demo 仅为界面演示 |
 | `YdInfiniteScroll` | 默认槽为列表内容；`load`、`hasMore`、`distance`、`root`、`immediate`；v-model loading/finished；错误可重试，ref 提供 reset/check |
 | `YdAnchor` | `items:{id,title,disabled?}[]`、`container`、`offset`、`smooth`；v-model:active，滚动 spy 与真实片段链接，ref 提供 scrollTo/refresh |
+| `YdListToolbar` | 管理列表页统一工具栏：`v-model:keyword`（内置搜索，`placeholder`、`searchWidth` 默认 320）、`v-model:status` + `statusItems:{value,label,count?,tone?}[]`（计数即筛选的胶囊行，`statusRatio` 默认开启只读比例条）；`#search`/`#filters`/`#actions` 插槽；`search`/`clear` 事件 |
+| `YdFilterSelect` | 宽度受控的 YD 选择器：`width`（默认 168）、`minWidth`（默认 132）以及 `options`/`placeholder`/`multiple`/`allowSearch`/`disabled`；用于筛选区，避免页面为 YdSelect 写 `:deep()` 限宽 |
 | `@yudream/components/map` 的 `YdMap` | 必须从子路径显式导入；Leaflet 是 optional peer，仅挂载时加载；调用方提供 `tileUrl` 和 `attribution`，地图瓦片服务、许可和访问密钥由调用方负责 |
 
 `YdEmpty` 默认渲染 56px 图标盒，显式传 `illustration` 或 `#illustration` 才换成插画，既有页面无需改动。状态插画只有六个命名场景，随明暗、三套外观与减少动效偏好变化，不是可换皮肤的资源库；业务需要自有画面时用 `#illustration` 插槽传自绘 SVG，并自行负责配色令牌化与暗色适配。
+
+`YdListToolbar` 与 `YdFilterSelect` 是列表页筛选区的统一入口：页面不再自建搜索框、状态计数胶囊与选择器限宽。搜索框由组件限宽（默认 320px，窄容器按可用宽度收缩），因此**禁止**在页面里用 `flex-1`/`w-full` 让搜索框铺满整行；状态计数一律通过 `statusItems` 传入，不要在页面重写一套胶囊。`YdFilterSelect` 的宽度以属性传入（落在内部触发器上），页面**不要**再对 YdSelect 写 scoped 限宽规则——FaSelect 用 `inheritAttrs:false` 把 class 摊到内部 trigger，页面作用域选择器不会命中，是静默失效的死样式。
 
 本表入口已包含在验签通过的 components 1.8.1 与 SDK 1.12.0 中；`@yudream/components/map` 需调用方自行安装 leaflet 后从子路径导入，它不属于宿主共享桥，也不在预览站示例内。
 

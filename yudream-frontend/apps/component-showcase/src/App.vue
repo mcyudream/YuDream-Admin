@@ -24,6 +24,7 @@ import FilesSection from '@/sections/FilesSection.vue'
 import FormControlsSection from '@/sections/FormControlsSection.vue'
 import FormSection from '@/sections/FormSection.vue'
 import LayoutSection from '@/sections/LayoutSection.vue'
+import ListToolbarSection from '@/sections/ListToolbarSection.vue'
 import LoadingSelectionSection from '@/sections/LoadingSelectionSection.vue'
 import MigrationSection from '@/sections/MigrationSection.vue'
 import NewComponentsSection from '@/sections/NewComponentsSection.vue'
@@ -95,6 +96,7 @@ const categories: Category[] = [
   { key: 'workflow-canvas', label: '工作流画布', en: 'Workflow Canvas', icon: 'morph:workflow', group: 'Components', description: '可缩放流程画布、受控节点连线、自定义节点与连接点。', section: WorkflowCanvasSection },
   { key: 'creatable-selection', label: '可创建搜索选择', en: 'Creatable Selection', icon: 'morph:list-plus', group: 'Components', description: '搜索候选不存在时由调用方明确接受新编码。', section: ComboboxCreateSection },
   { key: 'page-builder', label: '页面可视化构建', en: 'Page Builder', icon: 'morph:panels-top-left', group: 'Components', description: '受控 HTML、CSS 和构建项目数据，支持主题、上传与实例生命周期。', section: PageBuilderSection },
+  { key: 'list-toolbar', label: '列表工具栏', en: 'List Toolbar', icon: 'morph:list-filter', group: 'Components', description: '管理列表页统一筛选区：限宽搜索、计数即筛选的状态胶囊、宽度受控的下拉筛选。', section: ListToolbarSection },
   { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:chart-area', group: 'Components', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
   { key: 'data-display', label: '详情与数据标识', en: 'Details', icon: 'morph:file-text', group: 'Components', description: '描述列表、趋势标识、桌面表格与筛选区容器。', section: DataDisplaySection },
   { key: 'loading-selection', label: '加载与列表选择', en: 'Loading & Selection', icon: 'morph:inbox', group: 'Components', description: '局部遮罩、函数式文件选择与跨断点保留的表格选择。', section: LoadingSelectionSection },
