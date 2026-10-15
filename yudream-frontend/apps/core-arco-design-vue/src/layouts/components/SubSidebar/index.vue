@@ -15,14 +15,8 @@ const route = useRoute()
 
 const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
-const { generateTitle } = useAppMenu()
 
 const isCollapse = computed(() => appSettingsStore.settings.menu.subMenuCollapse)
-const activeModuleTitle = computed(() => generateTitle(appMenuStore.allMenus[appMenuStore.actived]?.meta?.title))
-// 品牌行保留站点 Logo 与名称；模块名作为独立说明行，只在多模块的一级导航下出现。
-const showModuleTitle = computed(() => !!activeModuleTitle.value
-  && appSettingsStore.settings.menu.mode === 'side'
-  && !isCollapse.value)
 
 const transitionName = ref('')
 watch(() => appMenuStore.actived, (val, oldVal) => {
@@ -58,9 +52,6 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
           single: appSettingsStore.settings.menu.mode === 'single',
         }"
       />
-      <div v-if="showModuleTitle" class="module-title" :title="activeModuleTitle">
-        {{ activeModuleTitle }}
-      </div>
       <Component :is="useSlots('sub-sidebar-after-logo')" />
       <YdScrollArea :scrollbar="false" mask class="overscroll-contain flex-1">
         <TransitionGroup :name="transitionName">
@@ -106,22 +97,6 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
   background-color: var(--g-sub-sidebar-bg);
   box-shadow: 1px 0 0 0 oklch(var(--border));
   transition: inset-inline-start var(--yd-motion-duration-slow) var(--yd-motion-ease), width var(--yd-motion-duration-slow) var(--yd-motion-ease), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
-
-  /* 品牌行下方的当前模块说明，比站点名轻一档 */
-  .module-title {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    height: 30px;
-    padding: 0 16px;
-    overflow: hidden;
-    color: var(--g-sub-sidebar-menu-color);
-    font-size: 12px;
-    font-weight: 600;
-    opacity: 0.72;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 
   &.is-collapse {
     width: var(--g-sub-sidebar-collapse-width);
