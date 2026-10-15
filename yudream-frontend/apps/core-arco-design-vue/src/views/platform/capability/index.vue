@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AiEndpointDraft } from './ai-endpoints'
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
-import { YdStateIllustration } from '@yudream/components'
+import { YdStat, YdStateIllustration, YdStats } from '@yudream/components'
 import apiCapability from '@/api/modules/platform-capability'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
@@ -45,6 +45,35 @@ const wsStatus = ref('未连接')
 let websocket: WebSocket | null = null
 let sseAbort: AbortController | null = null
 
+/**
+ * 能力图标兜底：后端下发的 Remix 图标里 file-eye-line 不在离线集合中，会渲染成空白。
+ * 这里按能力编码给 Morphicons 等价图标，避免任何能力出现"没有图标"的卡片。
+ */
+const capabilityIconFallbacks: Record<string, string> = {
+  'sse': 'morph:radio-tower',
+  'ai': 'morph:sparkles',
+  'agent': 'morph:bot',
+  'websocket': 'morph:refresh-cw',
+  'dataviz': 'morph:pie-chart',
+  'rabbitmq': 'morph:messages-square',
+  'api-docs': 'morph:file-text',
+  'milky': 'morph:message-circle',
+  'message-render': 'morph:image',
+  'integration': 'morph:terminal',
+  'document-template': 'morph:file-text',
+  'form': 'morph:clipboard-list',
+  'wiki': 'morph:book-open',
+  'neo4j': 'morph:share-2',
+  'cms': 'morph:layout-dashboard',
+  'plugin-market-source': 'morph:store',
+  'file-preview': 'morph:file-scan',
+  'inbound-mail': 'morph:mail',
+}
+
+function capabilityIcon(item: CapabilityItem) {
+  return item.icon || capabilityIconFallbacks[item.code] || 'morph:puzzle'
+}
+
 const groups: CapabilityGroup[] = [
   { type: 'REALTIME', title: '实时通信', icon: 'morph:activity' },
   { type: 'MESSAGING', title: '消息队列', icon: 'morph:message-square' },
@@ -70,6 +99,21 @@ const summary = computed(() => {
   const disabled = rows.value.filter(item => !item.enabled && item.status !== 'ERROR').length
   return { total: rows.value.length, enabled, error, disabled }
 })
+
+/** 统计四联卡：数值 + 图标 + 占比说明，用 YD 统计组件呈现。 */
+const summaryTiles = computed(() => {
+  const { total, enabled, disabled, error } = summary.value
+  const percent = (value: number) => (total ? Math.round(value / total * 100) : 0)
+  return [
+    { key: 'total', label: '能力总数', value: total, icon: 'morph:list-tree', tone: 'neutral', hint: '全部已注册能力' },
+    { key: 'enabled', label: '运行中', value: enabled, icon: 'morph:circle-check', tone: 'ok', hint: `占比 ${percent(enabled)}%` },
+    { key: 'disabled', label: '未启用', value: disabled, icon: 'morph:circle-slash', tone: 'muted', hint: `占比 ${percent(disabled)}%` },
+    { key: 'error', label: '异常', value: error, icon: 'morph:triangle-alert', tone: error > 0 ? 'bad' : 'ok', hint: error > 0 ? '需要处理' : '状态正常' },
+  ]
+})
+const enabledPercent = computed(() => (summary.value.total
+  ? Math.round(summary.value.enabled / summary.value.total * 100)
+  : 0))
 const filteredRows = computed(() => {
   const query = keyword.value.trim().toLocaleLowerCase()
   return rows.value.filter((item) => {
@@ -521,7 +565,7 @@ function dependencyStatus(item?: CapabilityItem) {
     return {
       code,
       name: dependency?.name || code,
-      icon: dependency?.icon || 'morph:puzzle',
+      icon: dependency ? capabilityIcon(dependency) : 'morph:puzzle',
       enabled: Boolean(dependency?.enabled),
       available: Boolean(dependency),
     }
@@ -676,11 +720,25 @@ function parseJsonConfig() {
       <div class="capability-workbench">
         <section class="capability-browser">
           <div class="capability-overview">
-            <div><span>能力总数</span><strong>{{ summary.total }}</strong></div>
-            <div><span>运行中</span><strong>{{ summary.enabled }}</strong></div>
-            <div><span>未启用</span><strong>{{ summary.disabled }}</strong></div>
-            <div :class="{ 'has-errors': summary.error > 0 }">
-              <span>异常</span><strong>{{ summary.error }}</strong>
+            <YdStats class="capability-overview__tiles">
+              <YdStat v-for="tile in summaryTiles" :key="tile.key" :data-tone="tile.tone">
+                <template #title>
+                  {{ tile.label }}
+                </template>
+                <template #value>
+                  <YdAnimatedCountTo :value="tile.value" />
+                </template>
+                <template #description>
+                  {{ tile.hint }}
+                </template>
+                <template #figure>
+                  <span class="capability-overview__figure"><YdIcon :name="tile.icon" /></span>
+                </template>
+              </YdStat>
+            </YdStats>
+            <div class="capability-overview__ratio">
+              <span>启用率 {{ enabledPercent }}%</span>
+              <YdProgress :model-value="enabledPercent" />
             </div>
           </div>
           <div class="capability-list-heading">
@@ -703,7 +761,7 @@ function parseJsonConfig() {
                 :aria-pressed="selected?.code === item.code"
                 @click="selectCapability(item)"
               >
-                <span class="capability-card__icon"><YdIcon :name="item.icon || 'morph:puzzle'" /></span>
+                <span class="capability-card__icon"><YdIcon :name="capabilityIcon(item)" /></span>
                 <span class="capability-card__content">
                   <span class="capability-card__topline">
                     <strong>{{ item.name }}</strong>
@@ -986,12 +1044,20 @@ function parseJsonConfig() {
 .capability-browser { display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:16px; min-width:0; min-height:0; }
 .capability-browser :deep(.yd-loading-overlay) { min-height:0; height:100%; }
 .capability-browser :deep(.yd-loading-overlay__content) { display:grid; grid-template-rows:minmax(0,1fr); min-height:0; height:100%; }
-.capability-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--color-border-2); border-radius:8px; background:var(--color-bg-2); }
-.capability-overview > div { display:grid; gap:4px; min-width:0; padding:12px; }
-.capability-overview > div + div { border-left:1px solid var(--color-border-2); }
-.capability-overview span { color:var(--color-text-3); font-size:11px; }
-.capability-overview strong { color:var(--color-text-1); font-size:18px; font-weight:650; }
-.capability-overview .has-errors strong { color:var(--color-danger-6); }
+/* 统计四联卡：YD 统计组件 + 图标底色 + 启用率进度，数值滚动入场 */
+.capability-overview { display:grid; gap:12px; min-width:0; }
+.capability-overview__tiles { min-width:0; }
+.capability-overview__tiles :deep(.yd-stat) { gap:4px; border:1px solid var(--color-border-2); border-radius:12px; background:var(--color-bg-1); transition:border-color .18s ease, transform .18s cubic-bezier(.32,.72,0,1), box-shadow .18s ease; }
+.capability-overview__tiles :deep(.yd-stat:hover) { transform:translateY(-2px); border-color:var(--color-border-3); box-shadow:0 8px 20px -16px oklch(0 0 0 / 45%); }
+.capability-overview__tiles :deep(.yd-stat-value) { font-size:24px; font-weight:650; line-height:1.15; }
+.capability-overview__tiles :deep(.yd-stat-value .yd-number-flow) { font-size:24px; font-weight:650; }
+.capability-overview__tiles :deep(.yd-stat-description) { font-size:11px; }
+.capability-overview__tiles :deep(.yd-stat[data-tone='bad'] .yd-stat-value) { color:var(--color-danger-6); }
+.capability-overview__figure { display:grid; width:34px; height:34px; place-items:center; border-radius:10px; background:var(--color-fill-2); color:var(--color-text-2); font-size:18px; }
+.capability-overview__tiles :deep(.yd-stat[data-tone='ok'] .capability-overview__figure) { color:var(--yd-emphasis, var(--color-text-1)); }
+.capability-overview__tiles :deep(.yd-stat[data-tone='bad'] .capability-overview__figure) { color:var(--color-danger-6); }
+.capability-overview__ratio { display:grid; gap:6px; padding:0 2px; }
+.capability-overview__ratio span { color:var(--color-text-3); font-size:11px; }
 .capability-list-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:0; }
 .capability-list-heading h2 { margin:0; color:var(--color-text-1); font-size:18px; font-weight:650; }
 .capability-list-heading p { margin:4px 0 0; color:var(--color-text-3); font-size:13px; }
@@ -1123,8 +1189,7 @@ function parseJsonConfig() {
   .capability-detail { max-height:none; overflow:visible; overscroll-behavior:auto; }
   .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
   .capability-card__icon { width:36px; height:36px; }
-  .capability-overview > div { padding:10px; }
-  .capability-overview strong { font-size:16px; }
+  .capability-overview__tiles :deep(.yd-stat) { padding:12px; }
   .capability-list-heading { align-items:flex-start; }
   .detail-header { flex-direction:column; align-items:stretch; }
   .detail-actions { justify-content:flex-start; }
@@ -1134,9 +1199,7 @@ function parseJsonConfig() {
 @media (max-width: 420px) {
   .capability-toolbar { grid-template-columns:minmax(0,1fr); }
   .capability-search { grid-column:1; }
-  .capability-overview > div { padding:8px 6px; }
-  .capability-overview span { font-size:10px; }
-  .capability-overview strong { font-size:15px; }
+  .capability-overview { gap:10px; }
   .capability-list-heading { align-items:center; }
   .capability-catalog { grid-template-columns:minmax(0,1fr); }
   .capability-card { grid-template-columns:36px minmax(0,1fr) 12px; gap:10px; padding:13px; }
