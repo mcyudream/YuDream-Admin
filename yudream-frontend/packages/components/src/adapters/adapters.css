@@ -58,11 +58,11 @@
 }
 
 /*
- * 视图切换与同排按钮同高：列表取控件高度（40/38/32），触发器只填满列表（h 100%-1px）。
- * 触发器禁止再设 min-height——列表有 3px 内边距，触发器撑到列表高度会溢出边框、与按钮错位。
+ * 本设计里默认按钮是 h-9（36px，UnoCSS 工具类未分层、压过适配层），输入/选择框走 --yd-control-height(40px)。
+ * tab 列表保持自身 h-9 与按钮一致；触发器只靠 h-[calc(100%-1px)] 填满列表，
+ * 禁止再给触发器设 min-height——列表有 3px 内边距，撑高会溢出边框、与按钮错位。
  */
 .yd-tabs [role="tablist"] {
-  min-height: var(--yd-control-height);
   border-radius: var(--yd-control-radius);
 }
 

@@ -23,10 +23,11 @@ const toast = useYdToast()
 const router = useRouter()
 const { auth } = useAppAuth()
 const activeView = ref<string | number>('list')
+/** 视图切换用选择框：与页头按钮同高（都走 --yd-control-height），不用 tab 拼样式 */
 const viewOptions = [
-  { value: 'list', label: '列表', icon: 'morph:list' },
-  { value: 'matrix', label: '矩阵', icon: 'morph:table' },
-  { value: 'trace', label: '溯源', icon: 'morph:orbit' },
+  { value: 'list', label: '列表' },
+  { value: 'matrix', label: '矩阵' },
+  { value: 'trace', label: '溯源' },
 ]
 const overview = shallowRef<PermissionOverview>()
 const overviewLoading = ref(false)
@@ -459,7 +460,7 @@ function importRoles() {
 <template>
   <div>
     <YdPageHeader title="角色管理" description="配置角色权限，查看授权矩阵并追溯用户与菜单的关系。" main-class="flex-[1_1_240px]" class="mb-0">
-      <YdTabs v-model="activeView" :list="viewOptions" class="min-w-56" />
+      <YdSelect v-model="activeView" :options="viewOptions" class="h-9 min-h-9 w-32" aria-label="视图切换" />
       <YdButton v-if="activeView === 'list'" v-auth="'system:role:export'" variant="outline" @click="exportRoles">
         <YdIcon name="morph:file-spreadsheet" />
         导出
