@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
+import type { AiEndpointDraft } from './ai-endpoints'
 import apiCapability from '@/api/modules/platform-capability'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
+import AiEndpointConfig from './AiEndpointConfig.vue'
+import { createEndpointDraft, firstChatEndpoint, modelOptionsOf, parseEndpointDrafts, serializeEndpointDrafts, validateEndpointDrafts } from './ai-endpoints'
 
 interface CapabilityGroup {
   type: CapabilityType
@@ -15,35 +18,6 @@ interface CapabilityConfigField {
   label: string
   placeholder?: string
   type?: 'text' | 'password' | 'number' | 'textarea'
-}
-
-type AiProviderType = 'OPENAI' | 'OPENAI_COMPATIBLE' | 'KIMI' | 'DEEPSEEK'
-
-interface AiModelDraft {
-  code: string
-  name: string
-  model: string
-  temperature: string
-  reasoningEffort: string
-  thinkingEnabled: boolean
-  extraBody: string
-  kind: string
-  vision: boolean
-}
-
-interface AiProviderDraft {
-  code: string
-  name: string
-  type: AiProviderType
-  baseUrl: string
-  completionsPath: string
-  apiKey: string
-  proxyUrl: string
-  defaultModel: string
-  temperature: string
-  extraBody: string
-  enabled: boolean
-  models: AiModelDraft[]
 }
 
 const toast = useYdToast()
@@ -59,26 +33,12 @@ const configEditing = ref(false)
 const editingCapabilityCode = ref('')
 const configText = ref('{}')
 const configDraft = ref<Record<string, string>>({})
-const aiProviders = ref<AiProviderDraft[]>([])
-/** 当前编辑的供应商下标 */
-const activeProviderIndex = ref(0)
+/** AI 端点草稿：聊天 / 向量化 / 重排序各自独立，由 AiEndpointConfig 维护。 */
+const aiEndpoints = ref<AiEndpointDraft[]>([])
 const testMessage = ref('平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
 let websocket: WebSocket | null = null
-
-const aiProviderTypeOptions: { label: string, value: AiProviderType }[] = [
-  { label: 'OpenAI', value: 'OPENAI' },
-  { label: 'OpenAI 兼容', value: 'OPENAI_COMPATIBLE' },
-  { label: 'Kimi', value: 'KIMI' },
-  { label: 'DeepSeek', value: 'DEEPSEEK' },
-]
-
-const aiModelKindOptions = [
-  { label: '对话', value: 'chat' },
-  { label: 'Embedding', value: 'embedding' },
-  { label: 'Rerank', value: 'rerank' },
-]
 
 const groups: CapabilityGroup[] = [
   { type: 'REALTIME', title: '实时通信', icon: 'morph:activity' },
@@ -99,21 +59,6 @@ const usesStructuredConfig = computed(() => isAiConfig.value || configFields.val
 const dependencyRows = computed(() => dependencyStatus(selected.value))
 const missingDependencies = computed(() => dependencyRows.value.filter(item => !item.enabled))
 const canEnableSelected = computed(() => !selected.value?.enabled && missingDependencies.value.length === 0)
-const aiProviderOptions = computed(() => aiProviders.value.map((provider, index) => ({
-  label: provider.name || provider.code || `供应商 ${index + 1}`,
-  value: provider.code,
-})).filter(item => item.value))
-const aiDefaultModelOptions = computed(() => modelOptions(
-  aiProviders.value.find(provider => provider.code === configDraft.value.defaultProvider) || aiProviders.value[0],
-))
-/** 当前编辑的供应商（钳制下标越界） */
-const activeProvider = computed(() => {
-  if (!aiProviders.value.length) {
-    return undefined
-  }
-  const index = Math.min(Math.max(activeProviderIndex.value, 0), aiProviders.value.length - 1)
-  return aiProviders.value[index]
-})
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -129,11 +74,6 @@ onMounted(load)
 onBeforeUnmount(() => {
   closeSse()
   closeWs()
-})
-watch(() => configDraft.value.defaultProvider, () => {
-  if (isAiConfig.value) {
-    syncAiDefaultModel()
-  }
 })
 
 async function load() {
@@ -179,15 +119,14 @@ function openConfig(item: CapabilityItem) {
   for (const key of Object.keys(item.secretConfigured || {})) {
     configDraft.value[key] = ''
   }
-  if (item.code === 'ai' && !configDraft.value.providers) {
-    configDraft.value.providers = legacyAiProvidersJson(item.config || {})
-    configDraft.value.defaultProvider ||= 'default'
-    configDraft.value.defaultModel ||= item.config?.model || 'gpt-4o-mini'
-  }
   if (item.code === 'ai') {
-    aiProviders.value = parseAiProvidersConfig(configDraft.value)
-    activeProviderIndex.value = 0
-    syncAiDefaults()
+    aiEndpoints.value = parseEndpointDrafts(item.config || {})
+    if (!aiEndpoints.value.length) {
+      aiEndpoints.value = [createEndpointDraft('chat', 'openai')]
+    }
+    const chat = firstChatEndpoint(aiEndpoints.value)
+    configDraft.value.defaultProvider ||= chat?.code || ''
+    configDraft.value.defaultModel ||= modelOptionsOf(chat)[0]?.value || ''
   }
   configText.value = JSON.stringify(item.config || {}, null, 2)
   editingCapabilityCode.value = item.code
@@ -197,47 +136,6 @@ function openConfig(item: CapabilityItem) {
 function cancelConfig() {
   configEditing.value = false
   editingCapabilityCode.value = ''
-}
-
-function legacyAiProvidersJson(config: Record<string, string>) {
-  const model = config.model || 'gpt-4o-mini'
-  const models = (config.models || model)
-    .split(/[,，\n\r]/)
-    .map(item => item.trim())
-    .filter(Boolean)
-  return JSON.stringify([
-    {
-      code: config.providerCode || 'default',
-      name: config.providerName || 'Default AI',
-      type: config.providerType || legacyAiProviderType(config.baseUrl || ''),
-      baseUrl: config.baseUrl || 'https://api.openai.com/v1',
-      apiKey: config.apiKey || '',
-      proxyUrl: config.proxyUrl || '',
-      defaultModel: model,
-      temperature: config.temperature || '0.4',
-      extraBody: config.extraBody || '',
-      models: models.map(value => ({
-        code: value,
-        name: value,
-        model: value,
-        thinkingEnabled: config.thinkingEnabled === 'true',
-        reasoningEffort: config.reasoningEffort || '',
-      })),
-      embeddingModels: config.embeddingModel ? [config.embeddingModel] : [],
-      rerankModels: config.rerankModel ? [config.rerankModel] : [],
-    },
-  ], null, 2)
-}
-
-function legacyAiProviderType(baseUrl: string) {
-  const value = baseUrl.toLowerCase()
-  if (value.includes('moonshot') || value.includes('kimi')) {
-    return 'KIMI'
-  }
-  if (value.includes('deepseek')) {
-    return 'DEEPSEEK'
-  }
-  return 'OPENAI_COMPATIBLE'
 }
 
 async function saveConfig() {
@@ -431,11 +329,6 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'queue', label: '队列', placeholder: 'yudream.capability.test' },
       { key: 'routingKey', label: '路由键', placeholder: 'capability.test' },
     ],
-    ai: [
-      { key: 'providers', label: '供应商列表 JSON', placeholder: '[{ "code": "kimi", "type": "KIMI", "baseUrl": "https://api.moonshot.cn/v1", "apiKey": "", "models": [] }]', type: 'textarea' },
-      { key: 'defaultProvider', label: '默认供应商编码', placeholder: 'openai' },
-      { key: 'defaultModel', label: '默认模型编码', placeholder: 'gpt-4o-mini' },
-    ],
     'file-preview': [
       { key: 'baseUrl', label: 'kkFileView 服务地址（浏览器可达）', placeholder: 'http(s)://站点/kkfileview' },
       { key: 'callbackBaseUrl', label: '回源基址（留空按请求推导）', placeholder: 'http://backend:8080' },
@@ -458,271 +351,28 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
   return code ? map[code] || [] : []
 }
 
-function parseAiProvidersConfig(config: Record<string, string>) {
-  try {
-    const parsed = JSON.parse(config.providers || legacyAiProvidersJson(config))
-    if (!Array.isArray(parsed)) {
-      toast.error('AI 供应商配置需要是数组')
-      return [createAiProvider()]
-    }
-    const providers = parsed.map((item, index) => normalizeAiProvider(item, index))
-    return providers.length ? providers : [createAiProvider()]
-  }
-  catch {
-    toast.error('AI 供应商配置格式错误', { description: '已使用默认供应商模板，请检查后保存' })
-    return [createAiProvider()]
-  }
-}
-
-function normalizeAiProvider(raw: unknown, index = 0): AiProviderDraft {
-  const data = objectRecord(raw)
-  const defaultCode = index === 0 ? 'openai' : `provider-${index + 1}`
-  const defaultModel = textValue(data.defaultModel, textValue(data.model, 'gpt-4o-mini'))
-  const rawModels = Array.isArray(data.models) ? data.models : [defaultModel]
-  const models = rawModels.map((item, modelIndex) => normalizeAiModel(item, modelIndex)).filter(model => model.code || model.model)
-  // 旧数组可能保存模型编码或实际模型名；显式登记的 kind 优先。
-  for (const kind of ['embedding', 'rerank'] as const) {
-    const legacyModels = toTextList(data[`${kind}Models`])
-    for (const value of legacyModels) {
-      const existing = models.find(model => model.code === value || model.model === value)
-      if (existing) {
-        const registered = rawModels.find((item) => {
-          const model = objectRecord(item)
-          return item === value || model.code === existing.code || model.model === existing.model
-        })
-        if (!textValue(objectRecord(registered).kind).trim()) {
-          existing.kind = kind
-        }
-      }
-      else {
-        models.push({ ...createAiModel(value), kind })
-      }
-    }
-  }
-  if (!models.length) {
-    models.push(createAiModel(defaultModel))
-  }
-  return {
-    code: textValue(data.code, defaultCode),
-    name: textValue(data.name, defaultCode),
-    type: normalizeAiProviderType(textValue(data.type, 'OPENAI_COMPATIBLE')),
-    baseUrl: textValue(data.baseUrl, 'https://api.openai.com/v1'),
-    completionsPath: textValue(data.completionsPath, '/chat/completions'),
-    apiKey: textValue(data.apiKey),
-    proxyUrl: textValue(data.proxyUrl),
-    defaultModel: textValue(data.defaultModel, models[0]?.code || models[0]?.model || defaultModel),
-    temperature: textValue(data.temperature, '0.4'),
-    extraBody: extraBodyValue(data.extraBody),
-    enabled: booleanValue(data.enabled, true),
-    models,
-  }
-}
-
-function normalizeAiModel(raw: unknown, index = 0): AiModelDraft {
-  if (typeof raw === 'string') {
-    return createAiModel(raw)
-  }
-  const data = objectRecord(raw)
-  const model = textValue(data.model, textValue(data.name, textValue(data.code, `model-${index + 1}`)))
-  return {
-    code: textValue(data.code, model),
-    name: textValue(data.name, model),
-    model,
-    temperature: textValue(data.temperature),
-    reasoningEffort: textValue(data.reasoningEffort),
-    thinkingEnabled: booleanValue(data.thinkingEnabled, false),
-    extraBody: extraBodyValue(data.extraBody),
-    kind: textValue(data.kind, 'chat').trim().toLowerCase() || 'chat',
-    vision: booleanValue(data.vision, false),
-  }
-}
-
-function createAiProvider(): AiProviderDraft {
-  return {
-    code: 'openai',
-    name: 'OpenAI',
-    type: 'OPENAI',
-    baseUrl: 'https://api.openai.com/v1',
-    completionsPath: '/chat/completions',
-    apiKey: '',
-    proxyUrl: '',
-    defaultModel: 'gpt-4o-mini',
-    temperature: '0.4',
-    extraBody: '',
-    enabled: true,
-    models: [createAiModel('gpt-4o-mini', 'GPT-4o mini')],
-  }
-}
-
-function createAiModel(model = 'gpt-4o-mini', name = model): AiModelDraft {
-  return {
-    code: model,
-    name,
-    model,
-    temperature: '',
-    reasoningEffort: '',
-    thinkingEnabled: false,
-    extraBody: '',
-    kind: 'chat',
-    vision: false,
-  }
-}
-
-function addAiProvider() {
-  const index = aiProviders.value.length + 1
-  aiProviders.value.push({
-    ...createAiProvider(),
-    code: `provider-${index}`,
-    name: `供应商 ${index}`,
-    type: 'OPENAI_COMPATIBLE',
-    apiKey: '',
-  })
-  activeProviderIndex.value = aiProviders.value.length - 1
-  syncAiDefaults()
-}
-
-function removeAiProvider(index: number) {
-  aiProviders.value.splice(index, 1)
-  if (activeProviderIndex.value >= aiProviders.value.length) {
-    activeProviderIndex.value = Math.max(0, aiProviders.value.length - 1)
-  }
-  syncAiDefaults()
-}
-
-function selectAiProvider(index: number) {
-  activeProviderIndex.value = index
-}
-
-function addAiModel(provider: AiProviderDraft) {
-  const model = createAiModel(`model-${provider.models.length + 1}`)
-  provider.models.push(model)
-  provider.defaultModel ||= model.code
-  syncAiDefaults()
-}
-
-function removeAiModel(provider: AiProviderDraft, index: number) {
-  provider.models.splice(index, 1)
-  if (!provider.models.some(model => model.code === provider.defaultModel)) {
-    provider.defaultModel = provider.models[0]?.code || ''
-  }
-  syncAiDefaults()
-}
-
-function modelOptions(provider?: AiProviderDraft) {
-  return (provider?.models || []).map((model, index) => ({
-    label: model.name || model.code || model.model || `模型 ${index + 1}`,
-    value: model.code || model.model,
-  })).filter(item => item.value)
-}
-
-function syncAiDefaults() {
-  const firstProvider = aiProviders.value[0]
-  if (!firstProvider) {
-    configDraft.value.defaultProvider = ''
-    configDraft.value.defaultModel = ''
-    return
-  }
-  if (!aiProviders.value.some(provider => provider.code === configDraft.value.defaultProvider)) {
-    configDraft.value.defaultProvider = firstProvider.code
-  }
-  syncAiDefaultModel()
-}
-
-function syncAiDefaultModel() {
-  const provider = aiProviders.value.find(item => item.code === configDraft.value.defaultProvider) || aiProviders.value[0]
-  if (!provider) {
-    configDraft.value.defaultModel = ''
-    return
-  }
-  const options = modelOptions(provider)
-  if (!options.some(option => option.value === provider.defaultModel)) {
-    provider.defaultModel = options[0]?.value || ''
-  }
-  if (!options.some(option => option.value === configDraft.value.defaultModel)) {
-    configDraft.value.defaultModel = provider.defaultModel || options[0]?.value || ''
-  }
-}
-
-function modelsByKind(provider: AiProviderDraft, kind: 'embedding' | 'rerank') {
-  return [...new Set(provider.models
-    .filter(model => model.kind === kind)
-    .map(model => model.model.trim())
-    .filter(Boolean))]
-}
-
-function serializeAiProviders() {
-  return aiProviders.value.map(provider => ({
-    code: provider.code.trim(),
-    name: provider.name.trim(),
-    type: provider.type,
-    baseUrl: provider.baseUrl.trim().replace(/\/+$/, ''),
-    completionsPath: provider.completionsPath.trim() || '/chat/completions',
-    apiKey: provider.apiKey.trim(),
-    proxyUrl: provider.proxyUrl.trim(),
-    defaultModel: provider.defaultModel.trim() || provider.models[0]?.code?.trim() || '',
-    temperature: textValue(provider.temperature, '0.4'),
-    extraBody: provider.extraBody.trim(),
-    models: provider.models.map(model => ({
-      code: model.code.trim(),
-      name: model.name.trim(),
-      model: model.model.trim(),
-      temperature: textValue(model.temperature),
-      reasoningEffort: textValue(model.reasoningEffort),
-      thinkingEnabled: model.thinkingEnabled,
-      extraBody: model.extraBody.trim(),
-      kind: model.kind.trim() || 'chat',
-      vision: model.vision,
-    })),
-    embeddingModels: modelsByKind(provider, 'embedding'),
-    rerankModels: modelsByKind(provider, 'rerank'),
-    enabled: provider.enabled,
-  }))
-}
-
+/** 保存前归一化：AI 走端点契约（保留配额等既有配置键），其他结构化能力按字段收集。 */
 function normalizedConfig() {
   if (selected.value?.code === 'ai') {
-    syncAiDefaults()
-    const providers = serializeAiProviders()
-    if (!providers.length) {
-      toast.error('请至少配置一个 AI 供应商')
+    const error = validateEndpointDrafts(aiEndpoints.value)
+    if (error) {
+      toast.error(error)
       return null
     }
-    const providerCodes = new Set<string>()
-    for (const [index, provider] of providers.entries()) {
-      if (!provider.code) {
-        toast.error(`第 ${index + 1} 个供应商缺少编码`)
-        return null
-      }
-      if (providerCodes.has(provider.code)) {
-        toast.error(`供应商编码重复：${provider.code}`)
-        return null
-      }
-      providerCodes.add(provider.code)
-      if (!provider.baseUrl) {
-        toast.error(`供应商 ${provider.code} 缺少 API 地址`)
-        return null
-      }
-      if (!provider.models.length) {
-        toast.error(`供应商 ${provider.code} 至少需要一个模型`)
-        return null
-      }
-      for (const model of provider.models) {
-        if (!model.code || !model.model) {
-          toast.error(`供应商 ${provider.code} 存在模型编码或模型名为空`)
-          return null
-        }
-      }
-    }
-    const defaultProvider = configDraft.value.defaultProvider?.trim() || providers[0].code
-    const selectedProvider = providers.find(provider => provider.code === defaultProvider) || providers[0]
-    const defaultModel = configDraft.value.defaultModel?.trim() || selectedProvider.defaultModel || selectedProvider.models[0]?.code || ''
-    if (!selectedProvider.models.some(model => model.code === defaultModel || model.model === defaultModel)) {
-      toast.error('默认模型必须属于默认供应商')
+    const chat = firstChatEndpoint(aiEndpoints.value)
+    const endpoint = aiEndpoints.value.find(item => item.usage === 'chat' && item.code === configDraft.value.defaultProvider) || chat
+    const options = modelOptionsOf(endpoint)
+    const selectedModel = configDraft.value.defaultModel?.trim() || ''
+    const defaultModel = options.some(option => option.value === selectedModel) ? selectedModel : (options[0]?.value || '')
+    if (!endpoint || !defaultModel) {
+      toast.error('默认模型必须属于默认聊天端点')
       return null
     }
     return {
-      providers: JSON.stringify(providers, null, 2),
-      defaultProvider: selectedProvider.code,
+      // 能力配置整体替换，必须带上配额、附件等既有键，避免保存端点时丢失。
+      ...(selected.value.config || {}),
+      providers: serializeEndpointDrafts(aiEndpoints.value),
+      defaultProvider: endpoint.code,
       defaultModel,
     }
   }
@@ -741,55 +391,6 @@ function parseJsonConfig() {
   }
 }
 
-function objectRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
-}
-
-function textValue(value: unknown, fallback = '') {
-  if (value === null || value === undefined) {
-    return fallback
-  }
-  return String(value)
-}
-
-function booleanValue(value: unknown, fallback: boolean) {
-  if (value === null || value === undefined || value === '') {
-    return fallback
-  }
-  if (typeof value === 'boolean') {
-    return value
-  }
-  return String(value).trim().toLowerCase() === 'true'
-}
-
-function normalizeAiProviderType(value: string): AiProviderType {
-  const normalized = value.trim().replace(/-/g, '_').toUpperCase()
-  return aiProviderTypeOptions.some(item => item.value === normalized) ? normalized as AiProviderType : 'OPENAI_COMPATIBLE'
-}
-
-function extraBodyValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return ''
-  }
-  if (typeof value === 'string') {
-    return value
-  }
-  return JSON.stringify(value, null, 2)
-}
-
-function toTextList(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.map(item => textValue(item).trim()).filter(Boolean)
-  }
-  return splitModelList(textValue(value))
-}
-
-function splitModelList(value: string) {
-  return value
-    .split(/[,，\n\r]/)
-    .map(item => item.trim())
-    .filter(Boolean)
-}
 </script>
 
 <template>
@@ -895,148 +496,14 @@ function splitModelList(value: string) {
               </div>
             </div>
 
-            <!-- AI 能力：供应商列表 + 选中编辑 + 模型表格 -->
-            <div v-if="isAiConfig" class="ai-inline">
-              <div class="ai-inline__topbar">
-                <label class="config-field">
-                  <span>默认供应商</span>
-                  <YdSelect v-model="configDraft.defaultProvider" :options="aiProviderOptions" placeholder="选择默认供应商" class="w-full" />
-                </label>
-                <label class="config-field">
-                  <span>默认模型</span>
-                  <YdSelect v-model="configDraft.defaultModel" :options="aiDefaultModelOptions" placeholder="选择默认模型" class="w-full" />
-                </label>
-              </div>
-
-              <div class="ai-inline__body">
-                <!-- 供应商列表 -->
-                <aside class="ai-provider-nav">
-                  <YdButton
-                    v-for="(provider, providerIndex) in aiProviders"
-                    :key="providerIndex"
-                    variant="ghost"
-                    type="button"
-                    class="ai-provider-nav__item"
-                    :class="{ 'is-active': providerIndex === activeProviderIndex }"
-                    :aria-pressed="providerIndex === activeProviderIndex"
-                    @click="selectAiProvider(providerIndex)"
-                  >
-                    <YdIcon name="morph:cloud" class="ai-provider-nav__icon" />
-                    <span class="ai-provider-nav__name">{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</span>
-                    <span class="ai-provider-nav__badge" :class="{ off: !provider.enabled }">{{ provider.enabled ? '启用' : '停用' }}</span>
-                  </YdButton>
-                  <YdButton variant="outline" size="sm" class="ai-provider-nav__add" @click="addAiProvider">
-                    <YdIcon name="morph:plus" />
-                    添加供应商
-                  </YdButton>
-                </aside>
-
-                <!-- 选中供应商编辑 -->
-                <div v-if="activeProvider" class="ai-provider-edit">
-                  <div class="ai-provider-edit__head">
-                    <strong>{{ activeProvider.name || activeProvider.code }}</strong>
-                    <div class="ai-provider-edit__tools">
-                      <span class="ai-switch-label">启用</span>
-                      <YdSwitch v-model="activeProvider.enabled" />
-                      <YdButton size="sm" variant="ghost" :disabled="aiProviders.length <= 1" title="删除供应商" @click="removeAiProvider(activeProviderIndex)">
-                        <YdIcon name="morph:trash-2" />
-                      </YdButton>
-                    </div>
-                  </div>
-
-                  <div class="ai-provider-form">
-                    <label class="config-field">
-                      <span>供应商编码</span>
-                      <YdInput v-model="activeProvider.code" placeholder="openai" @blur="syncAiDefaults" />
-                    </label>
-                    <label class="config-field">
-                      <span>显示名称</span>
-                      <YdInput v-model="activeProvider.name" placeholder="OpenAI" />
-                    </label>
-                    <label class="config-field">
-                      <span>供应商类型</span>
-                      <YdSelect v-model="activeProvider.type" :options="aiProviderTypeOptions" class="w-full" />
-                    </label>
-                    <label class="config-field">
-                      <span>默认模型</span>
-                      <YdSelect v-model="activeProvider.defaultModel" :options="modelOptions(activeProvider)" class="w-full" />
-                    </label>
-                    <label class="config-field ai-span-2">
-                      <span>API 地址</span>
-                      <YdInput v-model="activeProvider.baseUrl" placeholder="https://api.openai.com/v1" />
-                    </label>
-                    <label class="config-field">
-                      <span>补全路径</span>
-                      <YdInput v-model="activeProvider.completionsPath" placeholder="/chat/completions" />
-                    </label>
-                    <label class="config-field">
-                      <span>温度</span>
-                      <YdInput v-model="activeProvider.temperature" type="number" placeholder="0.4" />
-                    </label>
-                    <label class="config-field ai-span-2">
-                      <span>API Key</span>
-                      <YdInput v-model="activeProvider.apiKey" type="password" placeholder="sk-..." />
-                    </label>
-                    <label class="config-field ai-span-2">
-                      <span>代理地址</span>
-                      <YdInput v-model="activeProvider.proxyUrl" placeholder="http://127.0.0.1:7890" />
-                    </label>
-                  </div>
-
-                  <!-- 模型表格 -->
-                  <div class="ai-model-table-wrap">
-                    <div class="ai-model-table__head">
-                      <span>模型（{{ activeProvider.models.length }}）</span>
-                      <YdButton size="sm" variant="outline" @click="addAiModel(activeProvider)">
-                        <YdIcon name="morph:plus" />
-                        添加模型
-                      </YdButton>
-                    </div>
-                    <table class="ai-model-table">
-                      <thead>
-                        <tr>
-                          <th>名称</th>
-                          <th>模型名</th>
-                          <th>类型</th>
-                          <th>温度</th>
-                          <th>思考</th>
-                          <th>视觉</th>
-                          <th />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(model, modelIndex) in activeProvider.models" :key="modelIndex">
-                          <td class="ai-model-table__wide" data-label="名称"><YdInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
-                          <td class="ai-model-table__wide" data-label="模型名"><YdInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
-                          <td data-label="类型"><YdSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
-                          <td class="ai-model-table__num" data-label="温度"><YdInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
-                          <td class="ai-model-table__switch" data-label="思考"><YdSwitch v-model="model.thinkingEnabled" /></td>
-                          <td class="ai-model-table__switch" data-label="视觉"><YdSwitch v-model="model.vision" /></td>
-                          <td class="ai-model-table__op">
-                            <YdButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
-                              <YdIcon name="morph:trash-2" />
-                            </YdButton>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <p class="config-field__hint">
-                    向量 / 嵌入与重排模型统一在上表登记并选择类型，保存时自动生成对应模型列表，无需重复填写。
-                  </p>
-                  <details class="ai-advanced">
-                    <summary>高级：额外请求体</summary>
-                    <div class="ai-provider-form ai-advanced__body">
-                      <label class="config-field ai-span-4">
-                        <span>供应商额外请求体</span>
-                        <YdTextarea v-model="activeProvider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
-                      </label>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </div>
+            <!-- AI 能力：端点目录（聊天 / 向量化 / 重排序）与分层配置 -->
+            <AiEndpointConfig
+              v-if="isAiConfig"
+              v-model:endpoints="aiEndpoints"
+              v-model:default-provider="configDraft.defaultProvider"
+              v-model:default-model="configDraft.defaultModel"
+              :capability-enabled="Boolean(selected?.enabled)"
+            />
 
             <!-- 其他结构化配置 -->
             <div v-else-if="usesStructuredConfig" class="config-form">
@@ -1432,230 +899,6 @@ function splitModelList(value: string) {
   gap: 8px;
 }
 
-.ai-inline {
-  display: grid;
-  gap: 14px;
-}
-
-.ai-inline__topbar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-fill-1);
-}
-
-.ai-inline__body {
-  display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.ai-provider-nav {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-  padding: 10px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-2);
-}
-
-.ai-provider-nav__item {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--color-text-2);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-
-.ai-provider-nav__item:hover {
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-}
-
-.ai-provider-nav__item.is-active {
-  border-color: var(--color-border-3);
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-}
-
-.ai-provider-nav__icon {
-  color: var(--color-text-3);
-}
-
-.ai-provider-nav__item.is-active .ai-provider-nav__icon {
-  color: var(--color-text-1);
-}
-
-.ai-provider-nav__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-provider-nav__badge {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: rgba(var(--success-6), 0.12);
-  color: rgb(var(--success-6));
-  font-size: 11px;
-}
-
-.ai-provider-nav__badge.off {
-  background: var(--color-fill-2);
-  color: var(--color-text-3);
-}
-
-.ai-provider-nav__add {
-  margin-top: 6px;
-  justify-content: center;
-}
-
-.ai-provider-edit {
-  display: grid;
-  min-width: 0;
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-2);
-}
-
-.ai-provider-edit__head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.ai-provider-edit__head strong {
-  color: var(--color-text-1);
-  font-size: 15px;
-}
-
-.ai-provider-edit__tools {
-  display: inline-flex;
-  gap: 10px;
-  align-items: center;
-  color: var(--color-text-2);
-  font-size: 12px;
-}
-
-.ai-provider-form {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.ai-span-2 {
-  grid-column: span 2;
-}
-
-.ai-span-4 {
-  grid-column: 1 / -1;
-}
-
-/* 模型表格 */
-.ai-model-table-wrap {
-  display: grid;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-.ai-model-table__head {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--color-text-1);
-  font-weight: 700;
-}
-
-.ai-model-table {
-  width: 100%;
-  border-collapse: collapse;
-  overflow: hidden;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-1);
-  font-size: 13px;
-}
-
-.ai-model-table th {
-  padding: 8px 10px;
-  background: var(--color-fill-1);
-  color: var(--color-text-3);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-}
-
-.ai-model-table td {
-  padding: 6px 8px;
-  border-top: 1px solid var(--color-border-2);
-  vertical-align: middle;
-}
-
-.ai-model-table__num {
-  width: 84px;
-}
-
-.ai-model-table__switch {
-  width: 56px;
-  text-align: center;
-}
-
-.ai-model-table__op {
-  width: 44px;
-  text-align: center;
-}
-
-.ai-advanced {
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-1);
-}
-
-.ai-advanced summary {
-  padding: 10px 14px;
-  color: var(--color-text-2);
-  cursor: pointer;
-  font-size: 13px;
-  list-style: none;
-}
-
-.ai-advanced summary::-webkit-details-marker {
-  display: none;
-}
-
-.ai-advanced summary::before {
-  margin-right: 6px;
-  color: var(--color-text-3);
-  content: '▸';
-}
-
-.ai-advanced[open] summary::before {
-  content: '▾';
-}
-
-.ai-advanced__body {
-  padding: 0 14px 14px;
-}
-
 @media (max-width: 900px) {
   .capability-toolbar,
   .detail-header {
@@ -1663,8 +906,7 @@ function splitModelList(value: string) {
     align-items: stretch;
   }
 
-  .capability-layout,
-  .ai-inline__body {
+  .capability-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1672,98 +914,6 @@ function splitModelList(value: string) {
     justify-content: flex-start;
   }
 
-  .ai-provider-form {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-span-2,
-  .ai-span-4 {
-    grid-column: auto;
-  }
-
 }
 
-@media (min-width: 641px) and (max-width: 900px) {
-  .ai-model-table-wrap {
-    overflow-x: auto;
-  }
-
-  .ai-model-table {
-    min-width: 680px;
-  }
-}
-
-/* 窄屏：模型表转为卡片列表，避免列被压缩成竖排文字 */
-@media (max-width: 640px) {
-  .ai-model-table {
-    overflow: visible;
-    border: 0;
-    background: transparent;
-  }
-
-  .ai-model-table,
-  .ai-model-table tbody {
-    display: block;
-  }
-
-  .ai-model-table thead {
-    display: none;
-  }
-
-  .ai-model-table tr {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 12px;
-    border: 1px solid var(--color-border-2);
-    border-radius: 8px;
-    background: var(--color-bg-1);
-  }
-
-  .ai-model-table td {
-    display: block;
-    padding: 0;
-    border-top: 0;
-  }
-
-  .ai-model-table td[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 4px;
-    color: var(--color-text-3);
-    font-size: 11px;
-  }
-
-  .ai-model-table__wide {
-    flex: 1 1 100%;
-  }
-
-  .ai-model-table td[data-label='类型'] {
-    flex: 1 1 52%;
-  }
-
-  .ai-model-table__num {
-    flex: 1 1 30%;
-    width: auto;
-  }
-
-  .ai-model-table__switch {
-    display: inline-flex;
-    align-items: center;
-    flex: 0 0 auto;
-    gap: 6px;
-    width: auto;
-  }
-
-  .ai-model-table__switch::before {
-    margin-bottom: 0;
-  }
-
-  .ai-model-table__op {
-    width: auto;
-    margin-left: auto;
-    text-align: right;
-  }
-}
 </style>

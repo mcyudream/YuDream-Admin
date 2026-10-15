@@ -27,6 +27,21 @@ export interface CapabilityTestResult {
   testedAt?: string
 }
 
+export interface AiModelDiscoveryPayload {
+  providerCode?: string
+  usage: 'chat' | 'embedding' | 'rerank'
+  protocol?: string
+  baseUrl?: string
+  apiKey?: string
+  proxyUrl?: string
+}
+
+export interface AiModelDiscoveryResult {
+  models: { code: string, name: string, kind: string }[]
+  listed: boolean
+  message?: string
+}
+
 export default {
   list: () => {
     return systemClient.get<unknown, ApiResponse<CapabilityItem[]>>('api/platform/capabilities')
@@ -42,5 +57,9 @@ export default {
   },
   test: (code: string, message: string) => {
     return systemClient.post<unknown, ApiResponse<CapabilityTestResult>>(`api/platform/capabilities/${code}/test`, { message })
+  },
+  /** 端点模型发现：按用途/协议请求远端模型列表，供「获取模型」登记。 */
+  discoverModels: (payload: AiModelDiscoveryPayload) => {
+    return systemClient.post<unknown, ApiResponse<AiModelDiscoveryResult>>('api/platform/ai/endpoints/discover-models', payload)
   },
 }
