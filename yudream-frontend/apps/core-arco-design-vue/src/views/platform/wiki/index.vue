@@ -77,6 +77,12 @@ function mergedQuery(patch: Record<string, unknown>): Record<string, string> {
 /**
  * 页面内导航：先切本地状态（界面立即响应），再静默同步地址栏。
  * 不走 router.push，避免宿主布局按 fullPath 重挂载整页。
+ *
+ * spaceId 不是纯地址栏参数：它决定空间选择、目录树与属性栏。只写地址栏会让
+ * 「列表点卡片进入编辑区」停在旧空间（表现为进入后显示「未选择」、目录树空白），
+ * 随后进治理区时 openManage 又会因为状态里没有空间而把地址栏里的知识库一并抹掉。
+ * 因此带 spaceId / view 的补丁统一交给 applyRoute 收敛状态；applyRoute 内部是单次
+ * 收敛（补正地址栏时直接写，不再回调 patchQuery），不会互相递归。
  */
 function patchQuery(patch: Record<string, unknown>) {
   const next = mergedQuery(patch)
@@ -88,6 +94,9 @@ function patchQuery(patch: Record<string, unknown>) {
     activePanel.value = isWikiManagePanel(next.panel) ? next.panel : defaultWikiManagePanel
   }
   syncUrl(next)
+  if ('spaceId' in patch || 'view' in patch) {
+    applyRoute()
+  }
 }
 
 /** 静默地址栏同步：只替换当前 history 条目，不产生导航，因此不触发页面重挂载 */
@@ -178,9 +187,11 @@ function applyRoute() {
     loadingTree.value = false
   }
   if (!isEntry && nextSpaceId && !validRequested) {
-    // 深链缺少或写错 spaceId：补成实际生效的知识库，保证地址可分享
-    patchQuery({ spaceId: nextSpaceId })
-    return
+    // 深链缺少或写错 spaceId：补成实际生效的知识库，保证地址可分享。
+    // 直接写地址栏而不是回调 patchQuery：这里必须继续往下把目录与选中页面收敛完（单次收敛，不递归）。
+    const patched = mergedQuery({ spaceId: nextSpaceId })
+    urlQuery.value = patched
+    syncUrl(patched)
   }
   if (!isEntry && spaceId.value && treeLoadedFor.value !== spaceId.value && !loadingTree.value) {
     void reloadTree()
@@ -292,23 +303,32 @@ async function guardedNavigate(patch: Record<string, unknown>) {
   patchQuery(patch)
 }
 
+/**
+ * 进入某个工作面时的知识库解析：状态优先，其次地址栏。
+ * 兜底是防「状态还没收敛就导航」这类顺序问题把知识库从工作面上抹掉（进治理区曾因此变成「暂无知识库」）。
+ * 地址里的无效值不会被带进来：applyRoute 会按可见知识库校验，非法值自动回落到实际生效的知识库。
+ */
+function effectiveSpaceId(): string {
+  return spaceId.value || urlQuery.value.spaceId || ''
+}
+
 function openEntry() {
   void guardedNavigate({ view: 'entry', nodeId: undefined, panel: undefined })
 }
 
 function openAuthor(target?: { space?: WikiSpace, node?: WikiNode | null }) {
-  const nextSpaceId = target?.space?.id || spaceId.value
+  const nextSpaceId = target?.space?.id || effectiveSpaceId()
   const sameSpace = !target?.space || target.space.id === spaceId.value
   const nodeId = target?.node?.id || (sameSpace ? urlQuery.value.nodeId : undefined)
   // 必须显式传 spaceId，避免从知识库列表进入时丢失上下文
-  void guardedNavigate({ view: 'author', spaceId: nextSpaceId, nodeId, panel: undefined })
+  void guardedNavigate({ view: 'author', spaceId: nextSpaceId || undefined, nodeId, panel: undefined })
 }
 
 function openManage(panel?: string, target?: WikiSpace) {
   void guardedNavigate({
     view: 'manage',
     panel: panel || activePanel.value,
-    spaceId: target?.id || spaceId.value || undefined,
+    spaceId: target?.id || effectiveSpaceId() || undefined,
     nodeId: undefined,
   })
 }

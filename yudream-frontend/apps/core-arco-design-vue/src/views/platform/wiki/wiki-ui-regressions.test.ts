@@ -150,6 +150,19 @@ test('author toolbar keeps the save state next to the title and promotes the exe
   assert.doesNotMatch(author, /#4f46e5/)
 })
 
+test('entering a workspace always resolves the knowledge base into state, not only into the URL', () => {
+  const index = wikiFile('index.vue')
+  // 页面内导航要把 spaceId 收敛进状态：只写地址栏会让「列表点卡片进入」停在「未选择」、目录树空白
+  assert.match(index, /if \('spaceId' in patch \|\| 'view' in patch\) \{\s*applyRoute\(\)/)
+  // 进入工作面时状态优先、地址栏兜底；不允许把知识库从工作面上抹掉（治理区曾因此显示「暂无知识库」）
+  assert.match(index, /function effectiveSpaceId\(\): string \{\s*return spaceId\.value \|\| urlQuery\.value\.spaceId \|\| ''/)
+  assert.match(index, /spaceId: target\?\.id \|\| effectiveSpaceId\(\) \|\| undefined/)
+  assert.match(index, /const nextSpaceId = target\?\.space\?\.id \|\| effectiveSpaceId\(\)/)
+  // 深链补正 spaceId 时直接写地址栏：与 patchQuery 互相回调会递归
+  assert.match(index, /const patched = mergedQuery\(\{ spaceId: nextSpaceId \}\)/)
+  assert.doesNotMatch(index, /patchQuery\(\{ spaceId: nextSpaceId \}\)/)
+})
+
 test('inline images stay private and the public rendering gap is stated, not claimed solved', () => {
   const images = wikiFile('wiki-images.ts')
   // 上传固定私有，不做空间可见性推导
