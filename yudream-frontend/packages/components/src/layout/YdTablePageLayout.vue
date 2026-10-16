@@ -7,6 +7,7 @@ import YdIcon from '../basic/icon/index.vue'
 import YdPageHeader from '../basic/page-header/index.vue'
 import { tableActionsTargetKey } from '../basic/table/table-actions-context'
 import YdSegmented from '../extended/YdSegmented.vue'
+import { tablePageSearchFoldKey } from './table-page-layout-context'
 
 defineOptions({ name: 'YdTablePageLayout' })
 
@@ -52,6 +53,11 @@ const searchFolded = computed({
     foldedInner.value = value
     emit('update:searchFolded', value)
   },
+})
+
+// 供内嵌的 YdDynamicSearchForm 使用：提交/重置后收起搜索区，把空间还给表格
+provide(tablePageSearchFoldKey, (fold: boolean) => {
+  searchFolded.value = fold
 })
 
 const activeTabLocal = computed({
@@ -218,7 +224,8 @@ const foldedActions = computed(() => {
   gap: 16px;
   min-height: 0;
   padding: 16px;
-  overflow: hidden;
+  /* 视口过矮（表格卡触底最小高度）时整体可滚，避免表格被压缩到看不见 */
+  overflow: auto;
 }
 
 .yd-table-page-layout__search {
@@ -277,8 +284,12 @@ const foldedActions = computed(() => {
   overflow: hidden;
 }
 
+/* 搜索内容限高并内部滚动：字段多或屏幕矮时不至于把表格挤没 */
 .yd-table-page-layout__search-content {
+  max-height: min(40vh, 360px);
   padding: 0 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* 表格卡片：铺满剩余高度，内部三段式（操作栏 / 滚动区 / 分页） */
@@ -286,7 +297,8 @@ const foldedActions = computed(() => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
+  /* 表格卡最小可读高度：低于此值由内容区整体滚动兜底（小屏高度场景） */
+  min-height: 280px;
   overflow: hidden;
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SearchConfig, SearchFieldConfig, SearchOption, SearchOptionsSource } from './search-config-types'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import YdButton from '../basic/button/index.vue'
 import YdCheckboxGroup from '../basic/checkbox-group/index.vue'
 import YdIcon from '../basic/icon/index.vue'
@@ -9,6 +9,7 @@ import YdNumberRange from '../basic/number-range/index.vue'
 import YdRadioGroup from '../basic/radio-group/index.vue'
 import YdRangePicker from '../basic/range-picker/index.vue'
 import YdSelect from '../basic/select/index.vue'
+import { tablePageSearchFoldKey } from '../layout/table-page-layout-context'
 import { ControlType } from './search-config-types'
 
 defineOptions({ name: 'YdDynamicSearchForm' })
@@ -143,9 +144,13 @@ function setNumberRange(field: SearchFieldConfig, value?: (number | undefined)[]
   formData.value[`${field.fieldName}Max`] = value?.[1]
 }
 
+/** 由 YdTablePageLayout 注入：筛选/重置完成后自动收起搜索区（独立使用时为空） */
+const collapseSearch = inject(tablePageSearchFoldKey, undefined)
+
 // 处理搜索
 function handleSearch() {
   emit('search')
+  collapseSearch?.(true)
 }
 
 // 处理重置
@@ -155,6 +160,7 @@ function handleReset() {
     delete formData.value[key]
   })
   emit('reset')
+  collapseSearch?.(true)
 }
 
 // 监听配置变化,预加载选项
