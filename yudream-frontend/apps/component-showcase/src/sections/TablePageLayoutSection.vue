@@ -164,7 +164,7 @@ const { searchConfig, searchQuery } = useTablePage({
     </YdTablePageLayout>
 
     <ul class="text-xs text-muted-foreground mt-3 space-y-1">
-      <li>折叠态只显示「搜索」行，点击展开筛选表单；展开后右上角可收起。</li>
+      <li>折叠态只显示「搜索」行，点击整行平滑展开筛选表单；再次点击收起。</li>
       <li>操作按钮超过 <code>actionsThreshold</code> 时，标记 <code>autoFold</code> 的项收进「更多」下拉；<code>danger</code> 项红色标识且默认可二次确认。</li>
       <li>表格默认铺满可用宽度；移动端（≤768px）自动切换卡片视图。</li>
     </ul>

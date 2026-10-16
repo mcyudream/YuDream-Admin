@@ -99,32 +99,32 @@ const foldedActions = computed(() => {
     </YdPageHeader>
 
     <div class="yd-table-page-layout__body">
-      <!-- 搜索卡片：独立成卡，固定于顶部 -->
+      <!-- 搜索卡片：独立成卡，固定于顶部；整行点击切换展开，箭头带旋转过渡 -->
       <div v-if="showSearch" class="yd-table-page-layout__search">
-        <div class="yd-table-page-layout__search-head">
-          <button
-            type="button"
-            class="yd-table-page-layout__search-toggle"
-            :aria-expanded="!searchFolded"
-            @click="searchFolded = !searchFolded"
-          >
-            <YdIcon :name="searchFolded ? 'morph:chevron-right' : 'morph:chevron-down'" />
-            <span>搜索</span>
-          </button>
-          <button
-            v-if="!searchFolded"
-            type="button"
-            class="yd-table-page-layout__search-close"
-            aria-label="收起搜索"
-            title="收起搜索"
-            @click="searchFolded = true"
-          >
-            <YdIcon name="morph:x" />
-          </button>
-        </div>
+        <button
+          type="button"
+          class="yd-table-page-layout__search-toggle"
+          :aria-expanded="!searchFolded"
+          @click="searchFolded = !searchFolded"
+        >
+          <YdIcon
+            name="morph:chevron-down"
+            class="yd-table-page-layout__search-chevron"
+            :class="{ 'is-folded': searchFolded }"
+          />
+          <span>搜索</span>
+        </button>
 
-        <div v-show="!searchFolded" class="yd-table-page-layout__search-body">
-          <slot name="search" :fold="searchFolded" />
+        <!-- 展开动画：grid-template-rows 0fr↔1fr 平滑过渡，内层裁剪高度 -->
+        <div
+          class="yd-table-page-layout__search-body"
+          :class="{ 'is-open': !searchFolded }"
+        >
+          <div class="yd-table-page-layout__search-inner">
+            <div class="yd-table-page-layout__search-content">
+              <slot name="search" :fold="searchFolded" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -228,17 +228,11 @@ const foldedActions = computed(() => {
   border-radius: 8px;
 }
 
-.yd-table-page-layout__search-head {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
 .yd-table-page-layout__search-toggle {
   display: flex;
-  flex: 1;
   gap: 8px;
   align-items: center;
+  width: 100%;
   min-width: 0;
   padding: 12px 16px;
   font-size: 14px;
@@ -256,28 +250,34 @@ const foldedActions = computed(() => {
   background: var(--color-fill-1);
 }
 
-.yd-table-page-layout__search-close {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin-right: 12px;
-  color: var(--color-text-3);
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  transition: background-color 0.15s ease;
+/* 箭头折叠时顺时针转回 -90°，与展开动作呼应 */
+.yd-table-page-layout__search-chevron {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.yd-table-page-layout__search-close:hover {
-  color: var(--color-text-1);
-  background: var(--color-fill-2);
+.yd-table-page-layout__search-chevron.is-folded {
+  transform: rotate(-90deg);
 }
 
+/* 展开/收起：grid 轨道 0fr↔1fr 平滑过渡（无需测量内容高度） */
 .yd-table-page-layout__search-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.yd-table-page-layout__search-body.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.yd-table-page-layout__search-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.yd-table-page-layout__search-content {
   padding: 0 16px 16px;
 }
 
