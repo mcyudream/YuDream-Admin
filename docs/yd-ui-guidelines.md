@@ -215,13 +215,13 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 | 类别 | 公开入口 |
 | --- | --- |
-| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdWorkspaceLayout`、`YdWorkspaceTabs`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
+| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdTablePageLayout`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdWorkspaceLayout`、`YdWorkspaceTabs`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
 | 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction`、`YdFab`、`YdPopconfirm` |
-| 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate`、`YdColorPicker`、`YdTreeSelect` |
+| 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdNumberRange`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate`、`YdColorPicker`、`YdTreeSelect` |
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup`、`YdSegmented` |
 | 层级与专用选择 | `YdTree`、`YdTreeSelect`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
-| 查询与分页 | `YdListToolbar`、`YdFilterSelect`、`YdSearchBar`、`YdPagination` |
+| 查询与分页 | `YdListToolbar`、`YdFilterSelect`、`YdSearchBar`、`YdDynamicSearchForm`、`YdPagination` |
 | 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
