@@ -71,3 +71,6 @@ yd-docs/.dev-server.log
 # Local-only engineering notes and secrets
 /docs/plan/
 /docs/local.md
+
+# 截图脚本的临时 Chrome 用户数据（缓存/凭据，勿入库）
+tmp/screenshots/chrome-profile*/
