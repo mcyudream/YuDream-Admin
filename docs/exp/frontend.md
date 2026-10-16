@@ -26,6 +26,13 @@
 - **规避**：插件构建产物自行包含所需工具类，不能依赖宿主运行时补扫。
 - **来源**：`plugin-remote-style-injection`。
 
+### 表格页分页停在“共 0 条”且没有第二页
+
+- **现象**：某页分页首帧后再不更新（永远“共 0 条”、无页码），同页其它文本照常刷新，其它页同组件分页正常；控制台出现 `Unhandled error during execution of app errorHandler`。
+- **根因**：`:ref="fn"` 的函数式 ref 在组件每次 patch 都被重调；函数内先读后写同一份响应式状态（如 `shallowReactive(Map)` 注册表），且读写发生在当前渲染 effect 内，effect 自我失效 → 同一次 flush 递归渲染 100+ 次 → 撞 Vue 递归更新上限被跳过，排在后面的组件（分页）更新成批丢失。
+- **规避**：函数式 ref 里目标未变时立即 return，绝不在渲染期读写响应式状态；定位手段是包装全树实例的 `effect.run` 计数——被拖死的组件计数远超 1，正常链路各 1 次（见 `tmp/probe-update-counts.cjs`）。
+- **来源**：`f19a2591`；验证脚本 `tmp/verify-pagination-fix.cjs`、`tmp/final-three-pages.cjs`。
+
 ## 2. 布局与交互
 
 ### 首页插件卡片保存成功但刷新后消失
