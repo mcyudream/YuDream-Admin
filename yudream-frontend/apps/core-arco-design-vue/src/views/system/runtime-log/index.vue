@@ -551,7 +551,7 @@ async function saveDockerSettings() {
   border-radius: 8px;
 }
 
-.toolbar-level {
+:deep(.toolbar-level){
   width: 150px;
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, UserColumn } from '@yudream/components'
-import { useYdToast, YdEnhancedTable, YdResponsiveEnhancedTable } from '@yudream/components'
-import { ref } from 'vue'
+import type { ActionMenuItem, EnhancedTableProps, StatusColumn, UserColumn } from '@yudream/components'
+import { useYdToast, YdEnhancedTable, YdResponsiveEnhancedTable, YdSegmented } from '@yudream/components'
+import { computed, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
 const toast = useYdToast()
@@ -115,6 +115,28 @@ const columns = [
   { accessorKey: 'role', header: '角色', width: 110 },
 ]
 
+/** 固定列演示：宽表列，总宽超出内容区后才能看到固定列效果 */
+const fixedColumns: EnhancedTableProps<Member>['columns'] = [
+  ...columns,
+  { accessorKey: 'email', header: '邮箱', width: 240 },
+  { accessorKey: 'id', header: '用户 ID', width: 200 },
+]
+
+type UserColumnFixedMode = 'left' | 'right' | 'none'
+
+const fixedMode = ref<UserColumnFixedMode>('left')
+const fixedOptions: { label: string, value: UserColumnFixedMode }[] = [
+  { label: '左固定（默认）', value: 'left' },
+  { label: '右固定', value: 'right' },
+  { label: '不固定', value: 'none' },
+]
+
+/** userColumn.fixed：默认固定在左侧，false 取消固定，也可固定在右侧 */
+const fixedUserColumn = computed<UserColumn<Member>>(() => ({
+  ...userColumn,
+  fixed: fixedMode.value === 'none' ? false : fixedMode.value,
+}))
+
 /** 行级可见性与动态文案：停用/启用按行状态切换，无权限的项直接不出现 */
 const responsiveActions: ActionMenuItem<Member>[] = [
   {
@@ -176,6 +198,27 @@ const responsiveActions: ActionMenuItem<Member>[] = [
       <li><code>cardHiddenColumns</code> 可在卡片里隐藏宽列（本例隐藏手机号），列显示开关也同步生效。</li>
       <li><code>actions</code> 的 label 可传函数、visible 可做行级隐藏，卡片底部与桌面下拉保持一致。</li>
       <li>需要完全自绘卡片时用 <code>#card</code> 插槽，与 <code>YdResponsiveTable</code> 的使用方式一致。</li>
+    </ul>
+  </DemoCard>
+
+  <DemoCard
+    title="YdEnhancedTable · 固定用户列"
+    description="userColumn.fixed 控制用户列固定位置：默认左固定，false 取消固定，也可固定在右侧；操作列保持固定右侧"
+  >
+    <YdSegmented v-model="fixedMode" :options="fixedOptions" size="sm" aria-label="用户列固定方式" />
+    <YdEnhancedTable
+      :data="members"
+      :user-column="fixedUserColumn"
+      :status-column="statusColumn"
+      :columns="fixedColumns"
+      :actions="actions"
+      row-key="id"
+      class="min-w-0"
+
+      stripe border
+    />
+    <ul class="text-xs text-muted-foreground mt-3 space-y-1">
+      <li>横向滚动这张宽表：用户列默认吸附在左侧并带边缘阴影，切到「不固定」后随内容一起滚动，「右固定」则吸附在右侧操作列之前。</li>
     </ul>
   </DemoCard>
 </template>

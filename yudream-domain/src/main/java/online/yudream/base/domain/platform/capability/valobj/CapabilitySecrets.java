@@ -11,7 +11,8 @@ public final class CapabilitySecrets {
 
     private static final Map<String, Set<String>> SECRET_KEYS = Map.of(
             "neo4j", Set.of("password"),
-            "inbound-mail", Set.of("password")
+            "inbound-mail", Set.of("password"),
+            "feishu", Set.of("appSecret")
     );
 
     private CapabilitySecrets() {

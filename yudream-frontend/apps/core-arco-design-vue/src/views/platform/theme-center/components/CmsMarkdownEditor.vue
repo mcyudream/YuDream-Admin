@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import type { YdMarkdownImage, YdMarkdownImageUploadHandler } from '@yudream/components'
+import type { YdMarkdownEditorInstance, YdMarkdownImage, YdMarkdownImageUploadHandler, YdMarkdownToolbar } from '@yudream/components'
+import { computed, ref } from 'vue'
 import apiFiles from '@/api/modules/files'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
   placeholder?: string
+  toolbars?: YdMarkdownToolbar[]
+  showToolbarName?: boolean
+  catalogMaxDepth?: number
 }>(), {
   modelValue: '',
   placeholder: '在这里编写 Markdown 内容...',
@@ -13,9 +17,21 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'save': [markdown: string]
 }>()
 
 const toast = useYdToast()
+const markdownEditor = ref<YdMarkdownEditorInstance | null>(null)
+
+function insert(generate: Parameters<YdMarkdownEditorInstance['insert']>[0]) {
+  markdownEditor.value?.insert(generate)
+}
+
+function focus() {
+  markdownEditor.value?.focus()
+}
+
+defineExpose({ insert, focus })
 
 const editorValue = computed({
   get: () => props.modelValue || '',
@@ -61,12 +77,17 @@ async function uploadMarkdownImage(file: File): Promise<YdMarkdownImage> {
 
 <template>
   <YdMarkdownEditor
+    ref="markdownEditor"
     v-model="editorValue"
     :placeholder="placeholder"
     language="zh-CN"
     preview-theme="github"
     code-theme="github"
     height="640px"
+    :toolbars="toolbars"
+    :show-toolbar-name="showToolbarName"
+    :catalog-max-depth="catalogMaxDepth"
     :image-upload="uploadMarkdownImages"
+    @save="value => emit('save', value)"
   />
 </template>

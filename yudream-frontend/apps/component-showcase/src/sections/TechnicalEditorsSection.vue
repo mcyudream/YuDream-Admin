@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { YdCodeEditorInstance } from '@yudream/components'
+import type { YdCodeEditorInstance, YdMarkdownEditorInstance, YdMarkdownToolbar } from '@yudream/components'
 import { YdButton, YdCodeEditor, YdForm, YdFormItem, YdMarkdownEditor, YdUiProvider } from '@yudream/components'
 import { reactive, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
@@ -9,17 +9,28 @@ const readOnlyMarkdown = '# 只读预览\n\n使用同一编辑器的只读模式
 const json = ref('{"name":"YuDream","enabled":true}')
 const jsonEditor = ref<YdCodeEditorInstance | null>(null)
 const codeSample = 'const theme = "yd"\nconsole.log(theme)'
+const markdownEditor = ref<YdMarkdownEditorInstance | null>(null)
+const markdownToolbars: YdMarkdownToolbar[] = ['bold', 'italic', 'title', 'link', 'table', 'code', '=', 'save', 'preview', 'previewOnly', 'catalog']
+const markdownSaved = ref('')
 const formModel = reactive({ markdown: markdown.value, json: json.value })
+function insertMarkdownNote() {
+  markdownEditor.value?.insert(selected => ({ targetValue: `> ${selected || '重点内容'}`, select: false }))
+  markdownEditor.value?.focus()
+}
 const editorRules = { required: true, message: '请填写内容', trigger: 'blur' as const }
 </script>
 
 <template>
   <YdUiProvider>
     <DemoCard title="Markdown 编辑器" description="受控内容、只读预览、主题跟随、错误提示与可注入的图片上传回调。">
+      <div class="mb-2 flex items-center gap-3">
+        <YdButton size="sm" variant="outline" @click="insertMarkdownNote">插入引用</YdButton>
+        <span v-if="markdownSaved" class="editor-count">{{ markdownSaved }}</span>
+      </div>
       <YdForm :model="formModel">
         <YdFormItem field="markdown" label="Markdown 内容" extra="说明文本应通过 aria-describedby 关联到实际编辑输入。" :rules="editorRules">
           <template #default="{ fieldProps }">
-            <YdMarkdownEditor v-bind="fieldProps" v-model="formModel.markdown" aria-label="Markdown 内容编辑器" height="360px" />
+            <YdMarkdownEditor ref="markdownEditor" v-bind="fieldProps" v-model="formModel.markdown" aria-label="Markdown 内容编辑器" height="360px" :toolbars="markdownToolbars" :catalog-max-depth="3" show-toolbar-name @save="markdownSaved = '已触发保存命令'" />
           </template>
         </YdFormItem>
       </YdForm>

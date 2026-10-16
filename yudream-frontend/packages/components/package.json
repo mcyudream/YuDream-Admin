@@ -21,6 +21,7 @@
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
     "./map": "./src/map/index.ts",
+    "./workspace": "./src/ui/workspace-model.ts",
     "./examples": "./src/examples.ts",
     "./resolver": "./resolver.ts",
     "./appearance.css": "./src/theme/appearance.css"

@@ -1,11 +1,21 @@
 package online.yudream.base.infra.platform.wiki.mapper;
 
+import online.yudream.base.domain.platform.wiki.aggregate.WikiComment;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
+import online.yudream.base.domain.platform.wiki.aggregate.WikiSpaceMember;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceCoverType;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiTextBlockType;
+import online.yudream.base.domain.platform.wiki.valobj.WikiTextAnchor;
+import online.yudream.base.domain.platform.wiki.valobj.WikiTextBlockHint;
+import online.yudream.base.infra.platform.wiki.dataobj.WikiCommentAnchorDO;
+import online.yudream.base.infra.platform.wiki.dataobj.WikiCommentDO;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiNodeDO;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiPageVersionDO;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiSpaceDO;
+import online.yudream.base.infra.platform.wiki.dataobj.WikiSpaceMemberDO;
 
 import java.util.ArrayList;
 
@@ -55,6 +65,12 @@ public final class WikiInfraMapper {
                 .sourceGroundedDefault(dataObj.isSourceGroundedDefault())
                 .watchEnabled(dataObj.isWatchEnabled())
                 .watchFolderPath(dataObj.getWatchFolderPath())
+                .coverType(WikiSpaceCoverType.of(dataObj.getCoverType()))
+                .coverSeed(dataObj.getCoverSeed() == null ? "" : dataObj.getCoverSeed())
+                .coverFileObjectId(dataObj.getCoverFileObjectId())
+                .coverAlt(dataObj.getCoverAlt() == null ? "" : dataObj.getCoverAlt())
+                .commentEnabled(dataObj.isCommentEnabled())
+                .aclMode(WikiSpaceAclMode.of(dataObj.getAclMode()))
                 .build();
     }
 
@@ -96,6 +112,12 @@ public final class WikiInfraMapper {
         dataObj.setSourceGroundedDefault(domain.isSourceGroundedDefault());
         dataObj.setWatchEnabled(domain.isWatchEnabled());
         dataObj.setWatchFolderPath(domain.getWatchFolderPath());
+        dataObj.setCoverType(WikiSpaceCoverType.of(domain.getCoverType()));
+        dataObj.setCoverSeed(domain.getCoverSeed() == null ? "" : domain.getCoverSeed());
+        dataObj.setCoverFileObjectId(domain.getCoverFileObjectId());
+        dataObj.setCoverAlt(domain.getCoverAlt() == null ? "" : domain.getCoverAlt());
+        dataObj.setCommentEnabled(domain.isCommentEnabled());
+        dataObj.setAclMode(WikiSpaceAclMode.of(domain.getAclMode()));
         return dataObj;
     }
 
@@ -194,6 +216,147 @@ public final class WikiInfraMapper {
     }
 
     private static void copyBase(WikiPageVersion source, WikiPageVersionDO target) {
+        target.setId(source.getId());
+        target.setVersion(source.getVersion());
+        target.setCreateTime(source.getCreateTime());
+        target.setUpdateTime(source.getUpdateTime());
+    }
+
+    public static WikiSpaceMember member(WikiSpaceMemberDO dataObj) {
+        if (dataObj == null) return null;
+        return WikiSpaceMember.builder()
+                .id(dataObj.getId())
+                .version(dataObj.getVersion())
+                .createTime(dataObj.getCreateTime())
+                .updateTime(dataObj.getUpdateTime())
+                .spaceId(dataObj.getSpaceId())
+                .subjectType(dataObj.getSubjectType())
+                .subjectId(dataObj.getSubjectId())
+                .actions(dataObj.getActions() == null ? new ArrayList<>() : new ArrayList<>(dataObj.getActions()))
+                .createdByUserId(dataObj.getCreatedByUserId())
+                .build();
+    }
+
+    public static WikiSpaceMemberDO member(WikiSpaceMember domain) {
+        if (domain == null) return null;
+        WikiSpaceMemberDO dataObj = new WikiSpaceMemberDO();
+        copyBase(domain, dataObj);
+        dataObj.setSpaceId(domain.getSpaceId());
+        dataObj.setSubjectType(domain.getSubjectType());
+        dataObj.setSubjectId(domain.getSubjectId());
+        dataObj.setActions(domain.getActions() == null ? new ArrayList<>() : new ArrayList<>(domain.getActions()));
+        dataObj.setCreatedByUserId(domain.getCreatedByUserId());
+        return dataObj;
+    }
+
+    public static WikiComment comment(WikiCommentDO dataObj) {
+        if (dataObj == null) return null;
+        return WikiComment.builder()
+                .id(dataObj.getId())
+                .version(dataObj.getVersion())
+                .createTime(dataObj.getCreateTime())
+                .updateTime(dataObj.getUpdateTime())
+                .spaceId(dataObj.getSpaceId())
+                .nodeId(dataObj.getNodeId())
+                .parentId(dataObj.getParentId())
+                .authorType(dataObj.getAuthorType())
+                .authorUserId(dataObj.getAuthorUserId())
+                .authorName(dataObj.getAuthorName())
+                .content(dataObj.getContent())
+                .anchor(anchor(dataObj.getAnchor()))
+                .status(dataObj.getStatus())
+                .pinned(dataObj.isPinned())
+                .reviewedByUserId(dataObj.getReviewedByUserId())
+                .reviewedAt(dataObj.getReviewedAt())
+                .ragStatus(dataObj.getRagStatus())
+                .build();
+    }
+
+    public static WikiCommentDO comment(WikiComment domain) {
+        if (domain == null) return null;
+        WikiCommentDO dataObj = new WikiCommentDO();
+        copyBase(domain, dataObj);
+        dataObj.setSpaceId(domain.getSpaceId());
+        dataObj.setNodeId(domain.getNodeId());
+        dataObj.setParentId(domain.getParentId());
+        dataObj.setAuthorType(domain.getAuthorType());
+        dataObj.setAuthorUserId(domain.getAuthorUserId());
+        dataObj.setAuthorName(domain.getAuthorName());
+        dataObj.setContent(domain.getContent());
+        dataObj.setAnchor(anchor(domain.getAnchor()));
+        dataObj.setStatus(domain.getStatus());
+        dataObj.setPinned(domain.isPinned());
+        dataObj.setReviewedByUserId(domain.getReviewedByUserId());
+        dataObj.setReviewedAt(domain.getReviewedAt());
+        dataObj.setRagStatus(domain.getRagStatus());
+        return dataObj;
+    }
+
+    /** 锚点回写：版本/哈希为服务端盖章值，客户端无法从请求侧注入。 */
+    public static WikiCommentAnchorDO anchor(WikiTextAnchor anchor) {
+        if (anchor == null) {
+            return null;
+        }
+        WikiCommentAnchorDO dataObj = new WikiCommentAnchorDO();
+        dataObj.setExact(anchor.exact());
+        dataObj.setPrefix(anchor.prefix());
+        dataObj.setSuffix(anchor.suffix());
+        WikiTextBlockHint blockHint = anchor.blockHint();
+        if (blockHint != null) {
+            dataObj.setBlockType(blockHint.type().wireValue());
+            dataObj.setBlockOrdinal(blockHint.ordinal());
+            dataObj.setTableRow(blockHint.tableRow());
+            dataObj.setTableCell(blockHint.tableCell());
+        }
+        dataObj.setStartOffset(anchor.startOffset());
+        dataObj.setEndOffset(anchor.endOffset());
+        dataObj.setVersionId(anchor.versionId());
+        dataObj.setRevision(anchor.revision());
+        dataObj.setContentHash(anchor.contentHash());
+        return dataObj;
+    }
+
+    /**
+     * 锚点读取：历史评论（无 anchor 子文档）保持 null；异常存量字段按「丢弃块提示、
+     * 保留引用文本」降级，不因单条脏数据阻断整页评论读取。
+     */
+    public static WikiTextAnchor anchor(WikiCommentAnchorDO dataObj) {
+        if (dataObj == null || dataObj.getExact() == null || dataObj.getExact().isBlank()) {
+            return null;
+        }
+        try {
+            return new WikiTextAnchor(dataObj.getExact(), dataObj.getPrefix(), dataObj.getSuffix(),
+                    blockHint(dataObj), dataObj.getStartOffset(), dataObj.getEndOffset(),
+                    dataObj.getVersionId(), dataObj.getRevision(), dataObj.getContentHash());
+        }
+        catch (RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static WikiTextBlockHint blockHint(WikiCommentAnchorDO dataObj) {
+        WikiTextBlockType blockType = WikiTextBlockType.of(dataObj.getBlockType());
+        Integer ordinal = dataObj.getBlockOrdinal();
+        if (blockType == null || ordinal == null || ordinal < 0) {
+            return null;
+        }
+        if (blockType == WikiTextBlockType.TABLE_CELL) {
+            Integer row = dataObj.getTableRow();
+            Integer cell = dataObj.getTableCell();
+            return row == null || cell == null || row < 0 || cell < 0 ? null
+                    : WikiTextBlockHint.tableCell(ordinal, row, cell);
+        }
+        return WikiTextBlockHint.of(blockType, ordinal);
+    }
+
+    private static void copyBase(WikiSpaceMember source, WikiSpaceMemberDO target) {
+        target.setId(source.getId());
+        target.setVersion(source.getVersion());
+        target.setCreateTime(source.getCreateTime());
+        target.setUpdateTime(source.getUpdateTime());
+    }
+
+    private static void copyBase(WikiComment source, WikiCommentDO target) {
         target.setId(source.getId());
         target.setVersion(source.getVersion());
         target.setCreateTime(source.getCreateTime());

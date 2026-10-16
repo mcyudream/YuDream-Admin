@@ -40,7 +40,7 @@ public class WikiSourceExtractionService {
     private final DocumentTextExtractor documentTextExtractor;
     private final WikiDocumentImageExtractor imageExtractor;
 
-    public void extract(WikiSource source, WikiSpace space, Map<String, String> aiConfig) {
+    public void extract(WikiSource source, WikiSpace space, Long ownerId, Map<String, String> aiConfig) {
         if (source.getKind() != WikiSourceKind.FILE) {
             source.skipExtraction("仅文件资料需要抽取");
             return;
@@ -69,15 +69,15 @@ public class WikiSourceExtractionService {
                 log.warn("资料来源 {} 抽图失败：{}", source.getTitle(), exception.getMessage());
                 extracted = List.of();
             }
-            source.markExtracted(text, buildImages(source, space, aiConfig, extracted));
+            source.markExtracted(text, buildImages(source, space, ownerId, aiConfig, extracted));
         }
         catch (Exception exception) {
             source.failExtraction(exception.getMessage());
         }
     }
 
-    private List<WikiSourceImage> buildImages(WikiSource source, WikiSpace space, Map<String, String> aiConfig,
-                                              List<WikiExtractedImage> extracted) {
+    private List<WikiSourceImage> buildImages(WikiSource source, WikiSpace space, Long ownerId,
+                                              Map<String, String> aiConfig, List<WikiExtractedImage> extracted) {
         if (extracted == null || extracted.isEmpty()) {
             return List.of();
         }
@@ -90,8 +90,9 @@ public class WikiSourceExtractionService {
                 break;
             }
             try {
+                // 图片资产始终按私有文件入库。公开访问必须经过发布版本代理，不能只凭空间公开开关匿名读取草稿原图。
                 Long fileObjectId = fileAppService.upload(new ByteArrayInputStream(image.content()), image.fileName(),
-                        image.contentType(), image.content().length, "wiki-image", null, true).getId();
+                        image.contentType(), image.content().length, "wiki-image", ownerId, false).getId();
                 images.add(caption(fileObjectId, image, sequence++, space, aiConfig, captionEnabled));
             }
             catch (Exception exception) {

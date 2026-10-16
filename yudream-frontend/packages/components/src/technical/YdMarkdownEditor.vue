@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { YdMarkdownImage, YdMarkdownImageUploadHandler, YdMarkdownLinkClick } from './markdown-editor.types'
+import type { ExposeParam, HeadList } from 'md-editor-v3'
+import type { YdMarkdownHeading, YdMarkdownImage, YdMarkdownImageUploadHandler, YdMarkdownInsert, YdMarkdownLinkClick, YdMarkdownToolbar } from './markdown-editor.types'
 import { MdEditor, MdPreview } from 'md-editor-v3'
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { resolveYdEditorFieldAttrs } from './code-editor-model'
@@ -26,6 +27,11 @@ const props = withDefaults(defineProps<{
   ariaInvalid?: boolean | string
   ariaDescribedby?: string
   imageUpload?: YdMarkdownImageUploadHandler
+  toolbars?: YdMarkdownToolbar[]
+  toolbarsExclude?: YdMarkdownToolbar[]
+  showToolbarName?: boolean
+  catalogLayout?: 'fixed' | 'flat'
+  catalogMaxDepth?: number
 }>(), {
   modelValue: '',
   placeholder: '在这里编写 Markdown 内容...',
@@ -39,16 +45,19 @@ const props = withDefaults(defineProps<{
   ariaLabel: 'Markdown 编辑器',
 })
 
-const uploadLifecycle = createYdMarkdownUploadLifecycle()
-watch(() => [props.readonly, props.disabled] as const, () => uploadLifecycle.invalidate(), { flush: 'sync' })
-
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'uploadError': [error: unknown]
   'linkClick': [payload: YdMarkdownLinkClick]
+  'catalogChange': [headings: YdMarkdownHeading[]]
+  'save': [markdown: string]
 }>()
 
+const uploadLifecycle = createYdMarkdownUploadLifecycle()
+watch(() => [props.readonly, props.disabled] as const, () => uploadLifecycle.invalidate(), { flush: 'sync' })
+
 const root = ref<HTMLElement | null>(null)
+const editor = ref<ExposeParam | null>(null)
 const darkMode = ref(false)
 const editorValue = computed({
   get: () => props.modelValue,
@@ -139,6 +148,16 @@ function blur() {
   }
 }
 
+function insert(generate: YdMarkdownInsert) {
+  if (!isReadOnly.value) {
+    editor.value?.insert(generate)
+  }
+}
+
+function handleCatalogChange(headings: HeadList[]) {
+  emit('catalogChange', headings.map(({ text, level, line, active }) => ({ text, level, line, active })))
+}
+
 function handlePreviewClick(event: MouseEvent) {
   if (!isReadOnly.value || !(event.target instanceof Element)) {
     return
@@ -170,7 +189,7 @@ async function handleUploadImage(files: File[], callback: (images: YdMarkdownIma
   }
 }
 
-defineExpose({ focus, blur, element: root })
+defineExpose({ focus, blur, insert, element: root })
 
 let editorObserver: MutationObserver | undefined
 let themeObserver: MutationObserver | undefined
@@ -221,6 +240,7 @@ onBeforeUnmount(() => {
     />
     <MdEditor
       v-else
+      ref="editor"
       v-model="editorValue"
       :language="language"
       :preview-theme="previewTheme"
@@ -230,6 +250,13 @@ onBeforeUnmount(() => {
       :placeholder="placeholder"
       :style="{ height }"
       :sanitize="sanitizeYdMarkdownHtml"
+      :toolbars="toolbars"
+      :toolbars-exclude="toolbarsExclude"
+      :show-toolbar-name="showToolbarName"
+      :catalog-layout="catalogLayout"
+      :catalog-max-depth="catalogMaxDepth"
+      @on-get-catalog="handleCatalogChange"
+      @on-save="value => emit('save', value)"
       @on-upload-img="handleUploadImage"
     />
     <p v-if="error" :id="errorId" class="yd-markdown-editor__error" role="alert">

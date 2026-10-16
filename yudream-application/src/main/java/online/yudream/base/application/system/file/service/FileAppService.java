@@ -51,6 +51,16 @@ public class FileAppService {
         return toDTO(saved);
     }
 
+    /** 头像上传：只接受图片内容类型，按头像模块公开存读。 */
+    @Transactional
+    public FileObjectDTO uploadAvatar(InputStream inputStream, String originalName, String contentType,
+                                      long size, Long ownerId) {
+        if (!StringUtils.hasText(contentType) || !contentType.toLowerCase().startsWith("image/")) {
+            throw new BizException("头像只支持图片文件");
+        }
+        return upload(inputStream, originalName, contentType, size, "avatar", ownerId, true);
+    }
+
     @Transactional(readOnly = true)
     public FileObjectDTO get(Long id) {
         return toDTO(getActiveFile(id));
@@ -273,6 +283,21 @@ public class FileAppService {
             throw new BizException("文件未开放公开访问");
         }
         return fileObject;
+    }
+
+    /**
+     * 匿名公开可读判定：仅显式 publicAccess 的文件为 true；未知/已删除文件一律 false。
+     * 只反映文件级访问标记，不表示业务发布状态：调用方（如 Wiki 公开检索/DTO）必须叠加自身的发布版本过滤。
+     */
+    @Transactional(readOnly = true)
+    public boolean isPubliclyReadable(Long id) {
+        if (id == null) {
+            return false;
+        }
+        return fileObjectRepo.findById(id)
+                .filter(fileObject -> !fileObject.isDeleted())
+                .map(fileObject -> Boolean.TRUE.equals(fileObject.getPublicAccess()))
+                .orElse(false);
     }
 
     /** 内部用例删除（服务端编排路径），HTTP 入口必须走 delete(id, callerId, privileged)。 */

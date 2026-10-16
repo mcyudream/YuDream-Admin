@@ -90,6 +90,25 @@ public enum PlatformMenuModule {
             parentName = "MILKY", permission = "platform:render:use")
     RENDER_USE,
 
+    // 飞书菜单的权限语义是「查看页面」：MENU 显式挂 platform:feishu:view，
+    // 与下方按钮、控制器 @PermissionRegister 同码共享叶子（注解元数据优先，菜单只补缺）。
+    @MenuNode(code = "platform:feishu", name = "飞书", type = MenuNodeType.MENU,
+            parentName = "CONNECTION_HUB", path = "/platform/feishu", component = "platform/feishu/index.vue",
+            icon = "i-ri:cloud-line", sort = 75, permission = "platform:feishu:view")
+    FEISHU,
+
+    @MenuNode(code = "platform:feishu:view", name = "查看飞书云文档", type = MenuNodeType.BUTTON,
+            parentName = "FEISHU", permission = "platform:feishu:view")
+    FEISHU_VIEW,
+
+    @MenuNode(code = "platform:feishu:edit", name = "编辑飞书云文档", type = MenuNodeType.BUTTON,
+            parentName = "FEISHU", permission = "platform:feishu:edit")
+    FEISHU_EDIT,
+
+    @MenuNode(code = "platform:feishu:config", name = "配置飞书调用额度", type = MenuNodeType.BUTTON,
+            parentName = "FEISHU", permission = "platform:feishu:config")
+    FEISHU_CONFIG,
+
     @MenuNode(code = "platform:capability", name = "能力管理", type = MenuNodeType.MENU,
             parentName = "OPS_HUB", path = "/platform/capability", component = "platform/capability/index.vue",
             icon = "i-ri:dashboard-horizontal-line", sort = 100)

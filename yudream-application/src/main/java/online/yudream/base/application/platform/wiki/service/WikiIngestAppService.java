@@ -29,18 +29,21 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiIngestTaskType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiPageType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiReviewItemType;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiReviewStatus;
 import online.yudream.base.domain.platform.wiki.repo.WikiIngestTaskRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiReviewItemRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.domain.platform.wiki.service.WikiGeneratedPagePolicy;
 import online.yudream.base.domain.platform.wiki.service.WikiIngestCancellationRegistry;
 import online.yudream.base.domain.platform.wiki.service.WikiIngestTaskRunner;
 import online.yudream.base.domain.platform.wiki.service.WikiWebSearchGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiFrontmatter;
 import online.yudream.base.domain.platform.wiki.valobj.WikiIngestProgress;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSlug;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebSearchConfig;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebSearchResult;
 import org.springframework.stereotype.Service;
@@ -67,7 +70,17 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     private static final int SOURCE_CONTEXT_LIMIT = 60_000;
     private static final int FALLBACK_BODY_LIMIT = 8_000;
+    /** 进入生成上下文与原文档页的图片证据条数上限。 */
+    private static final int MAX_EVIDENCE_IMAGES = 40;
+    /** 生成内容的保留一级目录：LLM 生成的知识页只写入该目录，不再与根层级同名节点互相覆盖。 */
+    private static final String GENERATED_DIRECTORY_SLUG = "llm-gen";
+    private static final String GENERATED_DIRECTORY_TITLE = "LLM 生成";
     private static final Set<WikiPageType> SPECIAL_TYPES = Set.of(WikiPageType.INDEX, WikiPageType.LOG, WikiPageType.OVERVIEW);
+    /** 内容型生成页进入 llm-gen；结构页、原文档与运行日志仍由各自系统入口维护。 */
+    private static final Set<WikiPageType> GENERATED_PAGE_TYPES = Set.of(WikiPageType.SOURCE_SUMMARY,
+            WikiPageType.ENTITY, WikiPageType.CONCEPT, WikiPageType.SYNTHESIS, WikiPageType.COMPARISON,
+            WikiPageType.QUERY, WikiPageType.RESEARCH);
+    private static final Set<String> SYSTEM_ROOT_SLUGS = Set.of("index", "overview", "log");
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
@@ -91,7 +104,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
     public void enqueueIngest(Long spaceId, Long sourceId) {
         enabled();
         spaceRepo.findById(spaceId).orElseThrow(() -> new BizException("知识库不存在"));
-        sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
+        WikiSource source = sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
+        if (!spaceId.equals(source.getSpaceId())) {
+            throw new BizException("资料不属于指定知识库");
+        }
         enqueue(WikiIngestTask.create(spaceId, sourceId, WikiIngestTaskType.INGEST, null, System.currentTimeMillis()));
     }
 
@@ -219,7 +235,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         throwIfCancelled(isCancelled);
 
         if (source.getExtractionStatus() != WikiExtractionStatus.EXTRACTED) {
-            extractionService.extract(source, space, aiConfig());
+            extractionService.extract(source, space, task.getRequestedByUserId(), aiConfig());
             sourceRepo.save(source);
         }
         if (source.getExtractionStatus() == WikiExtractionStatus.FAILED) {
@@ -241,7 +257,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         throwIfCancelled(isCancelled);
         JsonNode generated = generate(space, source, analysis);
 
-        progress(task, source, "apply", "写入 Wiki 页面并维护 index/log/overview", 70);
+        progress(task, source, "apply", applyMessage(space), 70);
         throwIfCancelled(isCancelled);
         List<Long> touched = applyPages(space, source, generated);
         Long indexId = updateIndex(space);
@@ -299,8 +315,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 List<String> sources = new ArrayList<>(node.getSources());
                 sources.remove(path);
                 node.setSources(sources);
+                // 只移除已删除资料的来源引用，保留原 frontmatter 的其他内容与生成来源标记
                 String fullMarkdown = WikiFrontmatter.of(node.getTitle(), node.getPageType(), sources, node.getRelated(),
-                        node.getTags(), node.getSummary(), node.bodyMarkdown()).fullMarkdown();
+                        node.getTags(), node.getSummary(), node.bodyMarkdown())
+                        .withOrigin(node.frontmatter().origin()).fullMarkdown();
                 node.applyGeneratedMarkdown(fullMarkdown);
                 nodeRepo.save(node);
             }
@@ -340,16 +358,36 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         progress(task, null, "synthesize", "LLM 综合研究结果", 60);
         String body = synthesizeResearch(space, topic, results);
         String slug = WikiSlug.derive(topic);
-        WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, topic, slug, 0));
-        node.applyGeneratedMarkdown(WikiFrontmatter.of(topic, WikiPageType.RESEARCH,
+        String markdown = WikiFrontmatter.of(topic, WikiPageType.RESEARCH,
                 results.stream().map(WikiWebSearchResult::url).toList(), List.of(), List.of("research"),
-                "关于「" + topic + "」的深度研究", body).fullMarkdown());
-        Long nodeId = nodeRepo.save(node).getId();
+                "关于「" + topic + "」的深度研究", body).withOrigin(WikiFrontmatter.ORIGIN_LLM).fullMarkdown();
+        WikiNode directory = generatedDirectory(space);
+        WikiNode existing = generatedChild(space.getId(), directory.getId(), slug);
+        Long nodeId;
+        if (existing == null) {
+            WikiNode node = WikiNode.page(space.getId(), directory.getId(), topic, slug, 0);
+            node.setAncestorPath("/" + directory.getId() + "/");
+            node.applyGeneratedMarkdown(markdown);
+            nodeId = nodeRepo.save(node).getId();
+        }
+        else if (existing.getNodeType() == WikiNodeType.PAGE
+                && WikiGeneratedPagePolicy.mayOverwriteDraft(existing.getMarkdownDraft(), publishedMarkdown(existing))) {
+            existing.applyGeneratedMarkdown(markdown);
+            nodeId = nodeRepo.save(existing).getId();
+        }
+        else {
+            // 人工编辑过的研究页或同名非页面节点不覆盖，转为审核提案
+            proposeGeneratedUpdate(space, null, existing, topic, "关于「" + topic + "」的深度研究",
+                    existing.getNodeType() == WikiNodeType.PAGE ? "页面已被人工编辑" : "llm-gen 目录内已存在同名非页面节点");
+            nodeId = null;
+        }
         Long indexId = updateIndex(space);
         Long overviewId = updateOverview(space);
         progress(task, null, "publish", "发布研究页面", 85);
-        List<Long> toPublish = new ArrayList<>(List.of(nodeId));
+        List<Long> toPublish = new ArrayList<>();
+        if (nodeId != null) {
+            toPublish.add(nodeId);
+        }
         if (indexId != null) {
             toPublish.add(indexId);
         }
@@ -407,6 +445,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 + "现有内容目录(index)：\n" + existingIndex(space) + "\n\n"
                 + "原始资料标题：" + source.getTitle() + "\n"
                 + "原始资料路径：" + source.displayPath() + "\n\n"
+                + "原始资料图片证据（页码/图序 caption，可作为事实依据）：\n" + imageEvidence(source) + "\n\n"
                 + "原始资料内容(节选)：\n" + truncate(source.getExtractedText(), SOURCE_CONTEXT_LIMIT) + "\n\n"
                 + "请分析该资料并输出如下 JSON：\n"
                 + "{\"entities\":[\"关键实体\"],\"concepts\":[\"关键概念\"],\"contradictions\":[\"与现有知识的矛盾或张力\"],"
@@ -422,6 +461,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 + "结构规则：\n" + blankToEmpty(space.getSchemaContent()) + "\n\n"
                 + "原始资料标题：" + source.getTitle() + "\n"
                 + "原始资料路径：" + source.displayPath() + "\n\n"
+                + "原始资料图片证据（页码/图序 caption，可作为事实依据）：\n" + imageEvidence(source) + "\n\n"
                 + "第一步分析结果：\n" + analysis + "\n\n"
                 + "现有页面列表：\n" + existingPagesSummary(space) + "\n\n"
                 + "请基于分析结果生成 Wiki 页面，输出如下 JSON：\n"
@@ -431,6 +471,37 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 + "\"reviewItems\":[{\"type\":\"CREATE_PAGE|DEEP_RESEARCH|SKIP|FLAG\",\"title\":\"\",\"description\":\"\",\"suggestedAction\":\"\",\"searchQueries\":[\"\"]}]}\n\n"
                 + "必须包含至少一个 type 为 source_summary 的资料摘要页面。";
         return generateJson(system, user, space.getIngestProviderCode(), space.getIngestModelCode());
+    }
+
+    /** 图片证据提示文本：页码/图序 + caption；无 caption 时明确说明，避免模型凭空编造图片内容。 */
+    private String imageEvidence(WikiSource source) {
+        String lines = imageEvidenceLines(source);
+        return lines.isBlank() ? "（本资料没有可用的图片描述）" : lines;
+    }
+
+    /** 图片证据行（不含小标题）；caption 不进入生成与页面时返回空串。 */
+    private String imageEvidenceLines(WikiSource source) {
+        List<WikiSourceImage> images = source.getImages() == null ? List.of() : source.getImages();
+        StringBuilder evidence = new StringBuilder();
+        int included = 0;
+        for (WikiSourceImage image : images) {
+            String caption = image == null || image.caption() == null ? "" : image.caption().trim();
+            if (caption.isBlank()) {
+                continue;
+            }
+            evidence.append("- ").append(imageLocation(image)).append("：").append(truncate(caption, 400)).append('\n');
+            if (++included >= MAX_EVIDENCE_IMAGES) {
+                break;
+            }
+        }
+        return evidence.toString();
+    }
+
+    /** 定位只有页码与图序（抽取只提供页内资源序号），不承诺版面坐标。 */
+    private String imageLocation(WikiSourceImage image) {
+        return image.pageNumber() > 0
+                ? "第 " + image.pageNumber() + " 页 图 " + (image.sequence() + 1)
+                : "图 " + (image.sequence() + 1);
     }
 
     private JsonNode generateJson(String system, String user, String provider, String model) {
@@ -467,49 +538,197 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                     continue;
                 }
                 WikiPageType type = parsePageType(text(page, "type"));
+                if (!GENERATED_PAGE_TYPES.contains(type)) {
+                    proposeInvalidGeneratedType(space, source, title, text(page, "summary"), type);
+                    continue;
+                }
                 if (type == WikiPageType.SOURCE_SUMMARY) {
                     hasSourceSummary = true;
                 }
-                touched.add(saveGeneratedPage(space, title, type, stringList(page, "sources"),
-                        stringList(page, "related"), stringList(page, "tags"), text(page, "summary"), text(page, "body")));
+                Long nodeId = saveGeneratedPage(space, source, title, type, stringList(page, "sources"),
+                        stringList(page, "related"), stringList(page, "tags"), text(page, "summary"), text(page, "body"));
+                if (nodeId != null) {
+                    touched.add(nodeId);
+                }
             }
         }
         if (!hasSourceSummary) {
-            touched.add(ensureSourceSummary(space, source));
+            Long summaryId = ensureSourceSummary(space, source);
+            if (summaryId != null) {
+                touched.add(summaryId);
+            }
         }
-        // 原文档页面：完整保留原始资料正文（含图片），排序置顶，作为知识库的入口了解页
-        touched.add(ensureSourceDocument(space, source));
+        // 原文档页面：完整保留原始资料正文（含图片与图片证据），排序置顶，作为知识库的入口了解页
+        Long sourceDocumentId = ensureSourceDocument(space, source);
+        if (sourceDocumentId != null) {
+            touched.add(sourceDocumentId);
+        }
         return touched;
     }
 
-    /** 每个资料源对应一个稳定的原文档页面（slug 按资料 ID），重复摄入时原地更新。 */
+    /** 每个资料源对应一个稳定的原文档页面（slug 按资料 ID），固定根层级，不进入 llm-gen。 */
     private Long ensureSourceDocument(WikiSpace space, WikiSource source) {
         String slug = "source-" + source.getId();
-        WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, source.getTitle(), slug, 0));
+        WikiNode node = rootNode(space.getId(), slug);
+        boolean existing = node != null;
+        if (!existing) {
+            node = WikiNode.page(space.getId(), null, source.getTitle(), slug, 0);
+        }
+        if (node.getNodeType() != WikiNodeType.PAGE) {
+            throw new BizException("原文档保留路径 " + slug + " 已被非页面节点占用，资料页面未写入");
+        }
+        String markdown = WikiFrontmatter.of(source.getTitle(), WikiPageType.SOURCE_DOCUMENT,
+                List.of(source.displayPath()), List.of(), List.of("原文档"),
+                "原始资料原文：" + source.getTitle(), sourceDocumentBody(source))
+                .withOrigin(WikiFrontmatter.ORIGIN_LLM).fullMarkdown();
+        if (existing && node.getMarkdownDraft() != null
+                && !WikiGeneratedPagePolicy.mayOverwriteDraft(node.getMarkdownDraft(), publishedMarkdown(node))) {
+            proposeGeneratedUpdate(space, source, node, source.getTitle(), source.getTitle(),
+                    "原文档页已被人工编辑");
+            return null;
+        }
         // 置顶：WikiNode 工厂对 sort 做了 >=0 钳制，这里显式赋负值让原文档排在最前作为入口了解页
         node.setSort(-100);
-        node.applyGeneratedMarkdown(WikiFrontmatter.of(source.getTitle(), WikiPageType.SOURCE_DOCUMENT,
-                List.of(source.displayPath()), List.of(), List.of("原文档"),
-                "原始资料原文：" + source.getTitle(), source.getExtractedText()).fullMarkdown());
+        node.applyGeneratedMarkdown(markdown);
         return nodeRepo.save(node).getId();
     }
 
-    private Long saveGeneratedPage(WikiSpace space, String title, WikiPageType type, List<String> sources,
-                                   List<String> related, List<String> tags, String summary, String body) {
+    /** 原文档页正文：原文 + 图片证据（页码/图序/caption），保证 caption 出现在原始资料页。 */
+    private String sourceDocumentBody(WikiSource source) {
+        String text = source.getExtractedText() == null ? "" : source.getExtractedText();
+        String evidence = imageEvidenceLines(source);
+        if (evidence.isBlank()) {
+            return text;
+        }
+        return (text.isBlank() ? "" : text.stripTrailing() + "\n\n") + "## 图片证据\n\n" + evidence;
+    }
+
+    /**
+     * 写入 LLM 生成页面；返回 null 表示目标页面不可覆盖（人工编辑/同名冲突），生成候选未写入并转为审核提案。
+     * 生成页面只写入保留目录 llm-gen，不触碰根层级或其他目录的同名节点。
+     */
+    private Long saveGeneratedPage(WikiSpace space, WikiSource source, String title, WikiPageType type,
+                                   List<String> sources, List<String> related, List<String> tags,
+                                   String summary, String body) {
         String slug = WikiSlug.derive(title);
-        WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, title, slug, 0));
-        node.applyGeneratedMarkdown(WikiFrontmatter.of(title, type, sources, related, tags, summary, body).fullMarkdown());
-        return nodeRepo.save(node).getId();
+        String markdown = WikiFrontmatter.of(title, type, sources, related, tags, summary, body)
+                .withOrigin(WikiFrontmatter.ORIGIN_LLM).fullMarkdown();
+        WikiNode directory = generatedDirectory(space);
+        WikiNode node = generatedChild(space.getId(), directory.getId(), slug);
+        if (node == null) {
+            WikiNode created = WikiNode.page(space.getId(), directory.getId(), title, slug, 0);
+            created.setAncestorPath("/" + directory.getId() + "/");
+            created.applyGeneratedMarkdown(markdown);
+            return nodeRepo.save(created).getId();
+        }
+        if (node.getNodeType() != WikiNodeType.PAGE) {
+            proposeGeneratedUpdate(space, source, node, title, summary, "llm-gen 目录内已存在同名非页面节点");
+            return null;
+        }
+        if (WikiGeneratedPagePolicy.mayOverwriteDraft(node.getMarkdownDraft(), publishedMarkdown(node))) {
+            node.applyGeneratedMarkdown(markdown);
+            return nodeRepo.save(node).getId();
+        }
+        proposeGeneratedUpdate(space, source, node, title, summary, "页面已被人工编辑");
+        return null;
     }
 
+    /**
+     * 生成内容保留目录：按保留 slug 幂等查找/创建。
+     * slug 被非根目录节点占用（页面或非根目录）时 fail-closed，拒绝任何生成写入。
+     */
+    private WikiNode generatedDirectory(WikiSpace space) {
+        WikiNode existing = rootNode(space.getId(), GENERATED_DIRECTORY_SLUG);
+        if (existing != null) {
+            if (existing.getNodeType() != WikiNodeType.DIRECTORY || existing.getParentId() != null) {
+                throw new BizException("保留目录 " + GENERATED_DIRECTORY_SLUG + " 已被非根目录节点占用，生成内容未写入；请先调整该节点");
+            }
+            return existing;
+        }
+        WikiNode directory = WikiNode.directory(space.getId(), null, GENERATED_DIRECTORY_TITLE, GENERATED_DIRECTORY_SLUG, 1);
+        // 排在原文档（-100）之后、普通内容之前
+        directory.setSort(-50);
+        return nodeRepo.save(directory);
+    }
+
+    /** 保留目录内按 slug 查找子节点；路径解析只在这一层进行，不跨目录命中。 */
+    private WikiNode generatedChild(Long spaceId, Long directoryId, String slug) {
+        return nodeRepo.findBySpaceId(spaceId).stream()
+                .filter(node -> directoryId.equals(node.getParentId()) && slug.equals(node.getSlug()))
+                .findFirst().orElse(null);
+    }
+
+    /** 根层级系统/资料页查找：避免把生成写入误命中其他目录的同名节点。 */
+    private WikiNode rootNode(Long spaceId, String slug) {
+        return nodeRepo.findBySpaceId(spaceId).stream()
+                .filter(node -> node.getParentId() == null && slug.equals(node.getSlug()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * 旧版把生成页面直接放在根层级；来源仅靠 title/type/来源路径做保守检测，不执行静默迁移。
+     * 有无法确认来源的根层级业务页也提示人工整理，避免首次升级悄悄复制出一套重复页面。
+     */
+    private int legacyGeneratedCount(WikiSpace space) {
+        return (int) nodeRepo.findBySpaceId(space.getId()).stream()
+                .filter(node -> node.getNodeType() == WikiNodeType.PAGE && node.getParentId() == null)
+                .filter(node -> !SYSTEM_ROOT_SLUGS.contains(node.getSlug()))
+                .filter(node -> node.getPageType() == null || GENERATED_PAGE_TYPES.contains(node.getPageType()))
+                .count();
+
+    }
+
+    private String applyMessage(WikiSpace space) {
+        int legacy = legacyGeneratedCount(space);
+        if (legacy <= 0) {
+            return "写入生成页面到 " + GENERATED_DIRECTORY_SLUG + " 并维护 index/log/overview";
+        }
+        log.warn("知识库 {} 存在 {} 个根层级旧生成页面；本次不做静默迁移，保持原路径与 URL 不变", space.getId(), legacy);
+        return "写入生成页面到 " + GENERATED_DIRECTORY_SLUG + "；检测到 " + legacy + " 个根层级旧生成页面，保持原路径未迁移";
+    }
+
+    /** 已发布版本全文；页面未发布返回 null，发布版本缺失返回空串（不可确认，按保护处理）。 */
+    private String publishedMarkdown(WikiNode node) {
+        if (node.getPublishedVersionId() == null) {
+            return null;
+        }
+        return versionRepo.findById(node.getPublishedVersionId()).map(WikiPageVersion::getMarkdown).orElse("");
+    }
+
+    /** 不可覆盖：生成候选不落盘，登记待人工确认的审核提案（同知识库同标题去重）。 */
+    private void proposeGeneratedUpdate(WikiSpace space, WikiSource source, WikiNode node, String title, String summary,
+                                        String reason) {
+        String effectiveTitle = title == null || title.isBlank() ? node.getTitle() : title;
+        boolean exists = reviewItemRepo.findBySpaceIdAndStatus(space.getId(), WikiReviewStatus.PENDING).stream()
+                .anyMatch(item -> item.getItemType() == WikiReviewItemType.FLAG && effectiveTitle.equals(item.getTitle()));
+        if (exists) {
+            return;
+        }
+        reviewItemRepo.save(WikiReviewItem.create(space.getId(), source == null ? null : source.getId(),
+                WikiReviewItemType.FLAG, effectiveTitle,
+                reason + "，本次 LLM 生成结果未写入。候选摘要：" + blankToEmpty(summary),
+                "请人工确认：合并生成内容或保留当前版本；生成链路不会自动覆盖无法确认归属的页面。",
+                List.of(), List.of(effectiveTitle)));
+    }
+
+    private void proposeInvalidGeneratedType(WikiSpace space, WikiSource source, String title, String summary,
+                                             WikiPageType type) {
+        boolean exists = reviewItemRepo.findBySpaceIdAndStatus(space.getId(), WikiReviewStatus.PENDING).stream()
+                .anyMatch(item -> item.getItemType() == WikiReviewItemType.FLAG && title.equals(item.getTitle()));
+        if (exists) {
+            return;
+        }
+        reviewItemRepo.save(WikiReviewItem.create(space.getId(), source.getId(), WikiReviewItemType.FLAG, title,
+                "LLM 返回了不允许由生成流程创建的页面类型 " + type + "，候选内容未写入。候选摘要：" + blankToEmpty(summary),
+                "请人工检查候选内容并修正页面类型后重新摄入。", List.of(), List.of(title)));
+    }
     private Long ensureSourceSummary(WikiSpace space, WikiSource source) {
         String body = truncate(source.getExtractedText(), FALLBACK_BODY_LIMIT);
         String summary = truncate(source.getExtractedText(), 200);
-        return saveGeneratedPage(space, source.getTitle(), WikiPageType.SOURCE_SUMMARY, List.of(source.displayPath()),
-                List.of(), List.of("source"), summary, body);
+        return saveGeneratedPage(space, source, source.getTitle(), WikiPageType.SOURCE_SUMMARY,
+                List.of(source.displayPath()), List.of(), List.of("source"), summary, body);
     }
+
 
     private Long updateIndex(WikiSpace space) {
         Map<WikiPageType, List<WikiNode>> grouped = nodeRepo.findBySpaceId(space.getId()).stream()
@@ -555,19 +774,25 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     private Long appendLog(WikiSpace space, WikiSource source) {
         String slug = "log";
-        WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, "操作日志", slug, 0));
+        WikiNode node = rootNode(space.getId(), slug);
+        if (node == null) {
+            node = WikiNode.page(space.getId(), null, "操作日志", slug, 0);
+        }
         String existing = node.bodyMarkdown();
         String entry = "## [" + LocalDate.now() + "] ingest | " + source.getTitle() + "\n";
         String body = (existing == null || existing.isBlank() ? "" : existing.trim() + "\n\n") + entry;
-        node.savePage("操作日志", WikiPageType.LOG, List.of(), List.of(), List.of(), "", body);
+        node.applyGeneratedMarkdown(WikiFrontmatter.of("操作日志", WikiPageType.LOG, List.of(), List.of(),
+                List.of(), "", body).withOrigin(WikiFrontmatter.ORIGIN_LLM).fullMarkdown());
         return nodeRepo.save(node).getId();
     }
 
     private Long saveSpecialPage(WikiSpace space, String slug, String title, WikiPageType type, String body) {
-        WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, title, slug, 0));
-        node.savePage(title, type, List.of(), List.of(), List.of(), "", body);
+        WikiNode node = rootNode(space.getId(), slug);
+        if (node == null) {
+            node = WikiNode.page(space.getId(), null, title, slug, 0);
+        }
+        node.applyGeneratedMarkdown(WikiFrontmatter.of(title, type, List.of(), List.of(), List.of(), "", body)
+                .withOrigin(WikiFrontmatter.ORIGIN_LLM).fullMarkdown());
         return nodeRepo.save(node).getId();
     }
 

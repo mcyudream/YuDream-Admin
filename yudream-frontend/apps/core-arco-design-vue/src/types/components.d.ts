@@ -129,6 +129,7 @@ declare module 'vue' {
     YdDivider: typeof import('@yudream/components')['YdDivider']
     YdDrawer: typeof import('@yudream/components')['YdDrawer']
     YdDropdown: typeof import('@yudream/components')['YdDropdown']
+    YdDynamicSearchForm: typeof import('@yudream/components')['YdDynamicSearchForm']
     YdEmpty: typeof import('@yudream/components')['YdEmpty']
     YdEnhancedTable: typeof import('@yudream/components')['YdEnhancedTable']
     YdFab: typeof import('@yudream/components')['YdFab']
@@ -215,6 +216,7 @@ declare module 'vue' {
     YdSuggestion: typeof import('@yudream/components')['YdSuggestion']
     YdSwitch: typeof import('@yudream/components')['YdSwitch']
     YdTable: typeof import('@yudream/components')['YdTable']
+    YdTablePageLayout: typeof import('@yudream/components')['YdTablePageLayout']
     YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
     YdTabs: typeof import('@yudream/components')['YdTabs']
     YdTag: typeof import('@yudream/components')['YdTag']
@@ -236,6 +238,8 @@ declare module 'vue' {
     YdWelcome: typeof import('@yudream/components')['YdWelcome']
     YdWorkflowCanvas: typeof import('@yudream/components')['YdWorkflowCanvas']
     YdWorkflowHandle: typeof import('@yudream/components')['YdWorkflowHandle']
+    YdWorkspaceLayout: typeof import('@yudream/components')['YdWorkspaceLayout']
+    YdWorkspaceTabs: typeof import('@yudream/components')['YdWorkspaceTabs']
   }
 }
 
@@ -358,6 +362,7 @@ declare global {
   const YdDivider: typeof import('@yudream/components')['YdDivider']
   const YdDrawer: typeof import('@yudream/components')['YdDrawer']
   const YdDropdown: typeof import('@yudream/components')['YdDropdown']
+  const YdDynamicSearchForm: typeof import('@yudream/components')['YdDynamicSearchForm']
   const YdEmpty: typeof import('@yudream/components')['YdEmpty']
   const YdEnhancedTable: typeof import('@yudream/components')['YdEnhancedTable']
   const YdFab: typeof import('@yudream/components')['YdFab']
@@ -444,6 +449,7 @@ declare global {
   const YdSuggestion: typeof import('@yudream/components')['YdSuggestion']
   const YdSwitch: typeof import('@yudream/components')['YdSwitch']
   const YdTable: typeof import('@yudream/components')['YdTable']
+  const YdTablePageLayout: typeof import('@yudream/components')['YdTablePageLayout']
   const YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
   const YdTabs: typeof import('@yudream/components')['YdTabs']
   const YdTag: typeof import('@yudream/components')['YdTag']
@@ -465,4 +471,6 @@ declare global {
   const YdWelcome: typeof import('@yudream/components')['YdWelcome']
   const YdWorkflowCanvas: typeof import('@yudream/components')['YdWorkflowCanvas']
   const YdWorkflowHandle: typeof import('@yudream/components')['YdWorkflowHandle']
+  const YdWorkspaceLayout: typeof import('@yudream/components')['YdWorkspaceLayout']
+  const YdWorkspaceTabs: typeof import('@yudream/components')['YdWorkspaceTabs']
 }

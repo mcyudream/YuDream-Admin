@@ -4,6 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiReviewAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceResource;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
@@ -31,18 +34,21 @@ public class WikiReviewController {
 
     @GetMapping("/spaces/{spaceId}/reviews")
     @PermissionRegister(code = "platform:wiki:view", name = "查看 Wiki 审阅项", module = "平台能力", desc = "查看摄入时 LLM 标记的待人工判断项")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
     public Result<List<WikiReviewItemRes>> list(@PathVariable Long spaceId) {
         return Result.ok(WikiKnowledgeWebAssembler.toReviewItemResList(service.list(spaceId)));
     }
 
     @GetMapping("/spaces/{spaceId}/reviews/pending")
     @PermissionRegister(code = "platform:wiki:view", name = "查看待处理审阅项", module = "平台能力", desc = "查看待处理的 Wiki 审阅项")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
     public Result<List<WikiReviewItemRes>> pending(@PathVariable Long spaceId) {
         return Result.ok(WikiKnowledgeWebAssembler.toReviewItemResList(service.pending(spaceId)));
     }
 
     @PostMapping("/reviews/{id}/resolve")
     @PermissionRegister(code = "platform:wiki:edit", name = "完成 Wiki 审阅项", module = "平台能力", desc = "标记审阅项为已完成")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:edit", resource = WikiSpaceResource.REVIEW, idParam = "id")
     public Result<Void> resolve(@PathVariable Long id) {
         service.resolve(id);
         return Result.ok();
@@ -50,6 +56,7 @@ public class WikiReviewController {
 
     @PostMapping("/reviews/{id}/dismiss")
     @PermissionRegister(code = "platform:wiki:edit", name = "忽略 Wiki 审阅项", module = "平台能力", desc = "标记审阅项为已忽略")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:edit", resource = WikiSpaceResource.REVIEW, idParam = "id")
     public Result<Void> dismiss(@PathVariable Long id) {
         service.dismiss(id);
         return Result.ok();
@@ -57,6 +64,7 @@ public class WikiReviewController {
 
     @PostMapping("/reviews/{id}/execute")
     @PermissionRegister(code = "platform:wiki:edit", name = "执行 Wiki 审阅动作", module = "平台能力", desc = "执行完成/忽略/触发深度研究等预定义动作")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:edit", resource = WikiSpaceResource.REVIEW, idParam = "id")
     public Result<Void> execute(@PathVariable Long id, @Valid @RequestBody WikiReviewExecuteRequest request) {
         try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
             service.execute(id, request.getAction());

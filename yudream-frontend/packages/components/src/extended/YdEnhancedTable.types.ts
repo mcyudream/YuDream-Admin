@@ -16,6 +16,8 @@ export interface UserColumn<TData extends RowData = RowData> {
   header: string
   /** 列宽度 */
   width?: number | string
+  /** 列固定位置；默认固定在左侧，传 false 取消固定，传 'right' 固定在右侧 */
+  fixed?: boolean | 'left' | 'right'
 }
 
 /** 状态列配置 */

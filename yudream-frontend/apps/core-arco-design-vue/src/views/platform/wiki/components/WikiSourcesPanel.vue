@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { WikiSource } from '@/api/modules/platform-wiki'
 import type { YdFilePickerInstance } from '@yudream/components'
+import type { WikiSource } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
   captionWikiSourceImages,
@@ -12,11 +12,11 @@ import {
   updateWikiTextSource,
   uploadWikiSource,
 } from '@/api/modules/platform-wiki'
-import CmsMarkdownEditor from '../../theme-center/components/CmsMarkdownEditor.vue'
 import AiRunProgress from '@/components/AiRunProgress/index.vue'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { extractionStatusLabel, ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
+import WikiMarkdownEditor from './WikiMarkdownEditor.vue'
 
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
@@ -28,6 +28,7 @@ const captionProgressOpen = ref(false)
 
 const sources = ref<WikiSource[]>([])
 const loading = ref(false)
+const loadError = ref('')
 const folderPath = ref('/')
 const urlsText = ref('')
 const importing = ref(false)
@@ -48,13 +49,19 @@ const pagedSources = computed(() => {
 async function load() {
   if (!store.spaceId.value) {
     sources.value = []
+    loadError.value = ''
     return
   }
   loading.value = true
+  loadError.value = ''
   try {
     const res = await fetchWikiSources(store.spaceId.value)
     sources.value = res.data || []
     page.value = 1
+  }
+  catch (exception) {
+    // 保留错误与重试入口，不用空列表掩盖失败
+    loadError.value = exception instanceof Error ? exception.message : '资料加载失败，请稍后重试'
   }
   finally {
     loading.value = false
@@ -126,7 +133,9 @@ async function caption(source: WikiSource) {
 }
 
 watch(() => aiRuntime.runs[captionRunId.value]?.status, (status) => {
-  if (status === 'COMPLETED') void load()
+  if (status === 'COMPLETED') {
+    void load()
+  }
 })
 
 async function ingest(source: WikiSource) {
@@ -215,7 +224,9 @@ watch(() => store.spaceId.value, load)
                 <YdButton variant="outline" :loading="uploading" @click="pickFile">
                   <YdIcon name="morph:upload" /> 选择文件上传
                 </YdButton>
-                <YdFilePicker ref="fileInput" label="选择资料文件" @select="onFileChange"><template #default /></YdFilePicker>
+                <YdFilePicker ref="fileInput" label="选择资料文件" @select="onFileChange">
+                  <template #default />
+                </YdFilePicker>
               </div>
             </div>
             <div class="src-field">
@@ -239,15 +250,22 @@ watch(() => store.spaceId.value, load)
         </YdCard>
 
         <!-- 资料列表 -->
-        <div v-if="loading && !sources.length" class="src-loading">
-          <YdIcon name="morph:loader-circle" class="src-spin" /> 加载资料中…
+        <div v-if="loadError" class="src-error">
+          <YdAlert variant="destructive" title="资料加载失败" :description="loadError" />
+          <YdButton variant="outline" size="sm" :loading="loading" @click="load">
+            <YdIcon name="morph:rotate-cw" /> 重新加载
+          </YdButton>
         </div>
-        <div v-else-if="!sortedSources.length" class="src-empty">
-          <YdIcon name="morph:database" />
-          <strong>暂无资料</strong>
-          <p>上传文件或导入 URL，系统会自动抽取文本与图片</p>
+        <div v-if="loading && !sortedSources.length" class="src-loading">
+          <YdLoading :size="32" text="正在加载资料…" />
         </div>
-        <div v-else class="src-list">
+        <YdEmpty
+          v-else-if="!sortedSources.length && !loadError"
+          icon="morph:database"
+          title="暂无资料"
+          description="上传文件或导入 URL，系统会自动抽取文本与图片"
+        />
+        <div v-else-if="sortedSources.length" class="src-list">
           <YdCard v-for="source in pagedSources" :key="source.id" class="src-card">
             <div class="src-card__head">
               <div class="src-card__title">
@@ -331,13 +349,14 @@ watch(() => store.spaceId.value, load)
       v-model="textEditorVisible"
       :title="textEditingId ? '编辑在线文档' : '新建在线文档'"
       class="w-[min(960px,92vw)]"
+      content-class="max-h-[min(70vh,720px)]"
       show-cancel-button
       :confirm-button-loading="textSaving"
       @confirm="saveTextSource"
     >
       <div class="src-text-form">
         <YdInput v-model="textTitle" placeholder="资料标题（展示在资料列表与引用中）" />
-        <CmsMarkdownEditor v-model="textContent" class="src-text-editor" />
+        <WikiMarkdownEditor v-model="textContent" aria-label="资料内容编辑" height="min(52vh, 520px)" />
         <p class="src-text-hint">
           保存后自动进入摄入队列，生成对应的 Wiki 页面；内容变更会触发重新摄入。
         </p>
@@ -391,43 +410,16 @@ watch(() => store.spaceId.value, load)
   align-self: end;
 }
 
+/* YdAlert 没有默认插槽：重试动作必须与告警相邻，不能作为子节点传入 */
+.src-error {
+  display: grid;
+  gap: 8px;
+}
+
 .src-loading {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 60px 0;
-  color: var(--color-text-3);
-}
-
-.src-spin {
-  animation: src-rotate 1s linear infinite;
-}
-
-@keyframes src-rotate {
-  to { transform: rotate(360deg); }
-}
-
-.src-empty {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 60px 0;
-  color: var(--color-text-3);
-}
-
-.src-empty :deep(svg) {
-  color: var(--color-text-3);
-  font-size: 36px;
-}
-
-.src-empty strong {
-  color: var(--color-text-1);
-}
-
-.src-empty p {
-  margin: 0;
-  font-size: 12px;
+  padding: 56px 0;
 }
 
 .src-list {
@@ -585,14 +577,15 @@ watch(() => store.spaceId.value, load)
   justify-content: flex-end;
 }
 
+/* 在线文档长文弹窗：正文区高度受视口约束并内部滚动（content-class 用全局工具类），编辑区自身也为视口内高度 */
 .src-text-form {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
-.src-text-editor {
-  min-height: 380px;
-}
+/* 在线文档编辑器高度由 WikiMarkdownEditor 的 height 属性控制（YdMarkdownEditor 不透传 class，类选择器无效） */
 
 .src-text-hint {
   margin: 0;
@@ -603,6 +596,27 @@ watch(() => store.spaceId.value, load)
 @media (max-width: 1100px) {
   .src-import__grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* 窄屏：导入区真单列，卡片操作换行到独立一行，长文编辑区让位给视口 */
+@media (max-width: 768px) {
+  .src-inner {
+    padding: 12px;
+  }
+
+  .src-import__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .src-card__actions {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .src-card__url {
+    max-width: 100%;
   }
 }
 </style>

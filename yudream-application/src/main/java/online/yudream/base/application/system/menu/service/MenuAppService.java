@@ -58,7 +58,8 @@ public class MenuAppService {
             Map.entry("platform:ai:system", "ai"),
             Map.entry("platform:chat", "ai"),
             Map.entry("platform:render:use", "message-render"),
-            Map.entry("platform:mobile-config", "mobile-app")
+            Map.entry("platform:mobile-config", "mobile-app"),
+            Map.entry("platform:feishu", "feishu")
     );
 
     private final MenuDomainService menuDomainService;

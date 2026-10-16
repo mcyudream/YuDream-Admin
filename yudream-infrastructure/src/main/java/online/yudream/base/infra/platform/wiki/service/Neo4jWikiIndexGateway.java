@@ -51,6 +51,7 @@ public class Neo4jWikiIndexGateway implements WikiIndexGateway {
         progress.accept(new WikiIndexProgress("neo4j","Neo4j 写入完成",95));
     }
     @Override public void remove(WikiSpace space,Long nodeId,Long versionId){String code=table(space).getCode();try(Session s=graphGateway.openSession()){Map<String,Object>p=scope(code,space.getId(),nodeId,versionId);s.run("MATCH (c:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}) DETACH DELETE c",p);s.run("MATCH ()-[r:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}]->() DELETE r",p);}}
+    @Override public void updatePath(WikiSpace space,Long nodeId,Long versionId,String path){String code=table(space).getCode();Map<String,Object>p=new LinkedHashMap<>(scope(code,space.getId(),nodeId,versionId));p.put("path",path);try(Session s=graphGateway.openSession()){s.run("MATCH (c:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId,active:true}) SET c.path=$path",p);}}
     @Override public WikiIndexSnapshot inspect(WikiSpace space,Long nodeId,Long versionId){String code=table(space).getCode();Map<String,Object>p=scope(code,space.getId(),nodeId,versionId);try(Session s=graphGateway.openSession()){var cr=s.run("MATCH (c:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}) RETURN c ORDER BY c.sequence",p);List<WikiChunk>chunks=new ArrayList<>();while(cr.hasNext()){var c=cr.next().get("c").asNode();chunks.add(new WikiChunk(space.getId(),nodeId,versionId,c.get("sequence").asInt(),c.get("title").asString(),c.get("path").asString(),c.get("content").asString()));}var rr=s.run("MATCH (source:WikiEntity {tableCode:$tableCode,spaceId:$spaceId})-[r:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}]->(target:WikiEntity {tableCode:$tableCode,spaceId:$spaceId}) RETURN source,r,target ORDER BY r.confidence DESC",p);List<WikiGraphRelation>relations=new ArrayList<>();while(rr.hasNext()){var row=rr.next();var a=row.get("source").asNode();var b=row.get("target").asNode();var r=row.get("r").asRelationship();relations.add(new WikiGraphRelation(a.get("key").asString(),a.get("type").asString(),r.get("relation").asString(),b.get("key").asString(),b.get("type").asString(),r.get("confidence").asDouble()));}return new WikiIndexSnapshot(chunks,relations);}}
     @Override public List<WikiSearchHit> search(WikiSpace space,String query,int topK,String pathPrefix,boolean graphExpansion){
         String normalized=query==null?"":query.trim();
@@ -66,9 +67,9 @@ public class Neo4jWikiIndexGateway implements WikiIndexGateway {
             p.put("vector",vector);
             p.put("tableCode",code);
             p.put("spaceId",space.getId());
-            p.put("path",pathPrefix==null?"":pathPrefix);
+            p.put("path",pathPrefix==null?"":pathPrefix.trim().replaceAll("^/+|/+$", ""));
             p.put("limit",limit);
-            var rows=s.run("CALL db.index.vector.queryNodes($index,$candidateLimit,$vector) YIELD node,score WHERE node.tableCode=$tableCode AND node.spaceId=$spaceId AND node.active=true AND ($path='' OR node.path STARTS WITH $path) RETURN node,score ORDER BY score DESC LIMIT $limit",p);
+            var rows=s.run("CALL db.index.vector.queryNodes($index,$candidateLimit,$vector) YIELD node,score WHERE node.tableCode=$tableCode AND node.spaceId=$spaceId AND node.active=true AND ($path='' OR node.path=$path OR node.path STARTS WITH $path+'/' ) RETURN node,score ORDER BY score DESC LIMIT $limit",p);
             List<WikiSearchHit>hits=new ArrayList<>();
             LinkedHashMap<Long,WikiSearchHit>byNode=new LinkedHashMap<>();
             while(rows.hasNext()){
@@ -83,7 +84,7 @@ public class Neo4jWikiIndexGateway implements WikiIndexGateway {
                     Map<String,Object>gp=new LinkedHashMap<>();
                     gp.put("tableCode",code);
                     gp.put("spaceId",space.getId());
-                    gp.put("path",pathPrefix==null?"":pathPrefix);
+                    gp.put("path",pathPrefix==null?"":pathPrefix.trim().replaceAll("^/+|/+$", ""));
                     gp.put("seedIds",new ArrayList<>(byNode.keySet()));
                     gp.put("limit",Math.clamp(topK*2,4,40));
                     var expanded=s.run("""
@@ -94,7 +95,7 @@ public class Neo4jWikiIndexGateway implements WikiIndexGateway {
                             MATCH (entity)-[:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId}]-(related:WikiEntity {tableCode:$tableCode,spaceId:$spaceId})
                             MATCH (chunk:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,active:true})
                             WHERE chunk.nodeId <> seed.nodeId
-                              AND ($path='' OR chunk.path STARTS WITH $path)
+                              AND ($path='' OR chunk.path=$path OR chunk.path STARTS WITH $path+'/')
                               AND (toLower(chunk.content) CONTAINS related.key OR toLower(chunk.title) CONTAINS related.key)
                             WITH chunk, max(related.confidence) AS confidence
                             RETURN chunk, confidence

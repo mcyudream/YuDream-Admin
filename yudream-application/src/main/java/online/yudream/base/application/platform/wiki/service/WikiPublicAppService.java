@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.wiki.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.platform.wiki.assembler.WikiAssembler;
 import online.yudream.base.application.platform.wiki.dto.WikiNodeDTO;
 import online.yudream.base.application.platform.wiki.dto.WikiPublicDocumentDTO;
@@ -36,6 +37,7 @@ public class WikiPublicAppService {
     private final WikiSourceRepo sources;
     private final WikiAppService wikiAppService;
     private final WikiSearchAppService searches;
+    private final FileAppService files;
     private final CapabilityAppService capabilities;
 
     @Transactional(readOnly = true)
@@ -124,6 +126,8 @@ public class WikiPublicAppService {
         List<WikiPublicDocumentDetailDTO.Image> images = (source.getImages() == null ? List.<WikiSourceImage>of() : source.getImages())
                 .stream()
                 .filter(image -> image.fileObjectId() != null)
+                // 公开原文档只回匿名可读的图片，私有文件不因 URL 出现在公开 DTO 中
+                .filter(image -> files.isPubliclyReadable(image.fileObjectId()))
                 .map(image -> new WikiPublicDocumentDetailDTO.Image(
                         "/api/files/" + image.fileObjectId() + "/content",
                         image.caption(), image.width(), image.height()))

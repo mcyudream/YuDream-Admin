@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WikiFrontmatterTest {
@@ -39,5 +40,22 @@ class WikiFrontmatterTest {
     void bodyOnlyExcludesFrontmatter() {
         WikiFrontmatter frontmatter = WikiFrontmatter.of("T", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "s", "body");
         assertEquals("body", frontmatter.bodyOnly());
+    }
+
+    @Test
+    void originMarkerRoundTripsOnlyForGeneratedPages() {
+        WikiFrontmatter generated = WikiFrontmatter.of("生成页", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "s", "body")
+                .withOrigin(WikiFrontmatter.ORIGIN_LLM);
+
+        String markdown = generated.fullMarkdown();
+        WikiFrontmatter parsed = WikiFrontmatter.parse(markdown);
+
+        assertTrue(markdown.contains("origin: \"llm\""));
+        assertEquals(WikiFrontmatter.ORIGIN_LLM, parsed.origin());
+        assertTrue(parsed.llmGenerated());
+
+        WikiFrontmatter manual = WikiFrontmatter.of("人工页", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "s", "body");
+        assertFalse(manual.fullMarkdown().contains("origin:"));
+        assertFalse(WikiFrontmatter.parse(manual.fullMarkdown()).llmGenerated());
     }
 }

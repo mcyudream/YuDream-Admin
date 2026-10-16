@@ -182,6 +182,20 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_INBOUND_MAIL_ENABLED:true}
   plugin-market-source:
     enabled: ${PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED:true}
+  feishu:
+    enabled: ${PLATFORM_FEISHU_ENABLED:true}
+
+# 飞书开放平台出站受信主机（逗号分隔，必须 https）：官方主机 open.feishu.cn / open.larksuite.com 始终允许；
+# 自建受信网关或代理在此由部署方声明，避免能力配置管理员把应用凭据（app_id/app_secret）指向任意地址。
+yudream.platform.feishu:
+  allowed-hosts: ${PLATFORM_FEISHU_ALLOWED_HOSTS:}
+
+# 站点数据目录：插件经 SPI 2.37.0 的 context.siteFiles() 落盘到
+# sites/{siteCode}/plugins/{pluginCode}/，写入只限自属目录、跨插件读需宿主授权。
+# root 为站点数据根（相对进程工作目录），code 为当前站点编码；单站点部署保持默认即可。
+yudream.platform.site:
+  root: ${PLATFORM_SITE_ROOT:sites}
+  code: ${PLATFORM_SITE_CODE:default}
 
 yudream.platform.ai.client:
   connect-timeout: ${PLATFORM_AI_CONNECT_TIMEOUT:30s}

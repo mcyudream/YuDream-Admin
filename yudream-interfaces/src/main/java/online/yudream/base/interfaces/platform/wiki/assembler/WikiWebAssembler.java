@@ -54,6 +54,7 @@ public final class WikiWebAssembler {
         c.setSourceGroundedDefault(r.isSourceGroundedDefault());
         c.setWatchEnabled(r.isWatchEnabled());
         c.setWatchFolderPath(r.getWatchFolderPath());
+        c.setCommentEnabled(r.isCommentEnabled());
         return c;
     }
 

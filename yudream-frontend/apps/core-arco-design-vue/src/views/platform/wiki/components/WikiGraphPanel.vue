@@ -1,27 +1,41 @@
 <script setup lang="ts">
-import type {WikiGraphSnapshot} from '@/api/modules/platform-wiki'
+import type { WikiGraphSnapshot } from '@/api/modules/platform-wiki'
+import { useIsMobile } from '@yudream/components'
 import * as echarts from 'echarts'
-import {computed, inject, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import {fetchWikiGraph} from '@/api/modules/platform-wiki'
-import {pageTypeColor, pageTypeLabel, wikiWorkbenchKey} from '../wiki-utils'
+import { computed, inject, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { fetchWikiGraph } from '@/api/modules/platform-wiki'
+import { pageTypeColor, pageTypeLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
+const isMobile = useIsMobile()
 
 const graph = ref<WikiGraphSnapshot | null>(null)
 const loading = ref(false)
+const loadError = ref('')
 const chartEl = ref<HTMLElement | null>(null)
 const activeCommunity = ref('')
 const activeInsight = ref(-1)
+
+// 窄屏分区切换（768px 断点）：同一时刻只展示一个分区，避免主区与侧栏双重纵向滚动
+type GraphSection = 'graph' | 'side'
+const narrowSection = ref<GraphSection>('graph')
+const sectionOptions: Array<{ label: string, value: GraphSection }> = [
+  { label: '图谱', value: 'graph' },
+  { label: '社区与洞察', value: 'side' },
+]
+
 let chart: echarts.ECharts | null = null
 let resizeObserver: ResizeObserver | null = null
+
+const showEmpty = computed(() => !loading.value && !loadError.value && (!graph.value || !graph.value.nodes.length))
 
 const paletteTokens = [30, 38, 46, 54, 62, 70, 78, 86, 94, 100].map(weight => weight === 100 ? 'var(--color-text-2)' : `color-mix(in srgb, var(--color-text-2) ${weight}%, var(--color-bg-1))`)
 
 const insightKindMeta: Record<string, { label: string, icon: string }> = {
-  SURPRISING_CONNECTION: {label: '惊奇连接', icon: 'morph:sparkles'},
-  ORPHAN: {label: '孤立页面', icon: 'morph:ghost'},
-  SPARSE_COMMUNITY: {label: '稀疏社区', icon: 'i-ri:bubble-chart-line'},
-  BRIDGE: {label: '桥接页面', icon: 'morph:link'},
+  SURPRISING_CONNECTION: { label: '惊奇连接', icon: 'morph:sparkles' },
+  ORPHAN: { label: '孤立页面', icon: 'morph:ghost' },
+  SPARSE_COMMUNITY: { label: '稀疏社区', icon: 'i-ri:bubble-chart-line' },
+  BRIDGE: { label: '桥接页面', icon: 'morph:link' },
 }
 
 const nodeIndex = computed(() => {
@@ -33,9 +47,11 @@ const nodeIndex = computed(() => {
 async function load() {
   if (!store.spaceId.value) {
     graph.value = null
+    loadError.value = ''
     return
   }
   loading.value = true
+  loadError.value = ''
   try {
     const res = await fetchWikiGraph(store.spaceId.value)
     graph.value = res.data || null
@@ -43,13 +59,20 @@ async function load() {
     activeInsight.value = -1
     await nextTick()
     renderChart()
-  } finally {
+  }
+  catch (exception) {
+    // 保留错误与重试入口；刷新失败时保留已渲染的图谱，不用「暂无数据」掩盖失败
+    loadError.value = exception instanceof Error ? exception.message : '图谱加载失败，请稍后重试'
+  }
+  finally {
     loading.value = false
   }
 }
 
 function resolveColor(value: string, fallback: string) {
-  if (!chartEl.value) return fallback
+  if (!chartEl.value) {
+    return fallback
+  }
   const probe = document.createElement('span')
   probe.style.color = value
   probe.style.position = 'absolute'
@@ -87,7 +110,7 @@ function renderChart() {
     chart = echarts.init(chartEl.value)
     chart.on('click', (params: any) => {
       if (params.dataType === 'node' && params.data?.id != null) {
-        store.openPage({nodeId: String(params.data.id), title: params.data.title})
+        void store.openPage({ nodeId: String(params.data.id), title: params.data.title })
       }
     })
   }
@@ -100,11 +123,11 @@ function renderChart() {
   const colors = palette()
   const useCommunity = communities.length > 0
   const categories = useCommunity
-    ? communities.map((item, index) => ({name: item.label, itemStyle: {color: colors[index % colors.length]}}))
+    ? communities.map((item, index) => ({ name: item.label, itemStyle: { color: colors[index % colors.length] } }))
     : [...new Set(data.nodes.map(node => node.type || 'concept'))].map(type => ({
-      name: pageTypeLabel(type),
-      itemStyle: {color: resolveColor(pageTypeColor(type), colors[4])},
-    }))
+        name: pageTypeLabel(type),
+        itemStyle: { color: resolveColor(pageTypeColor(type), colors[4]) },
+      }))
 
   const maxDegree = Math.max(1, ...data.nodes.map(node => node.degree))
   const maxWeight = Math.max(1, ...data.edges.map(edge => edge.weight))
@@ -135,7 +158,7 @@ function renderChart() {
       top: 8,
       left: 8,
       orient: 'vertical',
-      textStyle: {fontSize: 11, color: textColor},
+      textStyle: { fontSize: 11, color: textColor },
       itemWidth: 10,
       itemHeight: 10,
       icon: 'circle',
@@ -161,13 +184,13 @@ function renderChart() {
       },
       emphasis: {
         focus: 'adjacency',
-        label: {fontWeight: 'bold'},
-        lineStyle: {width: 3},
+        label: { fontWeight: 'bold' },
+        lineStyle: { width: 3 },
       },
       blur: {
-        itemStyle: {opacity: 0.12},
-        lineStyle: {opacity: 0.04},
-        label: {opacity: 0.15},
+        itemStyle: { opacity: 0.12 },
+        lineStyle: { opacity: 0.04 },
+        label: { opacity: 0.15 },
       },
       data: data.nodes.map((node) => {
         const communityIndex = communities.findIndex(item => item.id === node.community)
@@ -205,7 +228,7 @@ function renderChart() {
         },
       })),
     }],
-  }, {notMerge: true})
+  }, { notMerge: true })
 }
 
 // echarts 的 source/target 需要与 data 的 name 或 id 匹配；graph series 用 id 匹配 links
@@ -213,19 +236,19 @@ function highlightNodes(nodeIds: string[]) {
   if (!chart) {
     return
   }
-  chart.dispatchAction({type: 'downplay', seriesIndex: 0})
+  chart.dispatchAction({ type: 'downplay', seriesIndex: 0 })
   const indexes = nodeIds
     .map(id => nodeIndex.value.get(id))
     .filter((index): index is number => index !== undefined)
   if (indexes.length) {
-    chart.dispatchAction({type: 'highlight', seriesIndex: 0, dataIndex: indexes})
+    chart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: indexes })
   }
 }
 
 function focusCommunity(communityId: string) {
   if (activeCommunity.value === communityId) {
     activeCommunity.value = ''
-    chart?.dispatchAction({type: 'downplay', seriesIndex: 0})
+    chart?.dispatchAction({ type: 'downplay', seriesIndex: 0 })
     return
   }
   activeCommunity.value = communityId
@@ -239,7 +262,7 @@ function focusCommunity(communityId: string) {
 function focusInsight(index: number) {
   if (activeInsight.value === index) {
     activeInsight.value = -1
-    chart?.dispatchAction({type: 'downplay', seriesIndex: 0})
+    chart?.dispatchAction({ type: 'downplay', seriesIndex: 0 })
     return
   }
   activeInsight.value = index
@@ -251,13 +274,22 @@ function focusInsight(index: number) {
 }
 
 function insightMeta(kind: string) {
-  return insightKindMeta[kind] || {label: kind, icon: 'morph:lightbulb'}
+  return insightKindMeta[kind] || { label: kind, icon: 'morph:lightbulb' }
+}
+
+// 容器隐藏（窄屏停在侧栏分区）或未布局时不触发 0 尺寸适配
+function resizeChart() {
+  const el = chartEl.value
+  if (!chart || !el || !el.clientWidth || !el.clientHeight) {
+    return
+  }
+  chart.resize()
 }
 
 onMounted(() => {
   load()
   if (chartEl.value) {
-    resizeObserver = new ResizeObserver(() => chart?.resize())
+    resizeObserver = new ResizeObserver(() => resizeChart())
     resizeObserver.observe(chartEl.value)
   }
 })
@@ -266,7 +298,7 @@ onActivated(() => {
   if (!graph.value && !loading.value) {
     load()
   }
-  nextTick(() => chart?.resize())
+  nextTick(() => resizeChart())
 })
 
 onBeforeUnmount(() => {
@@ -276,33 +308,70 @@ onBeforeUnmount(() => {
 })
 
 watch(() => store.spaceId.value, load)
+
+// 窄屏从「社区与洞察」切回「图谱」后，画布需要重新适配容器尺寸
+watch(narrowSection, async (section) => {
+  if (section !== 'graph') {
+    return
+  }
+  await nextTick()
+  resizeChart()
+})
 </script>
 
 <template>
   <div class="graph-panel">
-    <div class="graph-canvas-card">
+    <div class="graph-switch">
+      <YdSegmented
+        v-model="narrowSection"
+        block
+        size="sm"
+        aria-label="图谱视图切换"
+        :options="sectionOptions"
+      />
+    </div>
+
+    <div v-show="!isMobile || narrowSection === 'graph'" class="graph-canvas-card">
       <div class="graph-canvas__toolbar">
-        <span class="graph-canvas__hint">
-          <YdIcon name="morph:move"/> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
+        <span class="graph-canvas__hint graph-canvas__hint--pointer">
+          <YdIcon name="morph:move" /> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
+        </span>
+        <span class="graph-canvas__hint graph-canvas__hint--touch">
+          <YdIcon name="morph:move" /> 拖动平移 / 双指缩放 / 点击节点打开页面
         </span>
         <YdButton size="sm" variant="outline" :loading="loading" @click="load">
-          <YdIcon name="morph:refresh-cw"/>
+          <YdIcon name="morph:refresh-cw" />
           刷新图谱
         </YdButton>
       </div>
-      <div ref="chartEl" class="graph-canvas"/>
-      <div v-if="!loading && (!graph || !graph.nodes.length)" class="graph-canvas__empty">
-        <YdIcon name="morph:waypoints"/>
-        <strong>暂无图谱数据</strong>
-        <p>摄入更多资料后，系统会自动构建知识图谱</p>
+
+      <div v-if="loadError" class="graph-canvas__error">
+        <YdAlert
+          variant="destructive"
+          class="graph-canvas__alert"
+          title="图谱加载失败"
+          :description="loadError"
+        />
+        <YdButton variant="outline" size="sm" :loading="loading" @click="load">
+          <YdIcon name="morph:rotate-cw" /> 重新加载
+        </YdButton>
       </div>
-      <div v-if="loading" class="graph-canvas__loading">
-        <YdIcon name="morph:loader-circle" class="graph-spin"/>
-        正在加载图谱…
+
+      <div class="graph-canvas__body">
+        <div ref="chartEl" class="graph-canvas" />
+        <div v-if="showEmpty" class="graph-canvas__overlay">
+          <YdIcon name="morph:waypoints" />
+          <strong>暂无图谱数据</strong>
+          <p>摄入更多资料后，系统会自动构建知识图谱</p>
+        </div>
+        <div v-if="loading && !graph" class="graph-canvas__overlay">
+          <YdIcon name="morph:loader-circle" class="graph-spin" />
+          正在加载图谱…
+        </div>
       </div>
     </div>
 
-    <aside class="graph-side">
+    <aside v-show="!isMobile || narrowSection === 'side'" class="graph-side">
       <YdScrollArea class="graph-side__scroll">
         <YdCard title="社区" class="graph-side__card">
           <template v-if="graph?.communities?.length">
@@ -316,13 +385,15 @@ watch(() => store.spaceId.value, load)
               :aria-pressed="activeCommunity === community.id"
               @click="focusCommunity(community.id)"
             >
-              <span class="graph-community__dot" :style="{ background: communityColor(index) }"/>
+              <span class="graph-community__dot" :style="{ background: communityColor(index) }" />
               <span class="graph-community__label">{{ community.label }}</span>
               <span class="graph-community__meta">{{ community.size }} 页 · 内聚 {{ (community.cohesion * 100).toFixed(0) }}%</span>
               <span v-if="community.lowCohesion" class="graph-community__warn">低内聚</span>
             </YdButton>
           </template>
-          <p v-else class="graph-side__empty">暂无社区划分</p>
+          <p v-else class="graph-side__empty">
+            暂无社区划分
+          </p>
         </YdCard>
 
         <YdCard title="图谱洞察" class="graph-side__card">
@@ -339,7 +410,7 @@ watch(() => store.spaceId.value, load)
             >
               <div class="graph-insight__head">
                 <span class="graph-insight__kind">
-                  <YdIcon :name="insightMeta(insight.kind).icon"/>
+                  <YdIcon :name="insightMeta(insight.kind).icon" />
                   {{ insightMeta(insight.kind).label }}
                 </span>
                 <strong>{{ insight.title }}</strong>
@@ -347,7 +418,9 @@ watch(() => store.spaceId.value, load)
               <p>{{ insight.description }}</p>
             </YdButton>
           </template>
-          <p v-else class="graph-side__empty">暂无洞察</p>
+          <p v-else class="graph-side__empty">
+            暂无洞察
+          </p>
         </YdCard>
       </YdScrollArea>
     </aside>
@@ -362,6 +435,11 @@ watch(() => store.spaceId.value, load)
   min-height: 0;
   padding: 16px;
   background: var(--color-fill-1);
+}
+
+/* 分区切换只在窄屏出现；宽屏同时展示图谱与侧栏 */
+.graph-switch {
+  display: none;
 }
 
 .graph-canvas-card {
@@ -394,15 +472,34 @@ watch(() => store.spaceId.value, load)
   font-size: 12px;
 }
 
-.graph-canvas {
+.graph-canvas__hint--touch {
+  display: none;
+}
+
+/* YdAlert 没有默认插槽：重试动作必须与告警相邻，不能作为子节点传入 */
+.graph-canvas__error {
+  display: grid;
+  gap: 8px;
+}
+
+.graph-canvas__alert {
+  margin: 10px 14px 0;
+}
+
+.graph-canvas__body {
+  position: relative;
   flex: 1;
   min-height: 0;
 }
 
-.graph-canvas__empty,
-.graph-canvas__loading {
+.graph-canvas {
   position: absolute;
-  inset: 48px 0 0;
+  inset: 0;
+}
+
+.graph-canvas__overlay {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-content: center;
   justify-items: center;
@@ -411,16 +508,16 @@ watch(() => store.spaceId.value, load)
   pointer-events: none;
 }
 
-.graph-canvas__empty :deep(svg) {
+.graph-canvas__overlay :deep(svg) {
   color: var(--color-text-3);
   font-size: 40px;
 }
 
-.graph-canvas__empty strong {
+.graph-canvas__overlay strong {
   color: var(--color-text-1);
 }
 
-.graph-canvas__empty p {
+.graph-canvas__overlay p {
   margin: 0;
   font-size: 12px;
 }
@@ -564,17 +661,45 @@ watch(() => store.spaceId.value, load)
 }
 
 @media (max-width: 1100px) {
+  .graph-side {
+    width: 260px;
+  }
+}
+
+/* 窄屏（768px）：分区切换替代主区 + 侧栏同时纵向滚动 */
+@media (max-width: 768px) {
   .graph-panel {
+    gap: 10px;
+    padding: 12px;
     flex-direction: column;
-    overflow: auto;
+  }
+
+  .graph-switch {
+    display: block;
+    flex-shrink: 0;
   }
 
   .graph-canvas-card {
-    min-height: 480px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .graph-canvas__hint--pointer {
+    display: none;
+  }
+
+  .graph-canvas__hint--touch {
+    display: inline-flex;
   }
 
   .graph-side {
     width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .graph-side__scroll {
+    height: 100%;
   }
 }
 </style>

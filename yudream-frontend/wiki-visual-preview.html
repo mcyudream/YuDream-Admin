@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki 编辑页和管理页视觉重构预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f6f7;
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1f2937;
+        }
+        
+        /* 编辑页工具条 */
+        .wiki-author__header {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            padding: 0 16px;
+            height: 56px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            border-radius: 8px 8px 0 0;
+            min-width: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .wiki-author__header-left {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        .wiki-author__header-context {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            min-width: 0;
+        }
+        
+        .wiki-author__space-badge {
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #1f2937;
+            background: #f3f4f6;
+            border-radius: 6px;
+            white-space: nowrap;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .wiki-author__breadcrumb {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+        
+        .wiki-author__breadcrumb-sep {
+            flex-shrink: 0;
+            font-size: 13px;
+        }
+        
+        .wiki-author__node-type {
+            padding: 2px 6px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #4b5563;
+        }
+        
+        .wiki-author__title-input {
+            flex: 1;
+            min-width: 200px;
+            border: 1px solid #e5e7eb;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1f2937;
+            border-radius: 4px;
+            background: #ffffff;
+        }
+        
+        .wiki-author__header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+        
+        .wiki-author__status {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #6b7280;
+            background: #f9fafb;
+            border-radius: 6px;
+            transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 100px;
+            justify-content: center;
+        }
+        
+        .wiki-author__status--saved {
+            color: #059669;
+            background: #d1fae5;
+        }
+        
+        .wiki-author__status-icon--pulse {
+            animation: wiki-author-pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes wiki-author-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .wiki-author__status-text {
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        
+        .wiki-author__mode-switch {
+            flex-shrink: 0;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #1f2937;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 200ms;
+        }
+        
+        .btn:hover {
+            background: #f3f4f6;
+        }
+        
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* 管理页工具条 */
+        .wiki-manage__header {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+            border-bottom: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .wiki-manage__header-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .wiki-manage__space-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+            max-width: 280px;
+        }
+        
+        .wiki-manage__space {
+            flex: 1;
+            min-width: 120px;
+            border: 1px solid #d1d5db;
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+        
+        .wiki-manage__sync {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #0891b2;
+            background: #cffafe;
+            border-radius: 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        
+        .wiki-manage__spin {
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .wiki-manage__actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+        
+        .wiki-manage__action-btn {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            padding: 6px 12px;
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #1f2937;
+            transition: all 200ms;
+        }
+        
+        .wiki-manage__action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .btn-icon-sm {
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .icon {
+            display: inline-block;
+            font-size: 14px;
+        }
+        
+        .demo-container {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 1024px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+            
+            .wiki-manage__actions {
+                flex-direction: column;
+            }
+            
+            .wiki-manage__action-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        .label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 12px 0;
+        }
+        
+        .feature-list li {
+            padding: 6px 0;
+            color: #4b5563;
+            font-size: 13px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            color: #059669;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div style="max-width: 1400px; margin: 0 auto;">
+        <h1 style="margin-bottom: 24px; color: #1f2937;">🎨 Wiki 知识库视觉重构预览</h1>
+        
+        <!-- 编辑页 -->
+        <div class="section">
+            <h2 class="section-title">📝 编辑页（WikiAuthorEditor.vue）</h2>
+            <p style="margin-bottom: 16px; color: #6b7280;">现代化的分层工具条设计，包含上下文指示、标题输入和保存状态</p>
+            
+            <div class="demo-container">
+                <!-- 编辑页工具条 -->
+                <div class="wiki-author__header">
+                    <div class="wiki-author__header-left">
+                        <button class="btn btn-icon" title="返回知识库">←</button>
+                        <button class="btn btn-icon" title="展开/收起目录栏">⊕</button>
+                        <div class="wiki-author__header-context">
+                            <div class="wiki-author__space-badge">产品知识库</div>
+                            <div class="wiki-author__breadcrumb">
+                                <span class="wiki-author__breadcrumb-sep">›</span>
+                                <span class="wiki-author__node-type">页面</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <input class="wiki-author__title-input" placeholder="页面标题" value="知识库编辑指南">
+                    
+                    <div class="wiki-author__header-right">
+                        <div class="wiki-author__status">
+                            <span class="icon wiki-author__status-icon--pulse">●</span>
+                            <span class="wiki-author__status-text">未保存</span>
+                        </div>
+                        <button class="btn btn-icon" title="编辑">✎</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 16px;">
+                <span class="label">✨ 设计亮点</span>
+                <ul class="feature-list">
+                    <li>分层布局：左-中-右分区，信息层次清晰</li>
+                    <li>面包屑导航：空间名称 > 页面类型，上下文指示</li>
+                    <li>保存状态动画：未保存时脉冲闪烁，彩色背景反馈</li>
+                    <li>响应式设计：大屏完整，小屏折叠收起</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 管理页 -->
+        <div class="section">
+            <h2 class="section-title">⚙️ 管理页（WikiManageView.vue）</h2>
+            <p style="margin-bottom: 16px; color: #6b7280;">渐变背景提升视觉层次，操作按钮悬停上升动画</p>
+            
+            <div class="demo-container">
+                <!-- 管理页工具条 -->
+                <div class="wiki-manage__header">
+                    <div class="wiki-manage__header-left">
+                        <button class="btn btn-icon" title="返回知识库">←</button>
+                        <div class="wiki-manage__space-selector">
+                            <select class="wiki-manage__space">
+                                <option>📚 产品知识库</option>
+                                <option>📚 技术知识库</option>
+                            </select>
+                            <div class="wiki-manage__sync">
+                                <span class="wiki-manage__spin">⟳</span>
+                                <span>同步中</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="wiki-manage__actions">
+                        <button class="wiki-manage__action-btn">✎ 编辑</button>
+                        <button class="wiki-manage__action-btn">🔄 重建索引</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 16px;">
+                <span class="label">✨ 设计亮点</span>
+                <ul class="feature-list">
+                    <li>渐变背景：视觉层次提升，背景颜色更温和</li>
+                    <li>按钮悬停动画：translateY(-2px) 提升效果，增强交互反馈</li>
+                    <li>同步状态标签：品牌色徽章，清晰的加载提示</li>
+                    <li>响应式布局：移动端自动转为竖排全宽按钮</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 对比对照 -->
+        <div class="section">
+            <h2 class="section-title">📊 新旧对比</h2>
+            
+            <div class="comparison">
+                <div>
+                    <span class="label">❌ 旧设计问题</span>
+                    <ul class="feature-list">
+                        <li>工具条堆砌，行内元素无序</li>
+                        <li>缺少上下文指示，用户不知道当前知识库</li>
+                        <li>保存状态提示不够显眼</li>
+                        <li>管理页工具条平坦单调</li>
+                        <li>按钮交互反馈不足</li>
+                        <li>移动端适配欠缺</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <span class="label">✅ 新设计优化</span>
+                    <ul class="feature-list">
+                        <li>分层布局，逻辑清晰</li>
+                        <li>面包屑导航+空间徽章，即时反馈</li>
+                        <li>脉冲动画+彩色背景，保存状态醒目</li>
+                        <li>渐变背景+立体感，现代化视觉</li>
+                        <li>悬停上升动画，交互更流畅</li>
+                        <li>@media 响应式，各种屏幕适配</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 技术细节 -->
+        <div class="section">
+            <h2 class="section-title">🔧 技术细节</h2>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 6px; font-size: 13px; color: #4b5563; line-height: 1.6;">
+                <p><strong>CSS 变量统一：</strong> 所有颜色、动画、间距均通过 CSS 变量（--color-*, --yd-motion-*）实现，支持深色模式</p>
+                <p style="margin-top: 8px;"><strong>响应式断点：</strong><br>
+                    • 大屏 (≥1280px)：全信息展示<br>
+                    • 中屏 (768-1024px)：压缩空间名称<br>
+                    • 小屏 (<768px)：竖排布局，全宽按钮
+                </p>
+                <p style="margin-top: 8px;"><strong>动画性能：</strong> 采用 GPU 加速的 transform 和 opacity，禁止 layout 抖动</p>
+                <p style="margin-top: 8px;"><strong>Bug 修复：</strong> 从知识库列表进入编辑区时，现在显式传递 spaceId，避免上下文丢失</p>
+            </div>
+        </div>
+        
+        <!-- 调用指南 -->
+        <div class="section" style="background: #dbeafe; padding: 16px; border-radius: 6px; border-left: 4px solid #0284c7;">
+            <h3 style="color: #0c4a6e; margin-bottom: 8px;">📍 如何验证</h3>
+            <ol style="margin-left: 20px; color: #0c4a6e; font-size: 13px; line-height: 1.8;">
+                <li>启动前端开发服务：<code style="background: #ffffff; padding: 2px 6px; border-radius: 3px;">pnpm dev</code></li>
+                <li>访问 <code style="background: #ffffff; padding: 2px 6px; border-radius: 3px;">http://localhost:9003</code></li>
+                <li>进入 Wiki 工作台（需要有知识库数据）</li>
+                <li>观察编辑页顶部工具条的分层布局和保存状态动画</li>
+                <li>进入管理页，观察渐变背景和按钮悬停动画</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

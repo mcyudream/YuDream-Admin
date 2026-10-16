@@ -3,6 +3,9 @@ package online.yudream.base.interfaces.platform.wiki.controller;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiIngestAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceResource;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
@@ -29,6 +32,7 @@ public class WikiIngestController {
 
     @PostMapping("/spaces/{spaceId}/sources/{sourceId}/ingest")
     @PermissionRegister(code = "platform:wiki:publish", name = "摄入 Wiki 资料", module = "平台能力", desc = "将原始资料入队并执行两步思维链摄入")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:publish")
     public Result<Void> enqueue(@PathVariable Long spaceId, @PathVariable Long sourceId) {
         try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
             service.enqueueIngest(spaceId, sourceId);
@@ -38,12 +42,14 @@ public class WikiIngestController {
 
     @GetMapping("/spaces/{spaceId}/ingest-tasks")
     @PermissionRegister(code = "platform:wiki:view", name = "查看摄入任务", module = "平台能力", desc = "查看知识库摄入队列与进度")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
     public Result<List<WikiIngestTaskRes>> tasks(@PathVariable Long spaceId) {
         return Result.ok(WikiKnowledgeWebAssembler.toIngestTaskResList(service.tasks(spaceId)));
     }
 
     @PostMapping("/ingest-tasks/{id}/cancel")
     @PermissionRegister(code = "platform:wiki:publish", name = "取消摄入任务", module = "平台能力", desc = "取消排队中或运行中的摄入任务")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:publish", resource = WikiSpaceResource.INGEST_TASK, idParam = "id")
     public Result<Void> cancel(@PathVariable Long id) {
         service.cancelTask(id);
         return Result.ok();
@@ -51,6 +57,7 @@ public class WikiIngestController {
 
     @PostMapping("/ingest-tasks/{id}/retry")
     @PermissionRegister(code = "platform:wiki:publish", name = "重试摄入任务", module = "平台能力", desc = "重新入队失败或已取消的摄入任务")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:publish", resource = WikiSpaceResource.INGEST_TASK, idParam = "id")
     public Result<Void> retry(@PathVariable Long id) {
         service.retryTask(id);
         return Result.ok();
@@ -58,6 +65,7 @@ public class WikiIngestController {
 
     @DeleteMapping("/ingest-tasks/{id}")
     @PermissionRegister(code = "platform:wiki:publish", name = "取消摄入任务", module = "平台能力", desc = "删除摄入任务；运行中任务先取消")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:publish", resource = WikiSpaceResource.INGEST_TASK, idParam = "id")
     public Result<Void> delete(@PathVariable Long id) {
         service.deleteTask(id);
         return Result.ok();
@@ -65,6 +73,7 @@ public class WikiIngestController {
 
     @DeleteMapping("/spaces/{spaceId}/ingest-tasks")
     @PermissionRegister(code = "platform:wiki:publish", name = "取消摄入任务", module = "平台能力", desc = "清空知识库摄入队列")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:publish")
     public Result<Integer> clear(@PathVariable Long spaceId) {
         return Result.ok(service.clearTasks(spaceId));
     }

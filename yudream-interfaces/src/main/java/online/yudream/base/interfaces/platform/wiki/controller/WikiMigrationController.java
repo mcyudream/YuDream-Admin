@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope;
 import online.yudream.base.application.platform.wiki.service.WikiMigrationAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
@@ -27,6 +29,7 @@ public class WikiMigrationController {
 
     @GetMapping("/spaces/{spaceId}/export")
     @PermissionRegister(code = "platform:wiki:manage", name = "导出 Wiki 归档", module = "平台能力", desc = "导出知识库页面与资料元数据为 JSON 归档")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:manage")
     public Result<String> export(@PathVariable Long spaceId) {
         return Result.ok(service.exportArchive(spaceId));
     }
@@ -39,6 +42,7 @@ public class WikiMigrationController {
 
     @PostMapping("/spaces/{spaceId}/rebuild-index")
     @PermissionRegister(code = "platform:wiki:manage", name = "重建 Wiki 索引", module = "平台能力", desc = "从现有页面重建 index/overview 与向量索引")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:manage")
     public Result<Void> rebuild(@PathVariable Long spaceId) {
         try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
             service.rebuildIndex(spaceId);

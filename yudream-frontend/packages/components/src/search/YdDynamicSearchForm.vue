@@ -161,13 +161,13 @@ onMounted(() => {
       <span class="text-sm text-muted-foreground">暂无搜索配置</span>
     </div>
 
-    <!-- 搜索字段网格 -->
+    <!-- 搜索字段网格：所有控件等宽撑满列，范围字段占两列 -->
     <div v-else class="yd-dynamic-search-form__grid">
       <!-- 默认分组 -->
       <template v-for="field in fieldsByGroup.default" :key="field.fieldName">
         <div
           class="yd-dynamic-search-form__field"
-          :style="{ minWidth: field.width }"
+          :class="{ 'is-range': field.controlType === ControlType.DATE_RANGE || field.controlType === ControlType.NUMBER_RANGE }"
         >
           <label class="yd-dynamic-search-form__label">
             {{ field.label }}
@@ -177,6 +177,7 @@ onMounted(() => {
           <YdInput
             v-if="field.controlType === ControlType.TEXT"
             v-model="formData[field.fieldName]"
+            class="w-full"
             :placeholder="field.placeholder || `请输入${field.label}`"
             clearable
           />
@@ -185,33 +186,38 @@ onMounted(() => {
           <YdSelect
             v-else-if="field.controlType === ControlType.SELECT"
             v-model="formData[field.fieldName]"
+            class="w-full"
             :options="getFieldOptions(field) as any"
             :placeholder="field.placeholder || `请选择${field.label}`"
             clearable
           />
 
           <!-- DATE_RANGE 控件 -->
-          <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex gap-2 items-center">
+          <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex w-full gap-2 items-center">
             <YdDatePicker
               v-model="formData[`${field.fieldName}Start`]"
+              class="flex-1 min-w-0"
               placeholder="开始日期"
             />
-            <span>至</span>
+            <span class="shrink-0">至</span>
             <YdDatePicker
               v-model="formData[`${field.fieldName}End`]"
+              class="flex-1 min-w-0"
               placeholder="结束日期"
             />
           </div>
 
           <!-- NUMBER_RANGE 控件 -->
-          <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex gap-2 items-center">
+          <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex w-full gap-2 items-center">
             <YdNumberField
               v-model="formData[`${field.fieldName}Min`]"
+              class="flex-1 min-w-0"
               placeholder="最小值"
             />
-            <span>至</span>
+            <span class="shrink-0">至</span>
             <YdNumberField
               v-model="formData[`${field.fieldName}Max`]"
+              class="flex-1 min-w-0"
               placeholder="最大值"
             />
           </div>
@@ -220,6 +226,7 @@ onMounted(() => {
           <YdCheckboxGroup
             v-else-if="field.controlType === ControlType.CHECKBOX"
             v-model="formData[field.fieldName]"
+            class="w-full"
             :options="getFieldOptions(field) as any"
           />
 
@@ -227,6 +234,7 @@ onMounted(() => {
           <YdRadioGroup
             v-else-if="field.controlType === ControlType.RADIO"
             v-model="formData[field.fieldName]"
+            class="w-full"
             :options="getFieldOptions(field) as any"
           />
 
@@ -234,6 +242,7 @@ onMounted(() => {
           <YdInput
             v-else
             v-model="formData[field.fieldName]"
+            class="w-full"
             :placeholder="field.placeholder || `请输入${field.label}`"
             clearable
           />
@@ -253,7 +262,7 @@ onMounted(() => {
           <template v-for="field in fields" :key="field.fieldName">
             <div
               class="yd-dynamic-search-form__field"
-              :style="{ minWidth: field.width }"
+              :class="{ 'is-range': field.controlType === ControlType.DATE_RANGE || field.controlType === ControlType.NUMBER_RANGE }"
             >
               <label class="yd-dynamic-search-form__label">
                 {{ field.label }}
@@ -263,6 +272,7 @@ onMounted(() => {
               <YdInput
                 v-if="field.controlType === ControlType.TEXT"
                 v-model="formData[field.fieldName]"
+                class="w-full"
                 :placeholder="field.placeholder || `请输入${field.label}`"
                 clearable
               />
@@ -271,33 +281,38 @@ onMounted(() => {
               <YdSelect
                 v-else-if="field.controlType === ControlType.SELECT"
                 v-model="formData[field.fieldName]"
+                class="w-full"
                 :options="getFieldOptions(field) as any"
                 :placeholder="field.placeholder || `请选择${field.label}`"
                 clearable
               />
 
               <!-- DATE_RANGE 控件 -->
-              <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex gap-2 items-center">
+              <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex w-full gap-2 items-center">
                 <YdDatePicker
                   v-model="formData[`${field.fieldName}Start`]"
+                  class="flex-1 min-w-0"
                   placeholder="开始日期"
                 />
-                <span>至</span>
+                <span class="shrink-0">至</span>
                 <YdDatePicker
                   v-model="formData[`${field.fieldName}End`]"
+                  class="flex-1 min-w-0"
                   placeholder="结束日期"
                 />
               </div>
 
               <!-- NUMBER_RANGE 控件 -->
-              <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex gap-2 items-center">
+              <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex w-full gap-2 items-center">
                 <YdNumberField
                   v-model="formData[`${field.fieldName}Min`]"
+                  class="flex-1 min-w-0"
                   placeholder="最小值"
                 />
-                <span>至</span>
+                <span class="shrink-0">至</span>
                 <YdNumberField
                   v-model="formData[`${field.fieldName}Max`]"
+                  class="flex-1 min-w-0"
                   placeholder="最大值"
                 />
               </div>
@@ -306,6 +321,7 @@ onMounted(() => {
               <YdCheckboxGroup
                 v-else-if="field.controlType === ControlType.CHECKBOX"
                 v-model="formData[field.fieldName]"
+                class="w-full"
                 :options="getFieldOptions(field) as any"
               />
 
@@ -313,6 +329,7 @@ onMounted(() => {
               <YdRadioGroup
                 v-else-if="field.controlType === ControlType.RADIO"
                 v-model="formData[field.fieldName]"
+                class="w-full"
                 :options="getFieldOptions(field) as any"
               />
 
@@ -320,6 +337,7 @@ onMounted(() => {
               <YdInput
                 v-else
                 v-model="formData[field.fieldName]"
+                class="w-full"
                 :placeholder="field.placeholder || `请输入${field.label}`"
                 clearable
               />
@@ -360,15 +378,46 @@ onMounted(() => {
 
 .yd-dynamic-search-form__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px 12px;
-  align-items: end;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 16px;
+  align-items: start;
+}
+
+/* 窄一档退三列、再退两列、最后单列 */
+@media (width <= 1280px) {
+  .yd-dynamic-search-form__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 960px) {
+  .yd-dynamic-search-form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 640px) {
+  .yd-dynamic-search-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .yd-dynamic-search-form__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 范围字段占两列，两个子控件各有时长余量 */
+.yd-dynamic-search-form__field.is-range {
+  grid-column: span 2;
+}
+
+@media (width <= 960px) {
+  .yd-dynamic-search-form__field.is-range {
+    grid-column: span 1;
+  }
 }
 
 .yd-dynamic-search-form__label {
@@ -383,12 +432,12 @@ onMounted(() => {
 }
 
 .yd-dynamic-search-form__group-title {
-  grid-column: 1 / -1;
   padding-top: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-2);
   border-top: 1px solid var(--color-border-2);
+  grid-column: 1 / -1;
 }
 
 .yd-dynamic-search-form__actions {
@@ -396,14 +445,11 @@ onMounted(() => {
   gap: 8px;
   justify-content: flex-end;
   grid-column: 1 / -1;
+  padding-top: 4px;
 }
 
 /* 响应式适配 */
-@media (width <= 768px) {
-  .yd-dynamic-search-form__grid {
-    grid-template-columns: 1fr;
-  }
-
+@media (width <= 640px) {
   .yd-dynamic-search-form__actions {
     justify-content: stretch;
   }

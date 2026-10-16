@@ -29,6 +29,7 @@ function viewAiRun(task: WikiIngestTask) {
 
 const tasks = ref<WikiIngestTask[]>([])
 const loading = ref(false)
+const loadError = ref('')
 const live = ref(false)
 let abortController: AbortController | null = null
 
@@ -46,13 +47,19 @@ const pagedTasks = computed(() => {
 async function load() {
   if (!store.spaceId.value) {
     tasks.value = []
+    loadError.value = ''
     return
   }
   loading.value = true
+  loadError.value = ''
   try {
     const res = await fetchWikiIngestTasks(store.spaceId.value)
     tasks.value = res.data || []
     page.value = 1
+  }
+  catch (exception) {
+    // 保留错误与重试入口，不用空列表掩盖失败
+    loadError.value = exception instanceof Error ? exception.message : '摄入任务加载失败，请稍后重试'
   }
   finally {
     loading.value = false
@@ -212,7 +219,9 @@ watch(() => store.spaceId.value, () => {
           <div class="ing-head__status">
             <span class="ing-live" :class="{ 'ing-live--on': live }" />
             <span>{{ live ? '实时进度已连接' : '实时进度未连接' }}</span>
-            <YdTag v-if="runningCount" variant="secondary">{{ runningCount }} 个任务进行中</YdTag>
+            <YdTag v-if="runningCount" variant="secondary">
+              {{ runningCount }} 个任务进行中
+            </YdTag>
           </div>
           <div class="ing-head__actions">
             <YdButton v-if="sortedTasks.length" size="sm" variant="ghost" class="ing-danger" @click="clearTasks">
@@ -224,13 +233,23 @@ watch(() => store.spaceId.value, () => {
           </div>
         </div>
 
-        <div v-if="!sortedTasks.length && !loading" class="ing-empty">
-          <YdIcon name="morph:layers" />
-          <strong>暂无摄入任务</strong>
-          <p>在「资料源」面板对资料点击「摄入」，或在「深度研究」启动研究</p>
+        <div v-if="loadError" class="ing-error">
+          <YdAlert variant="destructive" title="摄入任务加载失败" :description="loadError" />
+          <YdButton variant="outline" size="sm" :loading="loading" @click="load">
+            <YdIcon name="morph:rotate-cw" /> 重新加载
+          </YdButton>
         </div>
 
-        <div v-else class="ing-list">
+        <div v-if="loading && !sortedTasks.length" class="ing-loading">
+          <YdLoading :size="32" text="正在加载摄入任务…" />
+        </div>
+        <YdEmpty
+          v-else-if="!sortedTasks.length && !loadError"
+          icon="morph:layers"
+          title="暂无摄入任务"
+          description="在「资料源」面板对资料点击「摄入」，或在「深度研究」启动研究"
+        />
+        <div v-else-if="sortedTasks.length" class="ing-list">
           <YdCard v-for="task in pagedTasks" :key="task.id" class="ing-card">
             <div class="ing-card__row">
               <span
@@ -351,26 +370,16 @@ watch(() => store.spaceId.value, () => {
   box-shadow: 0 0 0 3px #10b98133;
 }
 
-.ing-empty {
+/* YdAlert 没有默认插槽：重试动作必须与告警相邻，不能作为子节点传入 */
+.ing-error {
   display: grid;
-  justify-items: center;
   gap: 8px;
-  padding: 60px 0;
-  color: var(--color-text-3);
 }
 
-.ing-empty :deep(svg) {
-  color: var(--color-text-2);
-  font-size: 36px;
-}
-
-.ing-empty strong {
-  color: var(--color-text-1);
-}
-
-.ing-empty p {
-  margin: 0;
-  font-size: 12px;
+.ing-loading {
+  display: flex;
+  justify-content: center;
+  padding: 56px 0;
 }
 
 .ing-list {
@@ -387,6 +396,7 @@ watch(() => store.spaceId.value, () => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .ing-card__status {
@@ -409,6 +419,7 @@ watch(() => store.spaceId.value, () => {
   display: flex;
   gap: 8px;
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .ing-danger {
@@ -454,5 +465,39 @@ watch(() => store.spaceId.value, () => {
   background: #ef444412;
   color: #dc2626;
   font-size: 12px;
+}
+
+/* 窄屏：任务行与操作按钮换行堆叠，不横向挤压 */
+@media (max-width: 768px) {
+  .ing-inner {
+    padding: 12px;
+  }
+
+  .ing-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ing-card__row {
+    align-items: flex-start;
+  }
+
+  .ing-card__phase {
+    width: 100%;
+  }
+
+  .ing-card__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .ing-card__progress {
+    flex-wrap: wrap;
+  }
+
+  .ing-progress {
+    flex-basis: 100%;
+  }
 }
 </style>

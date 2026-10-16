@@ -31,7 +31,7 @@ defineExpose({
 const fullColumns = computed<TableColumn<TData, any>[]>(() => {
   const cols: TableColumn<TData, any>[] = []
 
-  // 用户信息列
+  // 用户信息列（默认固定在左侧，fixed === false 时取消固定）
   if (props.userColumn) {
     cols.push({
       id: 'user-info',
@@ -39,6 +39,7 @@ const fullColumns = computed<TableColumn<TData, any>[]>(() => {
       accessorKey: props.userColumn.nameKey as string,
       width: props.userColumn.width || 280,
       cellClass: 'py-3',
+      fixed: props.userColumn.fixed ?? 'left',
     })
   }
 

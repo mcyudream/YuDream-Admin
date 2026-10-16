@@ -43,4 +43,17 @@ public class WikiSpaceDTO {
     private boolean sourceGroundedDefault;
     private boolean watchEnabled;
     private String watchFolderPath;
+
+    /** NONE / SEEDED / UPLOAD */
+    private String coverType;
+    /** SEEDED 封面的稳定 seed（同一 seed 确定性呈现）。 */
+    private String coverSeed;
+    /** UPLOAD 封面引用的文件对象 ID（字符串，保持长 ID 精度）。 */
+    private String coverFileObjectId;
+    private String coverAlt;
+
+    /** 是否允许登录用户在公开页面发表评论。 */
+    private boolean commentEnabled;
+    /** LEGACY / RESTRICTED 实例 ACL 模式。 */
+    private String aclMode;
 }

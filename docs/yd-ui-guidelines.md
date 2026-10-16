@@ -76,6 +76,7 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 | 需要持续可见的提示 | `YdAlert` | 权限限制、配置问题、可恢复错误；与对应操作放在一起 |
 | 没有数据或结果 | `YdEmpty` | 区分初始为空、筛选无结果与加载失败；需要时给下一步动作 |
 | Chat / Coding Agent | `YdAgentWorkbench` 或既有 `YdChat*` | 工作区与工具任务用工作台，轻量问答可组合聊天元件 |
+| 长驻编辑工作区 | `YdWorkspaceLayout`、`YdWorkspaceTabs` | 需要活动栏、可拖拽分栏、多文件标签与状态栏的职业工作面（知识库编辑等）；外壳不滚、面板内滚，一次性内容页仍用页面容器与 `YdSettingsLayout` |
 
 ### 3.0 表格页版式（固定）
 
@@ -214,7 +215,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 
 | 类别 | 公开入口 |
 | --- | --- |
-| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
+| 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdWorkspaceLayout`、`YdWorkspaceTabs`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
 | 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction`、`YdFab`、`YdPopconfirm` |
 | 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate`、`YdColorPicker`、`YdTreeSelect` |
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup`、`YdSegmented` |

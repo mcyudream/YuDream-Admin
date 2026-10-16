@@ -19,6 +19,7 @@ import org.neo4j.driver.types.Node;
 import java.lang.reflect.Proxy;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -53,10 +54,62 @@ class Neo4jWikiIndexGatewayTest {
         assertEquals(1L, hits.getFirst().nodeId());
     }
 
-    private Neo4jWikiIndexGateway gateway(boolean failExpansion) {
+    @Test
+    void updatePathTargetsOnlyTheSpecifiedPublishedVersionAndKnowledgeBase() {
+        AtomicInteger calls = new AtomicInteger();
+        Map<String, Object> parameters = new java.util.concurrent.ConcurrentHashMap<>();
+        Session session = (Session) Proxy.newProxyInstance(Session.class.getClassLoader(), new Class<?>[]{Session.class}, (proxy, method, arguments) -> {
+            if ("run".equals(method.getName())) {
+                calls.incrementAndGet();
+                parameters.putAll((Map<String, Object>) arguments[1]);
+            }
+            if ("close".equals(method.getName())) {
+                return null;
+            }
+            return defaultValue(method.getReturnType());
+        });
+
+        gateway(session).updatePath(space(), 7L, 9L, "guide/moved/page");
+
+        assertEquals(1, calls.get());
+        assertEquals("wiki-table", parameters.get("tableCode"));
+        assertEquals(100L, parameters.get("spaceId"));
+        assertEquals(7L, parameters.get("nodeId"));
+        assertEquals(9L, parameters.get("versionId"));
+        assertEquals("guide/moved/page", parameters.get("path"));
+    }
+
+    @Test
+    void searchNormalizesPathPrefixAndMatchesExactOrDescendantPaths() {
+        List<String> queries = new java.util.ArrayList<>();
+        Map<String, Object> parameters = new java.util.concurrent.ConcurrentHashMap<>();
+        Session session = (Session) Proxy.newProxyInstance(Session.class.getClassLoader(), new Class<?>[]{Session.class}, (proxy, method, arguments) -> {
+            if ("run".equals(method.getName())) {
+                queries.add(String.valueOf(arguments[0]));
+                parameters.putAll((Map<String, Object>) arguments[1]);
+                return result(List.of(record(chunk(1L, "部署", "guide/target", "部署步骤"))));
+            }
+            if ("close".equals(method.getName())) {
+                return null;
+            }
+            return defaultValue(method.getReturnType());
+        });
+
+        List<WikiSearchHit> hits = gateway(session).search(space(), "部署", 5, "/guide/", false);
+
+        assertEquals(1, hits.size());
+        assertEquals("guide", parameters.get("path"));
+        assertTrue(queries.getFirst().contains("node.path=$path OR node.path STARTS WITH $path+'/'"));
+    }
+
+    private Neo4jWikiIndexGateway gateway(Session session) {
         WikiEmbeddingGateway embedding = (provider, model, texts) -> List.of(List.of(0.1f, 0.2f, 0.3f));
         WikiGraphExtractionGateway extractor = (provider, model, title, markdown) -> List.of();
-        return new Neo4jWikiIndexGateway(embedding, extractor, tables(), new SessionGraph(session(failExpansion)));
+        return new Neo4jWikiIndexGateway(embedding, extractor, tables(), new SessionGraph(session));
+    }
+
+    private Neo4jWikiIndexGateway gateway(boolean failExpansion) {
+        return gateway(session(failExpansion));
     }
 
     private GraphConnectionRepo tables() {

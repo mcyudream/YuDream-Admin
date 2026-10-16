@@ -9,7 +9,14 @@ const toast = useYdToast()
 
 const reviews = ref<WikiReviewItem[]>([])
 const loading = ref(false)
-const filter = ref<'ALL' | 'PENDING' | 'DONE'>('PENDING')
+const loadError = ref('')
+type ReviewFilter = 'ALL' | 'PENDING' | 'DONE'
+const filter = ref<ReviewFilter>('PENDING')
+const filterOptions: Array<{ label: string, value: ReviewFilter }> = [
+  { label: '待处理', value: 'PENDING' },
+  { label: '已处理', value: 'DONE' },
+  { label: '全部', value: 'ALL' },
+]
 const acting = ref('')
 
 const filtered = computed(() => reviews.value.filter((item) => {
@@ -23,6 +30,17 @@ const filtered = computed(() => reviews.value.filter((item) => {
 }))
 
 const pendingCount = computed(() => reviews.value.filter(item => !['RESOLVED', 'DISMISSED', 'DONE'].includes(item.status)).length)
+
+// 空态区分「初始为空」与「当前筛选无结果」
+const emptyState = computed(() => {
+  if (filter.value === 'PENDING') {
+    return { title: '没有待处理的审阅项', description: '摄入或 Lint 后发现的问题会出现在这里' }
+  }
+  if (reviews.value.length) {
+    return { title: '没有符合条件的审阅项', description: '切换到其他筛选条件查看。' }
+  }
+  return { title: '暂无审阅项', description: '摄入或 Lint 后发现的问题会出现在这里' }
+})
 
 // 客户端分页（审阅项可能很多）
 const page = ref(1)
@@ -43,13 +61,19 @@ const itemTypeMeta: Record<string, { label: string, color: string }> = {
 async function load() {
   if (!store.spaceId.value) {
     reviews.value = []
+    loadError.value = ''
     return
   }
   loading.value = true
+  loadError.value = ''
   try {
     const res = await fetchWikiReviews(store.spaceId.value)
     reviews.value = res.data || []
     page.value = 1
+  }
+  catch (exception) {
+    // 保留错误与重试入口，不用空列表掩盖失败
+    loadError.value = exception instanceof Error ? exception.message : '审阅项加载失败，请稍后重试'
   }
   finally {
     loading.value = false
@@ -98,38 +122,55 @@ watch(filter, () => {
     <YdScrollArea class="rev-scroll">
       <div class="rev-inner">
         <div class="rev-head">
-          <div class="rev-head__tabs">
-            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'PENDING'" :class="{ active: filter === 'PENDING' }" @click="filter = 'PENDING'">
-              待处理 <YdTag v-if="pendingCount" variant="secondary">{{ pendingCount }}</YdTag>
-            </YdButton>
-            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'DONE'" :class="{ active: filter === 'DONE' }" @click="filter = 'DONE'">
-              已处理
-            </YdButton>
-            <YdButton type="button" variant="ghost" :aria-pressed="filter === 'ALL'" :class="{ active: filter === 'ALL' }" @click="filter = 'ALL'">
-              全部
-            </YdButton>
-          </div>
+          <YdSegmented
+            v-model="filter"
+            class="rev-filter"
+            size="sm"
+            aria-label="审阅项筛选"
+            :options="filterOptions"
+          >
+            <template #option="{ option }">
+              <span class="rev-filter__option">
+                {{ option.label }}
+                <YdTag v-if="option.value === 'PENDING' && pendingCount" variant="secondary">{{ pendingCount }}</YdTag>
+              </span>
+            </template>
+          </YdSegmented>
           <YdButton size="sm" variant="outline" :loading="loading" @click="load">
             <YdIcon name="morph:refresh-cw" /> 刷新
           </YdButton>
         </div>
 
-        <div v-if="!filtered.length && !loading" class="rev-empty">
-          <YdIcon name="morph:list-checks" />
-          <strong>{{ filter === 'PENDING' ? '没有待处理的审阅项' : '暂无审阅项' }}</strong>
-          <p>摄入或 Lint 后发现的问题会出现在这里</p>
+        <div v-if="loadError" class="rev-error">
+          <YdAlert variant="destructive" title="审阅项加载失败" :description="loadError" />
+          <YdButton variant="outline" size="sm" :loading="loading" @click="load">
+            <YdIcon name="morph:rotate-cw" /> 重新加载
+          </YdButton>
         </div>
 
-        <div v-else class="rev-list">
+        <div v-if="loading && !reviews.length" class="rev-loading">
+          <YdLoading :size="32" text="正在加载审阅项…" />
+        </div>
+        <YdEmpty
+          v-else-if="!filtered.length && !loadError"
+          icon="morph:list-checks"
+          :title="emptyState.title"
+          :description="emptyState.description"
+        />
+        <div v-else-if="filtered.length" class="rev-list">
           <YdCard v-for="item in pagedReviews" :key="item.id" class="rev-card">
             <div class="rev-card__head">
               <span class="rev-card__type" :style="{ color: typeMeta(item.itemType).color, background: `${typeMeta(item.itemType).color}1a` }">
                 {{ typeMeta(item.itemType).label }}
               </span>
               <strong>{{ item.title }}</strong>
-              <YdTag variant="outline" class="rev-card__status">{{ statusLabel(item.status) }}</YdTag>
+              <YdTag variant="outline" class="rev-card__status">
+                {{ statusLabel(item.status) }}
+              </YdTag>
             </div>
-            <p class="rev-card__desc">{{ item.description }}</p>
+            <p class="rev-card__desc">
+              {{ item.description }}
+            </p>
             <div v-if="item.pageTitles?.length" class="rev-card__pages">
               <YdButton
                 v-for="title in item.pageTitles"
@@ -202,57 +243,30 @@ watch(filter, () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.rev-head__tabs {
-  display: flex;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--color-fill-2);
+.rev-filter {
+  min-width: 0;
 }
 
-.rev-head__tabs button {
+.rev-filter__option {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-text-3);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
 }
 
-.rev-head__tabs button.active {
-  background: var(--color-bg-1);
-  color: var(--color-text-2);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
-}
-
-.rev-empty {
+/* YdAlert 没有默认插槽：重试动作必须与告警相邻，不能作为子节点传入 */
+.rev-error {
   display: grid;
-  justify-items: center;
   gap: 8px;
-  padding: 50px 0;
-  color: var(--color-text-3);
 }
 
-.rev-empty :deep(svg) {
-  color: var(--color-text-2);
-  font-size: 36px;
-}
-
-.rev-empty strong {
-  color: var(--color-text-1);
-}
-
-.rev-empty p {
-  margin: 0;
-  font-size: 12px;
+.rev-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
 }
 
 .rev-list {
@@ -340,5 +354,35 @@ watch(filter, () => {
   display: flex;
   gap: 8px;
   margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* 窄屏：卡片行不横向挤压，操作按钮换行到独立一行 */
+@media (max-width: 768px) {
+  .rev-inner {
+    padding: 12px;
+  }
+
+  .rev-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rev-card__head {
+    align-items: flex-start;
+  }
+
+  .rev-card__status {
+    margin-left: 0;
+  }
+
+  .rev-card__footer {
+    align-items: flex-start;
+  }
+
+  .rev-card__actions {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 </style>

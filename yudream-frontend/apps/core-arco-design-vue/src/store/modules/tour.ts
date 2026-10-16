@@ -56,6 +56,19 @@ export const useTourStore = defineStore(
 
     const builtInGuides = computed<TourDefinition[]>(() => [
       {
+        code: 'platform.document.word-template',
+        title: 'Word 模板上手',
+        routePath: '/platform/document',
+        permission: 'platform:document:edit',
+        steps: [
+          { title: '模板与记录', content: '这里维护 DOCX 模板和占位符，并在生成记录中回看每次导出。' },
+          { target: '[data-tour="document-upload"]', title: '上传模板', content: '先上传 .docx 文件，再设置名称、编码和占位符。', placement: 'bottom' },
+          { target: '[data-tour="document-guide"]', title: '查看写法示例', content: '教程弹窗提供变量、表格循环和 JSON 数据示例，可复制后调整。', placement: 'bottom' },
+          { target: '[data-tour="document-tabs"]', title: '切换列表', content: '在模板列表与生成记录之间切换，生成后可从记录下载文件。', placement: 'bottom' },
+          { title: '开始生成', content: '在已启用模板的操作菜单中选择“生成”，按占位符填写 JSON 后即可下载文档。跳过或完成本引导后，可通过 AI 助手再次播放。' },
+        ],
+      },
+      {
         code: 'system.welcome',
         title: '欢迎使用余梦管理后台',
         routePath: appSettingsStore.settings.app.home.fullPath,

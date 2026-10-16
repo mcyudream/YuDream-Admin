@@ -21,8 +21,12 @@ public record WikiFrontmatter(
         List<String> related,
         List<String> tags,
         String summary,
-        String body
+        String body,
+        String origin
 ) {
+
+    /** LLM 生成来源标记：只有带该标记且自生成后未被改动的页面才允许被后续摄入覆盖。 */
+    public static final String ORIGIN_LLM = "llm";
 
     public WikiFrontmatter {
         title = title == null ? "" : title.trim();
@@ -32,15 +36,26 @@ public record WikiFrontmatter(
         tags = normalizeList(tags);
         summary = summary == null ? "" : summary.trim();
         body = body == null ? "" : body;
+        origin = origin == null || origin.isBlank() ? null : origin.trim();
     }
 
     public static WikiFrontmatter of(String title, WikiPageType pageType, List<String> sources,
                                      List<String> related, List<String> tags, String summary, String body) {
-        return new WikiFrontmatter(title, pageType, sources, related, tags, summary, body);
+        return new WikiFrontmatter(title, pageType, sources, related, tags, summary, body, null);
     }
 
     public static WikiFrontmatter empty(WikiPageType pageType) {
-        return new WikiFrontmatter("", pageType, List.of(), List.of(), List.of(), "", "");
+        return new WikiFrontmatter("", pageType, List.of(), List.of(), List.of(), "", "", null);
+    }
+
+    /** 追加来源类别（如 {@link #ORIGIN_LLM}），不改变其余字段。 */
+    public WikiFrontmatter withOrigin(String value) {
+        return new WikiFrontmatter(title, pageType, sources, related, tags, summary, body, value);
+    }
+
+    /** 是否为 LLM 生成内容标记。 */
+    public boolean llmGenerated() {
+        return ORIGIN_LLM.equals(origin);
     }
 
     /**
@@ -49,11 +64,11 @@ public record WikiFrontmatter(
     public static WikiFrontmatter parse(String markdown) {
         String content = markdown == null ? "" : markdown;
         if (!content.startsWith("---")) {
-            return new WikiFrontmatter("", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "", content);
+            return new WikiFrontmatter("", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "", content, null);
         }
         int end = content.indexOf("\n---", 3);
         if (end < 0) {
-            return new WikiFrontmatter("", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "", content);
+            return new WikiFrontmatter("", WikiPageType.CONCEPT, List.of(), List.of(), List.of(), "", content, null);
         }
         String header = content.substring(3, end);
         String body = content.substring(end + 4);
@@ -66,6 +81,7 @@ public record WikiFrontmatter(
         List<String> related = new ArrayList<>();
         List<String> tags = new ArrayList<>();
         String summary = "";
+        String origin = null;
         String currentList = null;
         for (String rawLine : header.split("\r?\n")) {
             String line = rawLine.strip();
@@ -92,11 +108,12 @@ public record WikiFrontmatter(
                     case "title" -> title = value;
                     case "type", "page_type" -> pageType = parseType(value);
                     case "summary", "description" -> summary = value;
+                    case "origin" -> origin = value;
                     default -> { /* 忽略未知键 */ }
                 }
             }
         }
-        return new WikiFrontmatter(title, pageType, sources, related, tags, summary, body);
+        return new WikiFrontmatter(title, pageType, sources, related, tags, summary, body, origin);
     }
 
     public String fullMarkdown() {
@@ -106,6 +123,9 @@ public record WikiFrontmatter(
             builder.append("title: ").append(yamlScalar(title)).append('\n');
         }
         builder.append("type: ").append(typeKey()).append('\n');
+        if (origin != null) {
+            builder.append("origin: ").append(yamlScalar(origin)).append('\n');
+        }
         if (!summary.isBlank()) {
             builder.append("summary: ").append(yamlScalar(summary)).append('\n');
         }

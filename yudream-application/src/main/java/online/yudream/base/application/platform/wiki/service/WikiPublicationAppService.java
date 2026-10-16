@@ -12,6 +12,7 @@ import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
+import online.yudream.base.domain.platform.wiki.service.WikiNodePaths;
 import online.yudream.base.domain.platform.wiki.service.WikiPublicationProgressGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiPublicationProgress;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class WikiPublicationAppService {
         WikiNode node = nodes.findById(nodeId).orElseThrow(() -> new BizException("节点不存在"));
         if (node.getNodeType() != WikiNodeType.PAGE) throw new BizException("仅页面可以发布");
         WikiSpace space = spaces.findById(node.getSpaceId()).orElseThrow(() -> new BizException("知识库不存在"));
+        String path = new WikiNodePaths(space.getId(), nodes.findBySpaceId(space.getId())).resolve(node).slugPath();
         publish(nodeId, null, "version", "正在创建发布版本", 5, false);
         long revision = versions.findLatest(nodeId).map(version -> version.getRevision() + 1).orElse(1L);
         WikiPageVersion version = WikiPageVersion.builder().spaceId(space.getId()).nodeId(nodeId).revision(revision)
@@ -45,7 +47,7 @@ public class WikiPublicationAppService {
         try {
             publish(nodeId, version.getId(), "indexing", "发布版本已创建，开始构建检索索引", 10, false);
             WikiPageVersion current = version;
-            indexes.index(space, current, node.getAncestorPath() + node.getSlug(), event ->
+            indexes.index(space, current, path, event ->
                     publish(nodeId, current.getId(), event.phase(), event.message(), event.percent(), false));
             version.indexed();
             publish(nodeId, version.getId(), "complete", "页面已发布，向量索引和图谱结果已就绪", 100, true);

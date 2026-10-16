@@ -4,20 +4,24 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCaptionStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
+import online.yudream.base.domain.platform.wiki.service.WikiNodePaths;
 import online.yudream.base.domain.platform.wiki.service.WikiQueryExpansionGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiRerankGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiFrontmatter;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSearchHit;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +44,15 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class WikiSearchAppService {
+
+    /**
+     * 图片证据启发式分下限（服务端钳制）。这是按 caption 来源/状态得到的工程启发式分值，不是校准概率；
+     * 低于该分的图片不进入命中证据（AI caption 0.8、人工 alt 0.7）。
+     */
+    private static final double MIN_IMAGE_EVIDENCE_SCORE = 0.6;
+    private static final double EVIDENCE_SCORE_AI_CAPTION = 0.8;
+    private static final double EVIDENCE_SCORE_MANUAL_ALT = 0.7;
+
     private final CapabilityAppService capabilities;
     private final WikiSpaceRepo spaces;
     private final WikiNodeRepo nodes;
@@ -48,6 +61,7 @@ public class WikiSearchAppService {
     private final WikiIndexGateway indexes;
     private final WikiQueryExpansionGateway expansions;
     private final WikiRerankGateway reranks;
+    private final FileAppService files;
 
     @Transactional(readOnly = true)
     public List<WikiSearchHitDTO> search(String slug, String query, int topK, String prefix, boolean graph) {
@@ -101,14 +115,14 @@ public class WikiSearchAppService {
         capabilities.ensureEnabled("wiki", "Wiki 知识库");
         WikiSpace space = spaces.findBySlug(slug).orElseThrow(() -> new BizException("知识库不存在"));
         List<WikiNode> all = nodes.findBySpaceId(space.getId());
-        Map<Long, String> paths = slugPaths(all);
+        WikiNodePaths paths = new WikiNodePaths(space.getId(), all);
         return all.stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE)
                 .sorted(Comparator.comparingInt(WikiNode::getSort)
                         .thenComparing(WikiNode::getTitle, Comparator.nullsLast(String::compareTo)))
                 .limit(Math.max(1, limit))
                 .map(node -> {
-                    String path = paths.getOrDefault(node.getId(), node.getSlug());
+                    String path = paths.resolve(node).slugPath();
                     return WikiSearchHitDTO.builder()
                             .score(0.01)
                             .nodeId(String.valueOf(node.getId()))
@@ -190,9 +204,8 @@ public class WikiSearchAppService {
             return sourceGroundedSearch(space, query, topK);
         }
         List<WikiSearchHit> candidates = candidates(space, query, topK, prefix, graph);
-        candidates = rerank(space, query, candidates);
-        return candidates.stream().limit(Math.max(topK, 1))
-                .map(hit -> pageHit(hit, space, adminMarkdown(hit))).toList();
+        return dedup(rerank(space, query, candidates)).stream().limit(Math.max(topK, 1))
+                .map(hit -> pageHit(hit, space, adminMarkdown(hit), query, false)).toList();
     }
 
     private String adminMarkdown(WikiSearchHit hit) {
@@ -209,9 +222,8 @@ public class WikiSearchAppService {
             return List.of();
         }
         List<WikiSearchHit> candidates = publicCandidates(space, query, topK, prefix, graph, published);
-        candidates = rerank(space, query, candidates);
-        return candidates.stream().limit(Math.max(topK, 1))
-                .map(hit -> pageHit(hit, space, publishedMarkdown(published.get(hit.nodeId())))).toList();
+        return dedup(rerank(space, query, candidates)).stream().limit(Math.max(topK, 1))
+                .map(hit -> pageHit(hit, space, publishedMarkdown(published.get(hit.nodeId())), query, true)).toList();
     }
 
     private String publishedMarkdown(PublishedPage page) {
@@ -224,16 +236,18 @@ public class WikiSearchAppService {
     private List<WikiSearchHit> publicCandidates(WikiSpace space, String query, int topK, String prefix, boolean graph,
                                                  Map<Long, PublishedPage> published) {
         List<WikiSearchHit> merged = new ArrayList<>();
-        // 向量/图谱召回仍走索引，但命中必须先过滤到已发布节点并重新用发布版本物化。
+        String normalizedPrefix = normalizePath(prefix);
+        // 索引中的旧路径不参与过滤；命中以当前 parentId 链重新物化。
         if (hasEmbedding(space)) {
             try {
                 List<String> queries = new ArrayList<>(List.of(query));
                 if (space.isQueryExpansionEnabled()) {
                     queries.addAll(expansions.expand(space.getGraphProviderCode(), space.getGraphModelCode(), query));
                 }
-                merged.addAll(queries.stream().flatMap(item -> indexes.search(space, item, Math.clamp(topK * 2, 4, 30), prefix,
+                merged.addAll(queries.stream().flatMap(item -> indexes.search(space, item, Math.clamp(topK * 2, 4, 30), "",
                                 graph && space.isGraphEnabled()).stream())
                         .filter(hit -> hit != null && hit.nodeId() != null && published.containsKey(hit.nodeId()))
+                        .filter(hit -> matchesPathPrefix(published.get(hit.nodeId()).path(), normalizedPrefix))
                         .map(hit -> materializePublishedHit(hit, published.get(hit.nodeId()), query))
                         .toList());
             }
@@ -241,12 +255,13 @@ public class WikiSearchAppService {
                 log.warn("向量检索失败，已回退到关键词检索：{}", exception.getMessage());
             }
         }
-        Map<Long, String> generatedCaptions = generatedCaptionByFileId(space.getId(), published.values().stream()
+        Map<Long, SourceImageEvidence> evidence = sourceImageEvidence(space.getId(), published.values().stream()
                 .flatMap(page -> imageRefs(page.version().getMarkdown(), space.effectiveHitImageLimit()).stream())
                 .map(ImageRef::fileObjectId)
                 .filter(java.util.Objects::nonNull)
                 .toList());
-        merged.addAll(publicKeywordHits(query, prefix, published, Math.clamp(topK * 2, 4, 30), generatedCaptions));
+        merged.addAll(publicKeywordHits(query, prefix, published, Math.clamp(topK * 2, 4, 30),
+                generatedCaptions(evidence)));
         return dedup(merged);
     }
 
@@ -255,6 +270,10 @@ public class WikiSearchAppService {
      */
     private List<WikiSearchHit> candidates(WikiSpace space, String query, int topK, String prefix, boolean graph) {
         List<WikiSearchHit> merged = new ArrayList<>();
+        List<WikiNode> all = nodes.findBySpaceId(space.getId());
+        WikiNodePaths paths = new WikiNodePaths(space.getId(), all);
+        Map<Long, WikiNode> byId = new LinkedHashMap<>();
+        all.forEach(node -> byId.put(node.getId(), node));
         // 阶段 1：向量召回（可选，取决于空间是否配置了 embedding）；失败时回退到关键词，不影响整体检索
         if (hasEmbedding(space)) {
             try {
@@ -262,22 +281,27 @@ public class WikiSearchAppService {
                 if (space.isQueryExpansionEnabled()) {
                     queries.addAll(expansions.expand(space.getGraphProviderCode(), space.getGraphModelCode(), query));
                 }
-                merged.addAll(queries.stream().flatMap(item -> indexes.search(space, item, Math.clamp(topK * 2, 4, 30), prefix,
-                                graph && space.isGraphEnabled()).stream()).toList());
+                merged.addAll(queries.stream().flatMap(item -> indexes.search(space, item, Math.clamp(topK * 2, 4, 30), "",
+                                graph && space.isGraphEnabled()).stream())
+                        .filter(hit -> hit != null && hit.nodeId() != null && byId.containsKey(hit.nodeId()))
+                        .filter(hit -> matchesPathPrefix(paths.resolve(byId.get(hit.nodeId())).slugPath(), prefix))
+                        .map(hit -> new WikiSearchHit(hit.score(), hit.nodeId(), hit.title(),
+                                paths.resolve(byId.get(hit.nodeId())).slugPath(), hit.content()))
+                        .toList());
             }
             catch (Exception exception) {
                 log.warn("向量检索失败，已回退到关键词检索：{}", exception.getMessage());
             }
         }
         // 阶段 1.5：关键词召回（标题/正文/summary），并应用路径前缀
-        merged.addAll(keywordHits(space, query, prefix, topK * 2));
+        merged.addAll(keywordHits(space, query, prefix, topK * 2, paths, byId));
         return dedup(merged);
     }
 
     private List<WikiSearchHit> dedup(List<WikiSearchHit> merged) {
         Map<String, WikiSearchHit> dedup = new LinkedHashMap<>();
         for (WikiSearchHit hit : merged) {
-            String key = hit.nodeId() + ":" + hit.path();
+            String key = hit.nodeId() == null ? hit.path() : String.valueOf(hit.nodeId());
             WikiSearchHit previous = dedup.get(key);
             if (previous == null || hit.score() > previous.score()) {
                 dedup.put(key, hit);
@@ -314,12 +338,16 @@ public class WikiSearchAppService {
                 .toList();
     }
 
-    private List<WikiSearchHit> keywordHits(WikiSpace space, String query, String prefix, int limit) {
+    private List<WikiSearchHit> keywordHits(WikiSpace space, String query, String prefix, int limit,
+                                            WikiNodePaths paths, Map<Long, WikiNode> byId) {
         return nodes.searchByKeyword(space.getId(), query, limit).stream()
+                .filter(java.util.Objects::nonNull)
+                .map(node -> byId.get(node.getId()))
+                .filter(java.util.Objects::nonNull)
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE)
-                .filter(node -> matchesPrefix(node, prefix))
+                .filter(node -> matchesPathPrefix(paths.resolve(node).slugPath(), prefix))
                 .map(node -> new WikiSearchHit(0.85, node.getId(), node.getTitle(),
-                        node.getAncestorPath() + node.getSlug(), excerptAroundQuery(node.bodyMarkdown(), query, 800)))
+                        paths.resolve(node).slugPath(), excerptAroundQuery(node.bodyMarkdown(), query, 800)))
                 .toList();
     }
 
@@ -451,7 +479,7 @@ public class WikiSearchAppService {
 
     private Map<Long, PublishedPage> publishedPages(WikiSpace space) {
         List<WikiNode> all = nodes.findBySpaceId(space.getId());
-        Map<Long, String> paths = slugPaths(all);
+        WikiNodePaths paths = new WikiNodePaths(space.getId(), all);
         Map<Long, WikiNode> publishedNodes = all.stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE && node.getPublishedVersionId() != null)
                 .collect(java.util.stream.Collectors.toMap(
@@ -466,47 +494,10 @@ public class WikiSearchAppService {
         for (WikiPageVersion version : versions.findByIds(publishedNodes.keySet())) {
             WikiNode node = publishedNodes.get(version.getId());
             if (node != null && node.getId().equals(version.getNodeId()) && node.getSpaceId().equals(version.getSpaceId())) {
-                result.put(node.getId(), new PublishedPage(node, version, paths.getOrDefault(node.getId(), "")));
+                result.put(node.getId(), new PublishedPage(node, version, paths.resolve(node).slugPath()));
             }
         }
         return result;
-    }
-
-    /**
-     * 依据 parentId 递归构造 slug 路径，与 {@link WikiAppService#tree} 的公开路由完全一致（无前导斜杠）。
-     */
-    private Map<Long, String> slugPaths(List<WikiNode> all) {
-        Map<Long, WikiNode> byId = new LinkedHashMap<>();
-        for (WikiNode node : all) {
-            if (node != null && node.getId() != null) {
-                byId.put(node.getId(), node);
-            }
-        }
-        Map<Long, String> paths = new LinkedHashMap<>();
-        Set<Long> visiting = new HashSet<>();
-        for (WikiNode node : byId.values()) {
-            slugPath(node, byId, paths, visiting);
-        }
-        return paths;
-    }
-
-    private String slugPath(WikiNode node, Map<Long, WikiNode> byId, Map<Long, String> paths, Set<Long> visiting) {
-        String cached = paths.get(node.getId());
-        if (cached != null) {
-            return cached;
-        }
-        if (!visiting.add(node.getId())) {
-            return node.getSlug() == null ? "" : node.getSlug();
-        }
-        String slug = node.getSlug() == null ? "" : node.getSlug();
-        String parentPath = "";
-        if (node.getParentId() != null && byId.containsKey(node.getParentId())) {
-            parentPath = slugPath(byId.get(node.getParentId()), byId, paths, visiting);
-        }
-        visiting.remove(node.getId());
-        String path = parentPath.isBlank() ? slug : parentPath + "/" + slug;
-        paths.put(node.getId(), path);
-        return path;
     }
 
     private WikiSearchHit materializePublishedHit(WikiSearchHit hit, PublishedPage page, String query) {
@@ -528,6 +519,9 @@ public class WikiSearchAppService {
             return true;
         }
         String normalizedPrefix = normalizePath(prefix);
+        if (normalizedPrefix.isEmpty()) {
+            return true;
+        }
         String normalizedPath = normalizePath(path);
         return normalizedPath.equals(normalizedPrefix) || normalizedPath.startsWith(normalizedPrefix + "/");
     }
@@ -543,22 +537,9 @@ public class WikiSearchAppService {
         return normalized;
     }
 
-    private boolean matchesPrefix(WikiNode node, String prefix) {
-        if (prefix == null || prefix.isBlank()) {
-            return true;
-        }
-        String normalized = prefix.trim();
-        if (!normalized.startsWith("/")) {
-            normalized = "/" + normalized;
-        }
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        String path = (node.getAncestorPath() == null ? "" : node.getAncestorPath()) + node.getSlug();
-        return path.equals(normalized) || path.startsWith(normalized + "/");
-    }
-
-    private WikiSearchHitDTO pageHit(WikiSearchHit hit, WikiSpace space, String pageMarkdown) {
+    private WikiSearchHitDTO pageHit(WikiSearchHit hit, WikiSpace space, String pageMarkdown, String query,
+                                     boolean publicSurface) {
+        ImageEvidence evidence = imageEvidence(space, hit.nodeId(), pageMarkdown, query, publicSurface);
         return WikiSearchHitDTO.builder()
                 .score(hit.score())
                 .nodeId(String.valueOf(hit.nodeId()))
@@ -567,36 +548,97 @@ public class WikiSearchAppService {
                 .path(hit.path())
                 .content(hit.content())
                 .sourceUrl(sourceUrl(space, hit.path()))
-                .images(extractImages(pageMarkdown, space.effectiveHitImageLimit(), space.getId()))
+                .images(evidence.images())
+                .imageNotice(evidence.notice())
                 .build();
     }
 
-    /** 页面正文引用的站内图片：![alt](/api/files/{id}/content)，用于检索命中随带相关图片 */
+    /** 页面正文引用的站内图片：![alt](/api/files/{id}/content) */
     private static final Pattern PAGE_IMAGE = Pattern.compile(
             "!\\[([^\\]]*)]\\(\\s*(/api/files/\\d+/content)(\\s+(?:\"[^\"]*\"|'[^']*'))?\\s*\\)");
 
-    /** limit 来自知识库设置 hitImageLimit（effectiveHitImageLimit 已兜底默认 4、上限 12），0 表示不带图片 */
-    private List<WikiSearchHitDTO.Image> extractImages(String markdown, int limit, Long spaceId) {
-        List<ImageRef> refs = imageRefs(markdown, limit);
+    /**
+     * 图片证据：只返回与查询相关、证据分达标的图片，并给出省略说明。
+     * 公开表面下，正文引用来自已发布版本，因此非公开文件改用发布感知代理地址
+     * （{@code /api/public/wiki/{spaceSlug}/nodes/{nodeId}/images/{fileId}}），
+     * 既不暴露裸文件 ID 的匿名读取，也不把已发布页面引用的图片静默丢弃。
+     */
+    private ImageEvidence imageEvidence(WikiSpace space, Long nodeId, String markdown, String query,
+                                        boolean publicSurface) {
+        List<ImageRef> refs = imageRefs(markdown, space.effectiveHitImageLimit());
         if (refs.isEmpty()) {
-            return List.of();
+            return new ImageEvidence(List.of(), null);
         }
-        Map<Long, String> generatedCaptions = generatedCaptionByFileId(spaceId, refs.stream()
-                .map(ImageRef::fileObjectId)
-                .filter(java.util.Objects::nonNull)
-                .toList());
-        return refs.stream()
-                .map(ref -> {
-                    String generated = generatedCaptions.getOrDefault(ref.fileObjectId(), "");
-                    String alt = ref.alt() == null ? "" : ref.alt().trim();
-                    return WikiSearchHitDTO.Image.builder()
-                            .url(ref.url())
-                            .alt(alt)
-                            .generatedCaption(generated)
-                            .caption(alt.isBlank() ? generated : alt)
-                            .build();
-                })
-                .toList();
+        Map<Long, SourceImageEvidence> sourceEvidence = sourceImageEvidence(space.getId(), refs.stream()
+                .map(ImageRef::fileObjectId).filter(java.util.Objects::nonNull).toList());
+        List<String> terms = tokenize(query);
+        String phrase = normalizedPhrase(query);
+        List<WikiSearchHitDTO.Image> images = new ArrayList<>();
+        int omitted = 0;
+        for (ImageRef ref : refs) {
+            SourceImageEvidence item = ref.fileObjectId() == null ? null : sourceEvidence.get(ref.fileObjectId());
+            String alt = ref.alt() == null ? "" : ref.alt().trim();
+            String generated = item == null || item.image().caption() == null ? "" : item.image().caption().trim();
+            double relevance = fieldScore(alt + " " + generated, terms, phrase);
+            double evidenceScore = evidenceScore(alt, generated, item == null ? null : item.image().captionStatus());
+            // 公开表面：已发布正文引用的图片可经发布感知代理访问；没有文件/节点锚点时保守省略
+            boolean filePublic = publicSurface && files.isPubliclyReadable(ref.fileObjectId());
+            boolean proxyEligible = publicSurface && ref.fileObjectId() != null && nodeId != null;
+            boolean accessible = !publicSurface || filePublic || proxyEligible;
+            if (relevance <= 0 || evidenceScore < MIN_IMAGE_EVIDENCE_SCORE || !accessible) {
+                omitted++;
+                continue;
+            }
+            String url = proxyEligible && !filePublic
+                    ? publicImageUrl(space, nodeId, ref.fileObjectId())
+                    : ref.url();
+            images.add(WikiSearchHitDTO.Image.builder()
+                    .url(url)
+                    .alt(alt)
+                    .generatedCaption(generated)
+                    .caption(alt.isBlank() ? generated : alt)
+                    .imageId(ref.fileObjectId() == null ? null : String.valueOf(ref.fileObjectId()))
+                    .score(relevance)
+                    .confidence(evidenceScore)
+                    .confidenceBasis("HEURISTIC")
+                    .sourceId(item == null || item.sourceId() == null ? null : String.valueOf(item.sourceId()))
+                    .pageNumber(item == null ? 0 : item.image().pageNumber())
+                    .sequence(item == null ? 0 : item.image().sequence())
+                    .build());
+        }
+        if (omitted == 0) {
+            return new ImageEvidence(images, null);
+        }
+        String notice = (images.isEmpty() ? "已省略全部 " : "已省略 ") + omitted + " 张与问题无关、证据分不足或不可公开访问的图片";
+        return new ImageEvidence(images, notice);
+    }
+
+    private String publicImageUrl(WikiSpace space, Long nodeId, Long fileObjectId) {
+        return "/api/public/wiki/" + space.getSlug() + "/nodes/" + nodeId + "/images/" + fileObjectId;
+    }
+
+    /**
+     * 图片证据启发式分（0-1，非校准概率）：AI caption 0.8；人工 alt 0.7；描述失败且无 alt 为 0。
+     * 早期数据可能缺少 caption 状态，按已描述处理以保持兼容；不把任一来源当成确定事实。
+     */
+    private double evidenceScore(String alt, String generated, WikiCaptionStatus status) {
+        if (!generated.isBlank() && status != WikiCaptionStatus.FAILED) {
+            return EVIDENCE_SCORE_AI_CAPTION;
+        }
+        if (!alt.isBlank()) {
+            return EVIDENCE_SCORE_MANUAL_ALT;
+        }
+        return 0.0;
+    }
+
+    private Map<Long, String> generatedCaptions(Map<Long, SourceImageEvidence> evidence) {
+        Map<Long, String> captions = new LinkedHashMap<>();
+        evidence.forEach((fileObjectId, item) -> {
+            if (item.image().caption() != null && !item.image().caption().isBlank()) {
+                captions.put(fileObjectId, item.image().caption());
+            }
+        });
+        return captions;
     }
 
     private List<ImageRef> imageRefs(String markdown, int limit) {
@@ -624,18 +666,18 @@ public class WikiSearchAppService {
                 .reduce("", (left, right) -> left + " " + right);
     }
 
-    private Map<Long, String> generatedCaptionByFileId(Long spaceId, List<Long> fileObjectIds) {
+    private Map<Long, SourceImageEvidence> sourceImageEvidence(Long spaceId, List<Long> fileObjectIds) {
         if (spaceId == null || fileObjectIds == null || fileObjectIds.isEmpty()) {
             return Map.of();
         }
-        Map<Long, String> result = new LinkedHashMap<>();
+        Map<Long, SourceImageEvidence> result = new LinkedHashMap<>();
         sources.findByImageFileObjectIds(spaceId, fileObjectIds).forEach(source -> {
             if (source.getImages() == null) {
                 return;
             }
             source.getImages().forEach(image -> {
-                if (image.fileObjectId() != null && image.caption() != null && !image.caption().isBlank()) {
-                    result.putIfAbsent(image.fileObjectId(), image.caption().trim());
+                if (image.fileObjectId() != null) {
+                    result.putIfAbsent(image.fileObjectId(), new SourceImageEvidence(source.getId(), image));
                 }
             });
         });
@@ -661,6 +703,14 @@ public class WikiSearchAppService {
     private static final Pattern PAGE_IMAGE_FILE_ID = Pattern.compile("/api/files/(\\d+)/content");
 
     private record ImageRef(String url, String alt, Long fileObjectId) {
+    }
+
+    /** 页面图片关联的原始资料证据：source 归属 + pageNumber/sequence/caption。 */
+    private record SourceImageEvidence(Long sourceId, WikiSourceImage image) {
+    }
+
+    /** 命中图片证据及省略说明。 */
+    private record ImageEvidence(List<WikiSearchHitDTO.Image> images, String notice) {
     }
 
     private boolean hasEmbedding(WikiSpace space) {

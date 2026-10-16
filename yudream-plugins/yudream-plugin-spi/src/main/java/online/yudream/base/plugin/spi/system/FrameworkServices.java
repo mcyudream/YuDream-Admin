@@ -3,10 +3,12 @@ package online.yudream.base.plugin.spi.system;
 import online.yudream.base.plugin.spi.system.security.PluginOAuthService;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateService;
+import online.yudream.base.plugin.spi.system.feishu.PluginFeishuService;
 import online.yudream.base.plugin.spi.system.mail.PluginMailService;
 import online.yudream.base.plugin.spi.system.mail.PluginInboundMailService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
+import online.yudream.base.plugin.spi.system.storage.PluginSiteFileStore;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
@@ -67,6 +69,32 @@ public interface FrameworkServices {
     PluginDocumentStore documents(String pluginCode);
 
     PluginFileStore files(String pluginCode);
+
+    /**
+     * 站点数据目录端口（SPI 2.37.0 起）：插件以自属目录
+     * {@code sites/{siteCode}/plugins/{pluginCode}/} 读写站点文件，写隔离、跨插件读需授权。
+     *
+     * <p>默认实现表示宿主无该能力（SPI 过旧）：调用方应按软依赖降级。
+     * 站点目录端口是 SPI 代理，只处理站点目录文件，与飞书云文档（{@link #feishu()}，只读）
+     * 互不相干，禁止混用。</p>
+     */
+    default PluginSiteFileStore siteFiles(String pluginCode) {
+        throw new UnsupportedOperationException("宿主无站点目录文件端口（需要 SPI >= 2.37.0 的宿主支持）：siteFiles");
+    }
+
+    /**
+     * 飞书云文档能力端口（SPI 2.37.0 起）：Drive/Wiki 文档/文档块的读取，以及块级编辑原语
+     * （追加/删除子块、更新文本 elements）；写原语条件可用——按应用对目标文档的编辑权限，
+     * 无权限时按飞书错误失败。不提供文档创建/删除/移动/权限分享，也不下发额度数据
+     * （额度只在宿主「飞书集成」页展示与配置）。
+     *
+     * <p>默认实现表示宿主未提供该能力（{@link PluginFeishuService#enabled()} 恒 false、
+     * 调用抛 {@link UnsupportedOperationException}），调用方应按软依赖降级。</p>
+     */
+    default PluginFeishuService feishu() {
+        return new PluginFeishuService() {
+        };
+    }
 
     /**
      * 备份触发端口：插件以自己的身份发起范围备份（含异地目标）并查询任务状态。

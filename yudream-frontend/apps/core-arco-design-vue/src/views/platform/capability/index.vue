@@ -662,6 +662,15 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'password', label: '密码或授权码', placeholder: '留空不修改', type: 'password' },
       { key: 'folder', label: '文件夹', placeholder: 'INBOX' },
     ],
+    'feishu': [
+      { key: 'appId', label: '飞书应用 App ID', placeholder: 'cli_xxxxxxxxxxxxxxxx' },
+      { key: 'appSecret', label: '飞书应用 App Secret', placeholder: '留空不修改', type: 'password' },
+      { key: 'baseUrl', label: '开放平台地址', placeholder: 'https://open.feishu.cn' },
+      { key: 'connectTimeoutMillis', label: '连接超时（毫秒）', placeholder: '5000', type: 'number' },
+      { key: 'readTimeoutMillis', label: '读取超时（毫秒）', placeholder: '15000', type: 'number' },
+      { key: 'defaultPerMinuteLimit', label: '每用户每分钟调用上限', placeholder: '20', type: 'number' },
+      { key: 'defaultDailyLimit', label: '每用户每日调用上限', placeholder: '500', type: 'number' },
+    ],
     'form': [
       { key: 'maxUploadSizeMb', label: '上传文件大小上限（MB）', placeholder: '100', type: 'number' },
     ],
@@ -695,9 +704,12 @@ function normalizedConfig() {
       defaultModel,
     }
   }
-  return Object.fromEntries(
-    configFields.value.map(field => [field.key, String(configDraft.value[field.key] ?? '').trim()]),
-  )
+  return {
+    ...(selected.value?.config || {}),
+    ...Object.fromEntries(
+      configFields.value.map(field => [field.key, String(configDraft.value[field.key] ?? '').trim()]),
+    ),
+  }
 }
 
 function parseJsonConfig() {

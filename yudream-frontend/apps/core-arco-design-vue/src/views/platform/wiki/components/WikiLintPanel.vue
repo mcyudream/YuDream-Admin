@@ -74,11 +74,12 @@ function meta(severity: string) {
           </div>
         </YdCard>
 
-        <YdAlert v-if="failure" variant="destructive" :title="failure">
+        <div v-if="failure" class="lint-error">
+          <YdAlert variant="destructive" :title="failure" />
           <YdButton variant="outline" size="sm" @click="task.reconnect">
             恢复后端进度
           </YdButton>
-        </YdAlert>
+        </div>
         <YdCard v-if="aiRun">
           <p>{{ running ? 'Lint 正在运行，切换页面后任务继续执行' : aiRun.status === 'COMPLETED' ? 'Lint 已完成' : aiRun.status === 'CANCELLED' ? 'Lint 已停止' : 'Lint 运行失败' }}</p>
           <YdChatReasoning v-if="aiRun.reasoning" :content="aiRun.reasoning" :pending="running" />
@@ -187,6 +188,12 @@ function meta(severity: string) {
   margin-left: auto;
   font-size: 11px;
   color: var(--color-text-3);
+}
+
+/* YdAlert 没有默认插槽：动作必须与告警相邻，不能作为子节点传入 */
+.lint-error {
+  display: grid;
+  gap: 8px;
 }
 
 .lint-empty {

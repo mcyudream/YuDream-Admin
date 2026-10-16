@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.wiki.service;
 
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSource;
@@ -42,10 +43,11 @@ class WikiSearchAppServiceTest {
     private final WikiIndexGateway indexes = mock(WikiIndexGateway.class);
     private final WikiQueryExpansionGateway expansions = mock(WikiQueryExpansionGateway.class);
     private final WikiRerankGateway reranks = mock(WikiRerankGateway.class);
+    private final FileAppService files = mock(FileAppService.class);
     private final Map<Long, WikiPageVersion> publishedVersions = new LinkedHashMap<>();
 
     private final WikiSearchAppService service = new WikiSearchAppService(
-            capabilities, spaces, nodes, versions, sources, indexes, expansions, reranks);
+            capabilities, spaces, nodes, versions, sources, indexes, expansions, reranks, files);
 
     @Test
     void publicSearchUsesRootPageSlugPathAndUrl() {
@@ -238,7 +240,9 @@ class WikiSearchAppServiceTest {
         WikiNode node = page(1L, null, "deploy", "部署教程");
         publish(node, "部署教程", "先打开设置页。\n\n![设置页截图](/api/files/123456/content)");
         setupPublicSpace(List.of(node));
+        when(files.isPubliclyReadable(123456L)).thenReturn(true);
         WikiSource source = WikiSource.url(100L, "/", "部署资料", "https://example.com/deploy", "text/markdown");
+        source.setId(77L);
         source.setImages(List.of(new WikiSourceImage(123456L, 0, 1, "设置页右上角的保存按钮", null, null, null, 0, 0, "image/png")));
         when(sources.findByImageFileObjectIds(100L, List.of(123456L))).thenReturn(List.of(source));
 
@@ -248,29 +252,111 @@ class WikiSearchAppServiceTest {
             assertThat(image.getAlt()).isEqualTo("设置页截图");
             assertThat(image.getGeneratedCaption()).isEqualTo("设置页右上角的保存按钮");
             assertThat(image.getCaption()).isEqualTo("设置页截图");
+            assertThat(image.getImageId()).isEqualTo("123456");
+            assertThat(image.getSourceId()).isEqualTo("77");
+            assertThat(image.getPageNumber()).isZero();
+            assertThat(image.getSequence()).isEqualTo(1);
+            assertThat(image.getScore()).isGreaterThan(0.0);
+            // 启发式证据分：不是校准概率，也不把任一来源当作确定事实
+            assertThat(image.getConfidence()).isGreaterThanOrEqualTo(0.6).isLessThan(1.0);
+            assertThat(image.getConfidenceBasis()).isEqualTo("HEURISTIC");
         }));
+    }
+
+    @Test
+    void publicSearchRewritesNonPublicImagesToPublicationAwareProxyUrl() {
+        WikiNode node = page(1L, null, "deploy", "部署教程");
+        publish(node, "部署教程", "先打开设置页。\n\n![私有截图](/api/files/222/content)");
+        setupPublicSpace(List.of(node));
+        when(files.isPubliclyReadable(222L)).thenReturn(false);
+
+        var result = service.searchForPublicSite("demo", "私有截图", 5, null, false);
+
+        // 已发布正文引用的图片不暴露裸文件地址，改走“空间公开 + 节点已发布 + 正文引用”代理
+        assertThat(result).singleElement().satisfies(hit -> {
+            assertThat(hit.getImages()).singleElement().satisfies(image -> {
+                assertThat(image.getUrl()).isEqualTo("/api/public/wiki/demo/nodes/1/images/222");
+                assertThat(image.getImageId()).isEqualTo("222");
+            });
+            assertThat(hit.getImageNotice()).isNull();
+        });
+    }
+
+    @Test
+    void publicSearchReturnsOnlyQueryRelevantImageEvidence() {
+        WikiNode node = page(1L, null, "deploy", "部署教程");
+        publish(node, "部署教程", "正文内容。\n\n![无关图片](/api/files/301/content)\n\n![保存按钮截图](/api/files/302/content)");
+        setupPublicSpace(List.of(node));
+        when(files.isPubliclyReadable(301L)).thenReturn(true);
+        when(files.isPubliclyReadable(302L)).thenReturn(true);
+        WikiSource source = WikiSource.url(100L, "/", "部署资料", "https://example.com/deploy", "text/markdown");
+        source.setId(77L);
+        source.setImages(List.of(
+                new WikiSourceImage(301L, 1, 0, "一张风景照片", null, null, null, 0, 0, "image/png"),
+                new WikiSourceImage(302L, 3, 1, "设置页右上角的保存按钮", null, null, null, 0, 0, "image/png")));
+        when(sources.findByImageFileObjectIds(100L, List.of(301L, 302L))).thenReturn(List.of(source));
+
+        var result = service.searchForPublicSite("demo", "保存按钮", 5, null, false);
+
+        assertThat(result).singleElement().satisfies(hit -> {
+            assertThat(hit.getImages()).singleElement().satisfies(image -> {
+                assertThat(image.getImageId()).isEqualTo("302");
+                assertThat(image.getPageNumber()).isEqualTo(3);
+                assertThat(image.getSourceId()).isEqualTo("77");
+            });
+            assertThat(hit.getImageNotice()).contains("已省略");
+        });
+    }
+
+    @Test
+    void publicSearchOmitsImagesWithoutCaptionOrAltEvidence() {
+        WikiNode node = page(1L, null, "deploy", "部署教程");
+        publish(node, "部署教程", "正文内容。\n\n![](/api/files/401/content)");
+        setupPublicSpace(List.of(node));
+        when(files.isPubliclyReadable(401L)).thenReturn(true);
+
+        var result = service.searchForPublicSite("demo", "正文内容", 5, null, false);
+
+        assertThat(result).singleElement().satisfies(hit -> {
+            assertThat(hit.getImages()).isEmpty();
+            assertThat(hit.getImageNotice()).contains("已省略全部 1 张");
+        });
+    }
+
+    @Test
+    void publicSearchNeverExposesDraftOnlyImageEvidenceEvenWhenFileIsPubliclyReadable() {
+        WikiNode node = page(1L, null, "deploy", "部署教程");
+        // 草稿含图片、发布版本不含：公开检索必须以发布版本为准，不能因文件级 publicAccess 暴露草稿资产
+        node.setMarkdownDraft("---\ntitle: 草稿标题\ntype: concept\n---\n![草稿图](/api/files/555/content)");
+        publish(node, "部署教程", "发布正文不含图片");
+        setupPublicSpace(List.of(node));
+        when(files.isPubliclyReadable(555L)).thenReturn(true);
+
+        var result = service.searchForPublicSite("demo", "草稿图", 5, null, false);
+
+        assertThat(result).isEmpty();
     }
 
     @Test
     void adminSearchPassesGraphExpansionWhenSpaceGraphIsEnabled() {
         WikiSpace space = setupGraphSearchSpace(true);
-        when(indexes.search(space, "部署", 10, null, true)).thenReturn(List.of());
+        when(indexes.search(space, "部署", 10, "", true)).thenReturn(List.of());
         when(nodes.searchByKeyword(100L, "部署", 10)).thenReturn(List.of());
 
         service.searchForAdmin("demo", "部署", 5, null, true);
 
-        verify(indexes).search(space, "部署", 10, null, true);
+        verify(indexes).search(space, "部署", 10, "", true);
     }
 
     @Test
     void adminSearchDisablesGraphExpansionWhenSpaceGraphIsDisabled() {
         WikiSpace space = setupGraphSearchSpace(false);
-        when(indexes.search(space, "部署", 10, null, false)).thenReturn(List.of());
+        when(indexes.search(space, "部署", 10, "", false)).thenReturn(List.of());
         when(nodes.searchByKeyword(100L, "部署", 10)).thenReturn(List.of());
 
         service.searchForAdmin("demo", "部署", 5, null, true);
 
-        verify(indexes).search(space, "部署", 10, null, false);
+        verify(indexes).search(space, "部署", 10, "", false);
     }
 
     @Test
@@ -278,9 +364,11 @@ class WikiSearchAppServiceTest {
         WikiSpace space = setupGraphSearchSpace(true);
         WikiNode keywordPage = page(1L, null, "deploy", "部署指南");
         keywordPage.setMarkdownDraft("---\ntitle: 部署指南\ntype: concept\n---\n部署步骤正文");
-        when(indexes.search(space, "部署", 10, null, true))
+        when(indexes.search(space, "部署", 10, "", true))
                 .thenThrow(new IllegalStateException("neo4j unavailable"));
         when(nodes.searchByKeyword(100L, "部署", 10)).thenReturn(List.of(keywordPage));
+        // 关键词回退后命中需要能按当前 parentId 链解析路径
+        when(nodes.findBySpaceId(100L)).thenReturn(List.of(keywordPage));
 
         List<WikiSearchHitDTO> result = service.searchForAdmin("demo", "部署", 5, null, true);
 

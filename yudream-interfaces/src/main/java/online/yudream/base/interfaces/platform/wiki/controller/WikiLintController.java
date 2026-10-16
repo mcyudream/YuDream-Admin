@@ -5,6 +5,8 @@ import online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler;
 import online.yudream.base.interfaces.platform.ai.res.AiRunRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.application.platform.wiki.service.WikiLintAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +28,8 @@ public class WikiLintController {
 
     @PostMapping({"/spaces/{spaceId}/lint", "/spaces/{spaceId}/lint/runs"})
     @PermissionRegister(code = "platform:wiki:view", name = "Lint 检查 Wiki", module = "平台能力", desc = "检查矛盾、过时声明、孤立页面、缺失交叉引用与数据空白")
-    public Result<AiRunRes> lint(@PathVariable Long spaceId) {
+    @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
+public Result<AiRunRes> lint(@PathVariable Long spaceId) {
         return Result.ok(AiRunWebAssembler.run(service.startLint(SecurityPrincipalSupport.current().userId(), spaceId)));
     }
 }

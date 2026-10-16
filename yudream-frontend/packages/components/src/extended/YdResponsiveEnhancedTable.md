@@ -110,7 +110,7 @@ const actions: ActionMenuItem<User>[] = [
 
 所有 `YdEnhancedTable` 的 props 都被支持：
 
-- `userColumn` - 用户列配置（卡片头部显示头像/标题/副标题）
+- `userColumn` - 用户列配置（卡片头部显示头像/标题/副标题）；`fixed` 控制桌面端固定位置，默认 `'left'` 固定在左侧，传 `false` 取消固定，也可传 `'right'`
 - `statusColumn` - 状态列配置（卡片底部显示徽章）
 - `columns` - 普通列配置
 - `actions` - 操作菜单；`label` 可传函数按行动态生成，`visible` 可做行级隐藏，全部隐藏时不渲染触发按钮
@@ -119,6 +119,18 @@ const actions: ActionMenuItem<User>[] = [
 - `selectable` - 是否可选择（多选 `multiple` 时卡片头部显示勾选框）
 - `multiple` - 是否多选
 - 以及所有 TanStack Table 的 props...
+
+### 固定用户列
+
+`userColumn.fixed` 复用表格既有的固定列机制（sticky + 边缘阴影），仅作用于桌面表格：
+
+| 取值 | 效果 |
+|------|------|
+| 不传 / `true` / `'left'` | 用户列固定在左侧（默认） |
+| `'right'` | 用户列固定在右侧 |
+| `false` | 用户列不固定，随横向滚动 |
+
+操作列（`actions`）保持固定右侧；移动端卡片布局不使用固定列配置。
 
 ## 移动端卡片渲染
 

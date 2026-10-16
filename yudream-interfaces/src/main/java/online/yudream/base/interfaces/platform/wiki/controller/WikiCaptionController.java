@@ -2,6 +2,9 @@ package online.yudream.base.interfaces.platform.wiki.controller;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.wiki.service.WikiSourceAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceResource;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler;
@@ -22,7 +25,8 @@ public class WikiCaptionController {
 
     @PostMapping({"/sources/{id}/caption-images", "/sources/{id}/caption-images/runs"})
     @PermissionRegister(code = "platform:wiki:edit", name = "重新生成图片描述", module = "平台能力", desc = "提交后台图片描述任务并实时查看运行进度")
-    public Result<AiRunRes> captionImages(@PathVariable Long id) {
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:edit", resource = WikiSpaceResource.SOURCE, idParam = "id")
+public Result<AiRunRes> captionImages(@PathVariable Long id) {
         return Result.ok(AiRunWebAssembler.run(service.startCaptionImages(id, SecurityPrincipalSupport.current().userId())));
     }
 }

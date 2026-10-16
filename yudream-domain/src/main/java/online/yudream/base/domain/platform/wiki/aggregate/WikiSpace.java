@@ -7,6 +7,9 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceCoverType;
+import online.yudream.base.domain.platform.wiki.valobj.WikiCover;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSlug;
 
 /**
@@ -59,6 +62,21 @@ public class WikiSpace extends BaseDomain {
     private boolean watchEnabled;
     private String watchFolderPath;
 
+    /** 封面来源；旧数据为空按 NONE 处理。 */
+    private WikiSpaceCoverType coverType;
+    /** SEEDED 封面的稳定 seed（同一 seed 确定性呈现）。 */
+    private String coverSeed;
+    /** UPLOAD 封面引用的系统文件对象 ID。 */
+    private Long coverFileObjectId;
+    /** 封面替代文本（无障碍展示）。 */
+    private String coverAlt;
+
+    /** 是否允许登录用户在公开页面发表评论；默认关闭。 */
+    private boolean commentEnabled;
+
+    /** 实例 ACL 模式；旧数据为空按 LEGACY 处理。 */
+    private WikiSpaceAclMode aclMode;
+
     public static WikiSpace create(String name, String slug) {
         WikiSpace space = new WikiSpace();
         space.update(name, slug, null, false, false, null, null, false, null, null, 1200, 160, 8);
@@ -79,6 +97,12 @@ public class WikiSpace extends BaseDomain {
         space.sourceGroundedDefault = false;
         space.watchEnabled = false;
         space.watchFolderPath = "";
+        // 存量空间与导入/迁移空间保持 LEGACY；平台侧新建空间由应用用例显式启用 RESTRICTED 并授予创建者 MANAGE。
+        space.coverType = WikiSpaceCoverType.NONE;
+        space.coverSeed = "";
+        space.coverAlt = "";
+        space.commentEnabled = false;
+        space.aclMode = WikiSpaceAclMode.LEGACY;
         return space;
     }
 
@@ -144,6 +168,44 @@ public class WikiSpace extends BaseDomain {
 
     public int effectiveHitImageLimit() {
         return hitImageLimit == null ? 4 : Math.clamp(hitImageLimit, 0, 12);
+    }
+
+    /** 当前封面值对象；旧数据无封面字段时视为无封面。 */
+    public WikiCover cover() {
+        WikiSpaceCoverType type = WikiSpaceCoverType.of(coverType);
+        return new WikiCover(type, coverSeed, coverFileObjectId, coverAlt);
+    }
+
+    /** 应用封面（SEEDED 需稳定 seed；UPLOAD 需文件对象 ID；NONE 清空全部封面字段）。 */
+    public void applyCover(WikiCover cover) {
+        WikiCover next = cover == null ? WikiCover.NONE : cover;
+        this.coverType = next.type();
+        this.coverSeed = next.seed();
+        this.coverFileObjectId = next.fileObjectId();
+        this.coverAlt = next.alt();
+    }
+
+    /** 移除封面只清空引用，不删除可能被其他位置共享的文件对象。 */
+    public void clearCover() {
+        applyCover(WikiCover.NONE);
+    }
+
+    /** 评论开关（默认关闭；匿名策略不在本用例内）。 */
+    public void applyCommentEnabled(boolean enabled) {
+        this.commentEnabled = enabled;
+    }
+
+    /** 当前 ACL 模式（旧数据回落 LEGACY）。 */
+    public WikiSpaceAclMode effectiveAclMode() {
+        return WikiSpaceAclMode.of(aclMode);
+    }
+
+    /**
+     * 启用受限 ACL。调用方必须先确保存在可管理成员（创建者 MANAGE），
+     * 否则会锁死空间；本方法只表达状态流转，不代替成员校验。
+     */
+    public void enableRestrictedAcl() {
+        this.aclMode = WikiSpaceAclMode.RESTRICTED;
     }
 
     private static String text(String value) {

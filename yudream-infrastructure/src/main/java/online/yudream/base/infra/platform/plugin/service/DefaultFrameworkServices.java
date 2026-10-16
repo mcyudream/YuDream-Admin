@@ -39,7 +39,9 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
+import online.yudream.base.plugin.spi.system.feishu.PluginFeishuService;
 import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -91,6 +93,26 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginSecretStore> secretStores = new ConcurrentHashMap<>();
+    /** 飞书云文档 SPI 适配：经 ObjectProvider 延迟解析，避免与能力模块装配形成启动循环依赖。 */
+    private final ObjectProvider<PluginFeishuFrameworkService> pluginFeishuProvider;
+    /** 站点目录 SPI 适配：宿主数据根下的 sites/{siteCode}/plugins/{pluginCode}/。 */
+    private final ObjectProvider<SiteFolderPluginFileStore> pluginSiteFileStoreProvider;
+
+    @Override
+    public PluginFeishuService feishu() {
+        PluginFeishuFrameworkService feishu = pluginFeishuProvider.getIfAvailable();
+        return feishu == null ? new PluginFeishuService() {
+        } : feishu;
+    }
+
+    @Override
+    public online.yudream.base.plugin.spi.system.storage.PluginSiteFileStore siteFiles(String pluginCode) {
+        SiteFolderPluginFileStore siteFiles = pluginSiteFileStoreProvider.getIfAvailable();
+        if (siteFiles == null) {
+            throw new UnsupportedOperationException("宿主无站点目录文件端口（SPI 2.37.0 能力未装配）：siteFiles");
+        }
+        return siteFiles.forPlugin(pluginCode);
+    }
 
     @Override
     public online.yudream.base.plugin.spi.system.backup.PluginBackupOperations backups(String pluginCode) {

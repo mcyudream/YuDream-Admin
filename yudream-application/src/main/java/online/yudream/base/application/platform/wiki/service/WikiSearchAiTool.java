@@ -89,12 +89,22 @@ public class WikiSearchAiTool implements AiAgentTool {
         value.put("path", hit.getPath());
         value.put("content", hit.getContent());
         value.put("sourceUrl", hit.getSourceUrl());
+        // 图片证据与 REST 命中同源过滤：只含相关且证据分达标的图片，并显式说明被省略的图片
+        value.put("imageNotice", hit.getImageNotice() == null ? "" : hit.getImageNotice());
         value.put("images", hit.getImages() == null ? List.of() : hit.getImages().stream()
-                .map(image -> Map.of("index", imageIndex.getAndIncrement(),
-                        "url", image.getUrl() == null ? "" : image.getUrl(),
-                        "alt", image.getAlt() == null ? "" : image.getAlt(),
-                        "generatedCaption", image.getGeneratedCaption() == null ? "" : image.getGeneratedCaption(),
-                        "caption", image.getCaption() == null ? "" : image.getCaption()))
+                .map(image -> Map.<String, Object>ofEntries(
+                        Map.entry("index", imageIndex.getAndIncrement()),
+                        Map.entry("url", image.getUrl() == null ? "" : image.getUrl()),
+                        Map.entry("alt", image.getAlt() == null ? "" : image.getAlt()),
+                        Map.entry("generatedCaption", image.getGeneratedCaption() == null ? "" : image.getGeneratedCaption()),
+                        Map.entry("caption", image.getCaption() == null ? "" : image.getCaption()),
+                        Map.entry("imageId", image.getImageId() == null ? "" : image.getImageId()),
+                        Map.entry("pageNumber", image.getPageNumber()),
+                        Map.entry("sequence", image.getSequence()),
+                        Map.entry("sourceId", image.getSourceId() == null ? "" : image.getSourceId()),
+                        Map.entry("score", image.getScore()),
+                        Map.entry("confidence", image.getConfidence()),
+                        Map.entry("confidenceBasis", image.getConfidenceBasis() == null ? "" : image.getConfidenceBasis())))
                 .toList());
         return value;
     }

@@ -99,11 +99,12 @@ async function start() {
           </div>
         </YdCard>
 
-        <YdAlert v-if="failure" variant="destructive" :title="failure">
+        <div v-if="failure" class="res-error">
+          <YdAlert variant="destructive" :title="failure" />
           <YdButton variant="outline" size="sm" @click="task.reconnect">
             恢复后端进度
           </YdButton>
-        </YdAlert>
+        </div>
         <YdCard v-if="aiRun" class="res-plan">
           <p class="res-run-status">
             {{ planning ? '计划正在生成，切换页面后任务继续执行' : aiRun.status === 'COMPLETED' ? '计划已完成' : aiRun.status === 'CANCELLED' ? '计划已停止' : '计划生成失败' }}
@@ -143,6 +144,12 @@ async function start() {
 </template>
 
 <style scoped>
+/* YdAlert 没有默认插槽：动作必须与告警相邻，不能作为子节点传入 */
+.res-error {
+  display: grid;
+  gap: 8px;
+}
+
 .res-panel {
   height: 100%;
   min-height: 0;

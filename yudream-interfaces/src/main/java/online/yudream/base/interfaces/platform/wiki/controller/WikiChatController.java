@@ -3,6 +3,8 @@ package online.yudream.base.interfaces.platform.wiki.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.wiki.service.WikiChatRunAppService;
+import online.yudream.base.domain.platform.wiki.anno.WikiSpaceAccess;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler;
@@ -31,7 +33,8 @@ public class WikiChatController {
 
     @PostMapping({"/spaces/{spaceId}/chat", "/spaces/{spaceId}/chat/runs"})
     @PermissionRegister(code = "platform:wiki:view", name = "Wiki 智能问答", module = "平台能力", desc = "创建持久后台 Wiki 问答运行")
-    public Result<AiRunRes> chat(@PathVariable Long spaceId, @Valid @RequestBody WikiChatRequest request) {
+        @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
+public Result<AiRunRes> chat(@PathVariable Long spaceId, @Valid @RequestBody WikiChatRequest request) {
         var principal = SecurityPrincipalSupport.current();
         return Result.ok(AiRunWebAssembler.run(service.start(principal.userId(), spaceId, request.getSessionId(),
                 request.getQuestion(), WikiWebAssembler.chatHistory(request), principal.permissions())));
@@ -39,7 +42,8 @@ public class WikiChatController {
 
     @PostMapping(value = {"/spaces/{spaceId}/chat/stream", "/spaces/{spaceId}/chat/agui"}, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:wiki:view", name = "Wiki 流式问答", module = "平台能力", desc = "订阅持久后台 Wiki 问答运行")
-    public SseEmitter chatStream(@PathVariable Long spaceId, @Valid @RequestBody WikiChatRequest request) {
+        @WikiSpaceAccess(action = WikiSpaceAclAction.READ, permission = "platform:wiki:view")
+public SseEmitter chatStream(@PathVariable Long spaceId, @Valid @RequestBody WikiChatRequest request) {
         var principal = SecurityPrincipalSupport.current();
         var run = service.start(principal.userId(), spaceId, request.getSessionId(), request.getQuestion(),
                 WikiWebAssembler.chatHistory(request), principal.permissions());

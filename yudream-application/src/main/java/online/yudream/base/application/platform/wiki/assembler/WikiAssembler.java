@@ -54,6 +54,12 @@ public final class WikiAssembler {
                 .sourceGroundedDefault(s.isSourceGroundedDefault())
                 .watchEnabled(s.isWatchEnabled())
                 .watchFolderPath(s.getWatchFolderPath())
+                .coverType(s.cover().type().name())
+                .coverSeed(s.cover().seed())
+                .coverFileObjectId(id(s.cover().fileObjectId()))
+                .coverAlt(s.cover().alt())
+                .commentEnabled(s.isCommentEnabled())
+                .aclMode(s.effectiveAclMode().name())
                 .build();
     }
 

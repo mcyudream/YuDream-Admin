@@ -327,3 +327,164 @@
   }
 }
 }
+
+@layer yudream-base {
+  /* —— 工作区外壳（YdWorkspaceLayout）—— */
+  .yd-workspace__rail-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    color: var(--color-text-3);
+    border-radius: var(--yd-control-radius);
+    transition: background var(--yd-motion-duration-fast) var(--yd-motion-ease), color var(--yd-motion-duration-fast) var(--yd-motion-ease);
+  }
+
+  .yd-workspace__rail-item:hover {
+    color: var(--color-text-1);
+    background: var(--color-fill-2);
+  }
+
+  .yd-workspace__rail-item--active {
+    color: var(--color-text-1);
+    background: var(--color-fill-3);
+  }
+
+  .yd-workspace__pane {
+    min-width: 0;
+  }
+
+  /* 分栏拖拽时不跑过渡，否则标签与内容会跟着手柄抖动 */
+  .yd-workspace--dragging * {
+    transition: none !important;
+  }
+
+  /* —— 工作区多标签栏（YdWorkspaceTabs）—— */
+  .yd-workspace-tabs__list {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .yd-workspace-tabs__list::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .yd-workspace-tabs__list::-webkit-scrollbar-thumb {
+    background: var(--color-border-2);
+    border-radius: 999px;
+  }
+
+  .yd-workspace-tabs__tab {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    max-width: 240px;
+    padding: 0 8px;
+    color: var(--color-text-3);
+    cursor: pointer;
+    user-select: none;
+    border-right: 1px solid var(--color-border-1);
+  }
+
+  .yd-workspace-tabs--sm .yd-workspace-tabs__tab {
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .yd-workspace-tabs--md .yd-workspace-tabs__tab {
+    height: 40px;
+    font-size: 13px;
+  }
+
+  .yd-workspace-tabs__tab:hover {
+    color: var(--color-text-1);
+    background: var(--color-fill-2);
+  }
+
+  .yd-workspace-tabs__tab--active {
+    color: var(--color-text-1);
+    background: var(--color-bg-1);
+  }
+
+  .yd-workspace-tabs__tab--active::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 2px;
+    content: '';
+    background: oklch(var(--primary));
+  }
+
+  .yd-workspace-tabs__tab:focus-visible {
+    outline: 2px solid oklch(var(--primary));
+    outline-offset: -2px;
+  }
+
+  .yd-workspace-tabs__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .yd-workspace-tabs__dot {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    background: oklch(var(--primary));
+    border-radius: 999px;
+  }
+
+  .yd-workspace-tabs__close {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: inherit;
+    border-radius: 4px;
+    opacity: 0;
+  }
+
+  .yd-workspace-tabs__tab:hover .yd-workspace-tabs__close,
+  .yd-workspace-tabs__tab--active .yd-workspace-tabs__close,
+  .yd-workspace-tabs__close:focus-visible {
+    opacity: 1;
+  }
+
+  .yd-workspace-tabs__close:hover {
+    background: var(--color-fill-3);
+  }
+
+  .yd-workspace-tabs__arrow {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--color-text-3);
+    border-radius: 4px;
+  }
+
+  .yd-workspace-tabs__arrow:hover {
+    color: var(--color-text-1);
+    background: var(--color-fill-2);
+  }
+
+  .yd-workspace-tabs__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+}

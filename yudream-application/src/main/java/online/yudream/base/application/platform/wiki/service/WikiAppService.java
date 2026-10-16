@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.wiki.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.wiki.assembler.WikiAssembler;
 import online.yudream.base.application.platform.wiki.cmd.WikiNodeSaveCmd;
@@ -22,15 +23,20 @@ import online.yudream.base.domain.platform.wiki.repo.WikiReviewItemRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
+import online.yudream.base.domain.platform.wiki.service.WikiNodePaths;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WikiAppService {
@@ -89,16 +95,43 @@ public class WikiAppService {
     @Transactional(readOnly = true)
     public List<WikiNodeDTO> tree(Long spaceId) {
         enabled();
-        Map<Long, List<WikiNode>> children = nodeRepo.findBySpaceId(spaceId).stream()
+        List<WikiNode> all = nodeRepo.findBySpaceId(spaceId);
+        WikiNodePaths paths = new WikiNodePaths(spaceId, all);
+        all.forEach(paths::resolve);
+        Map<Long, List<WikiNode>> children = all.stream()
                 .collect(Collectors.groupingBy(node -> node.getParentId() == null ? 0L : node.getParentId()));
-        return nodes(children.getOrDefault(0L, List.of()), children, "");
+        return nodes(children.getOrDefault(0L, List.of()), children, paths);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public WikiNodeDTO saveNode(WikiNodeSaveCmd c) {
         enabled();
         space(c.getSpaceId());
         WikiNode n = c.getId() == null ? createNode(c) : node(c.getId());
+        if (!Objects.equals(n.getSpaceId(), c.getSpaceId())) {
+            throw new BizException("节点不属于当前知识库");
+        }
+        List<WikiNode> spaceNodes = new ArrayList<>(nodeRepo.findBySpaceId(c.getSpaceId()));
+        if (c.getId() != null && spaceNodes.stream().noneMatch(item -> c.getId().equals(item.getId()))) {
+            spaceNodes.add(n);
+        }
+        if (c.getId() != null) {
+            replaceNode(spaceNodes, n);
+        }
+        WikiNodePaths paths = new WikiNodePaths(c.getSpaceId(), spaceNodes);
+        if (c.getParentId() != null && c.getId() == null) {
+            WikiNode parent = spaceNodes.stream().filter(item -> c.getParentId().equals(item.getId()))
+                    .findFirst().orElseThrow(() -> new BizException("父节点不存在或不属于当前知识库"));
+            parent.ensureCanContain(c.getNodeType());
+        }
+        if (c.getId() != null) {
+            paths.resolve(n);
+        }
+        List<WikiNode> affected = c.getId() == null ? List.of() : subtree(n, spaceNodes);
+        Map<Long, String> oldPaths = new HashMap<>();
+        for (WikiNode item : affected) {
+            oldPaths.put(item.getId(), paths.resolve(item).slugPath());
+        }
         if (c.getId() != null) {
             n.setTitle(c.getTitle());
             n.setSlug(c.getSlug());
@@ -107,25 +140,111 @@ public class WikiAppService {
                 applyPageContent(n, c);
             }
         }
-        return dto(nodeRepo.save(n));
+        n.setAncestorPath(paths.resolve(n).ancestorIds());
+        List<WikiNode> changed = new ArrayList<>();
+        WikiNodePaths updated = new WikiNodePaths(c.getSpaceId(), spaceNodes);
+        for (WikiNode item : affected) {
+            String newPath = updated.resolve(item).slugPath();
+            if (!Objects.equals(oldPaths.get(item.getId()), newPath)
+                    && item.getPublishedVersionId() != null) {
+                changed.add(item);
+            }
+        }
+        WikiSpace space = changed.isEmpty() ? null : space(c.getSpaceId());
+        WikiNode saved = nodeRepo.save(n);
+        syncIndexPaths(changed, space, item -> updated.resolve(item).slugPath());
+        return dto(saved);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public void moveNode(Long id, Long parentId) {
         enabled();
         WikiNode n = node(id);
+        List<WikiNode> spaceNodes = new ArrayList<>(nodeRepo.findBySpaceId(n.getSpaceId()));
+        if (spaceNodes.stream().noneMatch(item -> id.equals(item.getId()))) {
+            spaceNodes.add(n);
+        }
+        replaceNode(spaceNodes, n);
+        WikiNodePaths paths = new WikiNodePaths(n.getSpaceId(), spaceNodes);
         if (parentId != null) {
-            WikiNode p = node(parentId);
-            if (!p.getSpaceId().equals(n.getSpaceId())) {
-                throw new BizException("不能跨知识库移动节点");
+            WikiNode parent = spaceNodes.stream().filter(item -> parentId.equals(item.getId())).findFirst()
+                    .orElseThrow(() -> new BizException("父节点不存在或不属于当前知识库"));
+            parent.ensureCanContain(n.getNodeType());
+        }
+        List<WikiNode> affected = subtree(n, spaceNodes);
+        Map<Long, WikiNodePaths.Paths> targetPaths = new HashMap<>();
+        // 任何 Mongo 写入前验证整个受影响子树的父链与深度。
+        for (WikiNode item : affected) {
+            targetPaths.put(item.getId(), paths.resolve(item, id, parentId));
+        }
+        WikiSpace space = affected.stream().anyMatch(item -> item.getPublishedVersionId() != null)
+                ? space(n.getSpaceId()) : null;
+        n.setParentId(parentId);
+        for (WikiNode item : affected) {
+            item.setAncestorPath(targetPaths.get(item.getId()).ancestorIds());
+            nodeRepo.save(item);
+        }
+        syncIndexPaths(affected.stream().filter(item -> item.getPublishedVersionId() != null).toList(),
+                space, item -> targetPaths.get(item.getId()).slugPath());
+    }
+
+    private void replaceNode(List<WikiNode> spaceNodes, WikiNode node) {
+        for (int index = 0; index < spaceNodes.size(); index++) {
+            if (Objects.equals(spaceNodes.get(index).getId(), node.getId())) {
+                spaceNodes.set(index, node);
+                return;
             }
-            p.ensureCanContain(n.getNodeType());
-            n.moveTo(parentId, p.getAncestorPath() + p.getId() + "/");
         }
-        else {
-            n.moveTo(null, "/");
+    }
+
+    private List<WikiNode> subtree(WikiNode root, List<WikiNode> spaceNodes) {
+        List<WikiNode> affected = new ArrayList<>(List.of(root));
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        visited.add(root.getId());
+        for (int index = 0; index < affected.size(); index++) {
+            Long parentId = affected.get(index).getId();
+            for (WikiNode child : spaceNodes) {
+                if (parentId != null && parentId.equals(child.getParentId()) && visited.add(child.getId())) {
+                    affected.add(child);
+                }
+            }
         }
-        nodeRepo.save(n);
+        return affected;
+    }
+
+    private void syncIndexPaths(List<WikiNode> affected, WikiSpace space,
+                                java.util.function.Function<WikiNode, String> pathFor) {
+        if (affected.isEmpty()) {
+            return;
+        }
+        List<String> failures = new ArrayList<>();
+        for (WikiNode item : affected) {
+            try {
+                indexGateway.updatePath(space, item.getId(), item.getPublishedVersionId(), pathFor.apply(item));
+            }
+            catch (Exception error) {
+                String reason = "路径索引同步失败：" + error.getMessage();
+                try {
+                    WikiPageVersion version = versionRepo.findById(item.getPublishedVersionId())
+                            .orElseThrow(() -> new BizException("当前发布版本不存在"));
+                    version.failed(reason);
+                    versionRepo.save(version);
+                }
+                catch (Exception recordError) {
+                    log.error("Wiki 页面 {} 索引失败状态记录失败，发布版本 {}", item.getId(),
+                            item.getPublishedVersionId(), recordError);
+                    failures.add(String.valueOf(item.getId()) + "（FAILED 状态记录失败）");
+                    continue;
+                }
+                log.error("Wiki 页面 {} 路径索引同步失败，发布版本 {} 已标记 FAILED", item.getId(),
+                        item.getPublishedVersionId(), error);
+                failures.add(String.valueOf(item.getId()));
+            }
+        }
+        if (!failures.isEmpty()) {
+            throw new BizException("Wiki 结构已保存，但 " + failures.size() + " 个页面路径索引同步失败（页面 ID："
+                    + String.join("、", failures) + "）；请重建索引重试");
+        }
     }
 
     @Transactional
@@ -165,16 +284,11 @@ public class WikiAppService {
         if (c.getNodeType() == null) {
             throw new BizException("节点类型不能为空");
         }
-        if (c.getParentId() != null) {
-            WikiNode p = node(c.getParentId());
-            if (!p.getSpaceId().equals(c.getSpaceId())) {
-                throw new BizException("父节点不属于当前知识库");
-            }
-            p.ensureCanContain(c.getNodeType());
-        }
         WikiNode n = c.getNodeType() == WikiNodeType.DIRECTORY
                 ? WikiNode.directory(c.getSpaceId(), c.getParentId(), c.getTitle(), c.getSlug(), c.getSort())
                 : WikiNode.page(c.getSpaceId(), c.getParentId(), c.getTitle(), c.getSlug(), c.getSort());
+        n.setAncestorPath(new WikiNodePaths(c.getSpaceId(), nodeRepo.findBySpaceId(c.getSpaceId()))
+                .resolve(n).ancestorIds());
         if (c.getNodeType() == WikiNodeType.PAGE) {
             applyPageContent(n, c);
         }
@@ -197,10 +311,10 @@ public class WikiAppService {
         }
     }
 
-    private List<WikiNodeDTO> nodes(List<WikiNode> source, Map<Long, List<WikiNode>> children, String parentPath) {
+    private List<WikiNodeDTO> nodes(List<WikiNode> source, Map<Long, List<WikiNode>> children, WikiNodePaths paths) {
         return source.stream().sorted(Comparator.comparingInt(WikiNode::getSort)).map(n -> {
-            String path = parentPath.isBlank() ? n.getSlug() : parentPath + "/" + n.getSlug();
-            WikiNodeDTO dto = WikiAssembler.node(n, status(n), nodes(children.getOrDefault(n.getId(), List.of()), children, path));
+            String path = paths.resolve(n).slugPath();
+            WikiNodeDTO dto = WikiAssembler.node(n, status(n), nodes(children.getOrDefault(n.getId(), List.of()), children, paths));
             dto.setPath(path);
             return dto;
         }).toList();

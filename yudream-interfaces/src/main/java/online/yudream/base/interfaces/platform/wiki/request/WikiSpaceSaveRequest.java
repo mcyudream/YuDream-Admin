@@ -42,4 +42,6 @@ public class WikiSpaceSaveRequest {
     private boolean sourceGroundedDefault;
     private boolean watchEnabled;
     private String watchFolderPath;
+    /** 是否允许登录用户在公开页面发表评论；默认关闭。 */
+    private boolean commentEnabled;
 }

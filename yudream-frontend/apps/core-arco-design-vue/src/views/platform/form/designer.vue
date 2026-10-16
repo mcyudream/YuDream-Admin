@@ -31,11 +31,18 @@ const form = reactive<DynamicFormPayload>({
 })
 
 const pageTitle = computed(() => selected.value ? '编辑动态表单' : '新建动态表单')
+const pageDescription = computed(() => selected.value
+  ? `正在编辑「${selected.value.name}」的字段与布局，保存后立即影响公开填写与提交收集。`
+  : '填写表单信息后，在设计器中编排字段与布局；保存即可生成可发布的动态表单。')
 const statusOptions: { label: string, value: DynamicFormStatus }[] = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' },
   { label: '已停用', value: 'DISABLED' },
 ]
+const statusLabel = computed(() => statusOptions.find(option => option.value === form.status)?.label || form.status)
+const codeHint = computed(() => selected.value
+  ? `编码已固定为 /forms/${selected.value.code}，公开链接与接口按编码寻址，创建后不可修改。`
+  : '用于公开链接 /forms/{编码}，创建保存后不可修改，请使用小写字母、数字和连字符。')
 
 watch(() => route.query.id, () => {
   init()
@@ -221,7 +228,7 @@ function defaultOptions() {
 
 <template>
   <div>
-    <YdPageHeader :title="pageTitle" class="mb-0">
+    <YdPageHeader :title="pageTitle" :description="pageDescription" class="mb-0">
       <YdButton variant="outline" @click="returnToList">
         <YdIcon name="morph:arrow-left" />
         返回列表
@@ -236,36 +243,57 @@ function defaultOptions() {
       </YdButton>
     </YdPageHeader>
 
-    <YdLoadingOverlay :loading="loading"><YdPageMain >
-      <section class="designer-page">
-        <YdForm :model="form" layout="vertical" class="meta-grid">
-          <YdFormItem label="表单名称" required>
-            <YdInput v-model="form.name" />
-          </YdFormItem>
-          <YdFormItem label="表单编码" required>
-            <YdInput v-model="form.code" placeholder="form-contact" :disabled="!!selected" />
-          </YdFormItem>
-          <YdFormItem label="状态">
-            <YdSelect v-model="form.status" :options="statusOptions" />
-          </YdFormItem>
-          <YdFormItem label="公开填写">
-            <YdSwitch v-model="form.allowAnonymous" />
-          </YdFormItem>
-          <YdFormItem label="描述" class="meta-full">
-            <YdTextarea v-model="form.description" rows="3" />
-          </YdFormItem>
-        </YdForm>
+    <YdLoadingOverlay :loading="loading">
+      <YdPageMain>
+        <section class="designer-page">
+          <div class="designer-meta">
+            <div class="designer-meta__head">
+              <div class="designer-meta__intro">
+                <h2>表单信息</h2>
+                <p>名称与编码用于识别和公开寻址，状态决定公开链接能否填写。</p>
+              </div>
+              <div class="designer-meta__identity">
+                <YdTag>{{ statusLabel }}</YdTag>
+                <code v-if="selected">{{ selected.code }}</code>
+              </div>
+            </div>
 
-        <div class="designer-toolbar">
-          <span>{{ selected ? `正在编辑：${selected.name}` : '正在创建新表单' }}</span>
-          <span>字段与布局在下方设计器中调整，保存后即可用于公开填写和结果收集。</span>
-        </div>
+            <YdForm :model="form" layout="vertical" class="meta-grid">
+              <YdFormItem label="表单名称" field="name" required>
+                <YdInput v-model="form.name" placeholder="面向填写者展示的名称" />
+              </YdFormItem>
+              <YdFormItem label="表单编码" field="code" required :extra="codeHint">
+                <YdInput v-model="form.code" placeholder="form-contact" :disabled="!!selected" />
+              </YdFormItem>
+              <YdFormItem label="状态" field="status" extra="草稿仅在设计器中可见；发布后公开链接才能接收提交。">
+                <YdSelect v-model="form.status" :options="statusOptions" />
+              </YdFormItem>
+              <YdFormItem label="公开填写" field="allowAnonymous" extra="开启后未登录访客也可以提交。">
+                <YdSwitch v-model="form.allowAnonymous" />
+              </YdFormItem>
+              <YdFormItem label="描述" field="description" class="meta-full" extra="选填，用于说明表单用途或填写须知。">
+                <YdTextarea v-model="form.description" rows="3" placeholder="简要说明表单用途、面向人群或填写须知" />
+              </YdFormItem>
+            </YdForm>
+          </div>
 
-        <div class="designer-shell">
-          <fc-designer ref="designerRef" height="720px" />
-        </div>
-      </section>
-    </YdPageMain></YdLoadingOverlay>
+          <div class="designer-canvas">
+            <div class="designer-canvas__head">
+              <div>
+                <h2>表单设计器</h2>
+                <p>从左侧拖入字段组件，在画布中调整顺序与布局，右侧面板修改选中组件的属性。</p>
+              </div>
+              <span class="designer-canvas__hint">
+                {{ selected ? `正在编辑：${selected.name}` : '正在创建新表单，保存后生成公开链接' }}
+              </span>
+            </div>
+            <div class="designer-shell">
+              <fc-designer ref="designerRef" height="100%" />
+            </div>
+          </div>
+        </section>
+      </YdPageMain>
+    </YdLoadingOverlay>
 
     <YdModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
       <FormSubmissionPanel :form="selected" :form-id="selected?.id" :form-name="selected?.name" embedded />
@@ -276,36 +304,94 @@ function defaultOptions() {
 <style scoped>
 .designer-page {
   display: grid;
-  gap: 14px;
+  gap: var(--yd-content-gap, 16px);
+}
+
+/* 元信息只用一个平面容器，靠标题、分组与说明文本建立层级，不再套多层卡片。 */
+.designer-meta {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 12px;
+  background: var(--color-bg-2);
+}
+
+.designer-meta__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.designer-meta__intro h2,
+.designer-canvas__head h2 {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.designer-meta__intro p,
+.designer-canvas__head p {
+  margin: 4px 0 0;
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.designer-meta__identity {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.designer-meta__identity code {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .meta-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 12px 16px;
 }
 
 .meta-full {
   grid-column: 1 / -1;
 }
 
-.designer-toolbar {
-  display: flex;
+.designer-canvas {
+  display: grid;
   gap: 12px;
-  align-items: center;
+}
+
+.designer-canvas__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: flex-start;
   justify-content: space-between;
-  color: var(--color-text-2);
 }
 
-.designer-toolbar span {
-  min-width: 0;
+.designer-canvas__hint {
+  color: var(--color-text-3);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
+/* 画布按视口给足高度，短屏仍保留可用设计区，长屏不再限制在固定 720px。 */
 .designer-shell {
-  min-height: 720px;
+  height: clamp(640px, calc(100dvh - 360px), 1080px);
   overflow: hidden;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--color-bg-2);
 }
 
@@ -314,9 +400,8 @@ function defaultOptions() {
     grid-template-columns: 1fr;
   }
 
-  .designer-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+  .designer-shell {
+    height: clamp(560px, calc(100dvh - 320px), 900px);
   }
 }
 </style>

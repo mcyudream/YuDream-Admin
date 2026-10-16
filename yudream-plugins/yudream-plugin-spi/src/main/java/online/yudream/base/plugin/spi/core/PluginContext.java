@@ -11,8 +11,10 @@ import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.theme.PluginTheme;
 import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
+import online.yudream.base.plugin.spi.system.feishu.PluginFeishuService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
+import online.yudream.base.plugin.spi.system.storage.PluginSiteFileStore;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
 import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
@@ -39,6 +41,26 @@ public interface PluginContext {
 
     default PluginFileStore files() {
         return framework().files(pluginCode());
+    }
+
+    /**
+     * 站点数据目录端口（SPI 2.37.0 起）：当前插件在当前站点的自属目录
+     * {@code sites/{siteCode}/plugins/{pluginCode}/} 读写代理；写隔离、跨插件读需宿主授权。
+     * 旧宿主未实现时 {@code framework().siteFiles(...)} 抛 {@link UnsupportedOperationException}。
+     */
+    default PluginSiteFileStore siteFiles() {
+        return framework().siteFiles(pluginCode());
+    }
+
+    /**
+     * 飞书云文档能力（SPI 2.37.0 起）：Drive/Wiki 文档/文档块读取 + 块级编辑原语
+     * （追加/删除子块、更新文本 elements，条件可用：按应用对目标文档的编辑权限）；
+     * 额度只在宿主「飞书集成」页展示与配置，不经本端口下发。
+     * 旧宿主/未启用时 {@link PluginFeishuService#enabled()} 为 false，调用抛
+     * {@link UnsupportedOperationException}；插件按软依赖降级。
+     */
+    default PluginFeishuService feishu() {
+        return framework().feishu();
     }
 
     default PluginSecretStore secrets() {

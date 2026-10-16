@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.domain.platform.wiki.service.WikiNodePaths;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSlug;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -158,7 +159,7 @@ public class WikiMigrationAppService {
 
     /** 归档导入节点数与父链深度上限：畸形归档以业务异常拒绝，而非栈溢出。 */
     private static final int MAX_IMPORT_NODES = 5000;
-    private static final int MAX_PARENT_CHAIN_DEPTH = 200;
+    private static final int MAX_PARENT_CHAIN_DEPTH = WikiNodePaths.MAX_PARENT_CHAIN_DEPTH;
 
     private Long importNode(String oldId, Map<String, JsonNode> nodesById, Map<String, Long> importedIds,
                             Set<String> visiting, Long spaceId, int depth) {
