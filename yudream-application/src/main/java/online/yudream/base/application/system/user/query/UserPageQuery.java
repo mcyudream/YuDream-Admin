@@ -38,6 +38,7 @@ public class UserPageQuery extends PageQuery {
     @Searchable(
         label = "邮箱验证",
         controlType = ControlType.SELECT,
+        optionsSource = "emailVerifiedOptions",
         order = 4
     )
     private Boolean emailVerified;
@@ -45,6 +46,7 @@ public class UserPageQuery extends PageQuery {
     @Searchable(
         label = "状态",
         controlType = ControlType.SELECT,
+        optionsSource = "userStatusOptions",
         order = 5
     )
     private UserStatus status;
