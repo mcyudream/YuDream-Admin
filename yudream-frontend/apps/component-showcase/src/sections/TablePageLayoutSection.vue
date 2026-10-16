@@ -6,61 +6,61 @@ import DemoCard from '@/components/DemoCard.vue'
 
 const toast = useYdToast()
 
-/** 语料条目：演示用本地数据 */
-interface CorpusItem {
+/** 内容条目：演示用虚构数据 */
+interface ContentItem {
   id: string
   index: number
   title: string
   code: string
-  tokens: number
-  exportedAt: string
+  words: number
+  updatedAt: string
 }
 
-const rows = ref<CorpusItem[]>([
-  { id: '1', index: 1, title: '深埋地下洞室断裂型岩爆机理的数值模拟', code: 'QK_0003007', tokens: 0, exportedAt: '-' },
-  { id: '2', index: 2, title: '石化装置工业尺度管道爆轰传播实验研究', code: 'QK_0003014', tokens: 0, exportedAt: '-' },
-  { id: '3', index: 3, title: '深孔爆破技术在高地应力低透气性高瓦斯煤层增透防突中的适用性', code: 'QK_0003003', tokens: 0, exportedAt: '-' },
-  { id: '4', index: 4, title: '石灰岩冲击损伤实验与破碎特性研究', code: 'QK_0003015', tokens: 0, exportedAt: '-' },
+const rows = ref<ContentItem[]>([
+  { id: '1', index: 1, title: '产品需求文档（2026 Q4）', code: 'DOC_0001', words: 2380, updatedAt: '2026-10-12' },
+  { id: '2', index: 2, title: '用户调研访谈纪要（八月）', code: 'DOC_0002', words: 1560, updatedAt: '2026-10-08' },
+  { id: '3', index: 3, title: '接口设计规范 v2.1', code: 'DOC_0003', words: 4120, updatedAt: '2026-09-30' },
+  { id: '4', index: 4, title: '版本发布检查清单', code: 'DOC_0004', words: 760, updatedAt: '2026-09-26' },
 ])
 
-const columns: TableColumn<CorpusItem>[] = [
+const columns: TableColumn<ContentItem>[] = [
   { accessorKey: 'index', header: '序号', width: 80, align: 'center' },
   { accessorKey: 'title', header: '标题', minWidth: 320 },
-  { accessorKey: 'code', header: '唯一标识符', width: 180 },
-  { accessorKey: 'tokens', header: 'Tokens', width: 100, align: 'center' },
-  { accessorKey: 'exportedAt', header: '语料最后导出时间', width: 180 },
+  { accessorKey: 'code', header: '文档编号', width: 180 },
+  { accessorKey: 'words', header: '字数', width: 100, align: 'center' },
+  { accessorKey: 'updatedAt', header: '最后更新时间', width: 180 },
 ]
 
 /** 静态搜索配置：演示 @Searchable 注解产物；真实项目由 /api/search-config 按 queryClass 返回 */
 const searchConfig: SearchConfig = {
-  queryClassName: 'demo.CorpusPageQuery',
-  querySimpleName: 'CorpusPageQuery',
+  queryClassName: 'demo.ContentPageQuery',
+  querySimpleName: 'ContentPageQuery',
   fields: [
-    { fieldName: 'keyword', label: '关键词', placeholder: '标题 / 唯一标识符', controlType: 'TEXT' as never, order: 1, showWhenFolded: true, width: '240px', fieldType: 'String' },
-    { fieldName: 'category', label: '所属类别', controlType: 'SELECT' as never, order: 2, showWhenFolded: false, width: '200px', optionsSource: 'categoryOptions', fieldType: 'String' },
-    { fieldName: 'inLibrary', label: '是否入库', controlType: 'SELECT' as never, order: 3, showWhenFolded: false, width: '200px', optionsSource: 'yesNoOptions', fieldType: 'String' },
-    { fieldName: 'importTime', label: '导入时间', controlType: 'DATE_RANGE' as never, order: 4, showWhenFolded: false, width: '200px', fieldType: 'LocalDate' },
+    { fieldName: 'keyword', label: '关键词', placeholder: '标题 / 文档编号', controlType: 'TEXT' as never, order: 1, showWhenFolded: true, width: '240px', fieldType: 'String' },
+    { fieldName: 'category', label: '内容分类', controlType: 'SELECT' as never, order: 2, showWhenFolded: false, width: '200px', optionsSource: 'categoryOptions', fieldType: 'String' },
+    { fieldName: 'status', label: '发布状态', controlType: 'SELECT' as never, order: 3, showWhenFolded: false, width: '200px', optionsSource: 'statusOptions', fieldType: 'String' },
+    { fieldName: 'updatedTime', label: '更新时间', controlType: 'DATE_RANGE' as never, order: 4, showWhenFolded: false, width: '200px', fieldType: 'LocalDate' },
   ],
 }
 
 const optionsSources: SearchOptionsSource[] = [
-  { id: 'categoryOptions', loader: () => [{ label: '论文', value: 'paper' }, { label: '专利', value: 'patent' }, { label: '图书', value: 'book' }, { label: '标准', value: 'standard' }] },
-  { id: 'yesNoOptions', loader: () => [{ label: '已入库', value: 'yes' }, { label: '未入库', value: 'no' }] },
+  { id: 'categoryOptions', loader: () => [{ label: '产品', value: 'product' }, { label: '研发', value: 'dev' }, { label: '运营', value: 'ops' }, { label: '设计', value: 'design' }] },
+  { id: 'statusOptions', loader: () => [{ label: '草稿', value: 'draft' }, { label: '已发布', value: 'published' }, { label: '已归档', value: 'archived' }] },
 ]
 
 const searchQuery = ref<Record<string, any>>({})
 
 const tabs = [
-  { label: '论文', value: 'paper' },
-  { label: '专利', value: 'patent' },
-  { label: '图书', value: 'book' },
-  { label: '标准', value: 'standard' },
+  { label: '文章', value: 'article' },
+  { label: '页面', value: 'page' },
+  { label: '附件', value: 'attachment' },
+  { label: '素材', value: 'asset' },
 ]
-const activeTab = ref('paper')
+const activeTab = ref('article')
 
 /** 操作按钮：autoFold 的项在超过阈值时收进「更多」，danger 项红色标识 */
 const actions: YdTablePageAction[] = [
-  { label: '一键处理', icon: 'morph:zap', variant: 'default', onClick: () => toast.success('已加入处理队列') },
+  { label: '新建内容', icon: 'morph:plus', variant: 'default', onClick: () => toast.success('打开新建面板') },
   { label: '导入', icon: 'morph:upload', variant: 'outline', autoFold: true, onClick: () => toast('打开导入面板') },
   { label: '导出', icon: 'morph:download', variant: 'outline', autoFold: true, onClick: () => toast.success('导出任务已创建') },
   { label: '下载模板', icon: 'morph:file-down', variant: 'outline', autoFold: true, onClick: () => toast('下载导入模板') },
@@ -72,8 +72,8 @@ const size = ref(10)
 const total = ref(4)
 
 const layoutCode = `<YdTablePageLayout
-  title="语料管理"
-  :tabs="[{ label: '论文', value: 'paper' }]"
+  title="内容管理"
+  :tabs="[{ label: '文章', value: 'article' }]"
   v-model:active-tab="activeTab"
   :actions="actions"
   :actions-threshold="3"
@@ -99,18 +99,21 @@ const layoutCode = `<YdTablePageLayout
 </YdTablePageLayout>`
 
 const dynamicFormCode = `// 后端查询类（注解驱动，前端零硬编码）
-public class CorpusPageQuery extends PageQuery {
+public class ContentPageQuery extends PageQuery {
     @Searchable(label = "关键词", showWhenFolded = true, order = 1)
     private String keyword;
 
-    @Searchable(label = "所属类别", optionsSource = "categoryOptions", order = 2)
+    @Searchable(label = "内容分类", optionsSource = "categoryOptions", order = 2)
     private String category;
+
+    @Searchable(label = "更新时间", controlType = ControlType.DATE_RANGE, order = 3)
+    private LocalDate updatedTime;
 }
 
 // 前端按 queryClass 拉取配置并自动渲染
 const { searchConfig, searchQuery } = useTablePage({
-  queryClass: 'demo.CorpusPageQuery',
-  loadApi: apiCorpus.page,
+  queryClass: 'demo.ContentPageQuery',
+  loadApi: apiContent.page,
   optionsSources,
 })`
 </script>
@@ -123,7 +126,7 @@ const { searchConfig, searchQuery } = useTablePage({
   >
     <YdTablePageLayout
       v-model:active-tab="activeTab"
-      title="语料管理"
+      title="内容管理"
       :tabs="tabs"
       :actions="actions"
       :actions-threshold="3"

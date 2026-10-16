@@ -190,74 +190,113 @@ function openAuthor() {
 </template>
 
 <style scoped>
-/* 治理区是定高工作区：设置版式铺满白底，页头与分区导航固定，只有内容区滚动 */
-.manage {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  background: var(--color-bg-1);
-}
-
-.manage__layout {
-  flex: 1;
-  min-height: 0;
-}
-
-/* 现代化的管理页头 */
+/* 管理页：玻璃态 + 微交互 + 现代配色 */
 .wiki-manage__header {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, var(--color-bg-1) 0%, var(--color-fill-1) 100%);
-  border-bottom: 1px solid var(--color-border-2);
-  border-radius: 8px 8px 0 0;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.9) 100%);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.wiki-manage__header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 0% 0%, rgba(99,102,241,0.08) 0%, transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(139,92,246,0.08) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .wiki-manage__header-left {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex: 1;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .wiki-manage__space-selector {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   flex: 1;
   min-width: 0;
-  max-width: 280px;
+  max-width: 320px;
+  background: linear-gradient(135deg, rgba(243,244,246,0.8), rgba(249,250,251,0.8));
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  backdrop-filter: blur(10px);
+  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.wiki-manage__space-selector:hover {
+  background: linear-gradient(135deg, rgba(249,250,251,0.9), rgba(255,255,255,0.9));
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .wiki-manage__space {
   flex: 1;
-  min-width: 120px;
+  min-width: 140px;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  padding: 6px 10px !important;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95)) !important;
+  color: #1f2937;
+  transition: all 200ms;
+}
+
+.wiki-manage__space:hover {
+  border-color: #4f46e5 !important;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.1) !important;
+}
+
+.wiki-manage__space:focus {
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.1) !important;
 }
 
 .wiki-manage__sync {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  padding: 4px 8px;
+  padding: 5px 10px;
   font-size: 12px;
-  color: rgb(var(--primary-6));
-  background: rgb(var(--primary-1));
-  border-radius: 4px;
+  font-weight: 500;
+  color: #0891b2;
+  background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(8,145,178,0.1));
+  border: 1px solid rgba(8,145,178,0.2);
+  border-radius: 6px;
   white-space: nowrap;
   flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  transition: all 200ms;
+}
+
+.wiki-manage__sync:hover {
+  background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(8,145,178,0.15));
+  box-shadow: 0 2px 8px rgba(8,145,178,0.1);
 }
 
 .wiki-manage__spin {
-  animation: wiki-manage-spin 1s linear infinite;
+  animation: spin 1.2s linear infinite;
   flex-shrink: 0;
 }
 
-@keyframes wiki-manage-spin {
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .wiki-manage__actions {
@@ -266,17 +305,37 @@ function openAuthor() {
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .wiki-manage__action-btn {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  transition: all var(--yd-motion-duration-fast) var(--yd-motion-ease);
+  padding: 7px 14px;
+  background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
 }
 
-.wiki-manage__action-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
+.wiki-manage__action-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+  background: linear-gradient(135deg, #ffffff, #fafbfc);
+  border-color: #4f46e5;
+}
+
+.wiki-manage__action-btn:active {
+  transform: translateY(-1px);
 }
 
 @media (width <= 1024px) {

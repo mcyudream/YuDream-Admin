@@ -224,6 +224,7 @@ const YD_COMPONENT_NAMES = [
   'YdImageCaptcha',
   'YdInfiniteScroll',
   'YdAnchor',
+  'YdNumberRange',
   'YdTablePageLayout',
   'YdDynamicSearchForm',
 ] as const

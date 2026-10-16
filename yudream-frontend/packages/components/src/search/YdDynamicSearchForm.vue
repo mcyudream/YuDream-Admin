@@ -3,11 +3,11 @@ import type { SearchConfig, SearchFieldConfig, SearchOption, SearchOptionsSource
 import { computed, onMounted, ref, watch } from 'vue'
 import YdButton from '../basic/button/index.vue'
 import YdCheckboxGroup from '../basic/checkbox-group/index.vue'
-import YdDatePicker from '../basic/date-picker/index.vue'
 import YdIcon from '../basic/icon/index.vue'
 import YdInput from '../basic/input/index.vue'
-import YdNumberField from '../basic/number-field/index.vue'
+import YdNumberRange from '../basic/number-range/index.vue'
 import YdRadioGroup from '../basic/radio-group/index.vue'
+import YdRangePicker from '../basic/range-picker/index.vue'
 import YdSelect from '../basic/select/index.vue'
 import { ControlType } from './search-config-types'
 
@@ -111,6 +111,30 @@ function getFieldOptions(field: SearchFieldConfig): SearchOption[] {
   return []
 }
 
+/** 日期范围桥接：对外是 [start, end] 数组，落到表单上拆为 fieldNameStart/fieldNameEnd */
+function getDateRange(field: SearchFieldConfig): (string | number)[] | undefined {
+  const start = formData.value[`${field.fieldName}Start`]
+  const end = formData.value[`${field.fieldName}End`]
+  return start && end ? [start, end] : undefined
+}
+
+function setDateRange(field: SearchFieldConfig, value?: (string | number)[]) {
+  formData.value[`${field.fieldName}Start`] = value?.[0]
+  formData.value[`${field.fieldName}End`] = value?.[1]
+}
+
+/** 数值范围桥接：对外是 [min, max] 数组，落到表单上拆为 fieldNameMin/fieldNameMax */
+function getNumberRange(field: SearchFieldConfig): (number | undefined)[] | undefined {
+  const min = formData.value[`${field.fieldName}Min`]
+  const max = formData.value[`${field.fieldName}Max`]
+  return min === undefined && max === undefined ? undefined : [min, max]
+}
+
+function setNumberRange(field: SearchFieldConfig, value?: (number | undefined)[]) {
+  formData.value[`${field.fieldName}Min`] = value?.[0]
+  formData.value[`${field.fieldName}Max`] = value?.[1]
+}
+
 // 处理搜索
 function handleSearch() {
   emit('search')
@@ -193,34 +217,22 @@ onMounted(() => {
           />
 
           <!-- DATE_RANGE 控件 -->
-          <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex w-full gap-2 items-center">
-            <YdDatePicker
-              v-model="formData[`${field.fieldName}Start`]"
-              class="flex-1 min-w-0"
-              placeholder="开始日期"
-            />
-            <span class="shrink-0">至</span>
-            <YdDatePicker
-              v-model="formData[`${field.fieldName}End`]"
-              class="flex-1 min-w-0"
-              placeholder="结束日期"
-            />
-          </div>
+          <YdRangePicker
+            v-else-if="field.controlType === ControlType.DATE_RANGE"
+            class="w-full"
+            :model-value="getDateRange(field)"
+            :placeholder="['开始日期', '结束日期']"
+            allow-clear
+            @update:model-value="(v: (string | number)[] | undefined) => setDateRange(field, v)"
+          />
 
           <!-- NUMBER_RANGE 控件 -->
-          <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex w-full gap-2 items-center">
-            <YdNumberField
-              v-model="formData[`${field.fieldName}Min`]"
-              class="flex-1 min-w-0"
-              placeholder="最小值"
-            />
-            <span class="shrink-0">至</span>
-            <YdNumberField
-              v-model="formData[`${field.fieldName}Max`]"
-              class="flex-1 min-w-0"
-              placeholder="最大值"
-            />
-          </div>
+          <YdNumberRange
+            v-else-if="field.controlType === ControlType.NUMBER_RANGE"
+            class="w-full"
+            :model-value="getNumberRange(field)"
+            @update:model-value="(v: (number | undefined)[] | undefined) => setNumberRange(field, v)"
+          />
 
           <!-- CHECKBOX 控件 -->
           <YdCheckboxGroup
@@ -288,34 +300,22 @@ onMounted(() => {
               />
 
               <!-- DATE_RANGE 控件 -->
-              <div v-else-if="field.controlType === ControlType.DATE_RANGE" class="flex w-full gap-2 items-center">
-                <YdDatePicker
-                  v-model="formData[`${field.fieldName}Start`]"
-                  class="flex-1 min-w-0"
-                  placeholder="开始日期"
-                />
-                <span class="shrink-0">至</span>
-                <YdDatePicker
-                  v-model="formData[`${field.fieldName}End`]"
-                  class="flex-1 min-w-0"
-                  placeholder="结束日期"
-                />
-              </div>
+              <YdRangePicker
+                v-else-if="field.controlType === ControlType.DATE_RANGE"
+                class="w-full"
+                :model-value="getDateRange(field)"
+                :placeholder="['开始日期', '结束日期']"
+                allow-clear
+                @update:model-value="(v: (string | number)[] | undefined) => setDateRange(field, v)"
+              />
 
               <!-- NUMBER_RANGE 控件 -->
-              <div v-else-if="field.controlType === ControlType.NUMBER_RANGE" class="flex w-full gap-2 items-center">
-                <YdNumberField
-                  v-model="formData[`${field.fieldName}Min`]"
-                  class="flex-1 min-w-0"
-                  placeholder="最小值"
-                />
-                <span class="shrink-0">至</span>
-                <YdNumberField
-                  v-model="formData[`${field.fieldName}Max`]"
-                  class="flex-1 min-w-0"
-                  placeholder="最大值"
-                />
-              </div>
+              <YdNumberRange
+                v-else-if="field.controlType === ControlType.NUMBER_RANGE"
+                class="w-full"
+                :model-value="getNumberRange(field)"
+                @update:model-value="(v: (number | undefined)[] | undefined) => setNumberRange(field, v)"
+              />
 
               <!-- CHECKBOX 控件 -->
               <YdCheckboxGroup

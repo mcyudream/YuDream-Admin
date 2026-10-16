@@ -69,8 +69,8 @@ private String keyword;
 | `AUTO` | 自动推断 | 根据字段类型自动选择 |
 | `TEXT` | 文本框 | `YdInput` |
 | `SELECT` | 下拉选择 | `YdSelect` |
-| `DATE_RANGE` | 日期范围 | `YdDatePicker` (range模式) |
-| `NUMBER_RANGE` | 数值范围 | 两个 `YdNumberField` |
+| `DATE_RANGE` | 日期范围 | `YdRangePicker` 范围选择器 |
+| `NUMBER_RANGE` | 数值范围 | `YdNumberRange` 数值范围输入 |
 | `CHECKBOX` | 复选框组 | `YdCheckboxGroup` |
 | `RADIO` | 单选按钮组 | `YdRadioGroup` |
 

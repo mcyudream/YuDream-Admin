@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki 编辑页和管理页 - 全新现代化设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            margin-bottom: 48px;
+        }
+        
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+        
+        .section {
+            margin-bottom: 48px;
+        }
+        
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-desc {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        /* 编辑页工具条 */
+        .demo-editor-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 8px 16px;
+            height: 52px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-radius: 12px 12px 0 0;
+            min-width: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .demo-editor-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top right, rgba(99,102,241,0.05) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        
+        .demo-header-left {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-shrink: 0;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        
+        .icon-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #ffffff;
+        }
+        
+        .demo-header-context {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            min-width: 0;
+            background: linear-gradient(135deg, rgba(249,250,251,0.8), rgba(243,244,246,0.8));
+            padding: 4px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.06);
+            backdrop-filter: blur(10px);
+            z-index: 1;
+            position: relative;
+        }
+        
+        .space-badge {
+            padding: 4px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+            border-radius: 6px;
+            white-space: nowrap;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            transition: all 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .space-badge:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        .breadcrumb {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+        
+        .breadcrumb-sep {
+            font-size: 13px;
+            color: #d1d5db;
+        }
+        
+        .node-type {
+            padding: 3px 8px;
+            background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #4f46e5;
+            letter-spacing: 0.3px;
+        }
+        
+        .title-input {
+            flex: 1;
+            min-width: 240px;
+            height: 36px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f2937;
+            background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(249,250,251,0.9));
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            padding: 8px 14px;
+            transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .title-input:focus {
+            outline: none;
+            background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .demo-header-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #6b7280;
+            background: linear-gradient(135deg, rgba(243,244,246,0.9), rgba(249,250,251,0.9));
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+            white-space: nowrap;
+        }
+        
+        .status-indicator.saved {
+            color: #059669;
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.1));
+            border-color: rgba(5,150,105,0.2);
+        }
+        
+        .pulse-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1.8s cubic-bezier(0.4, 0.0, 0.6, 1.0) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.4;
+                transform: scale(1.2);
+            }
+        }
+        
+        /* 管理页工具条 */
+        .demo-manage-header {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.9) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .demo-manage-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 0% 0%, rgba(99,102,241,0.08) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(139,92,246,0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        
+        .demo-manage-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .space-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+            max-width: 320px;
+            background: linear-gradient(135deg, rgba(243,244,246,0.8), rgba(249,250,251,0.8));
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.08);
+            backdrop-filter: blur(10px);
+            transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .space-selector:hover {
+            background: linear-gradient(135deg, rgba(249,250,251,0.9), rgba(255,255,255,0.9));
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .space-select {
+            flex: 1;
+            min-width: 140px;
+            border: 1px solid rgba(0,0,0,0.08);
+            padding: 6px 10px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
+            color: #1f2937;
+            transition: all 200ms;
+            cursor: pointer;
+        }
+        
+        .space-select:hover {
+            border-color: #4f46e5;
+            box-shadow: 0 2px 8px rgba(79,70,229,0.1);
+        }
+        
+        .sync-badge {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #0891b2;
+            background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(8,145,178,0.1));
+            border: 1px solid rgba(8,145,178,0.2);
+            border-radius: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            backdrop-filter: blur(10px);
+            transition: all 200ms;
+        }
+        
+        .sync-badge:hover {
+            background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(8,145,178,0.15));
+            box-shadow: 0 2px 8px rgba(8,145,178,0.1);
+        }
+        
+        .spin {
+            display: inline-block;
+            animation: spin 1.2s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .demo-manage-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .action-btn {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            padding: 7px 14px;
+            background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1f2937;
+            transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            backdrop-filter: blur(10px);
+            white-space: nowrap;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            background: linear-gradient(135deg, #ffffff, #fafbfc);
+            border-color: #4f46e5;
+        }
+        
+        .action-btn:active {
+            transform: translateY(-1px);
+        }
+        
+        /* 特性列表 */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+        
+        .feature-card {
+            padding: 16px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(249,250,251,0.8));
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+            background: rgba(255,255,255,0.95);
+        }
+        
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .feature-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 6px;
+        }
+        
+        .feature-desc {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        
+        .demo-box {
+            background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(249,250,251,0.9));
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Wiki 知识库 - 全新现代化设计</h1>
+            <p class="subtitle">采用玻璃态 + 微交互 + 现代配色的全新视觉体验</p>
+        </div>
+
+        <!-- 编辑页 -->
+        <div class="section">
+            <h2 class="section-title">📝 编辑页工具条</h2>
+            <p class="section-desc">采用玻璃态设计 (Glassmorphism)、柔和的渐变背景、精心设计的微交互动画</p>
+            
+            <div class="demo-box">
+                <div class="demo-editor-header">
+                    <div class="demo-header-left">
+                        <button class="icon-btn" title="返回知识库">←</button>
+                        <button class="icon-btn" title="展开/收起目录">⊕</button>
+                        
+                        <div class="demo-header-context">
+                            <div class="space-badge">📚 产品知识库</div>
+                            <div class="breadcrumb">
+                                <span class="breadcrumb-sep">›</span>
+                                <span class="node-type">PAGE</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <input class="title-input" placeholder="编辑页面标题..." value="知识库使用指南">
+                    
+                    <div class="demo-header-right">
+                        <div class="status-indicator">
+                            <span class="pulse-dot"></span>
+                            <span>未保存</span>
+                        </div>
+                        <button class="icon-btn">✎</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <div class="feature-title">玻璃态设计</div>
+                    <div class="feature-desc">backdrop-filter 模糊效果 + 半透明背景，现代化视觉体验</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✨</div>
+                    <div class="feature-title">微交互动画</div>
+                    <div class="feature-desc">cubic-bezier 缓动、脉冲、上升、缩放等动画，每个交互都富有生命力</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">清晰的上下文</div>
+                    <div class="feature-desc">空间徽章 + 面包屑导航 + 页面类型标签，用户始终知道位置</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔔</div>
+                    <div class="feature-title">实时状态反馈</div>
+                    <div class="feature-desc">脉冲动画保存状态、渐变背景区分已保存/未保存</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📐</div>
+                    <div class="feature-title">精准间距</div>
+                    <div class="feature-desc">采用 8px 间距系统，元素排列紧凑但不拥挤</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-title">完美响应式</div>
+                    <div class="feature-desc">@media 查询自适应，大屏充分、小屏简洁</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理页 -->
+        <div class="section">
+            <h2 class="section-title">⚙️ 管理页工具条</h2>
+            <p class="section-desc">渐变背景 + 玻璃态 + 悬停上升动画，增强空间感和可交互性</p>
+            
+            <div class="demo-box">
+                <div class="demo-manage-header">
+                    <div class="demo-manage-left">
+                        <button class="icon-btn">←</button>
+                        
+                        <div class="space-selector">
+                            <select class="space-select">
+                                <option selected>📚 产品知识库</option>
+                                <option>📚 技术知识库</option>
+                            </select>
+                            <div class="sync-badge">
+                                <span class="spin">⟳</span>
+                                <span>同步中</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-manage-actions">
+                        <button class="action-btn">✎ 编辑</button>
+                        <button class="action-btn">🔄 重建索引</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">🌈</div>
+                    <div class="feature-title">渐变背景</div>
+                    <div class="feature-desc">135度渐变 + 隐藏的径向渐变，增加空间层次感</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⬆️</div>
+                    <div class="feature-title">悬停上升</div>
+                    <div class="feature-desc">按钮悬停时优雅上升，阴影变大，增强可点击感</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎭</div>
+                    <div class="feature-title">玻璃态容器</div>
+                    <div class="feature-desc">选择器和徽章都采用玻璃态，整体风格统一协调</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔵</div>
+                    <div class="feature-title">同步反馈</div>
+                    <div class="feature-desc">品牌色徽章显示同步状态，旋转动画增加生动感</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">聚焦感</div>
+                    <div class="feature-desc">选择器获得焦点时有清晰的视觉反馈，提升可用性</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <div class="feature-title">高效操作</div>
+                    <div class="feature-desc">按钮大小适中，易于点击，响应迅速</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设计理念 -->
+        <div class="section">
+            <h2 class="section-title">🎓 设计理念</h2>
+            <div class="demo-box">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px;">
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">🎨 玻璃态设计</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">采用 backdrop-filter 实现毛玻璃效果，半透明背景 + 柔和边框，营造轻盈感</p>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">✨ 微交互动画</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">cubic-bezier 缓动函数，每个交互都精心设计，让界面充满生命力</p>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">🌈 渐变配色</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">双色渐变 + 隐藏径向渐变，增加深度感和视觉层次</p>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">📐 精准间距</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">8px 间距系统，元素紧密排列但不拥挤，视觉舒适</p>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">🔔 状态反馈</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">脉冲动画、颜色变化、阴影变大，用户始终感知系统反馈</p>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; color: #1e293b; margin-bottom: 8px;">📱 移动适配</h3>
+                        <p style="font-size: 13px; color: #64748b; line-height: 1.6;">@media 查询自适应，大屏显示充分，小屏排列简洁</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 技术细节 -->
+        <div class="section">
+            <h2 class="section-title">🔧 技术细节</h2>
+            <div class="demo-box">
+                <div style="display: grid; gap: 16px; font-size: 13px; color: #64748b; line-height: 1.7;">
+                    <div>
+                        <strong style="color: #1e293b;">玻璃态实现：</strong><br>
+                        <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">backdrop-filter: blur(20px)</code> + 
+                        <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">rgba 半透明</code> + 
+                        <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">border: rgba(0,0,0,0.08)</code>
+                    </div>
+                    <div>
+                        <strong style="color: #1e293b;">微交互缓动：</strong><br>
+                        使用 <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">cubic-bezier(0.34, 1.56, 0.64, 1)</code>（自定义高阶缓动），200ms-300ms 过渡时间
+                    </div>
+                    <div>
+                        <strong style="color: #1e293b;">渐变配色：</strong><br>
+                        <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">linear-gradient(135deg, color1, color2)</code> 主渐变 + 
+                        <code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">radial-gradient</code> 隐藏渐变增加层次
+                    </div>
+                    <div>
+                        <strong style="color: #1e293b;">动画效果：</strong><br>
+                        脉冲：<code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">1.8s cubic-bezier</code> |
+                        旋转：<code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">1.2s linear infinite</code> |
+                        上升：<code style="background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;">translateY(-2px ~ -3px)</code>
+                    </div>
+                    <div>
+                        <strong style="color: #1e293b;">响应式设计：</strong><br>
+                        1024px 及以下：竖排布局、全宽按钮 | 768px 及以下：单列、简洁排列
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 48px; padding-top: 32px; border-top: 1px solid rgba(0,0,0,0.06);">
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 8px;">✅ 新设计已部署在生产环境</p>
+            <p style="font-size: 13px; color: #94a3b8;">访问 http://localhost:9003 查看实时效果</p>
+        </div>
+    </div>
+</body>
+</html>
