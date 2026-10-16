@@ -5,7 +5,14 @@ import { reactive, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
 const markdown = ref('# 可编辑 Markdown\n\n输入内容可同步到 **受控模型**。\n\n```ts\nconst editor = "theme aware"\n```')
-const readOnlyMarkdown = '# 只读预览\n\n使用同一编辑器的只读模式展示 Markdown。'
+const readOnlyMarkdown = [
+  '# 只读预览',
+  '',
+  '使用同一编辑器的只读模式展示 Markdown，正文按主题渲染，不接受编辑。',
+  '',
+  '- 版本 3 已于 2026-09-30 发布',
+  '- 下一次发布前内容保持锁定',
+].join('\n')
 const json = ref('{"name":"YuDream","enabled":true}')
 const jsonEditor = ref<YdCodeEditorInstance | null>(null)
 const codeSample = 'const theme = "yd"\nconsole.log(theme)'
@@ -38,7 +45,7 @@ const editorRules = { required: true, message: '请填写内容', trigger: 'blur
         模型字符数：{{ formModel.markdown.length }}
       </p>
     </DemoCard>
-    <DemoCard title="只读与错误状态" description="展示只读预览、主题和可访问的错误关联。">
+    <DemoCard title="只读与错误状态" description="展示只读预览、主题和可访问的错误关联；只读内容不可在此修复，错误以提示条呈现，不套红色输入框。" >
       <YdMarkdownEditor :model-value="readOnlyMarkdown" readonly error="此内容由发布流程锁定。" aria-label="锁定的 Markdown 内容" height="260px" />
     </DemoCard>
     <DemoCard title="Monaco 代码编辑器" description="JSON、HTML、CSS、JavaScript 语法、补全、只读状态和实例格式化方法。">

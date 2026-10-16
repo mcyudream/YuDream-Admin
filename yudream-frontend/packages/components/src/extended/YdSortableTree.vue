@@ -36,6 +36,8 @@ const expandedKeys = defineModel<string[]>('expandedKeys', { default: () => [] }
 const root = ref<HTMLElement | null>(null)
 const focusedKey = ref('')
 const draggingKey = ref('')
+/** 当前可接受的落点提案：只影响视觉，提交仍走 drop 事件的受控契约 */
+const dropTarget = ref<{ key: string, position: YdSortableTreeDropPosition } | undefined>()
 const loadingKeys = ref<string[]>([])
 const loadedChildren = ref(new Map<string, NodeData[]>())
 let initializedExpansion = false
@@ -185,7 +187,10 @@ function resolveCandidate(dragKey: string, dropKey: string, position: YdSortable
 
 function commitDrop(event: YdSortableTreeDropEvent) {
   emit('drop', event)
-  focusedKey.value = event.dragKey
+  dropTarget.value = undefined
+  draggingKey.value = ''
+  // 让焦点跟随被移动的节点，键盘重排后仍能继续操作
+  focusNode(event.dragKey)
 }
 
 function siblingsFor(key: string): NodeData[] | undefined {
@@ -339,17 +344,31 @@ function dropPosition(event: DragEvent): YdSortableTreeDropPosition {
   return ratio < 0.25 ? -1 : ratio > 0.75 ? 1 : 0
 }
 
+/** 落点提示只在提案变化时写入，避免每个 dragover 事件都触发整树重渲染 */
+function setDropTarget(next?: { key: string, position: YdSortableTreeDropPosition }) {
+  const current = dropTarget.value
+  if (current?.key === next?.key && current?.position === next?.position) {
+    return
+  }
+  dropTarget.value = next
+}
+
 function onDragOver(node: NodeData, event: DragEvent) {
   if (!draggingKey.value) {
     return
   }
-  const candidate = resolveCandidate(draggingKey.value, node.key, dropPosition(event), 'pointer', false)
+  const position = dropPosition(event)
+  const candidate = resolveCandidate(draggingKey.value, node.key, position, 'pointer', false)
   if (candidate) {
     event.preventDefault()
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move'
     }
+    setDropTarget({ key: node.key, position })
+    return
   }
+  // 不可接受的落点不劫持 dragover：浏览器自身给出禁止光标
+  setDropTarget(undefined)
 }
 
 function onDrop(node: NodeData, event: DragEvent) {
@@ -358,12 +377,14 @@ function onDrop(node: NodeData, event: DragEvent) {
   const candidate = key ? resolveCandidate(key, node.key, dropPosition(event), 'pointer') : undefined
   if (candidate) {
     commitDrop(candidate)
+    return
   }
-  draggingKey.value = ''
+  clearDragging()
 }
 
 function clearDragging() {
   draggingKey.value = ''
+  dropTarget.value = undefined
 }
 
 defineExpose({
@@ -392,6 +413,9 @@ onBeforeUnmount(() => {
         :expanded-keys="expandedKeys"
         :draggable="draggable && !disabled"
         :loading-keys="loadingKeys"
+        :drop-key="dropTarget?.key"
+        :drop-position="dropTarget?.position"
+        :dragging-key="draggingKey"
         @select="selectNode"
         @toggle="toggleNode"
         @drag-start="onDragStart"
@@ -415,22 +439,106 @@ onBeforeUnmount(() => {
 
 <style>
 .yd-sortable-tree { min-width: 0; color: var(--color-text-1); }
-.yd-sortable-tree--disabled { opacity: .65; }
+.yd-sortable-tree--disabled { opacity: 0.65; }
+
 .yd-sortable-tree__list,
-.yd-sortable-tree__group { margin: 0; padding: 0; list-style: none; }
-.yd-sortable-tree__row { display: flex; min-height: 34px; align-items: center; gap: 6px; border-radius: 5px; outline: none; cursor: pointer; user-select: none; }
-.yd-sortable-tree__row:hover { background: var(--color-fill-1); }
+.yd-sortable-tree__group { padding: 0; margin: 0; list-style: none; }
+
+.yd-sortable-tree__row {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 30px;
+  padding-inline: 6px;
+  margin-block: 1px;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  border-radius: calc(var(--yd-control-radius) - 4px);
+  transition:
+    background var(--yd-motion-duration-fast) var(--yd-motion-ease),
+    box-shadow var(--yd-motion-duration-fast) var(--yd-motion-ease);
+}
+
+.yd-sortable-tree__row:hover { background: var(--color-fill-2); }
 .yd-sortable-tree__row:focus-visible { outline: 2px solid rgb(var(--primary-6)); outline-offset: -2px; }
-.yd-sortable-tree__row--selected { background: var(--color-fill-2); color: rgb(var(--primary-6)); }
+
+/* 选中与落点沿用 Arco 调色板蓝色（宿主树选择态同色），alpha 用 color-mix 合成 */
+.yd-sortable-tree__row--selected {
+  color: rgb(var(--primary-6));
+  background: color-mix(in srgb, rgb(var(--primary-6)) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, rgb(var(--primary-6)) 26%, transparent);
+}
 .yd-sortable-tree__row--disabled { color: var(--color-text-3); cursor: not-allowed; }
 .yd-sortable-tree__row[draggable="true"] { cursor: grab; }
 .yd-sortable-tree__row[draggable="true"]:active { cursor: grabbing; }
-.yd-sortable-tree__indent { width: calc(var(--yd-tree-depth) * 18px); flex: 0 0 auto; }
-.yd-sortable-tree__chevron { display: inline-grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; color: var(--color-text-3); }
-.yd-sortable-tree__chevron > span:not(.yd-sortable-tree__spinner) { font-size: 18px; transition: transform 120ms ease; }
-.yd-sortable-tree__chevron--open > span:not(.yd-sortable-tree__spinner) { transform: rotate(90deg); }
-.yd-sortable-tree__title { min-width: 0; flex: 1; }
-.yd-sortable-tree__empty { padding: 12px; color: var(--color-text-3); text-align: center; }
-.yd-sortable-tree__spinner { width: 12px; height: 12px; border: 2px solid var(--color-border-2); border-top-color: rgb(var(--primary-6)); border-radius: 50%; animation: yd-sortable-tree-spin .8s linear infinite; }
+.yd-sortable-tree__row--dragging { opacity: 0.45; }
+
+/* 层级缩进同时画出参考线，父子关系不靠对齐猜测 */
+.yd-sortable-tree__indent {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: calc(var(--yd-tree-depth) * 18px);
+  background-image: repeating-linear-gradient(to right, var(--color-fill-3) 0 1px, transparent 1px 18px);
+  background-position: 9px 0;
+}
+
+.yd-sortable-tree__chevron { display: inline-grid; flex: 0 0 16px; place-items: center; width: 16px; height: 16px; }
+
+.yd-sortable-tree__toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: var(--color-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.yd-sortable-tree__row:hover .yd-sortable-tree__toggle { color: var(--color-text-1); }
+
+.yd-sortable-tree__toggle > i { font-size: 14px; transition: transform var(--yd-motion-duration-fast) var(--yd-motion-ease); }
+.yd-sortable-tree__toggle--open { transform: rotate(90deg); }
+
+.yd-sortable-tree__leading { display: inline-grid; flex: 0 0 16px; place-items: center; width: 16px; height: 16px; font-size: 15px; color: var(--color-text-3); }
+.yd-sortable-tree__row:hover .yd-sortable-tree__leading { color: var(--color-text-2); }
+.yd-sortable-tree__row--disabled .yd-sortable-tree__leading { opacity: 0.6; }
+
+.yd-sortable-tree__title { flex: 1; min-width: 0; }
+
+.yd-sortable-tree__grip { display: inline-grid; flex: 0 0 16px; place-items: center; width: 16px; height: 16px; font-size: 14px; color: var(--color-text-3); opacity: 0; transition: opacity var(--yd-motion-duration-fast) var(--yd-motion-ease); }
+.yd-sortable-tree__row:hover .yd-sortable-tree__grip { opacity: 0.8; }
+.yd-sortable-tree__row--selected .yd-sortable-tree__grip { opacity: 0.8; }
+
+/* 选中行里的图标和折叠箭头跟随行色，不再停在灰色 */
+.yd-sortable-tree__row--selected :is(.yd-sortable-tree__leading, .yd-sortable-tree__grip, .yd-sortable-tree__toggle) { color: currentcolor; }
+
+/* 落点提示：同级插在行前/行后画线，落入节点用整行高亮 */
+.yd-sortable-tree__row--drop-before::before,
+.yd-sortable-tree__row--drop-after::after {
+  position: absolute;
+  inset-inline: calc(var(--yd-tree-depth) * 18px + 34px) 6px;
+  z-index: 1;
+  height: 2px;
+  content: "";
+  background: rgb(var(--primary-6));
+  border-radius: 999px;
+}
+
+.yd-sortable-tree__row--drop-before::before { top: -2px; }
+.yd-sortable-tree__row--drop-after::after { bottom: -2px; }
+
+.yd-sortable-tree__row--drop-into {
+  background: color-mix(in srgb, rgb(var(--primary-6)) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, rgb(var(--primary-6)) 55%, transparent);
+}
+
+.yd-sortable-tree__empty { padding: 16px 12px; color: var(--color-text-3); text-align: center; }
+.yd-sortable-tree__spinner { width: 12px; height: 12px; border: 2px solid var(--color-border-2); border-top-color: rgb(var(--primary-6)); border-radius: 50%; animation: yd-sortable-tree-spin 0.8s linear infinite; }
+
 @keyframes yd-sortable-tree-spin { to { transform: rotate(360deg); } }
 </style>

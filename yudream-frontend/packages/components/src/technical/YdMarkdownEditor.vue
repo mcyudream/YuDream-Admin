@@ -3,6 +3,7 @@ import type { ExposeParam, HeadList } from 'md-editor-v3'
 import type { YdMarkdownHeading, YdMarkdownImage, YdMarkdownImageUploadHandler, YdMarkdownInsert, YdMarkdownLinkClick, YdMarkdownToolbar } from './markdown-editor.types'
 import { MdEditor, MdPreview } from 'md-editor-v3'
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import Icon from '../basic/icon/index.vue'
 import { resolveYdEditorFieldAttrs } from './code-editor-model'
 import { createYdMarkdownUploadCallback, createYdMarkdownUploadLifecycle } from './markdown-editor-lifecycle'
 import { resolveYdMarkdownEditorTheme } from './markdown-editor.types'
@@ -66,6 +67,8 @@ const editorValue = computed({
 const fieldAttrs = computed(() => resolveYdEditorFieldAttrs({ id: props.id, invalid: props.ariaInvalid, describedby: props.ariaDescribedby, error: props.error }))
 const errorId = computed(() => props.id ? `${props.id}-error` : undefined)
 const isReadOnly = computed(() => props.readonly || props.disabled)
+/** 只读内容不是可修复的输入：错误以提示呈现，不用红色输入框语义 */
+const showInvalidFrame = computed(() => Boolean(props.error) && !isReadOnly.value)
 const mdEditorId = `yd-markdown-editor-${useId()}`
 function editorInput() {
   return root.value?.querySelector<HTMLElement>('.md-editor-input, [contenteditable="true"], textarea, [role="textbox"]')
@@ -218,63 +221,91 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="root"
-    @click.capture="handlePreviewClick"
-    class="yd-markdown-editor"
-    :class="{ 'yd-markdown-editor--disabled': disabled, 'yd-markdown-editor--invalid': Boolean(error) }"
-    :style="isReadOnly ? { minHeight: height } : undefined"
-  >
-    <MdPreview
-      v-if="isReadOnly"
-      :model-value="modelValue"
-      :language="language"
-      :preview-theme="previewTheme"
-      :code-theme="codeTheme"
-      :id="mdEditorId"
-      :theme="resolveYdMarkdownEditorTheme(darkMode)"
-      :sanitize="sanitizeYdMarkdownHtml"
-      no-img-zoom-in
-      :style="{ minHeight: height }"
-      @click="disabled ? $event.preventDefault() : undefined"
-    />
-    <MdEditor
-      v-else
-      ref="editor"
-      v-model="editorValue"
-      :language="language"
-      :preview-theme="previewTheme"
-      :code-theme="codeTheme"
-      :id="mdEditorId"
-      :theme="resolveYdMarkdownEditorTheme(darkMode)"
-      :placeholder="placeholder"
-      :style="{ height }"
-      :sanitize="sanitizeYdMarkdownHtml"
-      :toolbars="toolbars"
-      :toolbars-exclude="toolbarsExclude"
-      :show-toolbar-name="showToolbarName"
-      :catalog-layout="catalogLayout"
-      :catalog-max-depth="catalogMaxDepth"
-      @on-get-catalog="handleCatalogChange"
-      @on-save="value => emit('save', value)"
-      @on-upload-img="handleUploadImage"
-    />
-    <p v-if="error" :id="errorId" class="yd-markdown-editor__error" role="alert">
-      {{ error }}
+  <div class="yd-markdown-editor-shell">
+    <div
+      ref="root"
+      @click.capture="handlePreviewClick"
+      class="yd-markdown-editor"
+      :class="{
+        'yd-markdown-editor--disabled': disabled,
+        'yd-markdown-editor--readonly': isReadOnly,
+        'yd-markdown-editor--invalid': showInvalidFrame,
+      }"
+      :style="isReadOnly ? { minHeight: height } : undefined"
+    >
+      <MdPreview
+        v-if="isReadOnly"
+        :model-value="modelValue"
+        :language="language"
+        :preview-theme="previewTheme"
+        :code-theme="codeTheme"
+        :id="mdEditorId"
+        :theme="resolveYdMarkdownEditorTheme(darkMode)"
+        :sanitize="sanitizeYdMarkdownHtml"
+        no-img-zoom-in
+        :style="{ minHeight: height }"
+        @click="disabled ? $event.preventDefault() : undefined"
+      />
+      <MdEditor
+        v-else
+        ref="editor"
+        v-model="editorValue"
+        :language="language"
+        :preview-theme="previewTheme"
+        :code-theme="codeTheme"
+        :id="mdEditorId"
+        :theme="resolveYdMarkdownEditorTheme(darkMode)"
+        :placeholder="placeholder"
+        :style="{ height }"
+        :sanitize="sanitizeYdMarkdownHtml"
+        :toolbars="toolbars"
+        :toolbars-exclude="toolbarsExclude"
+        :show-toolbar-name="showToolbarName"
+        :catalog-layout="catalogLayout"
+        :catalog-max-depth="catalogMaxDepth"
+        @on-get-catalog="handleCatalogChange"
+        @on-save="value => emit('save', value)"
+        @on-upload-img="handleUploadImage"
+      />
+    </div>
+    <p
+      v-if="error"
+      :id="errorId"
+      class="yd-markdown-editor__error"
+      :class="isReadOnly ? 'yd-markdown-editor__error--notice' : ''"
+      role="alert"
+    >
+      <Icon name="morph:circle-alert" class="yd-markdown-editor__error-icon" />
+      <span>{{ error }}</span>
     </p>
   </div>
 </template>
 
 <style>
+/* 错误提示放在编辑区域之外，边框只包住内容本身（与 YdCodeEditor 同构） */
+.yd-markdown-editor-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .yd-markdown-editor {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: var(--yd-control-radius);
   background: var(--color-bg-2);
 }
 
 .yd-markdown-editor:focus-within {
   border-color: rgb(var(--primary-6));
+}
+
+.yd-markdown-editor--readonly:focus-within {
+  border-color: var(--color-border-2);
 }
 
 .yd-markdown-editor--disabled {
@@ -297,6 +328,16 @@ onBeforeUnmount(() => {
 .yd-markdown-editor .md-editor-input,
 .yd-markdown-editor .md-editor-preview-wrapper {
   background: var(--color-bg-1);
+}
+
+/* 只读模式是阅读区域而非输入框：恢复被 previewOnly 抹掉的正文内边距，内容不贴边框 */
+.yd-markdown-editor--readonly .md-editor-preview {
+  padding: 14px 18px;
+}
+
+/* 应用层 reset 清掉了列表标记，渲染出的 Markdown 会读成断行；任务列表标记仍由主题自己收起 */
+.yd-markdown-editor .md-editor-preview :is(ul, ol) {
+  list-style: revert;
 }
 
 .yd-markdown-editor .md-editor-code {
@@ -340,15 +381,43 @@ onBeforeUnmount(() => {
 }
 
 .yd-markdown-editor__error {
-  margin: 0;
-  padding: 0 10px 8px;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 6px 0 0;
   color: rgb(var(--danger-6));
   font-size: 12px;
+  line-height: 1.6;
+}
+
+.yd-markdown-editor__error-icon {
+  flex: none;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+/* 只读内容无法在这里修复：改成说明性提示，不再是「输入框校验失败」 */
+.yd-markdown-editor__error--notice {
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--yd-status-danger) 8%, var(--color-bg-1));
+  border-radius: var(--yd-control-radius);
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.yd-markdown-editor__error--notice .yd-markdown-editor__error-icon {
+  margin-top: 1px;
+  color: var(--yd-status-danger);
+  font-size: 14px;
 }
 
 @media (max-width: 1100px) {
   .yd-markdown-editor .md-editor {
     min-height: 360px;
+  }
+
+  .yd-markdown-editor--readonly .md-editor {
+    min-height: 0;
   }
 }
 </style>

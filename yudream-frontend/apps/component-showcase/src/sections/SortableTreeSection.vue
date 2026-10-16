@@ -65,9 +65,11 @@ async function loadChildren(node: YdSortableTreeNode): Promise<YdSortableTreeNod
             <template #title="{ node, depth, loading }">
               <span class="sortable-title">
                 <strong>{{ node.label }}</strong>
-                <code>{{ node.key }}</code>
-                <span v-if="loading" class="muted">加载中</span>
-                <span class="muted">L{{ depth }}</span>
+                <span class="sortable-key">{{ node.key }}</span>
+                <span class="sortable-meta">
+                  <span v-if="loading" class="sortable-badge">加载中</span>
+                  <span class="sortable-badge">L{{ depth }}</span>
+                </span>
               </span>
             </template>
           </YdSortableTree>
@@ -109,12 +111,15 @@ async function loadChildren(node: YdSortableTreeNode): Promise<YdSortableTreeNod
 .summary-stats span,
 .summary-note { color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
 .summary-note { margin: 0; }
-.sortable-title { display: flex; min-width: 0; align-items: center; gap: 8px; }
-.sortable-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sortable-title code,
-.muted,
-.sortable-feedback { color: var(--color-text-3); font-size: 12px; }
-.sortable-event { overflow: auto; max-height: 180px; margin-top: 12px; padding: 10px; border-radius: 6px; background: var(--color-fill-1); color: var(--color-text-2); font-size: 12px; }
+
+/* 标题槽位：名称与 key 在左，层级/加载等元数据靠右成列 */
+.sortable-title { display: flex; flex: 1; gap: 8px; align-items: center; min-width: 0; }
+.sortable-title strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.sortable-key { overflow: hidden; color: var(--color-text-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.sortable-meta { display: flex; flex: none; gap: 6px; align-items: center; padding-inline-start: 12px; margin-inline-start: auto; }
+.sortable-badge { color: var(--color-text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.sortable-feedback { color: var(--color-text-3); font-size: 12px; margin: 0; }
+.sortable-event { overflow: auto; max-height: 180px; padding: 10px; margin-top: 12px; background: var(--color-bg-1); border-radius: 6px; color: var(--color-text-2); font-size: 12px; }
 
 @media (width <= 760px) {
   .sortable-layout { grid-template-columns: 1fr; }

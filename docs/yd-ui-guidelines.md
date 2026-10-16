@@ -107,7 +107,7 @@ ADMIN 主题插件在其声明式 `style.css` 中覆盖根变量，继承宿主�
 
 树的 `data` 使用 `{ key: string, label: string, children?, disabled? }`；选中、勾选和展开分别为 `selectedKeys`、`checkedKeys`、`expandedKeys` 三个模型。ID 不转为 Number。启用 `checkable` 默认按父子级联勾选；需要同时节点选中时显式设置 `selectable`。筛选保留命中节点的祖先，不能因搜索过滤而删除已有业务授权。
 
-`YdTree` 负责浏览、筛选与勾选；持久化重排使用独立的 `YdSortableTree`。它发出包含 drag/drop 节点、`dropPosition`、原/目标父级与深度的受控提案，拒绝禁用节点、自身子树环及 `maxDepth` 超限，支持 Alt + 方向键重排和类型化的 `loadChildren`。父级要应用并保存 `drop` 提案；组件不直接修改传入 `data`。`YdSortableTree` 当前不提供虚拟列表或 Arco `fieldNames` 兼容透传。`YdCascader` 当前也是单值；若需要多路径或多选，应先封装相应契约。
+`YdTree` 负责浏览、筛选与勾选；持久化重排使用独立的 `YdSortableTree`。它发出包含 drag/drop 节点、`dropPosition`、原/目标父级与深度的受控提案，拒绝禁用节点、自身子树环及 `maxDepth` 超限，支持 Alt + 方向键重排和类型化的 `loadChildren`。父级要应用并保存 `drop` 提案；组件不直接修改传入 `data`。拖拽过程给出落点提示（落在行前/行内/行后），不可接受的落点不给提示并由浏览器显示禁止状态；节点行带头部折叠箭头、层级缩进参考线与分支/叶子图标。`YdSortableTree` 当前不提供虚拟列表或 Arco `fieldNames` 兼容透传。`YdCascader` 当前也是单值；若需要多路径或多选，应先封装相应契约。
 
 流程图与关系网络使用场景不同：`YdWorkflowCanvas` 承载工作流编辑器，节点/边由调用方受控，事件只暴露 ID 与连接端点，节点 renderer 插槽使用 `#node-{type}`，连接点用 `YdWorkflowHandle`。它的 ref facade 提供画布坐标、增删改节点边和视口适配方法；`readonly` 保留查看/选择，关闭节点拖动和连线，`disabled` 冻结画布交互。技术引擎由 YD 组件在卸载时清理，业务页面不得直接导入 VueFlow 或其类型。`YdGraphCanvas` 继续用于一般关系/知识图，不替代可编辑工作流。
 
@@ -249,6 +249,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 - `YdMockupBrowser` 地址输入、前后退、刷新只更新本地 `v-model:url` 和事件；`YdMockupWindow` 的最小化/最大化/关闭通过 `v-model` 状态表达，不访问外网或操作系统窗口。
 - `YdMockupBrowser` 地址输入、前后退、刷新只更新本地 `v-model:url` 和事件；`YdMockupWindow` 的最小化/最大化/关闭通过 `v-model` 状态表达，不访问外网或操作系统窗口。
 - `YdCode` 保持高亮、复制与 `lineNumbers`；新增 `prefixes` 可为每行提供终端提示符或结果标记。
+- `YdMarkdownEditor` 的只读模式是阅读区域而不是输入控件：正文内边距与列表标记由组件补回（应用层 reset 会清掉 `list-style`），内容不贴边框；只读内容不能就地修复，此时 `error` 以提示条呈现在编辑区域之外，不给只读区域套红色校验边框。可编辑状态的校验失败仍按表单约定用无效边框 + 下方错误文案表达。
 - `YdSteps` 的 `steps` 项可提供独立 `status` 与 `icon`，否则继续按 `v-model` 和全局 `status` 推导；`YdTimeline` 支持方向、紧凑布局、可选日期、图标及自定义 marker/content 插槽。
 - `YdSettingsLayout` 默认整块内容居中限宽（`align="center"`，`widthClass` 可覆盖），宽屏为左侧吸顶分区导航 + 右侧内容；窄屏**不**退化为横向标签，而是渲染分区选择器切换分区。宿主设置类页面统一用 `surface` 模式：页面根节点铺白底（`min-h-full bg-card`）、不再套 `YdPageMain` 卡片，分区导航吸顶、页面自身滚动；**保存类操作统一放 `YdPageHeader`**（多分区按当前分区切换按钮），分区内不再出现「页底保存」按钮，`#footer` 只留给对话框式确认。宿主设置类页面（系统设置、安全中心、主题配置、数据备份）统一由它承载分区；页面已有 `YdPageHeader` 时不再传 `title`/`description`，避免双标题。
 - `YdResponsiveEnhancedTable` 是 `YdEnhancedTable` 的响应式版本：窄屏按桌面可见列生成卡片，`#cell-{id}` 插槽与列的 `cell` 渲染函数在卡片中复用，可用 `cardHiddenColumns` 隐藏宽列；`actions` 支持函数 `label`（启用/停用）与行级 `visible`。**有行级管理操作的列表统一优先使用该组件：名称身份列固定左侧，内置唯一“操作”下拉列固定右侧；所有行级操作集中在 `actions`，危险动作仍必须进入现有确认流程。** 不再同时声明 `operation` 普通列或在移动卡片重复绘制同一组操作。`YdPagination`、筛选和加载状态仍由页面组合。只读列表可使用 `YdResponsiveTable`；必须完全自绘移动卡片时也可使用其 `#card`，但不能因此重复创建桌面/移动两套业务行为。

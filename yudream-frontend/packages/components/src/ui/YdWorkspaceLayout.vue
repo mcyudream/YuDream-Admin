@@ -12,7 +12,8 @@
  *    不会把侧栏宽度错套到主区；
  * 3. 窄屏：< 768px 退化为单面板，用下拉选择器在 侧栏 / 主区 / 属性栏 之间切换，
  *    活动栏变成顶部横向图标行，主操作仍留在 header 插槽里；
- * 4. 外壳自带背景与高度，页面直接放进路由内容区即可铺满，不依赖百分比高度链。
+ * 4. 外壳自带背景与高度：容器给了确定高度就铺满（`h-full`），页面直接放进路由内容区即可，
+ *    不依赖百分比高度链；容器高度为 auto 时退回按内容撑开。
  */
 import type { YdWorkspacePanelSize, YdWorkspaceRailItem, YdWorkspaceStatusItem } from './workspace-model'
 import { computed, ref, useSlots, watch } from 'vue'
@@ -142,7 +143,7 @@ const dragging = ref(false)
 
 <template>
   <div
-    :class="cn('yd-workspace flex w-full flex-col overflow-hidden bg-card', props.class)"
+    :class="cn('yd-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-card', props.class)"
     :aria-label="ariaLabel"
   >
     <div
@@ -153,7 +154,8 @@ const dragging = ref(false)
       <slot name="header" />
     </div>
 
-    <div class="yd-workspace__body flex flex-1 min-h-0">
+    <!-- 窄屏活动栏是横向图标行，body 必须同步改成纵列，否则它会被当成左栏拉满高度 -->
+    <div class="yd-workspace__body flex flex-1 min-h-0" :class="compact ? 'flex-col' : ''">
       <div
         v-if="hasRail"
         class="yd-workspace__rail border-border bg-muted/40 flex flex-shrink-0 gap-1 items-center"

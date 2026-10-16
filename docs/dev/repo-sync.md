@@ -39,3 +39,4 @@
 - `docs/yd-ui-guidelines.md` 设置页布局与响应式增强表格条目（YdSettingsLayout 居中/窄屏分区选择器、YdResponsiveEnhancedTable 卡片按 cell 渲染）：插件仓同名副本存在未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待插件仓 WIP 落定后重跑同步。
 - `docs/yd-ui-guidelines.md` 设置页保存按钮页头规范与 `YdSettingsLayout surface` 铺满白底（宿主设置页新约定），以及 YdMarkdownEditor 可控工具栏、内链插入和预览能力：插件仓同名副本存在未提交改动，先保留其 WIP，待落定后再一并 `pnpm sync:ui-docs`。
 - SPI 2.37.0 飞书云文档（含 Wiki 知识空间节点列表）与站点目录文件端口（`docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`、`AGENTS.md` 基线条目、`docs/plugin-system/specification.md` 第 11 节与 `docs/dev/plugin-system.md` 的对应条目 → 插件仓 `AGENTS.md`/`docs/dev/plugin-development.md` 引用与消费）：主仓只完成源码升版，未获发布授权，不得推 Nexus 或让插件仓消费；插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），待发布验签且 WIP 落定后同工作项同步，先保留其 WIP 不动。
+- `docs/yd-ui-guidelines.md` 的 `YdSortableTree` 拖拽落点提示与 `YdMarkdownEditor` 只读区域/错误呈现条目（本次宿主组件视觉细化）：插件仓同名副本仍有未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待其 WIP 落定后一并重跑同步。

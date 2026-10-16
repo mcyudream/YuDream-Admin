@@ -8,6 +8,7 @@ const toast = useYdToast()
 
 const fileList = ref<FileItem[]>([
   { name: '季度报告.pdf', size: 1_284_311, status: 'success' },
+  { name: '素材归档.zip', size: 24_576_000, status: 'error', file: new File(['demo'], '素材归档.zip') },
 ])
 
 const imageList = ref<string[]>([])
@@ -35,7 +36,7 @@ function extractUrl(url: string) {
 <template>
   <DemoCard
     title="YdFileUpload"
-    description="文件上传：拖拽 / 点击 / 粘贴，v-model 绑定 FileItem[]；httpRequest 自定义上传请求，max 控制数量，directory 支持文件夹"
+    description="文件上传：拖拽 / 点击 / 粘贴，v-model 绑定 FileItem[]；httpRequest 自定义上传请求，max 控制数量，directory 支持文件夹。列表为满宽行：类型图标 + 名称 + 大小/进度，失败行可重试。"
   >
     <div class="gap-6 grid max-w-xl">
       <YdFileUpload
