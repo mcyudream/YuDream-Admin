@@ -6,7 +6,14 @@
  * 两侧均未填写时为 `undefined`。适用于筛选栏的数值区间条件。
  */
 import type { HTMLAttributes } from 'vue'
-import FaNumberField from '../number-field/index.vue'
+import { cn } from '#utils'
+import {
+  NumberField,
+  NumberFieldContent,
+  NumberFieldDecrement,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '../number-field/number-field'
 
 defineOptions({ name: 'YdNumberRange' })
 
@@ -28,36 +35,46 @@ const props = withDefaults(defineProps<{
 const value = defineModel<(number | undefined)[] | undefined>()
 
 /** 单侧更新：合并另一侧的现值，两侧都空时回退为 undefined */
-function updateAt(index: 0 | 1, next: number | undefined) {
+function updateAt(index: 0 | 1, next: number | null | undefined) {
   const current = value.value ?? []
   const merged: (number | undefined)[] = [current[0], current[1]]
-  merged[index] = next
+  merged[index] = next ?? undefined
   value.value = merged[0] === undefined && merged[1] === undefined ? undefined : merged
 }
 </script>
 
 <template>
-  <div class="flex gap-2 w-full items-center" :class="props.class">
-    <FaNumberField
+  <div class="flex gap-2 w-full items-center" :class="cn(props.class)">
+    <NumberField
       class="flex-1 min-w-0 w-full"
-      :model-value="value?.[0]"
-      :placeholder="placeholder[0]"
+      :model-value="value?.[0] ?? null"
       :min="min"
       :max="max"
       :step="step"
       :disabled="disabled"
-      @update:model-value="(v: number | undefined) => updateAt(0, v)"
-    />
+      @update:model-value="(v: number | null) => updateAt(0, v)"
+    >
+      <NumberFieldContent>
+        <NumberFieldDecrement />
+        <NumberFieldInput :placeholder="placeholder[0]" />
+        <NumberFieldIncrement />
+      </NumberFieldContent>
+    </NumberField>
     <span class="text-sm text-muted-foreground shrink-0">{{ separator }}</span>
-    <FaNumberField
+    <NumberField
       class="flex-1 min-w-0 w-full"
-      :model-value="value?.[1]"
-      :placeholder="placeholder[1]"
+      :model-value="value?.[1] ?? null"
       :min="min"
       :max="max"
       :step="step"
       :disabled="disabled"
-      @update:model-value="(v: number | undefined) => updateAt(1, v)"
-    />
+      @update:model-value="(v: number | null) => updateAt(1, v)"
+    >
+      <NumberFieldContent>
+        <NumberFieldDecrement />
+        <NumberFieldInput :placeholder="placeholder[1]" />
+        <NumberFieldIncrement />
+      </NumberFieldContent>
+    </NumberField>
   </div>
 </template>

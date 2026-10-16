@@ -150,6 +150,7 @@ const hasToolbar = computed(() => {
             <YdButton
               v-for="(action, index) in visibleActions"
               :key="index"
+              :ref="action.ref"
               :variant="action.variant || 'default'"
               :disabled="action.disabled"
               @click="action.onClick"

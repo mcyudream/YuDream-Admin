@@ -32,6 +32,11 @@ export interface YdDynamicSearchFormProps {
   optionsSources?: SearchOptionsSource[]
   /** 是否显示操作按钮 */
   showActions?: boolean
+  /**
+   * 选项缓存重载键：值变化时清空选项缓存并重新加载。
+   * 用于选项依赖其他搜索字段的级联场景（如部门变化后角色选项要收敛）。
+   */
+  reloadKey?: string | number
 }
 
 // 表单数据
@@ -86,7 +91,10 @@ async function loadOptions(field: SearchFieldConfig) {
 
   try {
     const options = await source.loader()
-    optionsCache.value[field.optionsSource] = options
+    // 空结果不缓存：数据源可能因依赖数据未就绪而暂时为空
+    if (options.length) {
+      optionsCache.value[field.optionsSource] = options
+    }
   }
   catch (error) {
     console.error(`加载选项失败: ${field.optionsSource}`, error)
@@ -95,17 +103,17 @@ async function loadOptions(field: SearchFieldConfig) {
 
 // 获取字段的选项列表
 function getFieldOptions(field: SearchFieldConfig): SearchOption[] {
-  // Boolean类型的内置选项
-  if (field.fieldType === 'Boolean' || field.fieldType === 'boolean') {
-    return [
-      { label: '是', value: 1 }, // 用数字代替boolean
-      { label: '否', value: 0 },
-    ]
-  }
-
-  // 枚举类型(需要从optionsSource获取)
+  // 显式声明的数据源优先(枚举/外键都建议显式声明,以便提供业务文案)
   if (field.optionsSource) {
     return optionsCache.value[field.optionsSource] || []
+  }
+
+  // Boolean 未声明数据源时给内置是/否,值用字符串以便直接提交给后端
+  if (field.fieldType === 'Boolean' || field.fieldType === 'boolean') {
+    return [
+      { label: '是', value: 'true' },
+      { label: '否', value: 'false' },
+    ]
   }
 
   return []
@@ -165,6 +173,24 @@ watch(
   },
   { immediate: true },
 )
+
+/** 重载全部选项：清缓存后重新加载（级联场景由 reloadKey 触发） */
+function reloadOptions() {
+  optionsCache.value = {}
+  if (!props.config?.fields) {
+    return
+  }
+  props.config.fields.forEach((field) => {
+    if (field.optionsSource) {
+      loadOptions(field)
+    }
+  })
+}
+
+// 级联依赖变化：清空缓存重拉选项
+watch(() => props.reloadKey, () => {
+  reloadOptions()
+})
 
 onMounted(() => {
   // 初始加载所有选项

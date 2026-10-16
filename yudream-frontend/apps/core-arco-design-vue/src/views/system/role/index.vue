@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
-import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
+import type { PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
 import type { UserManageItem } from '@/api/modules/system-user'
-import { useYdModal, useYdToast } from '@yudream/components'
+import { useTablePage, useYdModal, useYdToast } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
 import apiRole, { ROLE_COLOR_PRESETS } from '@/api/modules/system-role'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
@@ -22,7 +23,7 @@ const modal = useYdModal()
 const toast = useYdToast()
 const router = useRouter()
 const { auth } = useAppAuth()
-const activeView = ref<string | number>('list')
+const activeView = ref('list')
 /** 视图切换用选择框：与页头按钮同高（都走 --yd-control-height），不用 tab 拼样式 */
 const viewOptions = [
   { value: 'list', label: '列表' },
@@ -42,13 +43,8 @@ const matrixSaving = ref(false)
 const operationBusy = ref(false)
 const matrixResults = ref<{ roleId: string, name: string, success: boolean, message: string }[]>([])
 
-const loading = ref(false)
-let rolesRequest = 0
-const rows = ref<RoleManageItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 const permissions = shallowRef<PermissionItem[]>([])
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string, deptId?: IdValue, status?: RoleStatus }>({ keyword: '' })
 
 const formVisible = ref(false)
 const editing = ref<RoleManageItem | null>(null)
@@ -77,6 +73,55 @@ const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ labe
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
 const roleUserColumn: UserColumn<RoleManageItem> = { nameKey: 'name', emailKey: 'code', header: '角色', width: 220 }
 
+/** 搜索选项数据源：部门从部门树展开，状态用本地词表 */
+const optionsSources: SearchOptionsSource[] = [
+  {
+    id: 'deptOptions',
+    loader: async () => {
+      const res = await apiDept.tree()
+      return flattenDepts(res.data).map(item => ({ label: item.name, value: item.id }))
+    },
+  },
+  { id: 'roleStatusOptions', loader: () => statusOptions },
+]
+
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+  invalidatePending,
+} = useTablePage<RoleManageItem>({
+  queryClass: 'online.yudream.base.application.system.user.query.RolePageQuery',
+  loadApi: async (query) => {
+    const res = await apiRole.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+      deptId: query.deptId || undefined,
+      status: query.status || undefined,
+    })
+    return {
+      // 保留原权限快照供原编辑流程使用，派生计数只作用于列表展示
+      records: res.data.records.map(row => ({
+        ...row,
+        permissionCount: row.permissions.filter(code => permissionCodeSet.value.has(code)).length,
+      })),
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+  autoLoad: false,
+})
+
 /** 代表色取色：接口返回的 hex 归一化后直接驱动色块与列表标识；未设置时用中性色。 */
 function roleAccentColor(color?: string) {
   return normalizeEntityColor(color)
@@ -95,6 +140,22 @@ const roleStatusColumn: StatusColumn<RoleManageItem> = {
     DEPRECATED: { label: '停用', variant: 'secondary' },
   },
 }
+
+/** 页头操作(仅列表视图):新增为主操作,导入导出类收进「更多」 */
+const listPageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:role:create')
+    ? [{ label: '新增角色', icon: 'i-ri:user-star-line', onClick: openCreate }]
+    : []),
+  ...(auth('system:role:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportRoles }]
+    : []),
+  ...(auth('system:role:import')
+    ? [
+        { label: '模板', icon: 'morph:download', variant: 'outline' as const, autoFold: true, onClick: downloadRoleTemplate },
+        { label: '导入', icon: 'morph:upload', variant: 'outline' as const, autoFold: true, onClick: importRoles },
+      ]
+    : []),
+])
 
 /** 行操作统一收进下拉 */
 const roleActions: ActionMenuItem<RoleManageItem>[] = [
@@ -115,7 +176,7 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
 
 onMounted(async () => {
   await loadOptions()
-  await loadRoles()
+  await load()
 })
 
 watch(activeView, (value) => {
@@ -154,7 +215,7 @@ async function loadOverview() {
 
 async function refreshViews() {
   await Promise.allSettled([
-    loadRoles(),
+    load(),
     ...(overview.value || activeView.value !== 'list' ? [loadOverview()] : []),
   ])
 }
@@ -186,9 +247,8 @@ function editOverviewRole(row: RoleManageItem) {
 
 function updateOverviewRole(role: RoleManageItem) {
   ++overviewRequest
-  ++rolesRequest
+  invalidatePending()
   overviewLoading.value = false
-  loading.value = false
   rows.value = rows.value.map(item => item.id === role.id
     ? { ...role, permissionCount: role.permissions.filter(code => permissionCodeSet.value.has(code)).length }
     : item)
@@ -309,41 +369,6 @@ async function loadOptions() {
   permissions.value = permissionRes.data
 }
 
-async function loadRoles() {
-  const request = ++rolesRequest
-  loading.value = true
-  try {
-    const res = await apiRole.page({
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-      deptId: search.deptId,
-      status: search.status,
-    })
-    if (request === rolesRequest) {
-      // 只让最新请求更新列表；保留原权限快照供原编辑流程使用。
-      rows.value = res.data.records.map(row => ({
-        ...row,
-        permissionCount: row.permissions.filter(code => permissionCodeSet.value.has(code)).length,
-      }))
-      pagination.total = res.data.total
-    }
-  }
-  finally {
-    if (request === rolesRequest) {
-      loading.value = false
-    }
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.deptId = undefined
-  search.status = undefined
-  pagination.page = 1
-  loadRoles()
-}
-
 function openCreate() {
   if (!canEditOriginal()) {
     return
@@ -419,26 +444,15 @@ function confirmEnable(row: RoleManageItem) {
   })
 }
 
-function onPageChange(page: number) {
-  pagination.page = page
-  loadRoles()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  loadRoles()
-}
-
 function flattenDepts(items: DeptManageItem[]): DeptManageItem[] {
   return items.flatMap(item => [item, ...flattenDepts(item.children || [])])
 }
 
 async function exportRoles() {
   const res = await apiExcel.exportRoles({
-    keyword: search.keyword || undefined,
-    deptId: search.deptId,
-    status: search.status,
+    keyword: searchQuery.keyword || undefined,
+    deptId: searchQuery.deptId || undefined,
+    status: searchQuery.status || undefined,
   })
   saveExcelResponse(res, '角色管理.xlsx')
 }
@@ -459,137 +473,125 @@ function importRoles() {
 
 <template>
   <div>
-    <YdPageHeader title="角色管理" description="配置角色权限，查看授权矩阵并追溯用户与菜单的关系。" main-class="flex-[1_1_240px]" class="mb-0">
-      <YdSelect v-model="activeView" :options="viewOptions" class="h-9 min-h-9 w-32" aria-label="视图切换" />
-      <YdButton v-if="activeView === 'list'" v-auth="'system:role:export'" variant="outline" @click="exportRoles">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-      <YdButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
-        <YdIcon name="morph:download" />
-        模板
-      </YdButton>
-      <YdButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="importRoles">
-        <YdIcon name="morph:upload" />
-        导入
-      </YdButton>
-      <YdButton v-auth="'system:role:create'" @click="openCreate">
-        <YdIcon name="i-ri:user-star-line" />
-        新增角色
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="角色管理"
+      :show-search="activeView === 'list'"
+      :actions="activeView === 'list' ? listPageActions : []"
+      :actions-threshold="3"
+    >
+      <!-- 视图切换：列表 / 矩阵 / 溯源 -->
+      <template #tabs>
+        <YdSegmented v-model="activeView" :options="viewOptions" aria-label="视图切换" />
+      </template>
 
-    <YdPageMain v-if="activeView === 'list'">
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1128px]"
+      <template #table>
+        <div v-show="activeView === 'list'">
+          <YdLoadingOverlay :loading="loading">
+            <YdResponsiveEnhancedTable
 
-          column-visibility stripe border
-          :user-column="roleUserColumn"
-          :status-column="roleStatusColumn"
-          :actions="roleActions"
-          :card-hidden-columns="['systemRole']"
-          :columns="tableColumns"
-          :data="rows"
-        >
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-                <YdInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
-                <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-                <div class="flex gap-2 col-end--1 justify-end">
-                  <YdButton variant="outline" @click="resetSearch">
-                    重置
-                  </YdButton>
-                  <YdButton @click="loadRoles">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
-                </div>
-              </div>
-            </YdSearchBar>
-          </template>
-          <template #cell-visual="{ row }">
-            <span class="role-chip" :style="entityTintStyle(row.original.color)">
-              <YdIcon v-if="row.original.icon" :name="row.original.icon" aria-hidden="true" />
-              <span v-else class="role-chip__dot" aria-hidden="true" />
-              <span class="sr-only">代表色：{{ roleAccentLabel(row.original.color) }}</span>
-            </span>
-          </template>
-          <template #cell-systemRole="{ row }">
-            <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
-              {{ row.original.systemRole ? '系统角色' : '自定义' }}
-            </YdTag>
-          </template>
-        </YdResponsiveEnhancedTable>
-      </YdLoadingOverlay>
+              row-key="id"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[1128px]"
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+              column-visibility stripe border
+              :user-column="roleUserColumn"
+              :status-column="roleStatusColumn"
+              :actions="roleActions"
+              :card-hidden-columns="['systemRole']"
+              :columns="tableColumns"
+              :data="rows"
+            >
+              <template #cell-visual="{ row }">
+                <span class="role-chip" :style="entityTintStyle(row.original.color)">
+                  <YdIcon v-if="row.original.icon" :name="row.original.icon" aria-hidden="true" />
+                  <span v-else class="role-chip__dot" aria-hidden="true" />
+                  <span class="sr-only">代表色：{{ roleAccentLabel(row.original.color) }}</span>
+                </span>
+              </template>
+              <template #cell-systemRole="{ row }">
+                <YdTag :variant="row.original.systemRole ? 'default' : 'secondary'">
+                  {{ row.original.systemRole ? '系统角色' : '自定义' }}
+                </YdTag>
+              </template>
+            </YdResponsiveEnhancedTable>
+          </YdLoadingOverlay>
 
-    <YdPageMain v-show="activeView !== 'list'">
-      <div v-if="overviewError" class="p-6 flex flex-wrap gap-3 items-center justify-between" role="alert">
-        <span>{{ overviewError }}</span>
-        <YdButton variant="outline" @click="loadOverview">
-          重试
-        </YdButton>
-      </div>
-      <PermissionMatrix
-        v-show="activeView === 'matrix' && !overviewError"
-        ref="matrixRef"
-        :roles="overview?.roles || []"
-        :permissions="overview?.permissions || []"
-        :loading="overviewLoading"
-        :saving="matrixSaving || operationBusy"
-        @edit-role="editOverviewRole"
-        @save-changes="saveMatrixChanges"
-        @dirty-change="matrixDirty = $event"
-        @inspect-permission="operationsRef?.inspectPermission($event)"
-      />
-      <div v-if="activeView === 'matrix' && matrixResults.length" class="p-4 border-t flex flex-col gap-2" aria-live="polite">
-        <p v-for="result in matrixResults" :key="result.roleId" class="text-sm flex flex-wrap gap-2 items-center">
-          <YdTag :variant="result.success ? 'secondary' : 'destructive'">
-            {{ result.success ? '成功' : '需复核' }}
-          </YdTag>
-          <span>{{ result.name }}：{{ result.message }}</span>
-        </p>
-        <p class="text-xs text-secondary-foreground/70">
-          各角色独立保存，失败项的草稿保留；发生冲突需刷新复核后重新选择。
-        </p>
-      </div>
-      <PermissionConstellation
-        v-if="activeView === 'trace' && overview && !overviewError"
-        :overview="overview"
-        :loading="overviewLoading"
-        :user-keyword="overviewQuery.userKeyword"
-        :user-unassigned-only="overviewQuery.userUnassignedOnly"
-        @edit-role="editOverviewRole"
-        @edit-user="editOverviewUser"
-        @edit-menu="editOverviewMenu"
-        @grant-permission="operationsRef?.grantPermission($event)"
-        @revoke-permission="(roleId, code) => operationsRef?.revokePermission(roleId, code)"
-        @assign-user-roles="operationsRef?.assignUserRoles($event)"
-        @inspect-permission="operationsRef?.inspectPermission($event)"
-        @user-page="pageOverviewUsers"
-        @user-search="searchOverviewUsers"
-        @user-unassigned="showUnassignedUsers"
-        @refresh="loadOverview"
-      />
-      <div v-if="activeView === 'trace' && !overview && !overviewError" class="p-16 text-center" role="status">
-        正在加载权限全景…
-      </div>
-    </YdPageMain>
+          <YdPagination
+            v-model:page="pagination.page"
+            v-model:size="pagination.size"
+            :total="pagination.total"
+            class="mt-3"
+            @page-change="onPageChange"
+            @size-change="onSizeChange"
+          />
+        </div>
+
+        <!-- 矩阵 / 溯源视图 -->
+        <div v-show="activeView !== 'list'">
+          <div v-if="overviewError" class="p-6 flex flex-wrap gap-3 items-center justify-between" role="alert">
+            <span>{{ overviewError }}</span>
+            <YdButton variant="outline" @click="loadOverview">
+              重试
+            </YdButton>
+          </div>
+          <PermissionMatrix
+            v-show="activeView === 'matrix' && !overviewError"
+            ref="matrixRef"
+            :roles="overview?.roles || []"
+            :permissions="overview?.permissions || []"
+            :loading="overviewLoading"
+            :saving="matrixSaving || operationBusy"
+            @edit-role="editOverviewRole"
+            @save-changes="saveMatrixChanges"
+            @dirty-change="matrixDirty = $event"
+            @inspect-permission="operationsRef?.inspectPermission($event)"
+          />
+          <div v-if="activeView === 'matrix' && matrixResults.length" class="p-4 border-t flex flex-col gap-2" aria-live="polite">
+            <p v-for="result in matrixResults" :key="result.roleId" class="text-sm flex flex-wrap gap-2 items-center">
+              <YdTag :variant="result.success ? 'secondary' : 'destructive'">
+                {{ result.success ? '成功' : '需复核' }}
+              </YdTag>
+              <span>{{ result.name }}：{{ result.message }}</span>
+            </p>
+            <p class="text-xs text-secondary-foreground/70">
+              各角色独立保存，失败项的草稿保留；发生冲突需刷新复核后重新选择。
+            </p>
+          </div>
+          <PermissionConstellation
+            v-if="activeView === 'trace' && overview && !overviewError"
+            :overview="overview"
+            :loading="overviewLoading"
+            :user-keyword="overviewQuery.userKeyword"
+            :user-unassigned-only="overviewQuery.userUnassignedOnly"
+            @edit-role="editOverviewRole"
+            @edit-user="editOverviewUser"
+            @edit-menu="editOverviewMenu"
+            @grant-permission="operationsRef?.grantPermission($event)"
+            @revoke-permission="(roleId, code) => operationsRef?.revokePermission(roleId, code)"
+            @assign-user-roles="operationsRef?.assignUserRoles($event)"
+            @inspect-permission="operationsRef?.inspectPermission($event)"
+            @user-page="pageOverviewUsers"
+            @user-search="searchOverviewUsers"
+            @user-unassigned="showUnassignedUsers"
+            @refresh="loadOverview"
+          />
+          <div v-if="activeView === 'trace' && !overview && !overviewError" class="p-16 text-center" role="status">
+            正在加载权限全景…
+          </div>
+        </div>
+      </template>
+    </YdTablePageLayout>
 
     <PermissionOperations
       ref="operationsRef"

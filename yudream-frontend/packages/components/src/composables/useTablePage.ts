@@ -39,6 +39,11 @@ export interface UseTablePageOptions<T, Q extends PageQuery> {
   optionsSources?: SearchOptionsSource[]
   /** 是否自动加载 */
   autoLoad?: boolean
+  /**
+   * 自定义搜索配置加载器；默认走组件库内置的 /api/search-config 请求。
+   * 宿主项目可注入自己的 HTTP 客户端（携带鉴权、统一错误处理）。
+   */
+  loadSearchConfig?: (queryClass: string) => Promise<SearchConfig>
 }
 
 /**
@@ -72,6 +77,7 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
     initialSize = 20,
     optionsSources = [],
     autoLoad = true,
+    loadSearchConfig: loadConfigApi,
   } = options
 
   // 加载状态
@@ -95,10 +101,21 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
   // 搜索配置
   const searchConfig = ref<SearchConfig>()
 
+  /** 请求序号：后发请求覆盖先发，页面也可主动作废在途响应（本地乐观更新前调用） */
+  let loadRequest = 0
+
+  /** 作废在途的数据请求：其响应到达时不再写入 rows/分页 */
+  function invalidatePending() {
+    loadRequest++
+    loading.value = false
+  }
+
   // 加载搜索配置
   async function loadSearchConfig() {
     try {
-      searchConfig.value = await getCachedSearchConfig(queryClass)
+      searchConfig.value = loadConfigApi
+        ? await loadConfigApi(queryClass)
+        : await getCachedSearchConfig(queryClass)
     }
     catch (error) {
       console.error('加载搜索配置失败:', error)
@@ -107,6 +124,7 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
 
   // 加载数据
   async function load() {
+    const request = ++loadRequest
     loading.value = true
     try {
       const query = {
@@ -117,18 +135,26 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
 
       const result = await loadApi(query)
 
+      if (request !== loadRequest) {
+        return
+      }
       rows.value = result.records
       pagination.total = result.total
       pagination.page = result.page
       pagination.size = result.size
     }
     catch (error) {
+      if (request !== loadRequest) {
+        return
+      }
       console.error('加载数据失败:', error)
       rows.value = []
       pagination.total = 0
     }
     finally {
-      loading.value = false
+      if (request === loadRequest) {
+        loading.value = false
+      }
     }
   }
 
@@ -207,5 +233,7 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
     onSizeChange,
     /** 刷新 */
     refresh,
+    /** 作废在途请求（本地乐观更新前调用，避免过期响应覆盖） */
+    invalidatePending,
   }
 }

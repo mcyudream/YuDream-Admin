@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, YdTablePageAction, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { DeptManageItem, DeptPayload, DeptStatus } from '@/api/modules/system-dept'
 import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
+import { useTablePage } from '@yudream/components'
 import apiDept, { DEPT_COLOR_PRESETS } from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
@@ -12,10 +14,49 @@ import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from
 
 const modal = useYdModal()
 const toast = useYdToast()
+const { auth } = useAppAuth()
 
-const loading = ref(false)
-const rows = ref<DeptManageItem[]>([])
-const search = reactive<{ keyword: string, status?: DeptStatus }>({ keyword: '' })
+/** 状态选项：搜索下拉与表单共用 */
+const statusOptions = [
+  { label: '启用', value: 'ACTIVE' },
+  { label: '停用', value: 'DEPRECATED' },
+]
+
+/** 搜索选项数据源：上级部门从部门树展开，状态用本地词表 */
+const optionsSources: SearchOptionsSource[] = [
+  {
+    id: 'parentDeptOptions',
+    loader: async () => {
+      const res = await apiDept.tree()
+      return flattenDepts(withBackendAvatars(res.data))
+        .map(item => ({ label: item.name, value: item.id }))
+    },
+  },
+  { id: 'deptStatusOptions', loader: () => statusOptions },
+]
+
+const {
+  loading,
+  rows,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+} = useTablePage<DeptManageItem>({
+  queryClass: 'online.yudream.base.application.system.user.query.DeptTreeQuery',
+  loadApi: async (query) => {
+    const res = await apiDept.tree({
+      keyword: query.keyword || undefined,
+      parentId: query.parentId || undefined,
+      status: query.status || undefined,
+    })
+    const tree = withBackendAvatars(res.data)
+    return { records: tree, total: tree.length, page: 1, size: tree.length || 1 }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
 const formVisible = ref(false)
 const editing = ref<DeptManageItem | null>(null)
 const formAvatar = ref('')
@@ -33,10 +74,6 @@ const form = reactive<DeptPayload>({
   status: 'ACTIVE',
 })
 
-const statusOptions = [
-  { label: '启用', value: 'ACTIVE' },
-  { label: '停用', value: 'DEPRECATED' },
-]
 const deptOptions = computed(() => flattenDepts(rows.value)
   .filter(item => String(item.id) !== String(editing.value?.id ?? ''))
   .map(item => ({ label: item.name, value: item.id })))
@@ -75,7 +112,6 @@ const sortOrderValue = computed({
     form.sortOrder = value
   },
 })
-const { auth } = useAppAuth()
 
 /** 部门身份列：上传头像优先，未上传时按名称关键词回退 Morphicons 图标（底色取部门主色）。 */
 function deptAvatarFallback(row: DeptManageItem) {
@@ -110,6 +146,22 @@ const deptActions: ActionMenuItem<DeptManageItem>[] = [
   { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status === 'ACTIVE' && auth('system:dept:delete'), disabled: row => Boolean(row.systemDept), onClick: confirmDisable },
 ]
 
+/** 页头操作：新增为主操作，导入导出类收进「更多」 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:dept:create')
+    ? [{ label: '新增部门', icon: 'morph:network', onClick: () => openCreate() }]
+    : []),
+  ...(auth('system:dept:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportDepts }]
+    : []),
+  ...(auth('system:dept:import')
+    ? [
+        { label: '模板', icon: 'morph:download', variant: 'outline' as const, autoFold: true, onClick: downloadDeptTemplate },
+        { label: '导入', icon: 'morph:upload', variant: 'outline' as const, autoFold: true, onClick: importDepts },
+      ]
+    : []),
+])
+
 const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { id: 'name', header: '部门名称', width: 220, fixed: 'left' },
   { accessorKey: 'leaderName', header: '负责人', width: 140 },
@@ -119,22 +171,6 @@ const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { accessorKey: 'description', header: '描述', minWidth: 220 },
 ])
 
-onMounted(loadTree)
-
-async function loadTree() {
-  loading.value = true
-  try {
-    const res = await apiDept.tree({
-      keyword: search.keyword || undefined,
-      status: search.status,
-    })
-    rows.value = withBackendAvatars(res.data)
-  }
-  finally {
-    loading.value = false
-  }
-}
-
 /** 后端返回 /api/files/... 相对地址，列表落地前统一补后端基址 */
 function withBackendAvatars(items: DeptManageItem[]): DeptManageItem[] {
   return items.map(item => ({
@@ -142,12 +178,6 @@ function withBackendAvatars(items: DeptManageItem[]): DeptManageItem[] {
     avatar: item.avatar ? toBackendAssetUrl(item.avatar) : undefined,
     children: item.children ? withBackendAvatars(item.children) : undefined,
   }))
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.status = undefined
-  loadTree()
 }
 
 function openCreate(parent?: DeptManageItem) {
@@ -191,7 +221,7 @@ async function saveForm() {
   }
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
-  await loadTree()
+  await load()
 }
 
 function pickDeptAvatar() {
@@ -214,7 +244,7 @@ async function uploadDeptAvatar(files: File[]) {
     formAvatar.value = avatar
     target.avatar = avatar
     toast.success('部门头像已更新')
-    await loadTree()
+    await load()
   }
   finally {
     avatarUploading.value = false
@@ -228,7 +258,7 @@ function confirmDisable(row: DeptManageItem) {
     onConfirm: async () => {
       await apiDept.disable(row.id)
       toast.success('停用成功')
-      await loadTree()
+      await load()
     },
   })
 }
@@ -240,7 +270,7 @@ function confirmEnable(row: DeptManageItem) {
     onConfirm: async () => {
       await apiDept.enable(row.id)
       toast.success('启用成功')
-      await loadTree()
+      await load()
     },
   })
 }
@@ -251,8 +281,8 @@ function flattenDepts(items: DeptManageItem[]): DeptManageItem[] {
 
 async function exportDepts() {
   const res = await apiExcel.exportDepts({
-    keyword: search.keyword || undefined,
-    status: search.status,
+    keyword: searchQuery.keyword || undefined,
+    status: searchQuery.status || undefined,
   })
   saveExcelResponse(res, '部门管理.xlsx')
 }
@@ -266,86 +296,67 @@ function importDepts() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importDepts(excelForm(file))
     toast.success(importResultMessage(res.data))
-    await loadTree()
+    await load()
   })
 }
 </script>
 
 <template>
   <div>
-    <YdPageHeader title="部门管理" class="mb-0">
-      <YdButton v-auth="'system:dept:export'" variant="outline" @click="exportDepts">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-      <YdButton v-auth="'system:dept:import'" variant="outline" @click="downloadDeptTemplate">
-        <YdIcon name="morph:download" />
-        模板
-      </YdButton>
-      <YdButton v-auth="'system:dept:import'" variant="outline" @click="importDepts">
-        <YdIcon name="morph:upload" />
-        导入
-      </YdButton>
-      <YdButton v-auth="'system:dept:create'" @click="openCreate()">
-        <YdIcon name="morph:network" />
-        新增部门
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="部门管理"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1120px]"
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1120px]"
 
-          column-visibility tree
-          :default-expanded="true"
-          :status-column="deptStatusColumn"
-          :actions="deptActions"
-          :card-hidden-columns="['systemDept', 'phone']"
-          :columns="tableColumns"
-          :data="rows"
-        >
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-                <YdInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
-                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-                <div class="flex gap-2 col-end--1 justify-end">
-                  <YdButton variant="outline" @click="resetSearch">
-                    重置
-                  </YdButton>
-                  <YdButton @click="loadTree">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
-                </div>
+            column-visibility tree
+            :default-expanded="true"
+            :status-column="deptStatusColumn"
+            :actions="deptActions"
+            :card-hidden-columns="['systemDept', 'phone']"
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #cell-name="{ row }">
+              <div class="flex gap-2 min-w-0 items-center">
+                <YdAvatar
+                  v-if="row.original.avatar"
+                  :src="row.original.avatar"
+                  :fallback="deptAvatarFallback(row.original)"
+                  :alt="row.original.name"
+                  class="shrink-0 size-9"
+                />
+                <span v-else class="dept-chip" :style="entityTintStyle(row.original.color)" aria-hidden="true">
+                  <YdIcon :name="deptFallbackIcon(row.original.name)" />
+                </span>
+                <span class="font-medium truncate">{{ row.original.name }}</span>
               </div>
-            </YdSearchBar>
-          </template>
-          <template #cell-name="{ row }">
-            <div class="flex gap-2 min-w-0 items-center">
-              <YdAvatar
-                v-if="row.original.avatar"
-                :src="row.original.avatar"
-                :fallback="deptAvatarFallback(row.original)"
-                :alt="row.original.name"
-                class="shrink-0 size-9"
-              />
-              <span v-else class="dept-chip" :style="entityTintStyle(row.original.color)" aria-hidden="true">
-                <YdIcon :name="deptFallbackIcon(row.original.name)" />
-              </span>
-              <span class="font-medium truncate">{{ row.original.name }}</span>
-            </div>
-          </template>
-          <template #cell-systemDept="{ row }">
-            <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
-              {{ row.original.systemDept ? '系统部门' : '普通部门' }}
-            </YdTag>
-          </template>
-        </ydresponsiveenhancedtable>
-      </ydloadingoverlay>
-    </YdPageMain>
+            </template>
+            <template #cell-systemDept="{ row }">
+              <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
+                {{ row.original.systemDept ? '系统部门' : '普通部门' }}
+              </YdTag>
+            </template>
+          </ydresponsiveenhancedtable>
+        </ydloadingoverlay>
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑部门' : '新增部门'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">

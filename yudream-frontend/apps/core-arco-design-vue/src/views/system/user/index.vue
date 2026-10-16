@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
 import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
-import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStatus, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
+import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
+import { useTablePage } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -23,18 +25,10 @@ const appAccountStore = useAppAccountStore()
 const assistantCreateUserRef = useAiAssistantAction('system:user:create', '新增用户', 'system:user:create')
 const assistantExportUsersRef = useAiAssistantAction('system:user:export', '导出用户', 'system:user:export')
 
-type EmailVerifiedFilter = 'true' | 'false'
-
-const loading = ref(false)
-const rows = ref<UserManageItem[]>([])
 const roles = ref<OptionItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 /** 角色名 → 代表色映射：用户列表按角色名渲染彩色标签（接口只给 roleNames）。 */
 const roleColorByName = shallowRef<Map<string, string>>(new Map())
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string, roleId?: IdValue, deptId?: IdValue, emailVerified?: EmailVerifiedFilter, status?: UserStatus }>({
-  keyword: '',
-})
 
 const formVisible = ref(false)
 const assignVisible = ref(false)
@@ -74,7 +68,66 @@ const roleOptions = computed(() => roles.value.map(item => ({
   label: item.deptName ? `${item.deptName} / ${item.label}` : item.label,
   value: item.id,
 })))
-const searchRoleOptions = computed(() => search.deptId == null ? roleOptions.value : roleOptionsByDept(search.deptId))
+
+const optionsReloadKey = ref(0)
+
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<UserManageItem>({
+  queryClass: 'online.yudream.base.application.system.user.query.UserPageQuery',
+  loadApi: async (query) => {
+    const res = await apiUser.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+      roleId: query.roleId || undefined,
+      deptId: query.deptId || undefined,
+      emailVerified: resolveEmailVerifiedFilter(query.emailVerified),
+      status: query.status || undefined,
+    })
+    return {
+      records: res.data.records.map(item => ({
+        ...item,
+        avatar: item.avatar ? toBackendAssetUrl(item.avatar) : item.avatar,
+        defaultDeptAvatar: item.defaultDeptAvatar ? toBackendAssetUrl(item.defaultDeptAvatar) : item.defaultDeptAvatar,
+      })),
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+  autoLoad: false,
+})
+
+/** 搜索选项数据源：部门/角色从接口拉取（角色按当前部门收敛），状态词表本地定义 */
+const optionsSources: SearchOptionsSource[] = [
+  {
+    id: 'deptOptions',
+    loader: async () => {
+      const res = await apiDept.tree()
+      return flattenDepts(res.data).map(item => ({ label: item.name, value: item.id }))
+    },
+  },
+  {
+    id: 'roleOptions',
+    loader: () => searchQuery.deptId == null
+      ? roleOptions.value
+      : roleOptionsByDept(searchQuery.deptId),
+  },
+  { id: 'emailVerifiedOptions', loader: () => emailVerifiedOptions },
+  { id: 'userStatusOptions', loader: () => statusOptions },
+]
+
 const defaultDeptOptions = computed(() => selectedDeptIds.value.map(id => ({
   label: deptOptions.value.find(item => sameId(item.value, id))?.label || String(id),
   value: id,
@@ -107,6 +160,22 @@ const userStatusColumn: StatusColumn<UserManageItem> = {
   },
 }
 
+/** 页头操作：新增为主操作，导入导出类收进「更多」；ref 供 AI 助手动作定位按钮 */
+const userPageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:user:create')
+    ? [{ label: '新增用户', icon: 'morph:user-plus', ref: assistantCreateUserRef, onClick: openCreate }]
+    : []),
+  ...(auth('system:user:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, ref: assistantExportUsersRef, onClick: exportUsers }]
+    : []),
+  ...(auth('system:user:import')
+    ? [
+        { label: '模板', icon: 'morph:download', variant: 'outline' as const, autoFold: true, onClick: downloadUserTemplate },
+        { label: '导入', icon: 'morph:upload', variant: 'outline' as const, autoFold: true, onClick: importUsers },
+      ]
+    : []),
+])
+
 /** 行操作统一收进下拉，按权限与行状态决定是否出现 */
 const userActions: ActionMenuItem<UserManageItem>[] = [
   { label: '编辑', icon: 'morph:pencil', visible: () => auth('system:user:edit'), onClick: openEdit },
@@ -128,8 +197,9 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
 ])
 
 onMounted(async () => {
-  await Promise.all([loadOptions(), loadUsers()])
+  await loadOptions()
   void loadRoleColors()
+  await load()
   await openLinkedUser()
 })
 
@@ -162,9 +232,11 @@ watch([selectedDeptIds, roles], () => {
   pruneSelectedRoleIdsByDepts()
 })
 
-watch(() => search.deptId, () => {
-  if (search.roleId != null && !searchRoleOptions.value.some(item => sameId(item.value, search.roleId))) {
-    search.roleId = undefined
+watch(() => searchQuery.deptId, () => {
+  // 角色选项按部门收敛：触发选项重载并清掉不再可选的已选角色
+  optionsReloadKey.value++
+  if (searchQuery.roleId != null && !roleOptionsByDept(searchQuery.deptId).some(item => sameId(item.value, searchQuery.roleId))) {
+    searchQuery.roleId = undefined
   }
 })
 
@@ -248,45 +320,11 @@ function deptChipFallback(deptId: IdValue, deptName?: string) {
   return name ? name.slice(0, 2) : '部门'
 }
 
-async function loadUsers() {
-  loading.value = true
-  try {
-    const res = await apiUser.page({
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-      roleId: search.roleId,
-      deptId: search.deptId,
-      emailVerified: resolveEmailVerifiedFilter(),
-      status: search.status,
-    })
-    rows.value = res.data.records.map(item => ({
-      ...item,
-      avatar: item.avatar ? toBackendAssetUrl(item.avatar) : item.avatar,
-      defaultDeptAvatar: item.defaultDeptAvatar ? toBackendAssetUrl(item.defaultDeptAvatar) : item.defaultDeptAvatar,
-    }))
-    pagination.total = res.data.total
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.roleId = undefined
-  search.deptId = undefined
-  search.emailVerified = undefined
-  search.status = undefined
-  pagination.page = 1
-  loadUsers()
-}
-
-function resolveEmailVerifiedFilter() {
-  if (search.emailVerified === 'true') {
+function resolveEmailVerifiedFilter(value?: string) {
+  if (value === 'true') {
     return true
   }
-  if (search.emailVerified === 'false') {
+  if (value === 'false') {
     return false
   }
   return undefined
@@ -358,7 +396,7 @@ async function saveForm() {
   }
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
-  await loadUsers()
+  await load()
 }
 
 function openAssign(row: UserManageItem, mode: 'roles' | 'depts') {
@@ -386,7 +424,7 @@ async function saveAssign() {
   }
   toast.success('分配成功')
   assignVisible.value = false
-  await loadUsers()
+  await load()
 }
 
 function canImpersonateRow(row: UserManageItem) {
@@ -415,7 +453,7 @@ function confirmDisable(row: UserManageItem) {
     onConfirm: async () => {
       await apiUser.disable(row.id)
       toast.success('停用成功')
-      await loadUsers()
+      await load()
     },
   })
 }
@@ -427,7 +465,7 @@ function confirmEnable(row: UserManageItem) {
     onConfirm: async () => {
       await apiUser.enable(row.id)
       toast.success('启用成功')
-      await loadUsers()
+      await load()
     },
   })
 }
@@ -454,17 +492,6 @@ async function savePassword() {
   await apiUser.changePassword(editing.value.id, passwordForm.password)
   toast.success('密码已修改')
   passwordVisible.value = false
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  loadUsers()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  loadUsers()
 }
 
 function buildDeptPayload(): UserDeptAssign[] {
@@ -585,11 +612,11 @@ function userTagVariant(tag: UserTagItem) {
 
 async function exportUsers() {
   const res = await apiExcel.exportUsers({
-    keyword: search.keyword || undefined,
-    roleId: search.roleId,
-    deptId: search.deptId,
-    emailVerified: resolveEmailVerifiedFilter(),
-    status: search.status,
+    keyword: searchQuery.keyword || undefined,
+    roleId: searchQuery.roleId || undefined,
+    deptId: searchQuery.deptId || undefined,
+    emailVerified: resolveEmailVerifiedFilter(searchQuery.emailVerified),
+    status: searchQuery.status || undefined,
   })
   saveExcelResponse(res, '用户管理.xlsx')
 }
@@ -603,143 +630,122 @@ function importUsers() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importUsers(excelForm(file))
     toast.success(importResultMessage(res.data))
-    await loadUsers()
+    await load()
   })
 }
 </script>
 
 <template>
   <div>
-    <YdPageHeader title="用户管理" class="mb-0">
-      <YdButton :ref="assistantExportUsersRef" v-auth="'system:user:export'" variant="outline" @click="exportUsers">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-      <YdButton v-auth="'system:user:import'" variant="outline" @click="downloadUserTemplate">
-        <YdIcon name="morph:download" />
-        模板
-      </YdButton>
-      <YdButton v-auth="'system:user:import'" variant="outline" @click="importUsers">
-        <YdIcon name="morph:upload" />
-        导入
-      </YdButton>
-      <YdButton :ref="assistantCreateUserRef" v-auth="'system:user:create'" @click="openCreate">
-        <YdIcon name="morph:user-plus" />
-        新增用户
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="用户管理"
+      :actions="userPageActions"
+      :actions-threshold="3"
+    >
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          :reload-key="optionsReloadKey"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1280px]"
-          column-visibility
-          :user-column="userColumn"
-          :status-column="userStatusColumn"
-          :actions="userActions"
-          :card-hidden-columns="['identities', 'fields']"
-          :columns="tableColumns"
-          :data="rows"
-        >
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
-                <YdInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
-                <YdSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-                <YdSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
-                <YdSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
-                <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-                <div class="flex gap-2 col-end--1 justify-end">
-                  <YdButton variant="outline" @click="resetSearch">
-                    重置
-                  </YdButton>
-                  <YdButton @click="loadUsers">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1280px]"
+            column-visibility
+            :user-column="userColumn"
+            :status-column="userStatusColumn"
+            :actions="userActions"
+            :card-hidden-columns="['identities', 'fields']"
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #cell-identities="{ row }">
+              <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1">
+                <div v-if="row.original.qq" class="flex gap-2">
+                  <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
+                  <span class="break-all">{{ row.original.qq }}</span>
+                </div>
+                <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+                  <span class="text-secondary-foreground/60 shrink-0">{{ protocolLabel(item.protocol) }}</span>
+                  <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
                 </div>
               </div>
-            </YdSearchBar>
-          </template>
-          <template #cell-identities="{ row }">
-            <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1">
-              <div v-if="row.original.qq" class="flex gap-2">
-                <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
-                <span class="break-all">{{ row.original.qq }}</span>
+              <span v-else>-</span>
+            </template>
+            <template #cell-fields="{ row }">
+              <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1">
+                <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
+                  <span class="text-secondary-foreground/60 shrink-0">{{ field.label }}</span>
+                  <span class="break-all">{{ field.value }}</span>
+                </div>
               </div>
-              <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
-                <span class="text-secondary-foreground/60 shrink-0">{{ protocolLabel(item.protocol) }}</span>
-                <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
+              <span v-else>-</span>
+            </template>
+            <template #cell-tags="{ row }">
+              <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
+                <YdTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+                  {{ tag.label }}
+                </YdTag>
               </div>
-            </div>
-            <span v-else>-</span>
-          </template>
-          <template #cell-fields="{ row }">
-            <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1">
-              <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
-                <span class="text-secondary-foreground/60 shrink-0">{{ field.label }}</span>
-                <span class="break-all">{{ field.value }}</span>
+              <span v-else>-</span>
+            </template>
+            <template #cell-deptNames="{ row }">
+              <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
+                <YdTag
+                  v-for="(deptId, index) in row.original.deptIds"
+                  :key="deptId"
+                  :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'"
+                >
+                  <YdAvatar
+                    v-if="deptAvatarOf(row.original, deptId)"
+                    :src="deptAvatarOf(row.original, deptId)"
+                    :fallback="deptChipFallback(deptId, row.original.deptNames?.[index])"
+                    :alt="row.original.deptNames?.[index] || deptId"
+                    class="shrink-0 size-4"
+                  />
+                  <span v-else class="dept-chip" :style="deptChipStyle(deptId)" aria-hidden="true">
+                    <YdIcon :name="deptChipIcon(deptId, row.original.deptNames?.[index])" />
+                  </span>
+                  {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
+                </YdTag>
               </div>
-            </div>
-            <span v-else>-</span>
-          </template>
-          <template #cell-tags="{ row }">
-            <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
-              <YdTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
-                {{ tag.label }}
+              <span v-else>-</span>
+            </template>
+            <template #cell-roleNames="{ row }">
+              <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1">
+                <YdTag v-for="name in row.original.roleNames" :key="name" :style="roleTagStyle(name)">
+                  {{ name }}
+                </YdTag>
+              </div>
+              <span v-else>-</span>
+            </template>
+            <template #cell-emailVerified="{ row }">
+              <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
+                {{ row.original.emailVerified ? '已验证' : '未验证' }}
               </YdTag>
-            </div>
-            <span v-else>-</span>
-          </template>
-          <template #cell-deptNames="{ row }">
-            <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
-              <YdTag
-                v-for="(deptId, index) in row.original.deptIds"
-                :key="deptId"
-                :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'"
-              >
-                <YdAvatar
-                  v-if="deptAvatarOf(row.original, deptId)"
-                  :src="deptAvatarOf(row.original, deptId)"
-                  :fallback="deptChipFallback(deptId, row.original.deptNames?.[index])"
-                  :alt="row.original.deptNames?.[index] || deptId"
-                  class="shrink-0 size-4"
-                />
-                <span v-else class="dept-chip" :style="deptChipStyle(deptId)" aria-hidden="true">
-                  <YdIcon :name="deptChipIcon(deptId, row.original.deptNames?.[index])" />
-                </span>
-                {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
-              </YdTag>
-            </div>
-            <span v-else>-</span>
-          </template>
-          <template #cell-roleNames="{ row }">
-            <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1">
-              <YdTag v-for="name in row.original.roleNames" :key="name" :style="roleTagStyle(name)">
-                {{ name }}
-              </YdTag>
-            </div>
-            <span v-else>-</span>
-          </template>
-          <template #cell-emailVerified="{ row }">
-            <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
-              {{ row.original.emailVerified ? '已验证' : '未验证' }}
-            </YdTag>
-          </template>
-        </YdResponsiveEnhancedTable>
-      </YdLoadingOverlay>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          class="mt-3"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑用户' : '新增用户'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">

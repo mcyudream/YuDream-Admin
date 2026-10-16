@@ -18,4 +18,6 @@ export interface YdTablePageAction {
   danger?: boolean
   /** 是否禁用 */
   disabled?: boolean
+  /** 模板 ref:供 AI 助手动作等需要 DOM 句柄的场景绑定按钮元素 */
+  ref?: (el: any) => void
 }
