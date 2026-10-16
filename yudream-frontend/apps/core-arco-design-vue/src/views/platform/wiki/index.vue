@@ -1,25 +1,49 @@
 <script setup lang="ts">
-import type {WikiNode, WikiSpace} from '@/api/modules/platform-wiki'
-import {computed, onMounted, provide, ref, shallowRef, watch} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {fetchWikiSpaces, fetchWikiTree, rebuildWikiIndex, saveWikiSpace, deleteWikiSpace} from '@/api/modules/platform-wiki'
-import WikiDirectoryPanel from './components/WikiDirectoryPanel.vue'
-import WikiGraphPanel from './components/WikiGraphPanel.vue'
-import WikiIngestPanel from './components/WikiIngestPanel.vue'
-import WikiLintPanel from './components/WikiLintPanel.vue'
-import WikiResearchPanel from './components/WikiResearchPanel.vue'
-import WikiReviewPanel from './components/WikiReviewPanel.vue'
-import WikiSearchPanel from './components/WikiSearchPanel.vue'
-import WikiSettingsPanel from './components/WikiSettingsPanel.vue'
-import WikiSourcesPanel from './components/WikiSourcesPanel.vue'
-import {flattenTree, wikiWorkbenchKey} from './wiki-utils'
+import type { LocationQuery } from 'vue-router'
+import type { WikiWorkbenchView } from './wiki-utils'
+import type { WikiNode, WikiSpace } from '@/api/modules/platform-wiki'
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
+import { fetchWikiSpaces, fetchWikiTree } from '@/api/modules/platform-wiki'
+import WikiAuthorEditor from './components/WikiAuthorEditor.vue'
+import WikiEntryView from './components/WikiEntryView.vue'
+import WikiManageView from './components/WikiManageView.vue'
+import { defaultWikiManagePanel, flattenTree, isWikiManagePanel, wikiWorkbenchKey } from './wiki-utils'
 
+/**
+ * Wiki 工作台编排层：一个路由承载三个工作面（知识库入口 / 作者编辑 / 治理管理）。
+ *
+ * 状态所有权：工作台状态是本地 ref，URL 只在「进入/离开」两个方向同步——
+ * 1. 进入：真实路由导航（深链、前进后退、外部链接）采用 query 作为初始状态；
+ * 2. 离开：页面内切换用 `patchQuery` 静默改写地址栏（replaceState），
+ *    宿主布局按 `route.fullPath` 重挂载页面，走 router.push 会把整页（含未保存草稿、
+ *    目录与滚动位置）销毁重建，因此内部导航绝不触发路由导航。
+ * 代价是 history 里不留中间步骤，前进后退会回到最近一次真实导航的位置，属可接受取舍。
+ */
 const toast = useYdToast()
-const modal = useYdModal()
 const route = useRoute()
-const router = useRouter()
 const workbenchPath = route.path
+
+/** 地址栏查询的本地镜像：静默同步后 route.query 不再更新，它才是合并与深链回填的基底 */
+const urlQuery = ref<Record<string, string>>(querySnapshot(route.query))
+
+function querySnapshot(query: LocationQuery): Record<string, string> {
+  const snapshot: Record<string, string> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value === 'string') {
+      snapshot[key] = value
+    }
+    else if (Array.isArray(value) && typeof value[0] === 'string') {
+      snapshot[key] = value[0]
+    }
+  }
+  return snapshot
+}
+
+// 知识库列表三态：加载中 / 加载失败 / 空库，失败不得冒充「暂无知识库」
+const spacesLoading = ref(true)
 const spacesLoaded = ref(false)
+const spacesError = ref('')
 
 const spaces = ref<WikiSpace[]>([])
 const spaceId = ref('')
@@ -27,128 +51,288 @@ const tree = ref<WikiNode[]>([])
 const selectedNode = ref<WikiNode | null>(null)
 const loadingTree = ref(false)
 
+const view = ref<WikiWorkbenchView>(normalizeView(urlQuery.value.view))
+const activePanel = ref<string>(isWikiManagePanel(urlQuery.value.panel) ? urlQuery.value.panel : defaultWikiManagePanel)
 const space = computed(() => spaces.value.find(item => item.id === spaceId.value) || null)
 const flatTree = computed(() => flattenTree(tree.value))
 
-const panels = [
-  {key: 'directory', label: 'Wiki 目录', icon: 'morph:list-tree', component: shallowRef(WikiDirectoryPanel)},
-  {key: 'sources', label: '资料源', icon: 'morph:database', component: shallowRef(WikiSourcesPanel)},
-  {key: 'ingest', label: '摄入队列', icon: 'morph:layers', component: shallowRef(WikiIngestPanel)},
-  {key: 'search', label: '检索', icon: 'morph:zoom-in', component: shallowRef(WikiSearchPanel)},
-  {key: 'graph', label: '图谱', icon: 'morph:waypoints', component: shallowRef(WikiGraphPanel)},
-  {key: 'lint', label: 'Lint', icon: 'morph:shield-check', component: shallowRef(WikiLintPanel)},
-  {key: 'review', label: '审核', icon: 'morph:list-checks', component: shallowRef(WikiReviewPanel)},
-  {key: 'research', label: '深度研究', icon: 'morph:flask-conical', component: shallowRef(WikiResearchPanel)},
-  {key: 'settings', label: '设置', icon: 'morph:settings', component: shallowRef(WikiSettingsPanel)},
-]
-
-const panelGroups = [
-  {label: '内容管理', keys: ['directory', 'sources', 'ingest']},
-  {label: '探索研究', keys: ['search', 'graph', 'research']},
-  {label: '质量维护', keys: ['lint', 'review']},
-  {label: '知识库设置', keys: ['settings']},
-].map(group => ({...group, items: group.keys.map(key => panels.find(panel => panel.key === key)!)}))
-const panelOptions = panelGroups.map(group => ({
-  label: group.label,
-  options: group.items.map(item => ({label: item.label, value: item.key})),
-}))
-const spaceOptions = computed(() => spaces.value.filter(item => item.id).map(item => ({
-  label: item.name,
-  value: item.id!,
-})))
-const activePanel = computed({
-  get: () => panels.some(item => item.key === route.query.activePanel) ? route.query.activePanel as string : 'directory',
-  set: (value: string) => {
-    if (panels.some(item => item.key === value)) {
-      void router.push({query: {...route.query, activePanel: value}})
-    }
-  },
-})
-const activeItem = computed(() => panels.find(item => item.key === activePanel.value)!)
-const activeGroup = computed(() => panelGroups.find(group => group.keys.includes(activePanel.value))!)
-const activeComponent = computed(() => activeItem.value.component.value)
-const selectedSpaceId = computed({
-  get: () => spaceId.value,
-  set: (id: string) => {
-    if (spaces.value.some(item => item.id === id)) {
-      void router.push({query: {...route.query, spaceId: id}})
-    }
-  },
-})
-
-function restoreQuery() {
-  if (!spacesLoaded.value || route.path !== workbenchPath) return
-  const requestedId = route.query.spaceId
-  const nextId = spaces.value.find(item => item.id === requestedId)?.id || spaces.value[0]?.id || ''
-  if (spaceId.value !== nextId) {
-    spaceId.value = nextId
-    selectedNode.value = null
-    tree.value = []
-    void reloadTree()
-  }
-  if (route.query.spaceId !== (nextId || undefined) || route.query.activePanel !== activePanel.value) {
-    void router.replace({query: {...route.query, spaceId: nextId || undefined, activePanel: activePanel.value}})
-  }
+function normalizeView(raw: unknown): WikiWorkbenchView {
+  return raw === 'author' || raw === 'manage' || raw === 'entry' ? raw : 'entry'
 }
 
-watch(() => [route.path, route.query.spaceId, route.query.activePanel], restoreQuery)
+/** 合并后的查询对象：undefined / 空串表示移除该键 */
+function mergedQuery(patch: Record<string, unknown>): Record<string, string> {
+  const next: Record<string, string> = { ...urlQuery.value }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined || value === null || value === '') {
+      delete next[key]
+    }
+    else {
+      next[key] = String(value)
+    }
+  }
+  return next
+}
 
-async function loadSpaces() {
-  const res = await fetchWikiSpaces()
-  spaces.value = res.data || []
-  spacesLoaded.value = true
-  const previousId = spaceId.value
-  restoreQuery()
-  if (previousId === spaceId.value) await reloadTree()
+/**
+ * 页面内导航：先切本地状态（界面立即响应），再静默同步地址栏。
+ * 不走 router.push，避免宿主布局按 fullPath 重挂载整页。
+ */
+function patchQuery(patch: Record<string, unknown>) {
+  const next = mergedQuery(patch)
+  urlQuery.value = next
+  if ('view' in patch) {
+    view.value = normalizeView(next.view)
+  }
+  if ('view' in patch || 'panel' in patch) {
+    activePanel.value = isWikiManagePanel(next.panel) ? next.panel : defaultWikiManagePanel
+  }
+  syncUrl(next)
+}
+
+/** 静默地址栏同步：只替换当前 history 条目，不产生导航，因此不触发页面重挂载 */
+function syncUrl(query: Record<string, string>) {
+  const search = new URLSearchParams(query).toString()
+  const url = search ? `${workbenchPath}?${search}` : workbenchPath
+  window.history.replaceState(window.history.state, '', url)
 }
 
 let treeRequest = 0
+/** 目录树已成功加载的知识库 ID：入口页不预加载，进入作者/治理区时才按需拉取 */
+const treeLoadedFor = ref('')
+
 async function reloadTree() {
   const request = ++treeRequest
   const id = spaceId.value
   if (!id) {
     tree.value = []
+    treeLoadedFor.value = ''
     loadingTree.value = false
     return
   }
   loadingTree.value = true
   try {
     const res = await fetchWikiTree(id)
-    if (request === treeRequest && id === spaceId.value) tree.value = res.data || []
-  } finally {
-    if (request === treeRequest) loadingTree.value = false
+    if (request === treeRequest && id === spaceId.value) {
+      tree.value = res.data || []
+      treeLoadedFor.value = id
+      const selectedId = selectedNode.value?.id
+      if (selectedId) {
+        selectedNode.value = flattenTree(tree.value).find(item => item.id === selectedId) || null
+      }
+    }
+  }
+  catch {
+    // 失败时保留当前目录，不把请求失败渲染成「暂无页面」
+  }
+  finally {
+    if (request === treeRequest) {
+      loadingTree.value = false
+    }
   }
 }
 
-function selectNode(node: WikiNode | null) {
-  selectedNode.value = node
+async function loadSpaces() {
+  spacesLoading.value = true
+  spacesError.value = ''
+  try {
+    const res = await fetchWikiSpaces()
+    spaces.value = res.data || []
+    spacesLoaded.value = true
+    applyRoute()
+  }
+  catch (error) {
+    // 刷新失败保留已读内容；首次失败由「加载失败」状态呈现，接口层已给出原因提示
+    spacesError.value = error instanceof Error && error.message ? error.message : '知识库列表加载失败，请稍后重试'
+  }
+  finally {
+    spacesLoading.value = false
+  }
 }
+
+/**
+ * 当前查询 → 状态：解析知识库与选中页面。
+ * 只在真实差异处写入，避免与「状态 → 地址栏」的同步互相触发。
+ */
+function applyRoute() {
+  if (route.path !== workbenchPath || !spacesLoaded.value) {
+    return
+  }
+  const query = urlQuery.value
+  const requestedView = normalizeView(query.view)
+  view.value = requestedView
+  if (isWikiManagePanel(query.panel)) {
+    activePanel.value = query.panel
+  }
+  const isEntry = requestedView === 'entry'
+  const requestedSpaceId = query.spaceId ?? ''
+  const validRequested = spaces.value.find(item => item.id === requestedSpaceId)?.id
+  const currentValid = spaces.value.find(item => item.id === spaceId.value)?.id
+  const nextSpaceId = validRequested || (isEntry ? currentValid || '' : currentValid || spaces.value[0]?.id || '')
+  if (nextSpaceId !== spaceId.value) {
+    spaceId.value = nextSpaceId
+    selectedNode.value = null
+    tree.value = []
+    treeLoadedFor.value = ''
+    treeRequest++
+    loadingTree.value = false
+  }
+  if (!isEntry && nextSpaceId && !validRequested) {
+    // 深链缺少或写错 spaceId：补成实际生效的知识库，保证地址可分享
+    patchQuery({ spaceId: nextSpaceId })
+    return
+  }
+  if (!isEntry && spaceId.value && treeLoadedFor.value !== spaceId.value && !loadingTree.value) {
+    void reloadTree()
+    return
+  }
+  const requestedNodeId = query.nodeId ?? ''
+  if (view.value === 'author' && requestedNodeId !== (selectedNode.value?.id || '') && treeLoadedFor.value === spaceId.value) {
+    const target = requestedNodeId ? flattenTree(tree.value).find(item => item.id === requestedNodeId) || null : null
+    if (requestedNodeId && !target) {
+      toast.warning('地址中的页面已不存在，已回到目录选择')
+      selectedNode.value = null
+      patchQuery({ nodeId: undefined })
+      return
+    }
+    selectedNode.value = target
+  }
+  if (!requestedNodeId && view.value !== 'author' && selectedNode.value) {
+    selectedNode.value = null
+  }
+}
+
+// 真实路由导航（深链、前进后退、外部跳转）才重新采用 query；内部静默同步不触发路由，不会走到这里
+watch(() => route.fullPath, () => {
+  if (route.path !== workbenchPath) {
+    return
+  }
+  urlQuery.value = querySnapshot(route.query)
+  applyRoute()
+})
+watch(spacesLoaded, () => applyRoute())
+// 目录加载完成后补齐深链里的 nodeId（首帧树还是空的）
+watch(tree, () => applyRoute())
+
+// 状态 → 地址栏：作者区里点选页面后静默写回地址，刷新不丢当前页且不重挂载工作台
+watch(selectedNode, (value) => {
+  if (view.value !== 'author') {
+    return
+  }
+  if ((urlQuery.value.nodeId ?? '') === (value?.id || '')) {
+    return
+  }
+  patchQuery({ nodeId: value?.id || undefined, spaceId: spaceId.value || undefined })
+})
+
+let editorGuard: { confirmLeave: () => Promise<boolean>, dirty: () => boolean } | undefined
+function registerEditorGuard(guard: NonNullable<typeof editorGuard>) {
+  editorGuard = guard
+  return () => {
+    if (editorGuard === guard) {
+      editorGuard = undefined
+    }
+  }
+}
+
+/**
+ * 切换编辑目标：多标签下打开/激活标签本身不丢草稿，因此不再询问；
+ * 真正会丢草稿的「离开编辑工作区」确认放在下面的导航守卫里。
+ */
+async function selectNode(node: WikiNode | null): Promise<boolean> {
+  selectedNode.value = node
+  return true
+}
+
+onBeforeRouteLeave(() => editorGuard?.confirmLeave() ?? true)
+onBeforeRouteUpdate((to, from) => {
+  const leavingAuthor = from.query.view === 'author' && to.query.view !== 'author'
+  if (to.query.spaceId !== from.query.spaceId || to.query.nodeId !== from.query.nodeId || leavingAuthor) {
+    return editorGuard?.confirmLeave() ?? true
+  }
+})
+function warnUnsaved(event: BeforeUnloadEvent) {
+  if (!editorGuard?.dirty()) {
+    return
+  }
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', warnUnsaved))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsaved))
 
 function findNode(ref: { title?: string, nodeId?: string, path?: string }): WikiNode | null {
   const pages = flatTree.value.filter(node => node.nodeType === 'PAGE')
   if (ref.nodeId) {
     const byId = pages.find(node => node.id === ref.nodeId)
-    if (byId) return byId
+    if (byId) {
+      return byId
+    }
   }
   if (ref.path) {
     const byPath = pages.find(node => node.path === ref.path || node.slug === ref.path)
-    if (byPath) return byPath
+    if (byPath) {
+      return byPath
+    }
   }
   return (ref.title && pages.find(node => node.title === ref.title)) || null
 }
 
-function openPanel(panel: string) {
-  activePanel.value = panel
+/**
+ * 内部导航守卫：守卫对象由编辑区注册；只有真正离开编辑工作区（回入口 / 进治理 / 换知识库）
+ * 才先确认未保存草稿——页面内切换不再产生路由导航，路由守卫不会替我们拦这一下。
+ * 取消确认时原地不动，地址栏与状态都不变。
+ */
+async function guardedNavigate(patch: Record<string, unknown>) {
+  const leavingWorkspace = view.value === 'author'
+    && (patch.view !== 'author' || String(patch.spaceId ?? '') !== spaceId.value)
+  if (leavingWorkspace && editorGuard && !await editorGuard.confirmLeave()) {
+    return
+  }
+  patchQuery(patch)
 }
 
-function openPage(ref: { title?: string, nodeId?: string, path?: string }) {
+function openEntry() {
+  void guardedNavigate({ view: 'entry', nodeId: undefined, panel: undefined })
+}
+
+function openAuthor(target?: { space?: WikiSpace, node?: WikiNode | null }) {
+  const nextSpaceId = target?.space?.id || spaceId.value
+  const sameSpace = !target?.space || target.space.id === spaceId.value
+  const nodeId = target?.node?.id || (sameSpace ? urlQuery.value.nodeId : undefined)
+  // 必须显式传 spaceId，避免从知识库列表进入时丢失上下文
+  void guardedNavigate({ view: 'author', spaceId: nextSpaceId, nodeId, panel: undefined })
+}
+
+function openManage(panel?: string, target?: WikiSpace) {
+  void guardedNavigate({
+    view: 'manage',
+    panel: panel || activePanel.value,
+    spaceId: target?.id || spaceId.value || undefined,
+    nodeId: undefined,
+  })
+}
+
+function openPanel(panel: string) {
+  openManage(panel)
+}
+
+async function openPage(ref: { title?: string, nodeId?: string, path?: string }) {
   const node = findNode(ref)
   if (!node) {
     toast.warning(`未找到页面「${ref.title || ref.path || ref.nodeId}」`)
     return
   }
-  selectedNode.value = node
-  activePanel.value = 'directory'
+  if (await selectNode(node)) {
+    openAuthor({ node })
+  }
+}
+
+function clearSpace() {
+  spaceId.value = ''
+  selectedNode.value = null
+  tree.value = []
+  treeLoadedFor.value = ''
 }
 
 provide(wikiWorkbenchKey, {
@@ -159,333 +343,84 @@ provide(wikiWorkbenchKey, {
   flatTree,
   selectedNode,
   loadingTree,
+  spacesLoading,
+  spacesLoaded,
+  spacesError,
+  view,
+  activePanel,
   reloadTree,
   reloadSpaces: loadSpaces,
+  clearSpace,
   selectNode,
+  registerEditorGuard,
+  openEntry,
+  openAuthor,
+  openManage,
   openPanel,
   openPage,
   findNode,
 })
-
-// 新建知识库
-const createVisible = ref(false)
-const creating = ref(false)
-const createForm = ref({name: '', slug: '', description: ''})
-
-async function createSpace() {
-  if (!createForm.value.name.trim() || !createForm.value.slug.trim()) {
-    toast.warning('请填写名称与 slug')
-    return
-  }
-  creating.value = true
-  try {
-    await saveWikiSpace({
-      name: createForm.value.name.trim(),
-      slug: createForm.value.slug.trim(),
-      description: createForm.value.description.trim(),
-      publicReadEnabled: false,
-      externalSearchEnabled: false,
-      graphEnabled: true,
-      chunkSize: 800,
-      chunkOverlap: 120,
-      topK: 8,
-      queryExpansionEnabled: true,
-      rerankEnabled: false,
-      contextWindowTokens: 64000,
-      sourceGroundedDefault: false,
-      watchEnabled: false,
-    })
-    toast.success('知识库已创建')
-    createVisible.value = false
-    createForm.value = {name: '', slug: '', description: ''}
-    await loadSpaces()
-  } finally {
-    creating.value = false
-  }
-}
-
-async function rebuild() {
-  if (!spaceId.value) {
-    return
-  }
-  await rebuildWikiIndex(spaceId.value)
-  toast.success('已加入重建索引队列')
-  activePanel.value = 'ingest'
-}
-
-// 删除知识库：后端级联删除目录/页面、资料源、摄入任务与审核项
-const deletingSpaceId = ref('')
-
-function removeSpace(item: WikiSpace) {
-  if (!item.id) {
-    return
-  }
-  modal.confirm({
-    title: '删除知识库',
-    content: `确定删除知识库「${item.name}」吗？其中的目录、页面、资料源、摄入任务与审核项将被一并删除，且不可恢复。`,
-    onConfirm: async () => {
-      deletingSpaceId.value = item.id!
-      try {
-        await deleteWikiSpace(item.id!)
-        toast.success('知识库已删除')
-        await loadSpaces()
-      } finally {
-        deletingSpaceId.value = ''
-      }
-    },
-  })
-}
 
 onMounted(loadSpaces)
 </script>
 
 <template>
   <div class="wiki-workbench">
-    <YdPageHeader
-        title="LLM Wiki 工作台"
-        class="mb-0"
-        :description="space ? `${space.name} · /wiki/${space.slug}` : '资料源 → 摄入 → 自动维护的知识库'"
-    >
-      <YdButton variant="outline" :disabled="!space" @click="rebuild">
-        <YdIcon name="morph:refresh-cw"/>
-        重建索引
-      </YdButton>
-    </YdPageHeader>
-
-    <div class="wiki-toolbar">
-      <label class="wiki-space-picker">
-        <span>当前知识库</span>
-        <YdSelect v-model="selectedSpaceId" :options="spaceOptions" :disabled="!spaces.length" placeholder="暂无知识库" class="w-full" />
-      </label>
-      <div class="wiki-toolbar__actions">
-        <YdButton variant="outline" @click="createVisible = true">
-          <YdIcon name="morph:plus" />新建知识库
-        </YdButton>
-        <YdButton variant="ghost" :disabled="!space" :loading="!!deletingSpaceId" @click="space && removeSpace(space)">
-          <YdIcon name="morph:trash-2" />删除知识库
-        </YdButton>
-      </div>
-      <label class="wiki-mobile-nav">
-        <span>工作台功能</span>
-        <YdSelect v-model="activePanel" :options="panelOptions" class="w-full" />
-      </label>
+    <!-- 知识库列表三态：加载 / 失败 / 内容（入口页承担空库状态与新建） -->
+    <div v-if="spacesLoading && !spacesLoaded" class="wiki-workbench__state">
+      <YdLoading text="正在加载知识库" />
     </div>
-
-    <div class="wiki-shell">
-      <nav class="wiki-nav" aria-label="Wiki 分组导航">
-        <section v-for="group in panelGroups" :key="group.label" class="wiki-nav__group" :aria-label="group.label">
-          <h2>{{ group.label }}</h2>
-          <YdButton
-            v-for="item in group.items"
-            :key="item.key"
-            :variant="activePanel === item.key ? 'secondary' : 'ghost'"
-            class="w-full justify-start"
-            :aria-current="activePanel === item.key ? 'page' : undefined"
-            @click="openPanel(item.key)"
-          >
-            <YdIcon :name="item.icon" />
-            {{ item.label }}
+    <div v-else-if="!spacesLoaded && spacesError" class="wiki-workbench__state">
+      <YdResult status="error" title="知识库列表加载失败" :description="spacesError">
+        <template #action>
+          <YdButton variant="outline" :loading="spacesLoading" @click="loadSpaces">
+            <YdIcon name="morph:refresh-cw" />
+            重新加载
           </YdButton>
-        </section>
-      </nav>
-      <main class="wiki-main" :aria-label="activeItem.label">
-        <div class="wiki-main__heading">
-          <span>{{ activeGroup.label }}</span>
-          <YdIcon name="morph:chevron-right" />
-          <h2>{{ activeItem.label }}</h2>
-        </div>
-        <div v-if="!spacesLoaded" class="wiki-empty" role="status">正在加载知识库…</div>
-        <div v-else-if="!space" class="wiki-empty">
-          <YdIcon name="morph:library" class="text-3xl" />
-          <p>暂无知识库，新建后即可管理资料与页面。</p>
-          <YdButton @click="createVisible = true">新建知识库</YdButton>
-        </div>
-        <div v-else class="wiki-main__panel">
-          <KeepAlive>
-            <component :is="activeComponent" :key="activePanel"/>
-          </KeepAlive>
-        </div>
-      </main>
+        </template>
+      </YdResult>
     </div>
-
-    <YdModal
-        v-model="createVisible"
-        title="新建知识库"
-        show-cancel-button
-        :confirm-button-loading="creating"
-        @confirm="createSpace"
-    >
-      <div class="wiki-create-form">
-        <label class="wiki-field">
-          <span>名称</span>
-          <YdInput v-model="createForm.name" placeholder="例如：产品知识库"/>
-        </label>
-        <label class="wiki-field">
-          <span>路径 slug</span>
-          <YdInput v-model="createForm.slug" placeholder="例如：product"/>
-        </label>
-        <label class="wiki-field">
-          <span>描述</span>
-          <YdTextarea v-model="createForm.description" placeholder="这个知识库用来做什么？" :rows="3"/>
-        </label>
-      </div>
-    </YdModal>
+    <!-- 入口页是普通内容页，自身滚动；作者/治理是定高工作区，外壳不滚、面板内滚 -->
+    <div v-else-if="view === 'entry' || !spaces.length" class="wiki-workbench__entry">
+      <WikiEntryView />
+    </div>
+    <WikiAuthorEditor v-else-if="view === 'author'" />
+    <WikiManageView v-else />
   </div>
 </template>
 
 <style scoped>
+/*
+ * 工作台始终铺满宿主内容区并自带背景：宿主 .main 的占位高度来自 flex 拉伸，其计算高度仍是 auto，
+ * 子级 height:100% 无法解析，因此用绝对定位铺满（.main 自身 position:relative），
+ * 三个工作面共享同一背景与高度来源，避免局部留白或入口页下方露底色。
+ */
 .wiki-workbench {
+  position: absolute;
+  inset: 0;
   display: flex;
-  overflow: hidden;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.wiki-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border-2);
-  background: var(--color-bg-1);
-}
-
-.wiki-space-picker,
-.wiki-mobile-nav {
-  display: grid;
-  gap: 6px;
-  min-width: 220px;
-}
-
-.wiki-space-picker > span,
-.wiki-mobile-nav > span {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.wiki-toolbar__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.wiki-mobile-nav {
-  display: none;
-}
-
-.wiki-shell {
-  display: flex;
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  background: var(--color-fill-1);
-}
-
-.wiki-nav {
-  display: flex;
-  overflow-y: auto;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: 16px;
-  width: 220px;
-  min-height: 0;
-  padding: 16px 12px;
-  border-right: 1px solid var(--color-border-2);
-  background: var(--color-bg-1);
-}
-
-.wiki-nav__group {
-  display: grid;
-  gap: 6px;
-}
-
-.wiki-nav__group h2 {
-  margin: 0 4px 2px;
-  color: var(--color-text-3);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.wiki-main {
-  display: flex;
-  flex: 1;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--color-bg-1);
 }
 
-.wiki-main__heading {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 16px 10px;
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.wiki-main__heading h2 {
-  margin: 0;
-  color: var(--color-text-1);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.wiki-main__panel {
+.wiki-workbench__state {
+  display: grid;
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.wiki-empty {
-  display: grid;
-  justify-items: center;
   align-content: center;
-  gap: 10px;
-  min-height: 240px;
-  padding: 32px 16px;
-  color: var(--color-text-3);
-  text-align: center;
+  justify-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px 16px;
+  overflow: auto;
 }
 
-.wiki-create-form {
-  display: grid;
-  gap: 14px;
-}
-
-.wiki-field {
-  display: grid;
-  gap: 6px;
-}
-
-.wiki-field > span {
-  color: var(--color-text-3);
-  font-size: 13px;
-}
-
-@media (max-width: 900px) {
-  .wiki-nav {
-    display: none;
-  }
-
-  .wiki-mobile-nav {
-    display: grid;
-    width: 100%;
-  }
-
-  .wiki-toolbar {
-    align-items: stretch;
-  }
-
-  .wiki-space-picker,
-  .wiki-toolbar__actions {
-    width: 100%;
-    margin-left: 0;
-  }
+.wiki-workbench__entry {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 </style>
