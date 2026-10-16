@@ -5,20 +5,22 @@ import type { WikiNode, WikiSpace } from '@/api/modules/platform-wiki'
 export interface PageTypeMeta {
   label: string
   color: string
+  /** 目录树/列表里的类型圆点颜色（低饱和区分，不承担文字可读性） */
+  dot?: string
 }
 
 export const pageTypeMeta: Record<string, PageTypeMeta> = {
-  source_summary: { label: '资料摘要', color: 'var(--color-text-2)' },
-  source_document: { label: '原文档', color: 'var(--color-text-2)' },
-  entity: { label: '实体', color: 'var(--color-text-2)' },
-  concept: { label: '概念', color: 'var(--color-text-2)' },
-  synthesis: { label: '综合分析', color: 'var(--color-text-2)' },
-  comparison: { label: '对比', color: 'var(--color-text-2)' },
-  query: { label: '查询归档', color: 'var(--color-text-2)' },
-  research: { label: '深度研究', color: 'var(--color-text-2)' },
-  overview: { label: '全局概要', color: 'var(--color-text-2)' },
-  toc: { label: '内容目录', color: 'var(--color-text-2)' },
-  log: { label: '操作日志', color: 'var(--color-text-3)' },
+  source_summary: { label: '资料摘要', color: 'var(--color-text-2)', dot: 'rgb(var(--gold-6))' },
+  source_document: { label: '原文档', color: 'var(--color-text-2)', dot: 'rgb(var(--orange-6))' },
+  entity: { label: '实体', color: 'var(--color-text-2)', dot: 'rgb(var(--green-6))' },
+  concept: { label: '概念', color: 'var(--color-text-2)', dot: 'rgb(var(--arcoblue-6))' },
+  synthesis: { label: '综合分析', color: 'var(--color-text-2)', dot: 'rgb(var(--purple-6))' },
+  comparison: { label: '对比', color: 'var(--color-text-2)', dot: 'rgb(var(--cyan-6))' },
+  query: { label: '查询归档', color: 'var(--color-text-2)', dot: 'rgb(var(--magenta-6))' },
+  research: { label: '深度研究', color: 'var(--color-text-2)', dot: 'rgb(var(--pinkpurple-6))' },
+  overview: { label: '全局概要', color: 'var(--color-text-2)', dot: 'rgb(var(--blue-6))' },
+  toc: { label: '内容目录', color: 'var(--color-text-2)', dot: 'rgb(var(--lime-6))' },
+  log: { label: '操作日志', color: 'var(--color-text-3)', dot: 'rgb(var(--gray-6))' },
 }
 
 export function pageTypeLabel(pageType?: string): string {
@@ -27,6 +29,11 @@ export function pageTypeLabel(pageType?: string): string {
 
 export function pageTypeColor(pageType?: string): string {
   return (pageType && pageTypeMeta[pageType]?.color) || pageTypeMeta.concept.color
+}
+
+/** 类型圆点颜色：未登记的类型回落中灰，不猜测语义 */
+export function pageTypeDot(pageType?: string): string {
+  return (pageType && pageTypeMeta[pageType]?.dot) || 'rgb(var(--gray-6))'
 }
 
 export const pageTypeOptions = Object.entries(pageTypeMeta).map(([value, meta]) => ({

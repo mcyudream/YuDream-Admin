@@ -105,6 +105,51 @@ test('llm-gen is a real first-level directory, not only a grouped view', () => {
   assert.match(ops, /必须传数字字符串/)
 })
 
+test('entry cards carry density: usage, update time and actionable state', () => {
+  const entry = wikiFile('components/WikiEntryView.vue')
+  // 卡片信息密度：用量（页面/目录）、最近更新、需要处理的状态都直说，不靠封面撑场面
+  assert.match(entry, /function usageText\(item: WikiSpace\): string/)
+  assert.match(entry, /<YdTimeAgo :date="updatedAtOf\(item\)" \/>/)
+  assert.match(entry, /未发布 \{\{ unpublishedCountOf\(item\) \}\}/)
+  assert.match(entry, /摄入失败 \{\{ failedIngestCountOf\(item\) \}\}/)
+  // 聚合字段缺失时不伪造 0：计数读取必须区分 number 与 undefined
+  assert.match(entry, /typeof item\.pageCount === 'number' \? item\.pageCount : null/)
+  // 封面弱化：字母降为 28px 小方块，封面是窄横幅；未设置封面用中性点阵而不是名称哈希渐变
+  assert.match(entry, /\.entry-card__cover \{[\s\S]{0,120}height: 104px;/)
+  assert.match(entry, /\.entry-card__initial \{[\s\S]{0,200}width: 28px;/)
+  assert.match(entry, /entry-card__cover-art--empty/)
+  // 少数据时网格居中，并提供虚线新建引导卡
+  assert.match(entry, /\.entry__grid \{[\s\S]{0,200}justify-content: center;/)
+  assert.match(entry, /class="entry-create"/)
+  // 工具栏整合：搜索 / 筛选 / 视图切换同一条横栏
+  assert.match(entry, /class="entry__toolbar"[\s\S]{0,300}aria-label="搜索知识库"[\s\S]{0,300}aria-label="公开状态筛选"[\s\S]{0,300}aria-label="展示方式"/)
+})
+
+test('author toolbar keeps the save state next to the title and promotes the executable action', () => {
+  const author = wikiFile('components/WikiAuthorEditor.vue')
+  // 状态紧跟标题：标题输入与保存态同组
+  assert.match(author, /author-bar__title[\s\S]{0,700}wiki-author__status/)
+  // 主按钮随当前可执行动作切换：有改动时发布按钮即「保存并发布」（publish 内部先保存再发布），保存降为次要动作
+  assert.match(author, /const publishLabel = computed\(\(\) => dirty\.value/)
+  assert.match(author, /'保存并发布'/)
+  assert.match(author, /:variant="saveButtonVariant"/)
+  // 预览面与编辑面区分：浅灰地面 + 白色文档卡片
+  assert.match(author, /\.author-body__preview \{[\s\S]{0,120}background: var\(--color-fill-1\)/)
+  assert.match(author, /\.author-markdown \{[\s\S]{0,200}background: var\(--color-bg-1\)/)
+  // 工具栏按用途分组（组件库的分组分隔符）
+  assert.match(author, /'bold',\s*'italic',\s*'-',/)
+  assert.match(author, /'revoke',\s*'next',\s*'=',/)
+  // 目录树类型标签：淡色圆点 + 灰字，不再是灰底文字块
+  assert.match(author, /\.author-node__type-dot \{[\s\S]{0,120}border-radius: 50%;/)
+  // 属性面板按 基础信息 / 标签与关联 / 来源 分组折叠
+  assert.match(author, /<YdCollapsible v-model="asideGroups\.base">/)
+  assert.match(author, /<YdCollapsible v-model="asideGroups\.relations">/)
+  assert.match(author, /<YdCollapsible v-model="asideGroups\.sources">/)
+  // 外观回到宿主主题令牌：玻璃态与硬编码品牌色不得回流
+  assert.doesNotMatch(author, /backdrop-filter/)
+  assert.doesNotMatch(author, /#4f46e5/)
+})
+
 test('inline images stay private and the public rendering gap is stated, not claimed solved', () => {
   const images = wikiFile('wiki-images.ts')
   // 上传固定私有，不做空间可见性推导
@@ -131,7 +176,7 @@ test('settings uses YdSettingsLayout with header save, no fixed bottom bar', () 
   assert.match(settings, /\.settings-page-shell \{[\s\S]*?height: 100%;/)
 })
 
-test('manage surface is one settings layout: left area nav, dynamic right content', () => {
+test('manage surface is one top tab bar: area tabs, full-width dynamic content', () => {
   const manage = wikiFile('components/WikiManageView.vue')
   assert.equal(wikiManageAreas.length, 6)
   // 每个分区恰好属于一个区域，且区域首个分区必须是已注册分区
@@ -148,10 +193,11 @@ test('manage surface is one settings layout: left area nav, dynamic right conten
     assert.equal(wikiManageAreaPanels(area.key).length, area.panels.length)
   }
   assert.equal(seen.size, registered.size, '所有分区都要落在某个区域下')
-  // 整体使用设置版式：左侧区域导航，右侧按选中区域动态加载面板；不再自绘 <nav>
-  assert.match(manage, /<YdSettingsLayout/)
+  // 区域导航放顶部横向 Tab（治理面板以表格与统计为主，不再把内容挤进居中窄列）；不引入左侧设置版式与自绘 <nav>
+  assert.match(manage, /<YdTabs/)
   assert.match(manage, /:list="areaList"/)
-  assert.match(manage, /surface[\s\S]{0,40}scroll/)
+  assert.match(manage, /content-class="manage__content"/)
+  assert.doesNotMatch(manage, /<YdSettingsLayout/)
   assert.doesNotMatch(manage, /<nav class="manage__nav"/)
   assert.doesNotMatch(manage, /manage__mobile-nav/)
   // 区域插槽显式写全，不用 v-for + 动态插槽名（该组合会让组件库模板编译器崩溃）
@@ -169,4 +215,20 @@ test('manage surface is one settings layout: left area nav, dynamic right conten
   assert.match(area, /<YdSegmented[\s\S]{0,260}v-model="activePanelKey"/)
   assert.match(area, /\.manage__subhead \{[\s\S]*?flex-wrap: wrap;/)
   assert.match(area, /settingsDirty: \(\) => Boolean\(settingsRef\.value\?\.dirty\)/)
+})
+
+test('overview leads with what needs attention and keeps statistics as the main figure', () => {
+  const overview = wikiFile('components/WikiOverviewPanel.vue')
+  // 失败任务置顶（左侧色条 + 直达摄入队列），不混在统计里
+  assert.match(overview, /overview-alert[\s\S]{0,600}打开摄入队列/)
+  assert.match(overview, /border-left: 3px solid rgb\(var\(--danger-6\)\)/)
+  // 四个统计仍是主视觉，未发布需要处理时用警告色，不造假环比数据
+  assert.match(overview, /overview__stats[\s\S]{0,400}repeat\(4, minmax\(0, 1fr\)\)/)
+  assert.match(overview, /overview__value--attention[\s\S]{0,120}rgb\(var\(--warning-6\)\)/)
+  // 待接入能力是说明性内容：折叠收起，不占概览主视线
+  assert.match(overview, /<YdCollapsible v-model="pendingOpen">/)
+  assert.doesNotMatch(overview, /const pendingOpen = ref\(true\)/)
+  // 双栏版面放宽到宽屏上限，不再压进居中窄列
+  assert.match(overview, /grid-template-columns: minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/)
+  assert.match(overview, /max-width: 1280px/)
 })

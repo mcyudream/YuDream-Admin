@@ -38,6 +38,17 @@ export interface WikiSpace {
   sourceGroundedDefault: boolean
   watchEnabled: boolean
   watchFolderPath?: string
+  /** 封面契约（NONE / SEEDED / UPLOAD）与稳定 seed；旧响应缺字段时按 NONE 处理 */
+  coverType?: string
+  coverSeed?: string
+  coverFileObjectId?: string
+  coverAlt?: string
+  /** 列表卡片聚合事实（由后端按空间补算）；旧响应或非列表端点可能缺字段 */
+  pageCount?: number
+  directoryCount?: number
+  unpublishedPageCount?: number
+  lastUpdatedAt?: string
+  failedIngestCount?: number
 }
 
 export interface WikiNode {

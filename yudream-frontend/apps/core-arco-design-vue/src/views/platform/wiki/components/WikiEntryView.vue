@@ -6,7 +6,8 @@ import { deleteWikiSpace, saveWikiSpace } from '@/api/modules/platform-wiki'
 import { wikiCoverOf, wikiCoverStyle } from '../wiki-cover'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
-// 知识库入口：只承担「发现知识库 + 创建/删除 + 进入编辑或治理」，不再混放面板导航
+// 知识库入口：只承担「发现知识库 + 创建/删除 + 进入编辑或治理」，不再混放面板导航。
+// 卡片密度：封面是窄横幅，名称为主视觉；页面数、最近更新与需要处理的状态都在卡片里直说。
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
 const modal = useYdModal()
@@ -25,6 +26,8 @@ const publicFilterOptions = [
   { label: '仅公开', value: 'public' },
   { label: '仅私有', value: 'private' },
 ]
+
+const publicCount = computed(() => store.spaces.value.filter(item => item.publicReadEnabled).length)
 
 const filteredSpaces = computed(() => {
   const text = keyword.value.trim().toLocaleLowerCase()
@@ -64,7 +67,7 @@ async function copyPublicUrl(item: WikiSpace) {
   }
 }
 
-// 封面来自后端真实字段：UPLOAD 呈现公开文件图片，SEEDED 按 seed 确定性呈现，NONE 才回落名称哈希占位
+// 封面来自后端真实字段：UPLOAD 呈现公开文件图片，SEEDED 按 seed 确定性呈现，NONE 才回落空状态图案
 function coverOf(item: WikiSpace) {
   return wikiCoverOf(item)
 }
@@ -77,17 +80,56 @@ function coverTitle(item: WikiSpace) {
   if (cover.type === 'SEEDED') {
     return `随机封面（seed ${cover.seed}），同一 seed 呈现结果稳定`
   }
-  return '尚未设置封面：当前按名称显示占位图案，可在治理区「设置 → 封面」配置'
+  return '尚未设置封面：当前显示空状态图案，可在治理区「设置 → 封面」配置'
 }
 
 function spaceInitial(item: WikiSpace) {
   return (item.name || item.slug || '?').trim().slice(0, 1).toUpperCase()
 }
 
+/** 页面/目录计数：老响应缺聚合字段时返回 null，卡片不伪造 0（0 是真实值，null 是未知） */
+function pageCountOf(item: WikiSpace): number | null {
+  return typeof item.pageCount === 'number' ? item.pageCount : null
+}
+
+function directoryCountOf(item: WikiSpace): number | null {
+  return typeof item.directoryCount === 'number' ? item.directoryCount : null
+}
+
+function unpublishedCountOf(item: WikiSpace): number {
+  return typeof item.unpublishedPageCount === 'number' ? item.unpublishedPageCount : 0
+}
+
+function failedIngestCountOf(item: WikiSpace): number {
+  return typeof item.failedIngestCount === 'number' ? item.failedIngestCount : 0
+}
+
+function updatedAtOf(item: WikiSpace): string {
+  return typeof item.lastUpdatedAt === 'string' ? item.lastUpdatedAt : ''
+}
+
+/** 卡片/表格共用的用量文案：13 页面 · 3 目录；字段缺失时不显示 */
+function usageText(item: WikiSpace): string {
+  const pages = pageCountOf(item)
+  const directories = directoryCountOf(item)
+  if (pages === null && directories === null) {
+    return ''
+  }
+  const parts: string[] = []
+  if (pages !== null) {
+    parts.push(`${pages} 页面`)
+  }
+  if (directories !== null && directories > 0) {
+    parts.push(`${directories} 目录`)
+  }
+  return parts.join(' · ')
+}
+
 // 列表视图：桌面表格与移动卡片共用同一份 actions 定义
 const columns: TableColumn<WikiSpace>[] = [
   { accessorKey: 'name', header: '知识库', minWidth: 220 },
   { accessorKey: 'publicReadEnabled', header: '公开状态', width: 110 },
+  { id: 'usage', header: '内容与更新', width: 190 },
   { accessorKey: 'description', header: '描述', minWidth: 200 },
   { id: 'retrieval', header: '检索配置', width: 190 },
 ]
@@ -180,22 +222,30 @@ function removeSpace(item: WikiSpace) {
 
 <template>
   <div class="entry">
-    <YdPageHeader
-      class="entry__header"
-      title="知识库"
-      description="选择知识库进入专注编辑，或进入治理区维护资料、摄入与质量"
-    >
-      <YdButton variant="outline" :loading="store.spacesLoading.value" @click="store.reloadSpaces()">
-        <YdIcon name="morph:refresh-cw" />
-        刷新列表
-      </YdButton>
-      <YdButton @click="openCreate">
-        <YdIcon name="morph:plus" />
-        新建知识库
-      </YdButton>
-    </YdPageHeader>
+    <!-- 页头与工具栏各占一行：标题/动作在上，搜索/筛选/视图切换收进同一条工具栏 -->
+    <div class="entry__head">
+      <div class="entry__head-text">
+        <h1 class="entry__title">
+          知识库
+        </h1>
+        <p class="entry__subtitle">
+          {{ store.spaces.value.length }} 个知识库 · 已开启公开阅读 {{ publicCount }} 个
+        </p>
+      </div>
+      <div class="entry__head-actions">
+        <YdTooltip text="刷新列表">
+          <YdButton variant="outline" size="icon-sm" :loading="store.spacesLoading.value" aria-label="刷新知识库列表" @click="store.reloadSpaces()">
+            <YdIcon name="morph:refresh-cw" />
+          </YdButton>
+        </YdTooltip>
+        <YdButton @click="openCreate">
+          <YdIcon name="morph:plus" />
+          新建知识库
+        </YdButton>
+      </div>
+    </div>
 
-    <div class="entry__filters">
+    <div class="entry__toolbar">
       <YdInput v-model="keyword" clearable placeholder="搜索名称、slug 或描述" aria-label="搜索知识库" class="entry__search">
         <template #start>
           <YdIcon name="morph:search" />
@@ -203,6 +253,9 @@ function removeSpace(item: WikiSpace) {
       </YdInput>
       <YdSelect v-model="publicFilter" :options="publicFilterOptions" aria-label="公开状态筛选" class="entry__status" />
       <YdSegmented v-model="viewMode" :options="viewModeOptions" size="sm" aria-label="展示方式" class="entry__mode" />
+      <span class="entry__result-count">
+        <template v-if="keyword.trim() || publicFilter !== 'all'">{{ filteredSpaces.length }} / {{ store.spaces.value.length }}</template>
+      </span>
     </div>
 
     <div class="entry__body">
@@ -255,7 +308,7 @@ function removeSpace(item: WikiSpace) {
       <YdScrollArea v-else class="entry__scroll">
         <div class="entry__inner">
           <div v-if="viewMode === 'card'" class="entry__grid">
-            <!-- 飞书式封面卡：封面铺满整卡不留白，名称/描述压暗角渐变，hover 底部浮出设置条 -->
+            <!-- 封面卡：窄封面横幅 + 信息区（名称/描述/用量/待处理状态），操作条悬停时从封面底部浮出 -->
             <YdCard
               v-for="item in filteredSpaces"
               :key="item.id || item.slug"
@@ -267,7 +320,7 @@ function removeSpace(item: WikiSpace) {
               @click="selectSpace(item)"
               @keydown.enter.prevent="selectSpace(item)"
             >
-              <div class="entry-card__cover" :style="wikiCoverStyle(item)">
+              <div class="entry-card__cover">
                 <img
                   v-if="coverOf(item).hasImage"
                   :src="coverOf(item).url"
@@ -275,17 +328,21 @@ function removeSpace(item: WikiSpace) {
                   :title="coverTitle(item)"
                   class="entry-card__cover-img"
                 >
-                <span v-else class="entry-card__cover-initial" :title="coverTitle(item)">{{ spaceInitial(item) }}</span>
-                <div class="entry-card__top">
+                <div
+                  v-else-if="coverOf(item).type === 'SEEDED'"
+                  class="entry-card__cover-art"
+                  :style="wikiCoverStyle(item)"
+                  :title="coverTitle(item)"
+                />
+                <!-- 未设置封面：中性的点阵空状态，不用名称哈希渐变冒充已有封面 -->
+                <div v-else class="entry-card__cover-art entry-card__cover-art--empty" :title="coverTitle(item)">
+                  <YdIcon name="morph:image" />
+                </div>
+                <div class="entry-card__cover-top">
                   <YdTag :variant="item.publicReadEnabled ? 'default' : 'secondary'">
                     {{ item.publicReadEnabled ? '公开' : '私有' }}
                   </YdTag>
-                  <span v-if="!coverOf(item).hasImage && coverOf(item).type === 'NONE'" class="entry-card__cover-note" :title="coverTitle(item)">未设置封面</span>
-                  <span class="entry-card__cover-slug">{{ item.slug }}</span>
-                </div>
-                <div class="entry-card__info">
-                  <strong class="entry-card__name">{{ item.name }}</strong>
-                  <p class="entry-card__desc" :title="item.description || undefined">{{ item.description || '未填写描述' }}</p>
+                  <span v-if="!coverOf(item).hasImage && coverOf(item).type === 'NONE'" class="entry-card__cover-note">未设置封面</span>
                 </div>
                 <div class="entry-card__bar" @click.stop @keydown.stop>
                   <YdButton size="sm" variant="ghost" class="entry-bar-btn" :disabled="!item.id" :aria-label="`进入编辑 ${item.name}`" @click="selectSpace(item)">
@@ -306,7 +363,51 @@ function removeSpace(item: WikiSpace) {
                   </YdButton>
                 </div>
               </div>
+
+              <div class="entry-card__body">
+                <div class="entry-card__head">
+                  <span class="entry-card__initial" aria-hidden="true">{{ spaceInitial(item) }}</span>
+                  <div class="entry-card__head-text">
+                    <strong class="entry-card__name" :title="item.name">{{ item.name }}</strong>
+                    <span class="entry-card__slug" :title="`/wiki/${item.slug}`">/wiki/{{ item.slug }}</span>
+                  </div>
+                </div>
+                <p class="entry-card__desc" :title="item.description || undefined">
+                  {{ item.description || '未填写描述' }}
+                </p>
+                <div class="entry-card__meta">
+                  <span v-if="usageText(item)" class="entry-card__meta-item">
+                    <YdIcon name="morph:file-text" />
+                    {{ usageText(item) }}
+                  </span>
+                  <span v-if="updatedAtOf(item)" class="entry-card__meta-item" :title="`最近更新：${updatedAtOf(item)}`">
+                    <YdIcon name="morph:clock" />
+                    更新于 <YdTimeAgo :date="updatedAtOf(item)" />
+                  </span>
+                  <span v-else-if="pageCountOf(item) === 0" class="entry-card__meta-item">
+                    <YdIcon name="morph:clock" />
+                    还没有页面
+                  </span>
+                </div>
+                <div v-if="unpublishedCountOf(item) || failedIngestCountOf(item)" class="entry-card__flags">
+                  <span v-if="unpublishedCountOf(item)" class="entry-flag entry-flag--warn">
+                    未发布 {{ unpublishedCountOf(item) }}
+                  </span>
+                  <span v-if="failedIngestCountOf(item)" class="entry-flag entry-flag--danger">
+                    摄入失败 {{ failedIngestCountOf(item) }}
+                  </span>
+                </div>
+              </div>
             </YdCard>
+
+            <!-- 引导卡：少数据时补齐网格，同时给出唯一的新建入口（与页头按钮同义） -->
+            <YdButton variant="outline" class="entry-create" @click="openCreate">
+              <span class="entry-create__inner">
+                <YdIcon name="morph:plus" class="entry-create__icon" />
+                <span class="entry-create__title">新建知识库</span>
+                <span class="entry-create__hint">导入资料、生成页面、开始检索</span>
+              </span>
+            </YdButton>
           </div>
 
           <YdResponsiveEnhancedTable
@@ -314,7 +415,7 @@ function removeSpace(item: WikiSpace) {
             row-key="id"
 
             stripe column-visibility border
-            table-class="min-w-[880px]"
+            table-class="min-w-[980px]"
             :columns="columns"
             :actions="actions"
             :data="filteredSpaces"
@@ -329,6 +430,18 @@ function removeSpace(item: WikiSpace) {
               <YdTag :variant="row.original.publicReadEnabled ? 'default' : 'secondary'">
                 {{ row.original.publicReadEnabled ? '公开' : '私有' }}
               </YdTag>
+            </template>
+            <template #cell-usage="{ row }">
+              <div class="entry-cell">
+                <span class="entry-cell__desc">{{ usageText(row.original) || '-' }}</span>
+                <span v-if="unpublishedCountOf(row.original) || failedIngestCountOf(row.original)" class="entry-cell__flags">
+                  <span v-if="unpublishedCountOf(row.original)" class="entry-flag entry-flag--warn">未发布 {{ unpublishedCountOf(row.original) }}</span>
+                  <span v-if="failedIngestCountOf(row.original)" class="entry-flag entry-flag--danger">摄入失败 {{ failedIngestCountOf(row.original) }}</span>
+                </span>
+                <span v-else-if="updatedAtOf(row.original)" class="entry-cell__desc">
+                  更新于 <YdTimeAgo :date="updatedAtOf(row.original)" />
+                </span>
+              </div>
             </template>
             <template #cell-description="{ row }">
               <span class="entry-cell__desc" :title="row.original.description || undefined">{{ row.original.description || '-' }}</span>
@@ -367,7 +480,6 @@ function removeSpace(item: WikiSpace) {
 </template>
 
 <style scoped>
-/* 入口页用宿主页面滚动：面板只填满父级，滚动交给 .main-container 之外的本地滚动区 */
 .entry {
   display: flex;
   flex-direction: column;
@@ -377,19 +489,51 @@ function removeSpace(item: WikiSpace) {
   min-height: 0;
 }
 
-.entry__header {
-  flex-shrink: 0;
-  margin-bottom: 0;
+/* 页头：H1 20/600 + 计数副标题，动作收在右侧，不再跨行分散 */
+.entry__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 10px;
 }
 
-.entry__filters {
+.entry__head-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.entry__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-1);
+}
+
+.entry__subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.entry__head-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 工具栏：搜索 + 筛选 + 视图切换同一条横栏，与列表用一条细边分隔 */
+.entry__toolbar {
   display: flex;
   flex-shrink: 0;
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--color-bg-1);
+  padding: 0 16px 12px;
   border-bottom: 1px solid var(--color-border-2);
 }
 
@@ -404,7 +548,12 @@ function removeSpace(item: WikiSpace) {
 
 .entry__mode {
   flex-shrink: 0;
-  margin-left: auto;
+}
+
+.entry__result-count {
+  font-size: 12px;
+  color: var(--color-text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .entry__body {
@@ -434,11 +583,11 @@ function removeSpace(item: WikiSpace) {
 }
 
 .entry__skeleton-card {
-  aspect-ratio: 4 / 3;
+  height: 200px;
   overflow: hidden;
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .entry__scroll {
@@ -451,10 +600,12 @@ function removeSpace(item: WikiSpace) {
   padding: 16px;
 }
 
+/* 少数据时网格居中：列宽有上限，两张卡不会再孤零零贴在左上角 */
 .entry__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
   gap: 14px;
+  justify-content: center;
 }
 
 /* 卡片/正文默认内边距来自未分层工具类与适配层，同优先级拼顺序会输，用重叠选择器压掉 */
@@ -465,12 +616,12 @@ function removeSpace(item: WikiSpace) {
   padding: 0;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 .entry-card:hover {
-  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
-  transform: translateY(-2px);
+  border-color: var(--color-border-3);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
 }
 
 /* 焦点环复用共享外观令牌，不直接消费品牌色令牌 */
@@ -487,24 +638,36 @@ function removeSpace(item: WikiSpace) {
   padding: 0;
 }
 
-/* 封面铺满整卡：UPLOAD 呈现真实图片，SEEDED 按 seed 确定性渐变，未设置封面才回落名称哈希占位 */
+/* 封面是窄横幅而不是整卡：名称为主视觉，字母只留小尺寸方块 */
 .entry-card__cover {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 4 / 3;
+  height: 104px;
   overflow: hidden;
   background-color: var(--color-fill-2);
 }
 
-.entry-card__cover-img {
+.entry-card__cover-img,
+.entry-card__cover-art {
   width: 100%;
   height: 100%;
+}
+
+.entry-card__cover-img {
   object-fit: cover;
 }
 
-.entry-card__top {
+/* 未设置封面：中性点阵 + 小图标，低饱和、不冒充已有封面 */
+.entry-card__cover-art--empty {
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: var(--color-text-4);
+  background-color: var(--color-fill-2);
+  background-image: radial-gradient(var(--color-border-3) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.entry-card__cover-top {
   position: absolute;
   top: 0;
   right: 0;
@@ -518,59 +681,12 @@ function removeSpace(item: WikiSpace) {
 .entry-card__cover-note {
   padding: 1px 7px;
   font-size: 11px;
-  color: rgb(255 255 255 / 90%);
-  background: rgb(0 0 0 / 28%);
+  color: rgb(255 255 255 / 92%);
+  background: rgb(0 0 0 / 34%);
   border-radius: 999px;
 }
 
-.entry-card__cover-initial {
-  font-size: 44px;
-  font-weight: 700;
-  line-height: 1;
-  color: rgb(255 255 255 / 88%);
-}
-
-.entry-card__cover-slug {
-  padding: 1px 7px;
-  margin-left: auto;
-  font-size: 11px;
-  color: rgb(255 255 255 / 90%);
-  background: rgb(0 0 0 / 28%);
-  border-radius: 999px;
-}
-
-/* 名称/描述压在封面底部的暗角渐变上，保证任何封面下文字可读 */
-.entry-card__info {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: grid;
-  gap: 3px;
-  padding: 28px 12px 10px;
-  background: linear-gradient(180deg, rgb(0 0 0 / 0%) 0%, rgb(0 0 0 / 58%) 100%);
-}
-
-.entry-card__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 14px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 30%);
-  white-space: nowrap;
-}
-
-.entry-card__desc {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: rgb(255 255 255 / 78%);
-  white-space: nowrap;
-}
-
-/* hover 浮出的知识库设置条：半透明深色 + 背景模糊，从底部滑入；按钮等宽带文字标签 */
+/* hover 浮出的知识库设置条：深色实底（不用毛玻璃），从封面底部滑入；按钮等宽带文字标签 */
 .entry-card__bar {
   position: absolute;
   right: 0;
@@ -580,11 +696,10 @@ function removeSpace(item: WikiSpace) {
   gap: 2px;
   align-items: center;
   padding: 5px 8px;
-  background: rgb(10 12 16 / 68%);
+  background: rgb(10 12 16 / 82%);
   opacity: 0;
-  backdrop-filter: blur(8px);
   transform: translateY(100%);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
 .entry-card:hover .entry-card__bar,
@@ -619,6 +734,152 @@ function removeSpace(item: WikiSpace) {
   background: rgb(255 90 90 / 16%);
 }
 
+.entry-card__body {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.entry-card__head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 小尺寸字母 Logo：28px 方块，不抢名称为主视觉 */
+.entry-card__initial {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-2);
+  background: var(--color-fill-2);
+  border-radius: 8px;
+}
+
+.entry-card__head-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.entry-card__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  white-space: nowrap;
+}
+
+.entry-card__slug {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+.entry-card__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-2);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 39px;
+}
+
+.entry-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.entry-card__meta-item {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* 待处理状态：只有真实 > 0 时才出现，颜色成体系（未发布=警告、摄入失败=危险） */
+.entry-card__flags,
+.entry-cell__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.entry-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+}
+
+.entry-flag--warn {
+  color: rgb(var(--warning-7));
+  background: rgb(var(--warning-1));
+}
+
+.entry-flag--danger {
+  color: rgb(var(--danger-7));
+  background: rgb(var(--danger-1));
+}
+
+/* 新建引导卡：网格里的虚线空位，用 YD 按钮承载（业务模板不自绘原生按钮）；
+   重叠类名垫高优先级，压掉按钮自身的底色、描边与固定高度 */
+.entry-create.entry-create {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  height: auto;
+  min-height: 200px;
+  padding: 16px;
+  color: var(--color-text-3);
+  background: transparent;
+  border: 1px dashed var(--color-border-3);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.entry-create.entry-create:hover {
+  color: var(--color-text-1);
+  background: var(--color-bg-1);
+  border-color: var(--color-text-4);
+}
+
+.entry-create__inner {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.entry-create__icon {
+  font-size: 20px;
+}
+
+.entry-create__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.entry-create__hint {
+  font-size: 12px;
+}
+
 .entry-cell {
   display: grid;
   min-width: 0;
@@ -641,6 +902,10 @@ function removeSpace(item: WikiSpace) {
   white-space: nowrap;
 }
 
+.entry-cell__flags {
+  margin-top: 3px;
+}
+
 .entry-form {
   display: grid;
   gap: 14px;
@@ -657,7 +922,7 @@ function removeSpace(item: WikiSpace) {
 }
 
 @media (width <= 768px) {
-  .entry__filters {
+  .entry__toolbar {
     align-items: stretch;
   }
 
@@ -665,10 +930,6 @@ function removeSpace(item: WikiSpace) {
   .entry__status {
     flex: 1 1 100%;
     max-width: none;
-  }
-
-  .entry__mode {
-    margin-left: 0;
   }
 
   .entry__inner {

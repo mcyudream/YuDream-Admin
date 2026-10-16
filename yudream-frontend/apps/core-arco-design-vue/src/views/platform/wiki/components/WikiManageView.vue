@@ -5,9 +5,11 @@ import { wikiManageAreaPanels, wikiManageAreas, wikiWorkbenchKey } from '../wiki
 import WikiManageArea from './WikiManageArea.vue'
 
 /**
- * 治理区：整体采用设置版式（YdSettingsLayout）——左侧是一级区域导航，
- * 右侧按选中的区域动态加载对应的列表 / 表格 / 选项面板；区域内多分区时用横向子标签切换。
- * 治理区不暴露正文编辑器，也不复用作者区目录树。
+ * 治理区：顶部横向区域 Tab（概览 / 内容 / 质量 / 洞察 / 协作 / 设置）+ 全宽内容区。
+ *
+ * 区域导航放顶部而不是左侧竖排：治理面板以表格与统计为主，横向 Tab 释放整行宽度，
+ * 在宽屏上不再把内容挤进中间窄列；区域内多分区时仍用横向子标签切换。
+ * 设置面板（WikiSettingsPanel）内部保持 YdSettingsLayout 的设置版式，两者互不干扰。
  *
  * 每个区域显式写一个插槽（组件库模板编译不支持 v-for + 动态插槽名，会直接崩）；
  * 区域内容统一由 WikiManageArea 承载，避免六份重复结构。
@@ -23,7 +25,7 @@ const navAreas = computed(() => wikiManageAreas.map(area => ({
   unavailable: wikiManageAreaPanels(area.key).every(panel => Boolean(panel.unavailable)),
 })))
 
-/** 设置版式的左导航：区域名即分区名；未接入区域在名称上直说，不用角标制造歧义 */
+/** 顶部 Tab 列表：区域名即分区名；未接入区域在名称上直说，不用角标制造歧义 */
 const areaList = computed(() => navAreas.value.map(area => ({
   icon: area.icon,
   label: area.unavailable ? `${area.label}（待接入）` : area.label,
@@ -108,65 +110,48 @@ function openAuthor() {
 
 <template>
   <div class="manage">
-    <YdSettingsLayout
+    <!-- 上下文条：当前知识库 + 全库级动作，保持一行，不抢 Tab 的视觉主位 -->
+    <div class="manage__bar">
+      <div class="manage__bar-left">
+        <YdTooltip text="返回知识库列表">
+          <YdButton variant="ghost" size="icon-sm" aria-label="返回知识库列表" @click="store.openEntry()">
+            <YdIcon name="morph:arrow-left" />
+          </YdButton>
+        </YdTooltip>
+        <span class="manage__bar-label">治理</span>
+        <YdSelect
+          v-model="selectedSpaceId"
+          :options="spaceOptions"
+          :disabled="!spaceOptions.length"
+          placeholder="暂无知识库"
+          aria-label="当前知识库"
+          class="manage__space"
+        />
+        <span v-if="store.loadingTree.value" class="manage__sync" role="status">
+          <YdIcon name="morph:loader-circle" class="manage__spin" />
+          同步中
+        </span>
+      </div>
+
+      <div class="manage__bar-actions">
+        <YdButton variant="outline" size="sm" :disabled="!store.spaceId.value" @click="openAuthor">
+          <YdIcon name="morph:pencil" />
+          编辑
+        </YdButton>
+        <YdButton variant="outline" size="sm" :disabled="!store.spaceId.value" :loading="rebuilding" @click="rebuild">
+          <YdIcon name="morph:refresh-cw" />
+          重建索引
+        </YdButton>
+      </div>
+    </div>
+
+    <YdTabs
       v-model="activeAreaKey"
       :list="areaList"
-      surface
-      scroll
-      :title="wikiManageAreas.find(area => area.key === activeArea.key)?.label"
-      class="manage__layout"
+      class="manage__tabs"
       aria-label="知识库治理分区"
+      content-class="manage__content"
     >
-      <template #header>
-        <div class="wiki-manage__header">
-          <div class="wiki-manage__header-left">
-            <YdTooltip text="返回知识库列表">
-              <YdButton variant="ghost" size="icon-sm" aria-label="返回知识库列表" @click="store.openEntry()">
-                <YdIcon name="morph:arrow-left" />
-              </YdButton>
-            </YdTooltip>
-            <div class="wiki-manage__space-selector">
-              <YdSelect
-                v-model="selectedSpaceId"
-                :options="spaceOptions"
-                :disabled="!spaceOptions.length"
-                placeholder="暂无知识库"
-                aria-label="当前知识库"
-                class="wiki-manage__space"
-              />
-              <div v-if="store.loadingTree.value" class="wiki-manage__sync" role="status">
-                <YdIcon name="morph:loader-circle" class="wiki-manage__spin" />
-                <span>同步中</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="wiki-manage__actions">
-            <YdButton 
-              variant="outline" 
-              size="sm" 
-              :disabled="!store.spaceId.value" 
-              @click="openAuthor"
-              class="wiki-manage__action-btn"
-            >
-              <YdIcon name="morph:pencil" />
-              编辑
-            </YdButton>
-            <YdButton 
-              variant="outline" 
-              size="sm" 
-              :disabled="!store.spaceId.value" 
-              :loading="rebuilding" 
-              @click="rebuild"
-              class="wiki-manage__action-btn"
-            >
-              <YdIcon name="morph:refresh-cw" />
-              重建索引
-            </YdButton>
-          </div>
-        </div>
-      </template>
-
       <template #overview>
         <WikiManageArea :ref="(instance) => registerArea('overview', instance)" area-key="overview" />
       </template>
@@ -185,203 +170,157 @@ function openAuthor() {
       <template #settings>
         <WikiManageArea :ref="(instance) => registerArea('settings', instance)" area-key="settings" />
       </template>
-    </YdSettingsLayout>
+    </YdTabs>
   </div>
 </template>
 
 <style scoped>
-/* 管理页：玻璃态 + 微交互 + 现代配色 */
-.wiki-manage__header {
+.manage {
   display: flex;
-  gap: 14px;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg-1);
+}
+
+/* 上下文条：单行、可换行，去掉玻璃态与阴影，靠色阶与边框分隔 */
+.manage__bar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
   padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,250,251,0.9) 100%);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  border-radius: 0 0 12px 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  position: relative;
-  overflow: hidden;
+  border-bottom: 1px solid var(--color-border-2);
 }
 
-.wiki-manage__header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 0% 0%, rgba(99,102,241,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(139,92,246,0.08) 0%, transparent 50%);
-  pointer-events: none;
-}
-
-.wiki-manage__header-left {
+.manage__bar-left {
   display: flex;
-  gap: 10px;
-  align-items: center;
   flex: 1;
-  min-width: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.wiki-manage__space-selector {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  max-width: 320px;
-  background: linear-gradient(135deg, rgba(243,244,246,0.8), rgba(249,250,251,0.8));
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.08);
-  backdrop-filter: blur(10px);
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.wiki-manage__space-selector:hover {
-  background: linear-gradient(135deg, rgba(249,250,251,0.9), rgba(255,255,255,0.9));
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.wiki-manage__space {
-  flex: 1;
-  min-width: 140px;
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  padding: 6px 10px !important;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95)) !important;
-  color: #1f2937;
-  transition: all 200ms;
-}
-
-.wiki-manage__space:hover {
-  border-color: #4f46e5 !important;
-  box-shadow: 0 2px 8px rgba(79,70,229,0.1) !important;
-}
-
-.wiki-manage__space:focus {
-  border-color: #4f46e5 !important;
-  box-shadow: 0 0 0 3px rgba(79,70,229,0.1) !important;
-}
-
-.wiki-manage__sync {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #0891b2;
-  background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(8,145,178,0.1));
-  border: 1px solid rgba(8,145,178,0.2);
-  border-radius: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  backdrop-filter: blur(10px);
-  transition: all 200ms;
-}
-
-.wiki-manage__sync:hover {
-  background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(8,145,178,0.15));
-  box-shadow: 0 2px 8px rgba(8,145,178,0.1);
-}
-
-.wiki-manage__spin {
-  animation: spin 1.2s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.wiki-manage__actions {
-  display: flex;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  position: relative;
-  z-index: 1;
+  min-width: 0;
 }
 
-.wiki-manage__action-btn {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  padding: 7px 14px;
-  background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 8px;
-  cursor: pointer;
+.manage__bar-label {
   font-size: 13px;
-  font-weight: 500;
-  color: #1f2937;
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-  backdrop-filter: blur(10px);
+  font-weight: 600;
+  color: var(--color-text-1);
   white-space: nowrap;
 }
 
-.wiki-manage__action-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-  background: linear-gradient(135deg, #ffffff, #fafbfc);
-  border-color: #4f46e5;
+.manage__space {
+  width: 100%;
+  max-width: 260px;
 }
 
-.wiki-manage__action-btn:active {
-  transform: translateY(-1px);
+.manage__sync {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
 }
 
-@media (width <= 1024px) {
-  .wiki-manage__header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
+.manage__spin {
+  animation: manage-spin 1.2s linear infinite;
+}
 
-  .wiki-manage__header-left {
-    width: 100%;
+@keyframes manage-spin {
+  to {
+    transform: rotate(360deg);
   }
+}
 
-  .wiki-manage__space-selector {
-    width: 100%;
-    max-width: none;
-  }
+.manage__bar-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+}
 
-  .wiki-manage__actions {
-    margin-left: 0;
-    width: 100%;
-  }
+/*
+ * 顶部区域 Tab：压掉组件库的分段胶囊外观，改为页面级横向标签——透明底、
+ * 左对齐、活动项用品牌色下划线标记。用 :deep 触达 Tabs 内部元素，
+ * 重叠一层 .manage__tabs 以外层类垫高优先级，压过未分层工具类。
+ */
+.manage__tabs.manage__tabs {
+  flex: 1;
+  min-height: 0;
+}
 
-  .wiki-manage__action-btn {
-    flex: 1;
-    justify-content: center;
-  }
+.manage__tabs :deep([data-slot="tabs-list"]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  padding: 0 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border-2);
+  border-radius: 0;
+}
+
+.manage__tabs :deep([data-slot="tabs-trigger"]) {
+  flex: 0 0 auto;
+  width: auto;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--color-text-2);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 0 -2px 0 0 transparent;
+  transition: color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.manage__tabs :deep([data-slot="tabs-trigger"]:hover) {
+  color: var(--color-text-1);
+}
+
+.manage__tabs :deep([data-slot="tabs-trigger"][data-state="active"]) {
+  font-weight: 600;
+  color: var(--color-text-1);
+  background: transparent;
+  box-shadow: inset 0 -2px 0 0 var(--color-text-1);
+}
+
+/* 内容舞台与面板自带底色同为 fill-1，内边距不会露白；面板各自内部滚动 */
+.manage__tabs :deep(.manage__content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow: hidden;
+  background: var(--color-fill-1);
 }
 
 @media (width <= 768px) {
-  .wiki-manage__space-selector {
-    flex-direction: column;
+  .manage__bar {
     align-items: stretch;
   }
 
-  .wiki-manage__sync {
+  .manage__space {
+    max-width: none;
+  }
+
+  .manage__bar-actions {
     width: 100%;
+  }
+
+  .manage__bar-actions :deep([data-slot="button"]) {
+    flex: 1;
     justify-content: center;
   }
 
-  .wiki-manage__actions {
-    flex-direction: column;
-  }
-
-  .wiki-manage__action-btn {
-    width: 100%;
+  .manage__tabs :deep(.manage__content) {
+    padding: 12px;
   }
 }
 </style>

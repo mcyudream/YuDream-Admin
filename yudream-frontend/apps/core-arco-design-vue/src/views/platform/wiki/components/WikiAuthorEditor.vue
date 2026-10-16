@@ -14,7 +14,7 @@ import { buildWikiQuoteAnchor, WIKI_QUOTE_ANCHOR_LIMITS } from '@/views/wiki/wik
 import { createWikiDocuments } from '../wiki-documents'
 import { wikiDraftFields } from '../wiki-editor-state'
 import {
-  pageTypeColor,
+  pageTypeDot,
   pageTypeLabel,
   pageTypeOptions,
   resolveWikiLink,
@@ -42,7 +42,7 @@ type WikiTreeNode = YdTreeNode & {
   expandedIcon: string
   published: boolean
   typeLabel: string
-  typeColor?: string
+  typeDot?: string
 }
 
 const store = inject(wikiWorkbenchKey)!
@@ -63,6 +63,8 @@ const sidebarOpen = ref(true)
 const asideOpen = ref(false)
 const pane = ref<'sidebar' | 'main' | 'aside'>('main')
 const asideTab = ref<string>('meta')
+/** 属性栏分组折叠态：基础信息与关联默认展开，来源默认收起（属性栏窄，先看结构） */
+const asideGroups = ref({ base: true, relations: true, sources: false })
 const isMobile = useIsMobile()
 // 窄屏（<1024px）默认收起属性栏，让正文优先；≥1280px 默认展开
 const isWide = useMediaQuery('(min-width: 1280px)')
@@ -108,6 +110,21 @@ const tabsModel = computed({
 })
 
 const bodyCharCount = computed(() => editorFields.value.body.replace(/\s/g, '').length)
+
+/**
+ * 顶部保存态与主操作：
+ * 主按钮永远是当前可执行的那个——页面有改动时发布按钮就是「保存并发布」（publish 内部先保存再发布），
+ * 保存只作为次要动作保留；目录没有发布动作，保存即主操作。
+ */
+const statusText = computed(() => conflict.value ? '服务端已更新' : saving.value ? '保存中…' : dirty.value ? '未保存' : '已保存')
+const statusIcon = computed(() => conflict.value ? 'morph:triangle-alert' : dirty.value ? 'morph:circle-dot' : 'morph:circle-check')
+const statusToneClass = computed(() => conflict.value
+  ? 'wiki-author__status--conflict'
+  : dirty.value ? 'wiki-author__status--dirty' : 'wiki-author__status--saved')
+const saveButtonVariant = computed<'default' | 'outline'>(() => isPage.value ? 'outline' : 'default')
+const publishLabel = computed(() => dirty.value
+  ? '保存并发布'
+  : node.value?.publishedVersionId ? '重新发布' : '发布')
 
 const statusItems = computed<YdWorkspaceStatusItem[]>(() => {
   const current = node.value
@@ -214,7 +231,7 @@ const filteredTree = computed(() => {
       expandedIcon: 'morph:folder-open',
       published: !isDirectory && Boolean(item.publishedVersionId),
       typeLabel: !isDirectory && pageType ? pageTypeLabel(pageType) : '',
-      typeColor: !isDirectory && pageType ? pageTypeColor(pageType) : undefined,
+      typeDot: !isDirectory && pageType ? pageTypeDot(pageType) : undefined,
     }
     treeNodes.set(item.id, treeNode)
     const parent = item.parentId ? treeNodes.get(item.parentId) : undefined
@@ -273,14 +290,17 @@ watch(treeKeyword, () => {
 })
 
 const previewMarkdown = computed(() => rewriteApiFileUrls(wikilinksToMarkdown(editorFields.value.body)))
+// 工具栏按用途分组：文本样式 | 结构 | 插入 | 历史操作，再换行放视图切换（'-' 与 '=' 是组件库的分组分隔符）
 const wikiToolbars: YdMarkdownToolbar[] = [
   'bold',
   'italic',
+  '-',
   'title',
   'quote',
   'unorderedList',
   'orderedList',
   'task',
+  '-',
   'codeRow',
   'code',
   'link',
@@ -904,10 +924,10 @@ onBeforeUnmount(() => {
     :status-items="statusItems"
     aria-label="知识库编辑器"
   >
-    <!-- 顶部工具条：保持简洁高效 -->
+    <!-- 顶部工具条：一行三段——上下文 / 标题与保存态 / 动作；状态紧跟标题，主按钮随当前可执行动作切换 -->
     <template #header>
-      <div class="wiki-author__header">
-        <div class="wiki-author__header-left">
+      <div class="author-bar">
+        <div class="author-bar__left">
           <YdTooltip text="返回知识库">
             <YdButton variant="ghost" size="icon-sm" aria-label="返回知识库" @click="store.openEntry()">
               <YdIcon name="morph:arrow-left" />
@@ -924,35 +944,30 @@ onBeforeUnmount(() => {
               <YdIcon :name="sidebarOpen ? 'morph:panel-left-close' : 'morph:panel-left-open'" />
             </YdButton>
           </YdTooltip>
-          <div class="wiki-author__header-context">
-            <div class="wiki-author__space-badge">{{ space?.name || '未选择' }}</div>
-            <div class="wiki-author__breadcrumb" v-if="node">
-              <YdIcon name="morph:chevron-right" class="wiki-author__breadcrumb-sep" />
-              <span class="wiki-author__node-type">{{ node.nodeType === 'DIRECTORY' ? '目录' : '页面' }}</span>
-            </div>
-          </div>
+          <span class="author-bar__space" :title="space?.name || '未选择知识库'">{{ space?.name || '未选择' }}</span>
+          <template v-if="node">
+            <YdIcon name="morph:chevron-right" class="author-bar__sep" />
+            <span class="author-bar__kind">{{ node.nodeType === 'DIRECTORY' ? '目录' : '页面' }}</span>
+          </template>
         </div>
 
-        <YdInput
-          v-model="editorFields.title"
-          class="wiki-author__title-input"
-          :disabled="!node"
-          :placeholder="node?.nodeType === 'DIRECTORY' ? '目录名称' : '页面标题'"
-          aria-label="页面标题"
-        />
+        <!-- 标题与保存状态同组：状态跟在页面名后面，不再飘到工具条另一端 -->
+        <div class="author-bar__title">
+          <YdInput
+            v-model="editorFields.title"
+            class="wiki-author__title-input"
+            :disabled="!node"
+            :placeholder="node?.nodeType === 'DIRECTORY' ? '目录名称' : '页面标题'"
+            aria-label="页面标题"
+          />
+          <span :class="['wiki-author__status', statusToneClass]" role="status">
+            <YdIcon :name="statusIcon" :class="{ 'wiki-author__status-icon--pulse': dirty && !conflict }" />
+            <span class="wiki-author__status-text">{{ statusText }}</span>
+          </span>
+        </div>
 
-        <div class="wiki-author__header-right">
-          <div :class="['wiki-author__status', { 'wiki-author__status--saved': !dirty && !conflict }]" role="status">
-            <YdIcon 
-              :name="conflict ? 'morph:triangle-alert' : dirty ? 'morph:circle-dot' : 'morph:circle-check'"
-              :class="{ 'wiki-author__status-icon--pulse': dirty }"
-            />
-            <span class="wiki-author__status-text">
-              {{ conflict ? '服务端已更新' : saving ? '保存中…' : dirty ? '未保存' : '已保存' }}
-            </span>
-          </div>
-
-          <div class="wiki-author__mode-switch" v-if="isPage">
+        <div class="author-bar__right">
+          <div v-if="isPage" class="author-bar__mode">
             <YdSegmented
               v-model="viewMode"
               size="sm"
@@ -964,49 +979,50 @@ onBeforeUnmount(() => {
               </template>
             </YdSegmented>
           </div>
+          <YdButton
+            :variant="saveButtonVariant"
+            :loading="saving"
+            :disabled="!node || !dirty || conflict || publishing"
+            @click="saveNode"
+          >
+            <YdIcon name="morph:save" /> 保存
+          </YdButton>
+          <YdButton v-if="isPage" :loading="publishing" :disabled="!node || saving || conflict" @click="publish">
+            <YdIcon name="morph:send" /> {{ publishLabel }}
+          </YdButton>
+          <YdTooltip :text="publicPreviewHint">
+            <YdButton
+              variant="ghost"
+              size="icon-sm"
+              aria-label="预览公开页"
+              :disabled="!publicPreviewUrl"
+              @click="openPublicPreview"
+            >
+              <YdIcon name="morph:external-link" />
+            </YdButton>
+          </YdTooltip>
+          <YdTooltip v-if="commentEntryVisible" text="页面评论">
+            <YdButton variant="ghost" size="icon-sm" aria-label="打开页面评论" @click="openCommentsPanel">
+              <YdIcon name="morph:message-circle" />
+            </YdButton>
+          </YdTooltip>
+          <YdTooltip text="进入治理区">
+            <YdButton variant="ghost" size="icon-sm" aria-label="进入治理区" @click="store.openManage()">
+              <YdIcon name="morph:settings-2" />
+            </YdButton>
+          </YdTooltip>
+          <YdTooltip v-if="!isMobile" :text="asideOpen ? '收起属性栏' : '展开属性栏'">
+            <YdButton
+              variant="ghost"
+              size="icon-sm"
+              :aria-label="asideOpen ? '收起属性栏' : '展开属性栏'"
+              :aria-pressed="asideOpen"
+              @click="asideOpen = !asideOpen"
+            >
+              <YdIcon :name="asideOpen ? 'morph:panel-right-close' : 'morph:panel-right-open'" />
+            </YdButton>
+          </YdTooltip>
         </div>
-      </div>
-
-      <!-- 操作栏：保存、发布、治理等 -->
-      <div class="author__ops">
-        <YdButton :loading="saving" :disabled="!node || !dirty || conflict || publishing" @click="saveNode">
-          <YdIcon name="morph:save" /> 保存
-        </YdButton>
-        <YdButton v-if="isPage" variant="outline" :loading="publishing" :disabled="!node || saving || conflict" @click="publish">
-          <YdIcon name="morph:send" /> {{ node?.publishedVersionId ? '重新发布' : '发布' }}
-        </YdButton>
-        <YdTooltip :text="publicPreviewHint">
-          <YdButton
-            variant="ghost"
-            size="icon-sm"
-            aria-label="预览公开页"
-            :disabled="!publicPreviewUrl"
-            @click="openPublicPreview"
-          >
-            <YdIcon name="morph:external-link" />
-          </YdButton>
-        </YdTooltip>
-        <YdTooltip v-if="commentEntryVisible" text="页面评论">
-          <YdButton variant="ghost" size="icon-sm" aria-label="打开页面评论" @click="openCommentsPanel">
-            <YdIcon name="morph:message-circle" />
-          </YdButton>
-        </YdTooltip>
-        <YdTooltip text="进入治理区">
-          <YdButton variant="ghost" size="icon-sm" aria-label="进入治理区" @click="store.openManage()">
-            <YdIcon name="morph:settings-2" />
-          </YdButton>
-        </YdTooltip>
-        <YdTooltip v-if="!isMobile" :text="asideOpen ? '收起属性栏' : '展开属性栏'">
-          <YdButton
-            variant="ghost"
-            size="icon-sm"
-            :aria-label="asideOpen ? '收起属性栏' : '展开属性栏'"
-            :aria-pressed="asideOpen"
-            @click="asideOpen = !asideOpen"
-          >
-            <YdIcon :name="asideOpen ? 'morph:panel-right-close' : 'morph:panel-right-open'" />
-          </YdButton>
-        </YdTooltip>
       </div>
     </template>
 
@@ -1051,11 +1067,10 @@ onBeforeUnmount(() => {
                   :name="treeNodeIcon(treeNode, expanded)"
                 />
                 <span class="author-node__title" :title="treeNode?.label">{{ treeNode?.label }}</span>
-                <span
-                  v-if="treeNodeView(treeNode)?.typeLabel"
-                  class="author-node__type"
-                  :style="{ color: treeNodeView(treeNode)?.typeColor }"
-                >{{ treeNodeView(treeNode)?.typeLabel }}</span>
+                <span v-if="treeNodeView(treeNode)?.typeLabel" class="author-node__type">
+                  <span class="author-node__type-dot" :style="{ background: treeNodeView(treeNode)?.typeDot }" />
+                  {{ treeNodeView(treeNode)?.typeLabel }}
+                </span>
                 <span v-if="treeNodeView(treeNode)?.published" class="author-node__dot" title="已发布" aria-label="已发布" />
                 <YdButton
                   class="author-node__delete"
@@ -1204,45 +1219,88 @@ onBeforeUnmount(() => {
                 <YdEmpty icon="morph:mouse-pointer-click" title="未打开页面" description="在目录中选择页面后可编辑属性。" />
               </div>
               <template v-else>
-                <div class="author-aside__field">
-                  <span class="author-aside__label">路径</span>
-                  <span class="author-aside__value">{{ node.path || node.slug || '-' }}</span>
-                </div>
-                <div class="author-aside__field">
-                  <span class="author-aside__label">节点类型</span>
-                  <span class="author-aside__value">{{ node.nodeType === 'DIRECTORY' ? '目录' : '页面' }}</span>
-                </div>
-                <template v-if="isPage">
-                  <label class="author-aside__field">
-                    <span class="author-aside__label">页面类型</span>
-                    <YdSelect v-model="editorFields.pageType" :options="pageTypeOptions" aria-label="页面类型" />
-                  </label>
-                  <label class="author-aside__field">
-                    <span class="author-aside__label">摘要</span>
-                    <YdInput v-model="editorFields.summary" placeholder="一句话摘要（展示在页面头部）" aria-label="页面摘要" />
-                  </label>
-                  <label class="author-aside__field">
-                    <span class="author-aside__label">标签</span>
-                    <YdInputTag v-model="editorFields.tags" size="small" placeholder="回车添加标签" allow-clear aria-label="页面标签" />
-                  </label>
-                  <label class="author-aside__field">
-                    <span class="author-aside__label">相关页面</span>
-                    <YdInputTag v-model="editorFields.related" size="small" placeholder="wikilink 标题" allow-clear aria-label="相关页面" />
-                  </label>
-                  <div v-if="editorFields.sources.length" class="author-aside__field">
-                    <span class="author-aside__label">资料来源</span>
-                    <span v-for="source in editorFields.sources" :key="source" class="author-source-chip">
-                      {{ source }}
-                      <YdButton variant="ghost" size="icon-sm" :aria-label="`移除资料来源 ${source}`" @click="removeSourceChip(source)">
-                        <YdIcon name="morph:x" />
-                      </YdButton>
-                    </span>
-                  </div>
-                  <div class="author-aside__field">
-                    <span class="author-aside__label">内联图片</span>
-                    <span class="author-aside__value">{{ imageVisibilityHint }}</span>
-                  </div>
-                </template>
+                <!-- 属性按语义分组折叠：基础信息 / 标签与关联 / 来源，扫读时先见分组标题 -->
+                <section class="author-aside__group">
+                  <YdCollapsible v-model="asideGroups.base">
+                    <template #trigger="{ open }">
+                      <span class="author-aside__group-head">
+                        <span class="author-aside__group-title">基础信息</span>
+                        <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="author-aside__group-chevron" />
+                      </span>
+                    </template>
+                    <div class="author-aside__group-body">
+                      <div class="author-aside__field">
+                        <span class="author-aside__label">路径</span>
+                        <span class="author-aside__value">{{ node.path || node.slug || '-' }}</span>
+                      </div>
+                      <div class="author-aside__field">
+                        <span class="author-aside__label">节点类型</span>
+                        <span class="author-aside__value">{{ node.nodeType === 'DIRECTORY' ? '目录' : '页面' }}</span>
+                      </div>
+                      <template v-if="isPage">
+                        <label class="author-aside__field">
+                          <span class="author-aside__label">页面类型</span>
+                          <YdSelect v-model="editorFields.pageType" :options="pageTypeOptions" aria-label="页面类型" />
+                        </label>
+                        <label class="author-aside__field">
+                          <span class="author-aside__label">摘要</span>
+                          <YdInput v-model="editorFields.summary" placeholder="一句话摘要（展示在页面头部）" aria-label="页面摘要" />
+                        </label>
+                      </template>
+                    </div>
+                  </YdCollapsible>
+                </section>
+
+                <section v-if="isPage" class="author-aside__group">
+                  <YdCollapsible v-model="asideGroups.relations">
+                    <template #trigger="{ open }">
+                      <span class="author-aside__group-head">
+                        <span class="author-aside__group-title">标签与关联</span>
+                        <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="author-aside__group-chevron" />
+                      </span>
+                    </template>
+                    <div class="author-aside__group-body">
+                      <label class="author-aside__field">
+                        <span class="author-aside__label">标签</span>
+                        <YdInputTag v-model="editorFields.tags" size="small" placeholder="回车添加标签" allow-clear aria-label="页面标签" />
+                      </label>
+                      <label class="author-aside__field">
+                        <span class="author-aside__label">相关页面</span>
+                        <YdInputTag v-model="editorFields.related" size="small" placeholder="wikilink 标题" allow-clear aria-label="相关页面" />
+                      </label>
+                    </div>
+                  </YdCollapsible>
+                </section>
+
+                <section v-if="isPage" class="author-aside__group">
+                  <YdCollapsible v-model="asideGroups.sources">
+                    <template #trigger="{ open }">
+                      <span class="author-aside__group-head">
+                        <span class="author-aside__group-title">来源</span>
+                        <span class="author-aside__group-count">{{ editorFields.sources.length }}</span>
+                        <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="author-aside__group-chevron" />
+                      </span>
+                    </template>
+                    <div class="author-aside__group-body">
+                      <div v-if="editorFields.sources.length" class="author-aside__field">
+                        <span class="author-aside__label">资料来源</span>
+                        <span v-for="source in editorFields.sources" :key="source" class="author-source-chip">
+                          {{ source }}
+                          <YdButton variant="ghost" size="icon-sm" :aria-label="`移除资料来源 ${source}`" @click="removeSourceChip(source)">
+                            <YdIcon name="morph:x" />
+                          </YdButton>
+                        </span>
+                      </div>
+                      <p v-else class="author-aside__hint">
+                        还没有关联资料来源；来源标记由摄入与生成流程写入。
+                      </p>
+                      <div class="author-aside__field">
+                        <span class="author-aside__label">内联图片</span>
+                        <span class="author-aside__value">{{ imageVisibilityHint }}</span>
+                      </div>
+                    </div>
+                  </YdCollapsible>
+                </section>
               </template>
             </div>
           </YdScrollArea>
@@ -1330,11 +1388,11 @@ onBeforeUnmount(() => {
       <YdButton v-if="conflict" variant="outline" size="sm" @click="reloadRemote">
         <YdIcon name="morph:rotate-cw" /> 重新载入
       </YdButton>
-      <YdButton size="sm" :loading="saving" :disabled="!dirty || conflict || publishing" @click="saveNode">
+      <YdButton :variant="saveButtonVariant" size="sm" :loading="saving" :disabled="!dirty || conflict || publishing" @click="saveNode">
         <YdIcon name="morph:save" /> 保存
       </YdButton>
-      <YdButton v-if="isPage" variant="outline" size="sm" :loading="publishing" :disabled="saving || conflict" @click="publish">
-        <YdIcon name="morph:send" /> {{ node.publishedVersionId ? '重新发布' : '发布' }}
+      <YdButton v-if="isPage" size="sm" :loading="publishing" :disabled="saving || conflict" @click="publish">
+        <YdIcon name="morph:send" /> {{ publishLabel }}
       </YdButton>
     </div>
   </YdFixedBar>
@@ -1381,21 +1439,6 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-.author__space {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-}
-
-.author__title {
-  flex: 1 1 200px;
-  min-width: 120px;
-  font-weight: 600;
-}
-
 .author__state {
   display: inline-flex;
   flex-shrink: 0;
@@ -1408,26 +1451,6 @@ onBeforeUnmount(() => {
 
 .author__state--saved {
   color: var(--color-text-3);
-}
-
-.author__mode {
-  flex-shrink: 0;
-}
-
-.author__mode-option {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.author__ops {
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin-left: auto;
 }
 
 /* 主区：标签条固定、正文区域自己滚动 */
@@ -1496,6 +1519,12 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+/* 编辑面是 flex 列：编辑器外壳（含错误提示）与编辑区域一起撑满面板高度 */
+.author-body__md :deep(.yd-markdown-editor-shell) {
+  flex: 1;
+  min-height: 0;
+}
+
 .author-body__md :deep(.yd-markdown-editor) {
   flex: 1;
   min-height: 0;
@@ -1507,14 +1536,34 @@ onBeforeUnmount(() => {
   min-height: 0 !important;
 }
 
+/* 编辑区分屏预览：浅灰地面 + 白色文档卡片，右侧明确是「渲染结果」而不是又一块编辑器 */
+.author-body__md :deep(.md-editor-preview-wrapper) {
+  background: var(--color-fill-1);
+}
+
+.author-body__md :deep(.md-editor-preview) {
+  padding: 16px 24px 32px;
+  margin: 12px;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+/* 预览面：浅灰地面 + 白色文档卡片，明确「这里是渲染结果」，与编辑面区分 */
 .author-body__preview {
   flex: 1;
   min-height: 0;
+  background: var(--color-fill-1);
 }
 
 .author-markdown {
   position: relative;
-  padding: 8px 24px 24px;
+  max-width: 880px;
+  padding: 24px 32px 40px;
+  margin: 16px auto 24px;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
 }
 
 .author-markdown :deep(.md-editor-preview-wrapper) {
@@ -1647,14 +1696,22 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+/* 类型徽标：淡色小圆点 + 灰字标签，替代整块灰底文字，目录树不再杂乱 */
 .author-node__type {
+  display: inline-flex;
   flex-shrink: 0;
-  padding: 1px 6px;
-  font-size: 10px;
-  font-weight: 600;
+  gap: 5px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--color-text-3);
   white-space: nowrap;
-  background: var(--color-fill-2);
-  border-radius: 5px;
+}
+
+.author-node__type-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
 }
 
 .author-node__dot {
@@ -1866,190 +1923,187 @@ onBeforeUnmount(() => {
   color: var(--color-text-3);
 }
 </style>
-
 <style scoped>
-/* ========== 全新设计：现代化 + 微交互 + 玻璃态 ========== */
-
-.wiki-author__header {
+/* 工具条：一行三段（上下文 / 标题与状态 / 动作），用色阶与一条底边分隔，不用玻璃态、渐变与悬浮位移 */
+.author-bar {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
-  padding: 8px 16px;
-  height: 52px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  width: 100%;
   min-width: 0;
-  position: relative;
 }
 
-.wiki-author__header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top right, rgba(99,102,241,0.05) 0%, transparent 70%);
-  pointer-events: none;
-  border-radius: 0 0 0 0;
-}
-
-.wiki-author__header-left {
+.author-bar__left {
   display: flex;
+  flex-shrink: 0;
   gap: 6px;
   align-items: center;
-  flex-shrink: 0;
-}
-
-.wiki-author__header-context {
-  display: flex;
-  gap: 8px;
-  align-items: center;
   min-width: 0;
-  background: linear-gradient(135deg, rgba(249,250,251,0.8), rgba(243,244,246,0.8));
-  padding: 4px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(0,0,0,0.06);
-  backdrop-filter: blur(10px);
 }
 
-.wiki-author__space-badge {
-  padding: 4px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f2937;
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-radius: 6px;
-  white-space: nowrap;
-  max-width: 150px;
+.author-bar__space {
   overflow: hidden;
   text-overflow: ellipsis;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  transition: all 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.wiki-author__space-badge:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-}
-
-.wiki-author__breadcrumb {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  font-size: 12px;
-  color: #6b7280;
+  max-width: 160px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-1);
   white-space: nowrap;
 }
 
-.wiki-author__breadcrumb-sep {
+.author-bar__sep {
   flex-shrink: 0;
-  font-size: 13px;
-  color: #d1d5db;
+  font-size: 12px;
+  color: var(--color-text-4);
 }
 
-.wiki-author__node-type {
-  padding: 3px 8px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #4f46e5;
-  letter-spacing: 0.3px;
+.author-bar__kind {
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+/* 标题与保存态同组：状态紧跟在页面名后面 */
+.author-bar__title {
+  display: flex;
+  flex: 1 1 260px;
+  gap: 8px;
+  align-items: center;
+  min-width: 200px;
+}
+
+.author-bar__right {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.author-bar__mode {
+  display: flex;
+  align-items: center;
 }
 
 .wiki-author__title-input {
   flex: 1;
-  min-width: 240px;
-  height: 36px;
+  min-width: 160px;
 }
 
 .wiki-author__title-input :deep(input) {
   font-size: 15px;
   font-weight: 600;
-  color: #1f2937;
-  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(249,250,251,0.9));
-  border: 1px solid rgba(0,0,0,0.08) !important;
-  border-radius: 8px;
-  padding: 8px 14px !important;
-  height: 36px;
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  backdrop-filter: blur(10px);
+  color: var(--color-text-1);
 }
 
-.wiki-author__title-input :deep(input:focus) {
-  background: linear-gradient(135deg, #ffffff, rgba(249,250,251,0.95));
-  border-color: #4f46e5 !important;
-  box-shadow: 0 0 0 3px rgba(79,70,229,0.1) !important;
-  transform: translateY(-2px);
-}
-
-.wiki-author__title-input :deep(input::placeholder) {
-  color: #9ca3af;
-}
-
-.wiki-author__header-right {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
+/* 保存态三色成体系：成功 / 警告 / 危险，浅底 + 文字色，不靠渐变区分 */
 .wiki-author__status {
   display: inline-flex;
-  gap: 6px;
+  flex-shrink: 0;
+  gap: 5px;
   align-items: center;
-  padding: 6px 12px;
+  padding: 3px 10px;
   font-size: 12px;
-  font-weight: 500;
-  color: #6b7280;
-  background: linear-gradient(135deg, rgba(243,244,246,0.9), rgba(249,250,251,0.9));
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: 999px;
   white-space: nowrap;
 }
 
 .wiki-author__status--saved {
-  color: #059669;
-  background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.1));
-  border-color: rgba(5,150,105,0.2);
+  color: rgb(var(--success-7));
+  background: rgb(var(--success-1));
+}
+
+.wiki-author__status--dirty {
+  color: rgb(var(--warning-7));
+  background: rgb(var(--warning-1));
+}
+
+.wiki-author__status--conflict {
+  color: rgb(var(--danger-7));
+  background: rgb(var(--danger-1));
 }
 
 .wiki-author__status-icon--pulse {
-  animation: wiki-author-pulse 1.8s cubic-bezier(0.4, 0.0, 0.6, 1.0) infinite;
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+  animation: wiki-author-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes wiki-author-pulse {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 1;
-    transform: scale(1);
   }
-  50% { 
-    opacity: 0.4;
-    transform: scale(1.2);
+
+  50% {
+    opacity: 0.35;
   }
 }
 
 .wiki-author__status-text {
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.2px;
 }
 
-.wiki-author__mode-switch {
-  flex-shrink: 0;
+/* 属性栏分组：折叠头就是分组标题行，展开内容与标题共用内边距 */
+.author-aside__group + .author-aside__group {
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border-1);
+}
+
+.author-aside__group :deep([data-slot="collapsible-trigger"]) {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.author-aside__group :deep([data-slot="collapsible-trigger"]:focus-visible) {
+  outline: 2px solid var(--yd-focus-ring);
+  outline-offset: -2px;
+}
+
+.author-aside__group-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 0 6px;
+}
+
+.author-aside__group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-2);
+}
+
+.author-aside__group-count {
+  font-size: 11px;
+  color: var(--color-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.author-aside__group-chevron {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--color-text-3);
+}
+
+.author-aside__group-body {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 8px;
 }
 
 @media (width <= 768px) {
-  .author__space {
+  .author-bar__space {
     max-width: 96px;
+  }
+
+  .author-bar__title {
+    flex: 1 1 100%;
   }
 
   .author-insert,
@@ -2059,7 +2113,8 @@ onBeforeUnmount(() => {
   }
 
   .author-markdown {
-    padding: 8px 12px 24px;
+    padding: 16px 12px 24px;
+    margin: 8px;
   }
 }
 </style>
