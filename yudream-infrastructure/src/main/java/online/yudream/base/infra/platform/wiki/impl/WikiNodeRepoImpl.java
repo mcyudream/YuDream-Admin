@@ -2,7 +2,9 @@ package online.yudream.base.infra.platform.wiki.impl;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSpaceStats;
 import online.yudream.base.domain.shared.IdGenerator;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiNodeDO;
 import online.yudream.base.infra.platform.wiki.mapper.WikiInfraMapper;
@@ -47,6 +49,35 @@ public class WikiNodeRepoImpl implements WikiNodeRepo {
         return mongo.find(Query.query(Criteria.where("spaceId").is(spaceId))
                         .with(Sort.by("sort", "createTime")), WikiNodeDO.class)
                 .stream().map(WikiInfraMapper::node).toList();
+    }
+
+    /**
+     * 列表卡片的节点聚合：只投影统计所需字段，不把正文 Markdown 拉回内存；
+     * 最近更新取节点 updateTime 最大值（发布/取消发布会写回节点，因此时间跟随发布动作）。
+     */
+    @Override
+    public WikiSpaceStats statsBySpaceId(Long spaceId) {
+        Query query = Query.query(Criteria.where("spaceId").is(spaceId));
+        query.fields().include("nodeType").include("publishedVersionId").include("updateTime");
+        int pages = 0;
+        int directories = 0;
+        int unpublished = 0;
+        LocalDateTime lastUpdatedAt = null;
+        for (WikiNodeDO node : mongo.find(query, WikiNodeDO.class)) {
+            if (node.getNodeType() == WikiNodeType.DIRECTORY) {
+                directories++;
+            }
+            else {
+                pages++;
+                if (node.getPublishedVersionId() == null) {
+                    unpublished++;
+                }
+            }
+            if (node.getUpdateTime() != null && (lastUpdatedAt == null || node.getUpdateTime().isAfter(lastUpdatedAt))) {
+                lastUpdatedAt = node.getUpdateTime();
+            }
+        }
+        return new WikiSpaceStats(pages, directories, unpublished, lastUpdatedAt);
     }
 
     @Override

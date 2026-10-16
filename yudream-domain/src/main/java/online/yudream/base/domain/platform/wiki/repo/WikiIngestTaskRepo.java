@@ -17,5 +17,8 @@ public interface WikiIngestTaskRepo {
 
     List<WikiIngestTask> findByStatus(WikiIngestTaskStatus status);
 
+    /** 空间内指定状态的任务数（列表卡片提示用），不加载任务实体。 */
+    long countBySpaceIdAndStatus(Long spaceId, WikiIngestTaskStatus status);
+
     void deleteById(Long id);
 }

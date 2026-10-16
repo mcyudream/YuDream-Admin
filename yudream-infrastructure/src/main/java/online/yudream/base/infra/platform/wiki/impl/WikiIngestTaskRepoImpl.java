@@ -64,6 +64,12 @@ public class WikiIngestTaskRepoImpl implements WikiIngestTaskRepo {
     }
 
     @Override
+    public long countBySpaceIdAndStatus(Long spaceId, WikiIngestTaskStatus status) {
+        return mongo.count(Query.query(Criteria.where("spaceId").is(spaceId).and("status").is(status)),
+                WikiIngestTaskDO.class);
+    }
+
+    @Override
     public void deleteById(Long id) {
         mongo.remove(Query.query(Criteria.where("id").is(id)), WikiIngestTaskDO.class);
     }

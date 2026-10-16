@@ -14,15 +14,19 @@ import online.yudream.base.domain.platform.wiki.aggregate.WikiSpaceMember;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceMemberSubjectType;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiIngestTaskStatus;
 import online.yudream.base.domain.platform.wiki.repo.WikiCommentRepo;
+import online.yudream.base.domain.platform.wiki.repo.WikiIngestTaskRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceMemberRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiActorGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiSpaceAccessResolver;
 import online.yudream.base.domain.platform.wiki.valobj.WikiActor;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSpaceStats;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +47,7 @@ public class WikiSpaceAclAppService {
     private final WikiSpaceMemberRepo memberRepo;
     private final WikiCommentRepo commentRepo;
     private final WikiNodeRepo nodeRepo;
+    private final WikiIngestTaskRepo ingestTaskRepo;
     private final WikiActorGateway actorGateway;
     private final WikiAppService wikiAppService;
     private final WikiPublicationAppService publicationAppService;
@@ -131,20 +136,39 @@ public class WikiSpaceAclAppService {
         return WikiSpaceAccessResolver.permits(mode, members, actor, action);
     }
 
-    /** 知识库列表：受限空间只对命中 READ 的成员可见，避免元数据外泄。 */
+    /** 知识库列表：受限空间只对命中 READ 的成员可见，避免元数据外泄；卡片聚合事实按空间补算。 */
     @Transactional(readOnly = true)
     public List<WikiSpaceDTO> spaces() {
         WikiActor actor = requireGlobalPermission(WikiAccessPermissions.SPACE_VIEW);
         return spaceRepo.findAll().stream()
                 .filter(space -> permits(space, actor, WikiSpaceAclAction.READ))
                 .map(WikiAssembler::space)
+                .map(this::enrichStats)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public WikiSpaceDTO spaceDetail(Long id) {
-        return WikiAssembler.space(requireSpace(id, WikiSpaceAclAction.READ,
-                WikiAccessPermissions.SPACE_VIEW).space());
+        return enrichStats(WikiAssembler.space(requireSpace(id, WikiSpaceAclAction.READ,
+                WikiAccessPermissions.SPACE_VIEW).space()));
+    }
+
+    /**
+     * 列表/详情共用的聚合补充：节点数量、未发布数与最近更新时间，以及失败摄入任务数。
+     * 只读投影，不加载正文；入口页卡片不靠额外请求就能显示这些事实。
+     */
+    private WikiSpaceDTO enrichStats(WikiSpaceDTO dto) {
+        if (dto == null || !StringUtils.hasText(dto.getId())) {
+            return dto;
+        }
+        Long spaceId = Long.valueOf(dto.getId());
+        WikiSpaceStats stats = nodeRepo.statsBySpaceId(spaceId);
+        dto.setPageCount(stats.pageCount());
+        dto.setDirectoryCount(stats.directoryCount());
+        dto.setUnpublishedPageCount(stats.unpublishedPageCount());
+        dto.setLastUpdatedAt(stats.lastUpdatedAt());
+        dto.setFailedIngestCount((int) ingestTaskRepo.countBySpaceIdAndStatus(spaceId, WikiIngestTaskStatus.FAILED));
+        return dto;
     }
 
     /**
@@ -175,7 +199,7 @@ public class WikiSpaceAclAppService {
                 space.enableRestrictedAcl();
             }
         }
-        return WikiAssembler.space(spaceRepo.save(space));
+        return enrichStats(WikiAssembler.space(spaceRepo.save(space)));
     }
 
     /** 级联删除知识库：删除后清理实例 ACL 与评论；不依赖跨集合事务，失败留下的是可清理孤儿数据。 */

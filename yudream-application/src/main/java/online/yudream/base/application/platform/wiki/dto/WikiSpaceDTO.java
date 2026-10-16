@@ -3,6 +3,8 @@ package online.yudream.base.application.platform.wiki.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 public class WikiSpaceDTO {
@@ -56,4 +58,13 @@ public class WikiSpaceDTO {
     private boolean commentEnabled;
     /** LEGACY / RESTRICTED 实例 ACL 模式。 */
     private String aclMode;
+
+    /** 列表卡片聚合：页面节点数 / 目录节点数 / 未发布页面数（由应用层按空间补算）。 */
+    private int pageCount;
+    private int directoryCount;
+    private int unpublishedPageCount;
+    /** 节点最近更新时间；空库为 null。 */
+    private LocalDateTime lastUpdatedAt;
+    /** 失败状态的摄入任务数：大于 0 表示该知识库有需要处理的任务。 */
+    private int failedIngestCount;
 }

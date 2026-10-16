@@ -10,11 +10,14 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceMemberSubjectType;
 import online.yudream.base.domain.platform.wiki.repo.WikiCommentRepo;
+import online.yudream.base.domain.platform.wiki.repo.WikiIngestTaskRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceMemberRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiActorGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiActor;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSpaceStats;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -25,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,11 +46,19 @@ class WikiSpaceAclAppServiceTest {
     private final WikiSpaceMemberRepo members = mock(WikiSpaceMemberRepo.class);
     private final WikiCommentRepo comments = mock(WikiCommentRepo.class);
     private final WikiNodeRepo nodes = mock(WikiNodeRepo.class);
+    private final WikiIngestTaskRepo ingestTasks = mock(WikiIngestTaskRepo.class);
     private final WikiActorGateway actors = mock(WikiActorGateway.class);
     private final WikiAppService wikiAppService = mock(WikiAppService.class);
     private final WikiPublicationAppService publications = mock(WikiPublicationAppService.class);
     private final WikiSpaceAclAppService service = new WikiSpaceAclAppService(capabilities, spaces, members,
-            comments, nodes, actors, wikiAppService, publications);
+            comments, nodes, ingestTasks, actors, wikiAppService, publications);
+
+    /** 列表/详情固定补算聚合事实；ACL 测试只关心闸门语义，聚合默认给空统计。 */
+    @BeforeEach
+    void stubAggregates() {
+        lenient().when(nodes.statsBySpaceId(any())).thenReturn(WikiSpaceStats.EMPTY);
+        lenient().when(ingestTasks.countBySpaceIdAndStatus(any(), any())).thenReturn(0L);
+    }
 
     @Test
     void legacySpaceKeepsExistingGlobalPermissionBehaviourWithoutMembers() {
