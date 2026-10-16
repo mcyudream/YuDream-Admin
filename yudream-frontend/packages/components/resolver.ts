@@ -68,6 +68,8 @@ const YD_COMPONENT_NAMES = [
   'YdInputTag',
   'YdListToolbar',
   'YdFilterSelect',
+  'YdWorkspaceLayout',
+  'YdWorkspaceTabs',
   'YdRate',
   'YdUiProvider',
   'YdAgentWorkbench',
@@ -222,6 +224,8 @@ const YD_COMPONENT_NAMES = [
   'YdImageCaptcha',
   'YdInfiniteScroll',
   'YdAnchor',
+  'YdTablePageLayout',
+  'YdDynamicSearchForm',
 ] as const
 
 const COMPONENT_NAMES = [

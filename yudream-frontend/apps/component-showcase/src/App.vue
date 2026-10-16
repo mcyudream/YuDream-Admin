@@ -32,9 +32,11 @@ import OverlaysSection from '@/sections/OverlaysSection.vue'
 import PageBuilderSection from '@/sections/PageBuilderSection.vue'
 import SettingsLayoutSection from '@/sections/SettingsLayoutSection.vue'
 import SortableTreeSection from '@/sections/SortableTreeSection.vue'
+import TablePageLayoutSection from '@/sections/TablePageLayoutSection.vue'
 import TechnicalEditorsSection from '@/sections/TechnicalEditorsSection.vue'
 import ToolsSection from '@/sections/ToolsSection.vue'
 import WorkflowCanvasSection from '@/sections/WorkflowCanvasSection.vue'
+import WorkspaceSection from '@/sections/WorkspaceSection.vue'
 
 interface Category {
   key: string
@@ -61,7 +63,7 @@ const VisualGallerySection = defineAsyncComponent(() => import('@/sections/Visua
 
 // 五类内容目录：Components 复用已有组件页，其余目录使用场景与视觉展示页。
 const groups: Group[] = [
-  { key: 'Components', label: '组件', icon: 'morph:layout-grid', count: 49 },
+  { key: 'Components', label: '组件', icon: 'morph:layout-grid', count: 50 },
   { key: 'Screens', label: '整页场景', icon: 'morph:panels-top-left', count: 12 },
   { key: 'Blocks', label: '功能区块', icon: 'morph:layout-grid', count: 11 },
   { key: 'Illustrations', label: '插画', icon: 'morph:shapes', count: 23 },
@@ -94,9 +96,11 @@ const categories: Category[] = [
   { key: 'technical-editors', label: '内容与代码编辑', en: 'Editors', icon: 'morph:file-code', group: 'Components', description: '主题化 Markdown 与代码编辑，支持受控内容、只读和禁用状态。', section: TechnicalEditorsSection },
   { key: 'sortable-tree', label: '拖拽与层级重排', en: 'Sortable Tree', icon: 'morph:list-tree', group: 'Components', description: '受控拖拽、键盘重排与延迟加载，保留字符串标识和层级元数据。', section: SortableTreeSection },
   { key: 'workflow-canvas', label: '工作流画布', en: 'Workflow Canvas', icon: 'morph:workflow', group: 'Components', description: '可缩放流程画布、受控节点连线、自定义节点与连接点。', section: WorkflowCanvasSection },
+  { key: 'workspace', label: '工作区与多标签', en: 'Workspace', icon: 'morph:panel-left-open', group: 'Components', description: 'VS Code 式工作区外壳：活动栏、可拖拽分栏、多文件标签与状态栏，窄屏退化为单面板。', section: WorkspaceSection },
   { key: 'creatable-selection', label: '可创建搜索选择', en: 'Creatable Selection', icon: 'morph:list-plus', group: 'Components', description: '搜索候选不存在时由调用方明确接受新编码。', section: ComboboxCreateSection },
   { key: 'page-builder', label: '页面可视化构建', en: 'Page Builder', icon: 'morph:panels-top-left', group: 'Components', description: '受控 HTML、CSS 和构建项目数据，支持主题、上传与实例生命周期。', section: PageBuilderSection },
   { key: 'list-toolbar', label: '列表工具栏', en: 'List Toolbar', icon: 'morph:list-filter', group: 'Components', description: '管理列表页统一筛选区：限宽搜索、计数即筛选的状态胶囊、宽度受控的下拉筛选。', section: ListToolbarSection },
+  { key: 'table-page-layout', label: '表格页版式', en: 'Table Page Layout', icon: 'morph:layout-list', group: 'Components', description: '表格页标准版式：页头只放标题、搜索默认折叠展开、Tab 在左操作在右并自动折叠不常用项。', section: TablePageLayoutSection },
   { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:chart-area', group: 'Components', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
   { key: 'data-display', label: '详情与数据标识', en: 'Details', icon: 'morph:file-text', group: 'Components', description: '描述列表、趋势标识、桌面表格与筛选区容器。', section: DataDisplaySection },
   { key: 'loading-selection', label: '加载与列表选择', en: 'Loading & Selection', icon: 'morph:inbox', group: 'Components', description: '局部遮罩、函数式文件选择与跨断点保留的表格选择。', section: LoadingSelectionSection },
