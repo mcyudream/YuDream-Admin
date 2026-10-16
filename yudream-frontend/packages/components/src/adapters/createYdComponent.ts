@@ -26,9 +26,11 @@ export function createYdComponent<T extends object>(base: T, name: string, style
           ...(styleName === 'button' ? { 'data-yd-auto-size': attrs.size === undefined ? '' : undefined } : {}),
           ...(styleName === 'card'
             ? {
-                headerClass: ['yd-card-header', attrs.headerClass],
-                contentClass: ['yd-card-content', attrs.contentClass],
-                footerClass: ['yd-card-footer', attrs.footerClass],
+                // 模板惯用 kebab 写法（content-class），attrs 里也是 kebab key；
+                // 只读驼峰会静默丢掉调用方类名，导致自定义样式永远不生效
+                headerClass: ['yd-card-header', attrs.headerClass ?? attrs['header-class']],
+                contentClass: ['yd-card-content', attrs.contentClass ?? attrs['content-class']],
+                footerClass: ['yd-card-footer', attrs.footerClass ?? attrs['footer-class']],
               }
             : {}),
         }, slots)
