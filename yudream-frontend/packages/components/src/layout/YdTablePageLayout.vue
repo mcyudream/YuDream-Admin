@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { YdTablePageAction } from './table-page-layout-types'
-import { computed, ref } from 'vue'
+import { computed, provide, ref, useId } from 'vue'
 import YdButton from '../basic/button/index.vue'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenu as YdDropdownMenu } from '../basic/dropdown/dropdown-menu/index'
 import YdIcon from '../basic/icon/index.vue'
 import YdPageHeader from '../basic/page-header/index.vue'
 import YdPageMain from '../basic/page-main/index.vue'
+import { tableActionsTargetKey } from '../basic/table/table-actions-context'
 import YdSegmented from '../extended/YdSegmented.vue'
 
 defineOptions({ name: 'YdTablePageLayout' })
@@ -16,11 +17,13 @@ const props = withDefaults(defineProps<YdTablePageLayoutProps>(), {
   searchDefaultFolded: true,
   actionsThreshold: 4,
 })
-
 const emit = defineEmits<{
   'update:activeTab': [value: string]
   'update:searchFolded': [value: boolean]
 }>()
+/** 操作栏尾部容器：表格的「列显隐」控件经 Teleport 并入此处，与操作按钮同排且最后 */
+const actionsAppendId = `yd-table-actions-${useId()}`
+provide(tableActionsTargetKey, actionsAppendId)
 
 export interface YdTablePageLayoutProps {
   /** 页面标题 */
@@ -84,11 +87,6 @@ const foldedActions = computed(() => {
   const visibleSet = new Set(visibleActions.value)
   return props.actions.filter(a => !visibleSet.has(a))
 })
-
-/** 是否有Tab或操作栏 */
-const hasToolbar = computed(() => {
-  return (props.tabs && props.tabs.length > 0) || (props.actions && props.actions.length > 0)
-})
 </script>
 
 <template>
@@ -130,8 +128,8 @@ const hasToolbar = computed(() => {
         </div>
       </div>
 
-      <!-- Tab + 操作栏 -->
-      <div v-if="hasToolbar" class="yd-table-page-layout__toolbar">
+      <!-- Tab + 操作栏：列显隐控件经 Teleport 并入操作栏末尾（三空时整行由 CSS 收起） -->
+      <div class="yd-table-page-layout__toolbar">
         <!-- 左侧Tab -->
         <div class="yd-table-page-layout__tabs">
           <YdSegmented
@@ -181,6 +179,8 @@ const hasToolbar = computed(() => {
               </DropdownMenuContent>
             </YdDropdownMenu>
           </slot>
+          <!-- 列显隐传送目标：始终位于操作按钮之后 -->
+          <div :id="actionsAppendId" class="yd-table-page-layout__actions-append" />
         </div>
       </div>
 
@@ -274,6 +274,15 @@ const hasToolbar = computed(() => {
   margin-bottom: 16px;
 }
 
+/* Tab、操作按钮与列显隐都没有内容时收起整行，避免空占位 */
+.yd-table-page-layout__toolbar:not(:has(
+  .yd-table-page-layout__tabs > *,
+  .yd-table-page-layout__actions > :not(.yd-table-page-layout__actions-append),
+  .yd-table-page-layout__actions-append > *
+)) {
+  display: none;
+}
+
 .yd-table-page-layout__tabs {
   flex: 1;
   min-width: 0;
@@ -284,6 +293,11 @@ const hasToolbar = computed(() => {
   flex-shrink: 0;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+.yd-table-page-layout__actions-append {
+  display: flex;
   align-items: center;
 }
 

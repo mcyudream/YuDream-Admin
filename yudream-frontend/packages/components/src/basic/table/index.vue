@@ -5,6 +5,7 @@ import type {
   Column,
   ColumnDef,
   ColumnPinningState,
+  ColumnSizingState,
   DisplayColumnDef,
   ExpandedState,
   Header,
@@ -23,10 +24,11 @@ import {
   FlexRender,
   getCoreRowModel,
   getExpandedRowModel,
+  getSortedRowModel,
   isFunction,
   useVueTable,
 } from '@tanstack/vue-table'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { cn } from '#utils'
 import Button from '../../basic/button/index.vue'
 import { Checkbox } from '../../basic/checkbox/checkbox'
@@ -43,6 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from './table'
+import { tableActionsTargetKey } from './table-actions-context'
 import { valueUpdater } from './table/utils'
 
 const SELECTION_COLUMN_ID = '__fa_table_selection__'
@@ -148,7 +151,11 @@ export interface TableProps<TData extends RowData = RowData> {
   headerRowClass?: HTMLAttributes['class']
   indentSize?: number
   manualExpanding?: boolean
+  /** 服务端排序场景置 true；默认本地排序 */
+  manualSorting?: boolean
   multiple?: boolean
+  /** 列宽拖拽启用（配合列宽定义；拖动结果写入列 sizing 状态） */
+  resizable?: boolean
   rowClass?: RowClass<TData>
   rowKey?: RowKey<TData>
   selectable?: boolean
@@ -179,7 +186,9 @@ const props = withDefaults(defineProps<TableProps<TData>>(), {
   emptyText: '暂无数据',
   indentSize: 20,
   manualExpanding: false,
+  manualSorting: false,
   multiple: false,
+  resizable: false,
   selectable: false,
   sortable: false,
   sortDescFirst: true,
@@ -199,10 +208,19 @@ const slots = defineSlots<TableSlots<TData>>()
 
 const rowSelection = ref<RowSelectionState>({})
 const columnVisibilityState = ref<VisibilityState>({})
+const columnSizingState = ref<ColumnSizingState>({})
 const sortingState = ref<SortingState>(props.sorting ?? props.defaultSorting ?? [])
 const expandedState = ref<ExpandedState>(props.expanded ?? props.defaultExpanded ?? {})
 const isSortingControlled = computed(() => props.sorting !== undefined)
 const isExpandedControlled = computed(() => props.expanded !== undefined)
+
+/** 列显隐控件传送目标：被 YdTablePageLayout 包裹时并入页面操作栏 */
+const actionsTargetId = inject(tableActionsTargetKey, undefined)
+const columnVisibilityTarget = computed(() => actionsTargetId ? `#${actionsTargetId}` : undefined)
+/** 自身工具栏行是否还需要占位（有 toolbar 插槽，或列控件未被传送走） */
+const hasToolbar = computed(() => Boolean(slots.toolbar) || (props.columnVisibility && !columnVisibilityTarget.value))
+/** 列宽拖动生效时用 table-fixed 精确分配列宽 */
+const isResizeLayout = computed(() => props.resizable)
 
 function isSelectionColumnDef(column: TableColumn<TData, any>): column is TableSelectionColumn<TData> {
   return column.type === 'selection'
@@ -272,8 +290,10 @@ function normalizeColumn(column: TableColumn<TData, any>): TableColumn<TData, an
   }
 
   normalized.header ??= normalized.label ?? normalized.title
-  normalized.enableSorting ??= false
-  normalized.size ??= parseNumericWidth(normalized.width)
+  // 列默认参与排序（选择列等特殊列在各自分支显式关闭）
+  normalized.enableSorting ??= true
+  // 拖动起点：优先 width，其次 minWidth（无显式宽度的列按最小宽开始，避免拖动瞬间跳变）
+  normalized.size ??= parseNumericWidth(normalized.width) ?? parseNumericWidth(normalized.minWidth)
   normalized.minSize ??= parseNumericWidth(normalized.minWidth)
   normalized.maxSize ??= parseNumericWidth(normalized.maxWidth)
 
@@ -403,6 +423,10 @@ function handleColumnVisibilityChange(updaterOrValue: Updater<VisibilityState>) 
   valueUpdater(updaterOrValue, columnVisibilityState)
 }
 
+function handleColumnSizingChange(updaterOrValue: Updater<ColumnSizingState>) {
+  valueUpdater(updaterOrValue, columnSizingState)
+}
+
 function handleSortingChange(updaterOrValue: Updater<SortingState>) {
   const nextSorting = isFunction(updaterOrValue) ? updaterOrValue(sortingState.value) : updaterOrValue
 
@@ -447,14 +471,22 @@ const table = useVueTable<TData>({
   },
   getCoreRowModel: getCoreRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
+  getSortedRowModel: getSortedRowModel(),
   autoResetExpanded: false,
   getRowId: resolveRowId,
   getSubRows: resolveSubRows,
   get manualExpanding() {
     return props.manualExpanding
   },
-  manualSorting: true,
+  get manualSorting() {
+    return props.manualSorting
+  },
+  get enableColumnResizing() {
+    return props.resizable
+  },
+  columnResizeMode: 'onChange',
   onColumnVisibilityChange: handleColumnVisibilityChange,
+  onColumnSizingChange: handleColumnSizingChange,
   onRowSelectionChange: handleRowSelectionChange,
   onExpandedChange: handleExpandedChange,
   onSortingChange: handleSortingChange,
@@ -467,6 +499,9 @@ const table = useVueTable<TData>({
     },
     get columnPinning() {
       return columnPinning.value
+    },
+    get columnSizing() {
+      return columnSizingState.value
     },
     get rowSelection() {
       return rowSelection.value
@@ -495,7 +530,6 @@ const singleSelectedRowId = computed(() => Object.keys(rowSelection.value).find(
 const tableRootComponent = computed(() => isSingleSelectionMode.value ? RadioGroup : 'div')
 const tableRootModelValue = computed(() => isSingleSelectionMode.value ? singleSelectedRowId.value : undefined)
 const stripeInteractionClass = computed(() => props.stripe ? '[&:hover:not([data-state=selected])>td]:bg-muted/50' : undefined)
-const hasToolbar = computed(() => props.columnVisibility || Boolean(slots.toolbar))
 const columnVisibilityColumns = computed(() => {
   void resolvedColumns.value
   void columnVisibilityState.value
@@ -669,7 +703,11 @@ function resolveSize(size?: number | string) {
 function getColumnStyle(column: Column<TData, unknown>): CSSProperties | undefined {
   const columnDef = column.columnDef as TableColumn<TData, unknown>
   const pin = column.getIsPinned()
-  const width = resolveSize(columnDef.width ?? (pin ? column.getSize() : columnDef.size && columnDef.size !== 150 ? columnDef.size : undefined))
+  // 拖动过该列后由 TanStack sizing 接管宽度；未拖动保持原 width 定义优先的既有行为
+  const isResized = columnSizingState.value[column.id] !== undefined
+  const width = isResized
+    ? `${column.getSize()}px`
+    : resolveSize(columnDef.width ?? (pin ? column.getSize() : columnDef.size && columnDef.size !== 150 ? columnDef.size : undefined))
   const minSize = columnDef.minSize && columnDef.minSize !== 20 ? columnDef.minSize : undefined
   const maxSize = columnDef.maxSize && columnDef.maxSize !== Number.MAX_SAFE_INTEGER ? columnDef.maxSize : undefined
   const minWidth = resolveSize(columnDef.minWidth ?? minSize)
@@ -957,7 +995,12 @@ defineExpose({
       <div class="flex flex-1 gap-2 min-w-0 items-center">
         <slot name="toolbar" :table="table" />
       </div>
-      <Dropdown v-if="props.columnVisibility" :items="columnVisibilityMenuItems" align="end">
+      <!-- 未被布局传送时列显隐留在自身工具栏行（与页面操作栏同排的场景见下方 Teleport 分支） -->
+      <Dropdown
+        v-if="props.columnVisibility && !columnVisibilityTarget"
+        :items="columnVisibilityMenuItems"
+        align="end"
+      >
         <Button
           variant="outline"
           size="icon"
@@ -967,6 +1010,24 @@ defineExpose({
         </Button>
       </Dropdown>
     </div>
+    <!-- 列显隐并入 YdTablePageLayout 操作栏末尾（与操作按钮同排且最后）；
+         defer：目标容器与表格同轮渲染，需等整棵树插入文档后再解析目标 -->
+    <Teleport
+      v-if="props.columnVisibility && columnVisibilityTarget"
+      :to="columnVisibilityTarget"
+      defer
+    >
+      <Dropdown :items="columnVisibilityMenuItems" align="end">
+        <Button
+          variant="outline"
+          size="icon"
+          :disabled="!columnVisibilityColumns.length"
+          title="显示字段"
+        >
+          <Icon name="i-lucide:columns-3" />
+        </Button>
+      </Dropdown>
+    </Teleport>
     <component
       :is="tableRootComponent"
       :class="cn('size-full', props.border && 'border', props.tableRootClass)"
@@ -974,7 +1035,7 @@ defineExpose({
       :model-value="tableRootModelValue"
       @update:model-value="handleSingleSelectionChange"
     >
-      <Table :class="cn(tableClass, !tableRows.length && 'h-full')">
+      <Table :class="cn(tableClass, isResizeLayout && 'table-fixed', !tableRows.length && 'h-full')">
         <slot name="caption">
           <TableCaption v-if="caption">
             {{ caption }}
@@ -1028,6 +1089,16 @@ defineExpose({
                   </template>
                 </div>
               </template>
+              <!-- 列宽拖动手柄：置于表头内容之上，拖动结束的点击不应触发排序 -->
+              <div
+                v-if="props.resizable && header.column.getCanResize()"
+                class="w-1.5 cursor-col-resize select-none inset-y-0 right-0 absolute z-10 touch-none hover:bg-primary/40"
+                :class="header.column.getIsResizing() && 'bg-primary/60'"
+                aria-hidden="true"
+                @click.stop
+                @mousedown.stop="header.getResizeHandler()?.($event)"
+                @touchstart.stop="header.getResizeHandler()?.($event)"
+              />
             </TableHead>
           </TableRow>
         </TableHeader>

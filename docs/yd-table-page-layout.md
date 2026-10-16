@@ -169,6 +169,29 @@ function createUser() {
 </template>
 ```
 
+## 表格行为规范（强制默认）
+
+`YdEnhancedTable` / `YdResponsiveEnhancedTable` 默认启用以下能力，表格页统一遵循，不需要逐页开启：
+
+| 能力 | 默认 | 说明 |
+|------|------|------|
+| 列排序 | 开（`sortable`） | 点击表头在本页数据上排序，第三次点击取消；选择列/操作列自动排除 |
+| 列宽拖动 | 开（`resizable`） | 拖动表头右缘调整列宽，宽度写入列 sizing 状态并启用 `table-fixed` 精确分配 |
+| 列显隐 | 开（`columnVisibility`） | 控件自动并入 `YdTablePageLayout` 操作栏末尾（与操作按钮同排且最后）；未包裹布局时留在表格自带工具栏行 |
+| 固定列 | 约定 | 名称（对人可读的标识）列 `fixed: 'left'`；操作列由增强表格自动 `fixed: 'right'` 且不可隐藏 |
+
+页面只需在列定义中标好 `width` / `minWidth`（列宽拖动需要初始宽度），固定列按语义标注：
+
+```ts
+const tableColumns = [
+  { id: 'name', header: '角色名称', width: 160, fixed: 'left' },  // 名称列固定左
+  { accessorKey: 'code', header: '编码', width: 180 },
+  // … 其余数据列
+]
+```
+
+如需关闭某项（如树形表格不希望排序），在列上显式设置 `enableSorting: false`；整表关闭传 `:sortable="false"` / `:resizable="false"`。
+
 ## API
 
 ### YdTablePageLayout Props

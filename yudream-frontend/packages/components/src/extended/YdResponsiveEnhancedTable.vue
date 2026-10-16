@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<EnhancedTableProps<TData> & {
   headerRowClass: undefined,
   manualExpanding: undefined,
   multiple: undefined,
+  resizable: undefined,
   rowClass: undefined,
   selectable: undefined,
   selectionColumnClass: undefined,

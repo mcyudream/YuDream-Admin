@@ -11,9 +11,12 @@ import FaIcon from '../basic/icon/index.vue'
 import FaTable from '../basic/table/index.vue'
 
 const props = withDefaults(defineProps<EnhancedTableProps<TData>>(), {
+  columnVisibility: true,
+  resizable: true,
   showActions: true,
   actionsHeader: '操作',
   actionsWidth: 80,
+  sortable: true,
 })
 
 const emit = defineEmits<{ selectionChange: [rows: TData[], selection: RowSelectionState] }>()
@@ -65,6 +68,8 @@ const fullColumns = computed<TableColumn<TData, any>[]>(() => {
       header: props.actionsHeader,
       width: props.actionsWidth,
       fixed: 'right',
+      enableSorting: false,
+      enableHiding: false,
       cell: () => '', // 通过插槽渲染
     })
   }
