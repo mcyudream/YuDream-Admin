@@ -19,6 +19,13 @@
 - **规避**：存储层原样保留未知权限码；展示层仅隐藏不存在项；重建前可回读备份并校验角色/用户/菜单指纹，只改 `sysPermission`，不播种、不重启插件。
 - **来源**：`role-permission-codes-passthrough`、`permission-management-views`；`docs/system/permission-management.md`。
 
+### 带注解参数的 @Around 切面用 HIGHEST_PRECEDENCE 后整组接口 500
+
+- **现象**：所有标注 `@PermissionRegister` 的接口返回 500，日志为 `IllegalStateException: Required to bind 2 arguments, but only bound 1 (JoinPointMatch was NOT bound in invocation)`，栈顶停在 `AbstractAspectJAdvice.argBinding`；同进程其他接口正常。
+- **根因**：`PermissionRegisterAspect` 标了 `@Order(Ordered.HIGHEST_PRECEDENCE)`，与 Spring 自动插入的 `ExposeInvocationInterceptor`（同为 `HIGHEST_PRECEDENCE`）并列，排序后切面排在拦截器之前，注解参数无法绑定。探针实测：`HIGHEST_PRECEDENCE` 必失败，`HIGHEST_PRECEDENCE + 1` 与不写 `@Order` 均正常。
+- **规避**：凡在切面方法参数里绑定注解（`@annotation(x)`）的 `@Around`，**禁止**用 `Ordered.HIGHEST_PRECEDENCE`；要抢在最前就用 `HIGHEST_PRECEDENCE + 1`。定位法：先看失败接口的公共注解，再核对该切面的 `@Order`。
+- **来源**：`permission-register-aspect-order`。
+
 ## 2. Mongo 与备份
 
 ### 插件热重载第二次保存触发乐观锁异常

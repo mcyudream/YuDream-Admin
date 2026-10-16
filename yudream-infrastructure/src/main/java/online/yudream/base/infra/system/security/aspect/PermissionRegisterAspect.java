@@ -10,6 +10,8 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -26,6 +28,9 @@ import java.lang.reflect.Method;
 @Slf4j
 @Aspect
 @Component
+// 不能取 HIGHEST_PRECEDENCE：与 Spring 的 ExposeInvocationInterceptor 并列时排序会把本切面排到它前面，
+// 注解参数绑定失败（JoinPointMatch was NOT bound in invocation），所有 @PermissionRegister 接口 500。
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class PermissionRegisterAspect {
 
     @Around("@annotation(permissionRegister)")
