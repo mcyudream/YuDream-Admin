@@ -197,8 +197,8 @@ const foldedActions = computed(() => {
           <slot name="table" />
         </div>
 
-        <!-- 分页固定于卡片底部（表格滚动时保持可见） -->
-        <div v-if="$slots.footer" class="yd-table-page-layout__footer">
+        <!-- 分页固定于卡片底部（表格滚动时保持可见）；空态由 CSS 收起 -->
+        <div class="yd-table-page-layout__footer">
           <slot name="footer" />
         </div>
       </div>
@@ -356,6 +356,11 @@ const foldedActions = computed(() => {
   flex-shrink: 0;
   padding: 10px 16px;
   border-top: 1px solid var(--color-border-2);
+}
+
+/* 未提供分页等底部内容时不占位 */
+.yd-table-page-layout__footer:not(:has(*)) {
+  display: none;
 }
 
 /* 响应式适配 */

@@ -47,6 +47,14 @@ export interface UseTablePageOptions<T, Q extends PageQuery> {
 }
 
 /**
+ * 归一化后端返回的计数（可能是字符串）
+ */
+function asNumber(value: unknown, fallback: number): number {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+/**
  * 表格页面统一逻辑封装
  *
  * @example
@@ -139,9 +147,10 @@ export function useTablePage<T = any, Q extends PageQuery = PageQuery>(
         return
       }
       rows.value = result.records
-      pagination.total = result.total
-      pagination.page = result.page
-      pagination.size = result.size
+      // 后端 Long 计数经全局 ToStringSerializer 序列化为字符串，统一归一化，避免下游按数字使用时报错
+      pagination.total = asNumber(result.total, pagination.total)
+      pagination.page = asNumber(result.page, pagination.page)
+      pagination.size = asNumber(result.size, pagination.size)
     }
     catch (error) {
       if (request !== loadRequest) {

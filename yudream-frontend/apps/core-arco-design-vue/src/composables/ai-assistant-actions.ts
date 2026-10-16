@@ -42,6 +42,7 @@ export function useAiAssistantAction(code: string, label: string, permission: st
   }
   const route = useRoute()
   let element: HTMLElement | undefined
+  let registeredRouteName: string | undefined
   let unregister: (() => void) | undefined
   let active = true
   const register = () => {
@@ -49,10 +50,12 @@ export function useAiAssistantAction(code: string, label: string, permission: st
       return
     }
     unregister = registerAiAssistantAction({ code, label, routeName: route.name, permission }, element)
+    registeredRouteName = route.name
   }
   const remove = () => {
     unregister?.()
     unregister = undefined
+    registeredRouteName = undefined
   }
   onActivated(() => {
     active = true
@@ -64,9 +67,15 @@ export function useAiAssistantAction(code: string, label: string, permission: st
   })
   onBeforeUnmount(remove)
   return (value: Element | ComponentPublicInstance | null) => {
-    remove()
     const candidate = value && '$el' in value ? value.$el : value
-    element = candidate instanceof HTMLElement ? candidate : undefined
+    const next = candidate instanceof HTMLElement ? candidate : undefined
+    // 组件每次 patch 都会重新调用函数式 ref；目标元素与路由未变时必须直接返回，
+    // 否则 remove/register 的「读 + 写」会在当前渲染 effect 内自我失效，触发无限重渲染
+    if (next === element && registeredRouteName === route.name) {
+      return
+    }
+    remove()
+    element = next
     register()
   }
 }
