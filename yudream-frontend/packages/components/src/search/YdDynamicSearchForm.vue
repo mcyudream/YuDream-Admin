@@ -185,14 +185,11 @@ onMounted(() => {
       <span class="text-sm text-muted-foreground">暂无搜索配置</span>
     </div>
 
-    <!-- 搜索字段网格：所有控件等宽撑满列，范围字段占两列 -->
+    <!-- 搜索字段网格：所有控件等宽撑满列 -->
     <div v-else class="yd-dynamic-search-form__grid">
       <!-- 默认分组 -->
       <template v-for="field in fieldsByGroup.default" :key="field.fieldName">
-        <div
-          class="yd-dynamic-search-form__field"
-          :class="{ 'is-range': field.controlType === ControlType.DATE_RANGE || field.controlType === ControlType.NUMBER_RANGE }"
-        >
+        <div class="yd-dynamic-search-form__field">
           <label class="yd-dynamic-search-form__label">
             {{ field.label }}
           </label>
@@ -272,10 +269,7 @@ onMounted(() => {
             {{ groupName }}
           </div>
           <template v-for="field in fields" :key="field.fieldName">
-            <div
-              class="yd-dynamic-search-form__field"
-              :class="{ 'is-range': field.controlType === ControlType.DATE_RANGE || field.controlType === ControlType.NUMBER_RANGE }"
-            >
+            <div class="yd-dynamic-search-form__field">
               <label class="yd-dynamic-search-form__label">
                 {{ field.label }}
               </label>
@@ -407,17 +401,6 @@ onMounted(() => {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-}
-
-/* 范围字段占两列，两个子控件各有时长余量 */
-.yd-dynamic-search-form__field.is-range {
-  grid-column: span 2;
-}
-
-@media (width <= 960px) {
-  .yd-dynamic-search-form__field.is-range {
-    grid-column: span 1;
-  }
 }
 
 .yd-dynamic-search-form__label {

@@ -101,20 +101,20 @@ const hasToolbar = computed(() => {
     </YdPageHeader>
 
     <YdPageMain>
-      <!-- 搜索折叠区:折叠态只显示「搜索」行,点击展开表单;展开态右上角可收起 -->
+      <!-- 搜索折叠区:折叠态只显示「搜索」标题行;展开后标题行右侧出现收起按钮 -->
       <div v-if="showSearch" class="yd-table-page-layout__search">
-        <button
-          type="button"
-          class="yd-table-page-layout__search-toggle"
-          :aria-expanded="!searchFolded"
-          @click="searchFolded = !searchFolded"
-        >
-          <YdIcon :name="searchFolded ? 'morph:chevron-right' : 'morph:chevron-down'" />
-          <span>搜索</span>
-        </button>
-
-        <div v-show="!searchFolded" class="yd-table-page-layout__search-body">
+        <div class="yd-table-page-layout__search-head">
           <button
+            type="button"
+            class="yd-table-page-layout__search-toggle"
+            :aria-expanded="!searchFolded"
+            @click="searchFolded = !searchFolded"
+          >
+            <YdIcon :name="searchFolded ? 'morph:chevron-right' : 'morph:chevron-down'" />
+            <span>搜索</span>
+          </button>
+          <button
+            v-if="!searchFolded"
             type="button"
             class="yd-table-page-layout__search-close"
             aria-label="收起搜索"
@@ -123,6 +123,9 @@ const hasToolbar = computed(() => {
           >
             <YdIcon name="morph:x" />
           </button>
+        </div>
+
+        <div v-show="!searchFolded" class="yd-table-page-layout__search-body">
           <slot name="search" :fold="searchFolded" />
         </div>
       </div>
@@ -208,15 +211,23 @@ const hasToolbar = computed(() => {
   border-radius: 8px;
 }
 
-.yd-table-page-layout__search-toggle {
+.yd-table-page-layout__search-head {
   display: flex;
   gap: 8px;
   align-items: center;
-  width: 100%;
+}
+
+.yd-table-page-layout__search-toggle {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
   padding: 12px 16px;
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-1);
+  text-align: left;
   cursor: pointer;
   background: transparent;
   border: none;
@@ -228,20 +239,14 @@ const hasToolbar = computed(() => {
   background: var(--color-fill-1);
 }
 
-.yd-table-page-layout__search-body {
-  position: relative;
-  padding: 4px 16px 16px;
-}
-
 .yd-table-page-layout__search-close {
-  position: absolute;
-  top: 0;
-  right: 12px;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
+  margin-right: 12px;
   color: var(--color-text-3);
   cursor: pointer;
   background: transparent;
@@ -253,6 +258,10 @@ const hasToolbar = computed(() => {
 .yd-table-page-layout__search-close:hover {
   color: var(--color-text-1);
   background: var(--color-fill-2);
+}
+
+.yd-table-page-layout__search-body {
+  padding: 0 16px 16px;
 }
 
 .yd-table-page-layout__toolbar {

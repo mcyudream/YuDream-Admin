@@ -40,6 +40,7 @@ const searchConfig: SearchConfig = {
     { fieldName: 'category', label: '内容分类', controlType: 'SELECT' as never, order: 2, showWhenFolded: false, width: '200px', optionsSource: 'categoryOptions', fieldType: 'String' },
     { fieldName: 'status', label: '发布状态', controlType: 'SELECT' as never, order: 3, showWhenFolded: false, width: '200px', optionsSource: 'statusOptions', fieldType: 'String' },
     { fieldName: 'updatedTime', label: '更新时间', controlType: 'DATE_RANGE' as never, order: 4, showWhenFolded: false, width: '200px', fieldType: 'LocalDate' },
+    { fieldName: 'words', label: '字数', controlType: 'NUMBER_RANGE' as never, order: 5, showWhenFolded: false, width: '200px', fieldType: 'Long' },
   ],
 }
 
