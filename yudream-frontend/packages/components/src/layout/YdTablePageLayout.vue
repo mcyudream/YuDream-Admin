@@ -5,7 +5,6 @@ import YdButton from '../basic/button/index.vue'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenu as YdDropdownMenu } from '../basic/dropdown/dropdown-menu/index'
 import YdIcon from '../basic/icon/index.vue'
 import YdPageHeader from '../basic/page-header/index.vue'
-import YdPageMain from '../basic/page-main/index.vue'
 import { tableActionsTargetKey } from '../basic/table/table-actions-context'
 import YdSegmented from '../extended/YdSegmented.vue'
 
@@ -90,16 +89,17 @@ const foldedActions = computed(() => {
 </script>
 
 <template>
-  <div class="yd-table-page-layout">
+  <!-- data-yd-fullheight：宿主布局据此把外层容器切为固定视口高，滚动交给页面内部 -->
+  <div class="yd-table-page-layout" data-yd-fullheight>
     <!-- 页面标题区:只放标题 -->
-    <YdPageHeader v-if="title" :title="title">
+    <YdPageHeader v-if="title" :title="title" class="mb-0">
       <template v-if="$slots['page-title']" #default>
         <slot name="page-title" />
       </template>
     </YdPageHeader>
 
-    <YdPageMain>
-      <!-- 搜索折叠区:折叠态只显示「搜索」标题行;展开后标题行右侧出现收起按钮 -->
+    <div class="yd-table-page-layout__body">
+      <!-- 搜索卡片：独立成卡，固定于顶部 -->
       <div v-if="showSearch" class="yd-table-page-layout__search">
         <div class="yd-table-page-layout__search-head">
           <button
@@ -128,72 +128,75 @@ const foldedActions = computed(() => {
         </div>
       </div>
 
-      <!-- Tab + 操作栏：列显隐控件经 Teleport 并入操作栏末尾（三空时整行由 CSS 收起） -->
-      <div class="yd-table-page-layout__toolbar">
-        <!-- 左侧Tab -->
-        <div class="yd-table-page-layout__tabs">
-          <YdSegmented
-            v-if="tabs && tabs.length"
-            v-model="activeTabLocal"
-            :options="tabs"
-            aria-label="数据视图切换"
-          />
-          <slot name="tabs" />
+      <!-- 表格卡片：操作栏 + 表格滚动区 + 底部固定分页；卡片铺满剩余高度 -->
+      <div class="yd-table-page-layout__card">
+        <!-- Tab + 操作栏：列显隐控件经 Teleport 并入操作栏末尾（三空时整行由 CSS 收起） -->
+        <div class="yd-table-page-layout__toolbar">
+          <!-- 左侧Tab -->
+          <div class="yd-table-page-layout__tabs">
+            <YdSegmented
+              v-if="tabs && tabs.length"
+              v-model="activeTabLocal"
+              :options="tabs"
+              aria-label="数据视图切换"
+            />
+            <slot name="tabs" />
+          </div>
+
+          <!-- 右侧操作按钮 -->
+          <div class="yd-table-page-layout__actions">
+            <slot name="actions">
+              <!-- 直接显示的操作按钮 -->
+              <YdButton
+                v-for="(action, index) in visibleActions"
+                :key="index"
+                :ref="action.ref"
+                :variant="action.variant || 'default'"
+                :disabled="action.disabled"
+                @click="action.onClick"
+              >
+                <YdIcon v-if="action.icon" :name="action.icon" />
+                {{ action.label }}
+              </YdButton>
+
+              <!-- 折叠的操作 -->
+              <YdDropdownMenu v-if="foldedActions.length">
+                <DropdownMenuTrigger as-child>
+                  <YdButton variant="outline">
+                    <YdIcon name="morph:more-horizontal" />
+                    更多
+                  </YdButton>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent>
+                  <DropdownMenuItem
+                    v-for="(action, index) in foldedActions"
+                    :key="index"
+                    :disabled="action.disabled"
+                    @click="action.onClick"
+                  >
+                    <YdIcon v-if="action.icon" :name="action.icon" />
+                    <span>{{ action.label }}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </YdDropdownMenu>
+            </slot>
+            <!-- 列显隐传送目标：始终位于操作按钮之后 -->
+            <div :id="actionsAppendId" class="yd-table-page-layout__actions-append" />
+          </div>
         </div>
 
-        <!-- 右侧操作按钮 -->
-        <div class="yd-table-page-layout__actions">
-          <slot name="actions">
-            <!-- 直接显示的操作按钮 -->
-            <YdButton
-              v-for="(action, index) in visibleActions"
-              :key="index"
-              :ref="action.ref"
-              :variant="action.variant || 'default'"
-              :disabled="action.disabled"
-              @click="action.onClick"
-            >
-              <YdIcon v-if="action.icon" :name="action.icon" />
-              {{ action.label }}
-            </YdButton>
+        <!-- 表格滚动区：页面不再整体滚动，纵向滚动发生在这里 -->
+        <div class="yd-table-page-layout__table">
+          <slot name="table" />
+        </div>
 
-            <!-- 折叠的操作 -->
-            <YdDropdownMenu v-if="foldedActions.length">
-              <DropdownMenuTrigger as-child>
-                <YdButton variant="outline">
-                  <YdIcon name="morph:more-horizontal" />
-                  更多
-                </YdButton>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent>
-                <DropdownMenuItem
-                  v-for="(action, index) in foldedActions"
-                  :key="index"
-                  :disabled="action.disabled"
-                  @click="action.onClick"
-                >
-                  <YdIcon v-if="action.icon" :name="action.icon" />
-                  <span>{{ action.label }}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </YdDropdownMenu>
-          </slot>
-          <!-- 列显隐传送目标：始终位于操作按钮之后 -->
-          <div :id="actionsAppendId" class="yd-table-page-layout__actions-append" />
+        <!-- 分页固定于卡片底部（表格滚动时保持可见） -->
+        <div v-if="$slots.footer" class="yd-table-page-layout__footer">
+          <slot name="footer" />
         </div>
       </div>
-
-      <!-- 表格区 -->
-      <div class="yd-table-page-layout__table">
-        <slot name="table" />
-      </div>
-
-      <!-- 底部:分页等 -->
-      <div v-if="$slots.footer" class="yd-table-page-layout__footer">
-        <slot name="footer" />
-      </div>
-    </YdPageMain>
+    </div>
   </div>
 </template>
 
@@ -202,11 +205,24 @@ const foldedActions = computed(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 内容区：搜索卡与表格卡纵向排列，余高全部给表格卡 */
+.yd-table-page-layout__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
 }
 
 .yd-table-page-layout__search {
-  margin-bottom: 16px;
+  flex-shrink: 0;
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
@@ -265,13 +281,26 @@ const foldedActions = computed(() => {
   padding: 0 16px 16px;
 }
 
+/* 表格卡片：铺满剩余高度，内部三段式（操作栏 / 滚动区 / 分页） */
+.yd-table-page-layout__card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
 .yd-table-page-layout__toolbar {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  padding: 12px 16px;
 }
 
 /* Tab、操作按钮与列显隐都没有内容时收起整行，避免空占位 */
@@ -301,17 +330,29 @@ const foldedActions = computed(() => {
   align-items: center;
 }
 
+/* 表格滚动区：整页不滚动，纵向滚动发生在这里 */
 .yd-table-page-layout__table {
   flex: 1;
   min-height: 0;
+  padding: 0 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
+/* 分页固定于卡片底部 */
 .yd-table-page-layout__footer {
-  margin-top: 16px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border-2);
 }
 
 /* 响应式适配 */
 @media (width <= 768px) {
+  .yd-table-page-layout__body {
+    gap: 12px;
+    padding: 12px;
+  }
+
   .yd-table-page-layout__toolbar {
     flex-direction: column;
     align-items: stretch;

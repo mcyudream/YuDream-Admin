@@ -735,12 +735,13 @@ function importUsers() {
             </template>
           </YdResponsiveEnhancedTable>
         </YdLoadingOverlay>
+      </template>
 
+      <template #footer>
         <YdPagination
           v-model:page="pagination.page"
           v-model:size="pagination.size"
           :total="pagination.total"
-          class="mt-3"
           @page-change="onPageChange"
           @size-change="onSizeChange"
         />

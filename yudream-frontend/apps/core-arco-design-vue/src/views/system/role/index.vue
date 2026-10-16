@@ -526,15 +526,6 @@ function importRoles() {
               </template>
             </YdResponsiveEnhancedTable>
           </YdLoadingOverlay>
-
-          <YdPagination
-            v-model:page="pagination.page"
-            v-model:size="pagination.size"
-            :total="pagination.total"
-            class="mt-3"
-            @page-change="onPageChange"
-            @size-change="onSizeChange"
-          />
         </div>
 
         <!-- 矩阵 / 溯源视图 -->
@@ -590,6 +581,16 @@ function importRoles() {
             正在加载权限全景…
           </div>
         </div>
+      </template>
+
+      <template v-if="activeView === 'list'" #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
       </template>
     </YdTablePageLayout>
 

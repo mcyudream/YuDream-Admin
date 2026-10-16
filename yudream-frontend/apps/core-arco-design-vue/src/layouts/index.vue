@@ -260,6 +260,27 @@ async function resendVerificationEmail() {
   transition: width var(--yd-motion-duration-normal) var(--yd-motion-ease);
 }
 
+/*
+  整高内滚页面（YdTablePageLayout 等打了 data-yd-fullheight 标记的页面）：
+  容器固定为视口高度、不再整页滚动，滚动交给页面内部（如表格卡片的滚动区），
+  分页等底部元素因此能固定在卡片底部。未标记的页面行为不变。
+*/
+.main-container:has(> .main [data-yd-fullheight]) {
+  height: 100dvh;
+  overflow: hidden;
+
+  > .main {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+
+    /* 页面根与整高容器之间没有布局包装，贯通整高 */
+    > * {
+      height: 100%;
+    }
+  }
+}
+
 .email-verification-banner {
   display: flex;
   gap: 12px;
