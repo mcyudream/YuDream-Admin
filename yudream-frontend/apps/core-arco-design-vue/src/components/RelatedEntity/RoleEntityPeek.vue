@@ -32,7 +32,8 @@ let flatRoles: RoleManageItem[] = []
 
 const canEdit = computed(() => auth('system:role:edit'))
 const canDisable = computed(() => auth('system:role:delete'))
-const name = computed(() => detail.value?.name || props.label || props.entityId)
+// 与用户卡一致：列表给什么名称就一直显示什么，详情只在列表没给时兜底
+const name = computed(() => props.label || detail.value?.name || props.entityId)
 
 const status = computed(() => {
   if (!detail.value) {

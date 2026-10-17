@@ -36,8 +36,12 @@ const canEdit = computed(() => auth('system:user:edit'))
 const canDisable = computed(() => auth('system:user:delete'))
 const canView = computed(() => auth('system:user:view'))
 
-/** 卡片内容以详情为准，列表回退值只在加载完成前显示 */
-const name = computed(() => detail.value?.username || props.label || props.entityId)
+/**
+ * 展示名以列表给的名称为准：登录日志给用户名、接口日志给昵称，
+ * 详情回来后不能替换成另一个（否则触发器上的「SiberianHusky」会突然变成「husky」）。
+ * 详情只在列表没给名称时兜底。
+ */
+const name = computed(() => props.label || detail.value?.username || props.entityId)
 const subtitle = computed(() => detail.value?.email || detail.value?.nickname || '')
 const avatar = computed(() => detail.value?.avatar || props.avatar || '')
 
@@ -55,7 +59,7 @@ const facts = computed<EntityPeekFact[]>(() => {
   if (!item) {
     return []
   }
-  return [
+  const rows: EntityPeekFact[] = [
     { label: '邮箱', value: item.email },
     { label: '邮箱验证', value: item.emailVerified ? '已验证' : '未验证', tone: item.emailVerified ? 'success' : 'warning' },
     { label: '手机', value: item.phone, mono: true },
@@ -63,6 +67,11 @@ const facts = computed<EntityPeekFact[]>(() => {
     { label: '注册时间', value: dateText(item.createTime) },
     { label: '用户 ID', value: item.id, mono: true },
   ]
+  // 标题显示的是昵称时，把用户名补进事实清单，避免详情里的用户名无处可见
+  if (item.username && item.username !== name.value) {
+    rows.unshift({ label: '用户名', value: item.username, mono: true })
+  }
+  return rows
 })
 
 const chipGroups = computed<Array<{ label: string, items: Array<{ label: string }> }>>(() => {
