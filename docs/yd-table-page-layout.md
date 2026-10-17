@@ -180,6 +180,7 @@ function createUser() {
 | 列宽拖动 | 开（`resizable`） | 拖动表头右缘调整列宽，宽度写入列 sizing 状态并启用 `table-fixed` 精确分配 |
 | 列显隐 | 开（`columnVisibility`） | 控件自动并入 `YdTablePageLayout` 操作栏末尾（与操作按钮同排且最后）；未包裹布局时留在表格自带工具栏行；列定义里标 `defaultHidden: true` 的列默认隐藏，菜单顶部给「显示全部字段 / 只看常用字段」快捷项（有默认隐藏列时才出现） |
 | 固定列 | 约定 | 名称（对人可读的标识）列 `fixed: 'left'`；操作列由增强表格自动 `fixed: 'right'` 且不可隐藏 |
+| 行选择 | 按需 | 需要勾选时必须**显式**在列定义首列写 `{ type: 'selection', width: 44 }` 并传 `selectable`；多选再加 `multiple`。行的可选性依赖这一列存在，只传 `selectable` 不会出现勾选框 |
 | 表头固定 | 布局内自动 | 表格卡内纵向滚动时表头钉在顶部；表头背景由布局覆盖为不透明，避免行从表头下方透出 |
 
 页面只需在列定义中标好 `width` / `minWidth`（列宽拖动需要初始宽度），固定列按语义标注：

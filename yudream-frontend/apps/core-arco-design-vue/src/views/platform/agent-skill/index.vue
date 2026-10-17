@@ -1,65 +1,122 @@
 <script setup lang="ts">
+import type { ActionMenuItem, StatusColumn, TableColumn, YdFilePickerInstance, YdTablePageAction } from '@yudream/components'
 import type { AgentSkill } from '@/api/modules/platform-agent-skill'
-import type { TableColumn } from '@yudream/components'
-import type { YdFilePickerInstance } from '@yudream/components'
+
+import { useTablePage } from '@yudream/components'
 import apiSkill from '@/api/modules/platform-agent-skill'
-import { useMediaQuery } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 
 const toast = useYdToast()
 const modal = useYdModal()
-const loading = ref(false)
+const { auth } = useAppAuth()
+
 const visible = ref(false)
 const editing = ref<AgentSkill | null>(null)
-const rows = ref<AgentSkill[]>([])
 const selectedRows = shallowRef<AgentSkill[]>([])
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const isCompact = useMediaQuery('(max-width: 640px)')
-const paginationLayout = computed(() => isCompact.value ? 'total, pager' : 'total, sizes, ->, pager, jumper')
-const keyword = ref('')
 const resourcesText = ref('{}')
 const uploadInput = ref<YdFilePickerInstance | null>(null)
 const form = reactive({ name: '', description: '', content: '', enabled: true })
 
+/** 列表：搜索条件来自 AgentSkillPageQuery 的 @Searchable 注解，分页由后端切片 */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<AgentSkill>({
+  queryClass: 'online.yudream.base.application.platform.agent.query.AgentSkillPageQuery',
+  loadApi: async (query) => {
+    const res = await apiSkill.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+    })
+    selectedRows.value = []
+    return {
+      records: res.data.records,
+      total: Number(res.data.total || 0),
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
 const columns = computed<TableColumn<AgentSkill>[]>(() => [
+  // 行选择必须显式给选择列：表格的行可选性依赖这一列存在（多选再加 multiple）
   { type: 'selection', fixed: 'left', width: 44 },
-  { accessorKey: 'name', header: '名称' },
-  { accessorKey: 'description', header: '描述' },
-  { id: 'builtin', header: '来源', width: 90 },
-  { id: 'enabled', header: '状态', width: 90 },
-  { accessorKey: 'updateTime', header: '更新时间', width: 170 },
-  { id: 'operation', header: '操作', width: 200 },
+  { id: 'name', header: '名称', minWidth: 180 },
+  { accessorKey: 'description', header: '描述', minWidth: 280 },
+  { id: 'builtin', header: '来源', width: 100, align: 'center' },
+  // 审计时间字段：可勾选但默认不展示（列显隐菜单里「只看常用字段 / 显示全部字段」切换）
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ])
 
-onMounted(load)
-async function load() {
-  loading.value = true
-  try {
-    const res = await apiSkill.page({ ...pagination, keyword: keyword.value || undefined })
-    rows.value = res.data.records
-    pagination.total = Number(res.data.total || 0)
-    selectedRows.value = []
-  }
-  finally { loading.value = false }
+const statusColumn: StatusColumn<AgentSkill> = {
+  statusKey: 'enabled',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    true: { label: '启用', variant: 'default', tone: 'success' },
+    false: { label: '停用', variant: 'secondary', tone: 'neutral' },
+  },
 }
+
+/** 行操作：编辑/启停/删除统一走表格内置操作列（移动端卡片同一套） */
+const rowActions: ActionMenuItem<AgentSkill>[] = [
+  { label: '编辑', icon: 'morph:pencil', visible: () => auth('platform:agent-skill:edit'), onClick: edit },
+  { label: '启用', icon: 'morph:circle-check', visible: row => !row.enabled && auth('platform:agent-skill:edit'), onClick: row => confirmToggle(row) },
+  { label: '停用', icon: 'morph:ban', visible: row => row.enabled && auth('platform:agent-skill:edit'), onClick: row => confirmToggle(row) },
+  { label: '删除', icon: 'morph:trash-2', danger: true, visible: row => !row.builtin && auth('platform:agent-skill:delete'), onClick: remove },
+]
+
+/** 页头操作：新建常用直接显示；上传与批量动作收进「更多」，删除危险标红 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('platform:agent-skill:create')
+    ? [{ label: '新建技能', icon: 'morph:plus', onClick: create }]
+    : []),
+  ...(auth('platform:agent-skill:create')
+    ? [{ label: '上传压缩包', icon: 'morph:upload', variant: 'outline' as const, autoFold: true, onClick: pickZip }]
+    : []),
+  ...(selectedRows.value.length && auth('platform:agent-skill:edit')
+    ? [
+        { label: '批量启用', icon: 'morph:circle-check', variant: 'outline' as const, autoFold: true, onClick: () => batchSetEnabled(true) },
+        { label: '批量停用', icon: 'morph:ban', variant: 'outline' as const, autoFold: true, onClick: () => batchSetEnabled(false) },
+      ]
+    : []),
+  ...(selectedRows.value.length && auth('platform:agent-skill:delete')
+    ? [{ label: '批量删除', icon: 'morph:trash-2', variant: 'destructive' as const, danger: true, onClick: batchRemove }]
+    : []),
+])
+
 function onSelectionChange(selected: AgentSkill[]) {
   selectedRows.value = selected
 }
+
 function resetForm() {
   Object.assign(form, { name: '', description: '', content: '', enabled: true })
   resourcesText.value = '{}'
 }
+
 function create() {
   editing.value = null
   resetForm()
   visible.value = true
 }
+
 function edit(row: AgentSkill) {
   editing.value = row
   Object.assign(form, { name: row.name, description: row.description, content: row.content, enabled: row.enabled })
   resourcesText.value = JSON.stringify(row.resources ?? {}, null, 2)
   visible.value = true
 }
+
 function parseResources(): Record<string, string> | null {
   const text = resourcesText.value.trim()
   if (!text) {
@@ -83,6 +140,7 @@ function parseResources(): Record<string, string> | null {
     return null
   }
 }
+
 async function save() {
   if (!form.name.trim() || !form.description.trim() || !form.content.trim()) {
     toast.error('请填写技能名称、描述和内容')
@@ -104,11 +162,13 @@ async function save() {
   visible.value = false
   await load()
 }
+
 async function setEnabled(row: AgentSkill, enabling: boolean) {
   await apiSkill.setEnabled(row.id, enabling)
   toast.success('已保存')
   await load()
 }
+
 function confirmToggle(row: AgentSkill) {
   const enabling = !row.enabled
   modal.confirm({
@@ -117,6 +177,7 @@ function confirmToggle(row: AgentSkill) {
     onConfirm: () => setEnabled(row, enabling),
   })
 }
+
 function remove(row: AgentSkill) {
   modal.confirm({
     title: '删除技能',
@@ -128,6 +189,7 @@ function remove(row: AgentSkill) {
     },
   })
 }
+
 async function batchSetEnabled(enabling: boolean) {
   const targets = selectedRows.value
   if (!targets.length) {
@@ -146,6 +208,7 @@ async function batchSetEnabled(enabling: boolean) {
     },
   })
 }
+
 function batchRemove() {
   const targets = selectedRows.value.filter(row => !row.builtin)
   if (!selectedRows.value.length) {
@@ -168,9 +231,11 @@ function batchRemove() {
     },
   })
 }
+
 function pickZip() {
   uploadInput.value?.open()
 }
+
 async function onZipChange(files: File[]) {
   const file = files[0]
   uploadInput.value?.reset()
@@ -185,6 +250,7 @@ async function onZipChange(files: File[]) {
   toast.success(`技能「${res.data.name}」已导入${res.data.enabled ? '' : '（当前为停用状态）'}`)
   await load()
 }
+
 function formatTime(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
@@ -192,111 +258,108 @@ function formatTime(value?: string) {
 
 <template>
   <div>
-    <YdPageHeader title="平台技能库" class="mb-0">
-      <YdButton v-auth="'platform:agent-skill:create'" @click="create">
-        <YdIcon name="morph:plus" /> 新建技能
-      </YdButton>
-    </YdPageHeader>
-    <YdPageMain>
-      <section class="skill-section">
-        <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-          
-          row-key="id"
-          :data="rows"
-          :columns="columns"
-          selectable
-          multiple
-          @selection-change="onSelectionChange"
-        >
-          <template #toolbar>
-            <div class="toolbar">
-              <YdInput v-model="keyword" class="w-72" clearable placeholder="名称 / 描述" @keydown.enter="load" />
-              <div class="flex-1" />
-              <template v-if="selectedRows.length">
-                <span class="selected-hint">已选 {{ selectedRows.length }} 项</span>
-                <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(true)">
-                  批量启用
-                </YdButton>
-                <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(false)">
-                  批量停用
-                </YdButton>
-                <YdButton v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="batchRemove">
-                  批量删除
-                </YdButton>
-              </template>
-              <YdButton v-auth="'platform:agent-skill:create'" size="sm" variant="outline" @click="pickZip">
-                <YdIcon name="morph:upload" /> 上传压缩包
-              </YdButton>
-            </div>
-          </template>
-          <template #cell-builtin="{ row }">
-            <YdTag :variant="row.original.builtin ? 'secondary' : 'default'">
-              {{ row.original.builtin ? '内置' : '自定义' }}
-            </YdTag>
-          </template>
-          <template #cell-enabled="{ row }">
-            <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
-              {{ row.original.enabled ? '启用' : '停用' }}
-            </YdTag>
-          </template>
-          <template #cell-updateTime="{ row }">
-            {{ formatTime(row.original.updateTime) }}
-          </template>
-          <template #cell-operation="{ row }">
-            <div class="flex gap-2 justify-center">
-              <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row.original)">
-                {{ row.original.enabled ? '停用' : '启用' }}
-              </YdButton>
-              <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row.original)">
-                编辑
-              </YdButton>
-              <YdButton v-if="!row.original.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row.original)">
-                删除
-              </YdButton>
-            </div>
-          </template>
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                  <YdTag :variant="row.enabled ? 'default' : 'secondary'">
-                    {{ row.enabled ? '启用' : '停用' }}
-                  </YdTag>
-                </div>
-                <div class="flex flex-col gap-1 text-sm">
-                  <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">描述</span>
-                    <span class="break-all">{{ row.description }}</span>
+    <YdTablePageLayout
+      title="平台技能库"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 选中数量是只读情报，按规范放页头而不占操作位 -->
+      <template #page-title>
+        <span v-if="selectedRows.length" class="text-sm text-muted-foreground">已选 {{ selectedRows.length }} 项</span>
+      </template>
+
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
+
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+            column-visibility
+            stripe
+            selectable
+            multiple
+            :status-column="statusColumn"
+            :actions="rowActions"
+            :columns="columns"
+            :data="rows"
+            @selection-change="onSelectionChange"
+          >
+            <template #cell-name="{ row }">
+              <span class="font-medium break-all">{{ row.original.name }}</span>
+            </template>
+            <template #cell-builtin="{ row }">
+              <YdTag :variant="row.original.builtin ? 'secondary' : 'default'">
+                {{ row.original.builtin ? '内置' : '自定义' }}
+              </YdTag>
+            </template>
+            <template #cell-updateTime="{ row }">
+              <span v-if="row.original.updateTime">{{ formatTime(row.original.updateTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.name }}</span>
+                    <YdTag :variant="row.enabled ? 'default' : 'secondary'">
+                      {{ row.enabled ? '启用' : '停用' }}
+                    </YdTag>
                   </div>
-                  <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">来源</span>
-                    <span>{{ row.builtin ? '内置' : '自定义' }}</span>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2 min-w-0">
+                      <span class="text-secondary-foreground/60 shrink-0">描述</span>
+                      <span class="break-all">{{ row.description }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">来源</span>
+                      <span>{{ row.builtin ? '内置' : '自定义' }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">更新</span>
+                      <span>{{ formatTime(row.updateTime) }}</span>
+                    </div>
                   </div>
-                  <div class="flex gap-2">
-                    <span class="shrink-0 text-secondary-foreground/60">更新</span>
-                    <span>{{ formatTime(row.updateTime) }}</span>
+                  <div class="pt-3 border-t flex flex-wrap gap-2">
+                    <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row)">
+                      {{ row.enabled ? '停用' : '启用' }}
+                    </YdButton>
+                    <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row)">
+                      编辑
+                    </YdButton>
+                    <YdButton v-if="!row.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row)">
+                      删除
+                    </YdButton>
                   </div>
                 </div>
-                <div class="flex flex-wrap gap-2 border-t pt-3">
-                  <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="confirmToggle(row)">
-                    {{ row.enabled ? '停用' : '启用' }}
-                  </YdButton>
-                  <YdButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="edit(row)">
-                    编辑
-                  </YdButton>
-                  <YdButton v-if="!row.builtin" v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="remove(row)">
-                    删除
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
-          </template>
-        </YdResponsiveTable></YdLoadingOverlay>
-        <YdPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="paginationLayout" class="mt-3" @page-change="load" @size-change="load" />
-      </section>
-    </YdPageMain>
-    <YdFilePicker ref="uploadInput" accept=".zip" label="选择技能压缩包" @select="onZipChange"><template #default /></YdFilePicker>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
+    <YdFilePicker ref="uploadInput" accept=".zip" label="选择技能压缩包" @select="onZipChange">
+      <template #default />
+    </YdFilePicker>
     <YdModal v-model="visible" :title="editing ? '编辑技能' : '新建技能'" class="sm:max-w-3xl">
       <div class="skill-form">
         <div class="gap-4 grid sm:grid-cols-2">
@@ -321,7 +384,7 @@ function formatTime(value?: string) {
         </label>
         <label class="form-field">
           <span>引用资源（JSON，可选）</span>
-          <YdTextarea v-model="resourcesText" class="w-full" input-class="font-mono" :autosize="{ minRows: 4, maxRows: 10 }" placeholder='{ "references/style-guide.md": "内容…" }' />
+          <YdTextarea v-model="resourcesText" class="w-full" input-class="font-mono" :autosize="{ minRows: 4, maxRows: 10 }" placeholder="{ &quot;references/style-guide.md&quot;: &quot;内容…&quot; }" />
           <small>相对路径 → 文本内容；技能内容中以相对路径引用（如 scripts/run.py）</small>
         </label>
       </div>
@@ -337,9 +400,6 @@ function formatTime(value?: string) {
 </template>
 
 <style scoped>
-.skill-section { display: grid; gap: 16px; }
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
-.selected-hint { color: var(--color-text-3); font-size: 12px; }
 .skill-form { display: grid; gap: 16px; }
 .form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }
 .form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }
