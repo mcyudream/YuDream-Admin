@@ -161,3 +161,40 @@
 - **根因**：每个 Harness Agent 另接本地技能列表，而非使用框架 AgentSkillRepository。
 - **规避**：`platformAgentSkill` 作为框架统一技能源，MongoAgentSkillRepository 实现接口，每轮经 `<available_skills>` 注入。
 - **来源**：主仓 AgentScope 迁移规范；`docs/platform/ai-foundation.md`。
+
+## 7. 系统工具模块与 MCP 接入（2026-10-18）
+
+### 系统工具开关只改管理端列表，运行期仍能调用
+
+- **现象**：管理端把某个模块关掉，模型/工作流仍能列出甚至调用该模块的工具。
+- **根因**：工具装配有多处入口（Harness global toolkit、工作流 `AgentToolExecutor`、schema 过滤中间件、管理端候选与发布校验），只在一处过滤等于没有过滤。
+- **规避**：开关判定用同一枚举/同一服务（`AiToolModuleAppService`），在四处全部落闸：Harness 装配时不注册、`resolve()` 时抛「工具模块已关闭」、中间件同时校验加载状态、候选/授权并集过滤；插件与 MCP 工具参与同一套模块编码（`plugin:<code>`／`mcp:<server>`），不另开开关。
+- **来源**：系统工具模块化交付（`AiToolModuleAppService`、`AiToolModulePlan`）。
+
+### 按需加载把已授权工具挡在门外（审批恢复被拒）
+
+- **现象**：模型在上一轮规划了写入工具，用户确认后恢复运行，工具调用被「当前会话未授权 AI 工具」拒绝；或 CMS/插件会话里显式授权的工具突然不可见。
+- **根因**：按需加载状态按「每次运行」重建，恢复/审批续跑与调用方 scoped 授权的工具集被当成普通全局工具集过滤。
+- **规避**：只在全局工具集上做按需过滤；`AiAgentToolExecutionScope` 非空（调用方显式授权）与 `resume/respond/confirmDecisions` 续跑时 `onDemand=false`（`AiToolModulePlan.newLoadState(false)`），全部已注册工具直接可见；`load_tools` 元工具自身始终可见。
+- **来源**：系统工具模块化交付（`HarnessAgentRuntime.execute` 的 `resuming`/`scoped` 判定）。
+
+### MCP 工具编码在管理端与运行期不一致
+
+- **现象**：从管理端复制的工具编码存进工作流后运行期解析不到（工具不存在）。
+- **根因**：模块编码用冒号（`mcp:code`）、工具名用点（`mcp.code.tool`），两处各写一遍字符串拼接就会漂移。
+- **规避**：编码只在 `AiToolModules.mcpToolName(serverCode, toolName)` 一处生成，管理端 DTO、桥接工具名、前端模块索引都调它；前端不得自行拼 `mcp:` 前缀当工具编码。
+- **来源**：编排页模块选择器联调（`AiToolModules.mcpToolName`；前端已在 editor/index 注释中标注）。
+
+### MCP 探测挂住：SSE 响应体不会自己结束
+
+- **现象**：调用 MCP 连接测试长时间不返回，服务端日志显示已完成响应。
+- **根因**：Streamable HTTP 允许用 `text/event-stream` 返回单次响应，部分实现不主动关闭流；JDK HttpClient 的 `send()` 只对响应头生效，`readAllBytes()` 会一直等。
+- **规避**：响应体读取放到独立线程并按 `timeoutMillis` 强超时（`Future.get` + 超时后关闭流），再按 SSE 帧解析出与请求 id 匹配的 JSON-RPC 消息；不要用 `BodyHandlers.ofString()` 直接等体结束。
+- **来源**：`HttpMcpClientGateway`；测试 `HttpMcpClientGatewayTest`（含 SSE 体、分页游标、协议版本回退、会话头回传）。
+
+### 机器审核判定不能只有布尔：要分清「判定不通过」与「没审成」
+
+- **现象**：评论交给 AI 审核时，把「模型说不行」与「模型没答上来（能力未启用、模型未配、上游 5xx/超时）」混成一个结果，人工复核时无从下手；更糟的是解析失败被当成通过，等于用坏输出替人做决定。
+- **根因**：只设计了布尔语义（通过/不通过），没有给「审核不可用」留位置；解析失败也没和模型判定分开处理。上游聚合网关常见 `No available channel for model xxx` 这类 500，看起来像「模型拒绝」其实根本没审。
+- **规避**：三态落库（approved / rejected / unavailable）并各自带理由摘要与模型标识，判定理由要能被治理端读到；只有明确 `approved: true` 才自动公开，其余一律回落人工；模型输出解析失败、缺字段、类型不对都必须抛异常（不是判定），由应用层记成 unavailable 并保住读者内容。判定端口在领域层，SQL/HTTP 细节留在基础设施实现。
+- **来源**：`ai-comment-review-three-state`（Wiki 评论 AI 审核：领域端口 + 治理端三态标签）。
