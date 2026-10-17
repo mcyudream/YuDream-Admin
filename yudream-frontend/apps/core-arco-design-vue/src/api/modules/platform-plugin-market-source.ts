@@ -88,7 +88,7 @@ export default {
   sync: (id: string) => systemClient.post<unknown, ApiResponse<PluginMarketSource>>(`api/platform/plugin-market-sources/${id}/sync`),
   syncAll: () => systemClient.post<unknown, ApiResponse<PluginMarketSource[]>>('api/platform/plugin-market-sources/sync-all'),
   test: (data: { rootUrl: string, token?: string, type?: MarketSourceType }) => systemClient.post<unknown, ApiResponse<PluginMarketSourceTestResult>>('api/platform/plugin-market-sources/test', data),
-  publications: (params?: { status?: PluginPublicationStatus, mine?: boolean, page?: number, size?: number }) =>
+  publications: (params?: { status?: PluginPublicationStatus, mine?: boolean, keyword?: string, page?: number, size?: number }) =>
     systemClient.get<unknown, ApiResponse<PageResult<PluginMarketPublication>>>('api/platform/plugin-market-source/publications', { params }),
   uploadPublication: (data: FormData) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>('api/platform/plugin-market-source/publications', data, { timeout: 0 }),
   acceptPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/accept`, { note }),

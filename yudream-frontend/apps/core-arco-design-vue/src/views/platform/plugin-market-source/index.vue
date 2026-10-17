@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { MarketSourceType, PluginMarketSource, PluginMarketSourcePayload } from '@/api/modules/platform-plugin-market-source'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 
 const modal = useYdModal()
 const toast = useYdToast()
+const { auth } = useAppAuth()
 const featureStore = useAppFeatureStore()
 const localSourceEnabled = computed(() => featureStore.capabilityEnabled('plugin-market-source'))
 
@@ -13,11 +14,9 @@ const loading = ref(false)
 const loadFailed = ref(false)
 const syncing = ref(false)
 const rows = ref<PluginMarketSource[]>([])
-const search = ref('')
-const filteredRows = computed(() => {
-  const keyword = search.value.trim().toLowerCase()
-  return keyword ? rows.value.filter(row => [row.name, row.code, row.rootUrl].some(value => value?.toLowerCase().includes(keyword))) : rows.value
-})
+const keyword = ref('')
+const statusFilter = ref<'ALL' | 'ENABLED' | 'DISABLED'>('ALL')
+const typeFilter = ref<'ALL' | MarketSourceType>('ALL')
 const publicEnabled = ref(true)
 const publicSaving = ref(false)
 
@@ -40,18 +39,95 @@ const sourceTypeOptions: { label: string, value: MarketSourceType }[] = [
   { label: 'v2 协议源', value: 'V2_API' },
   { label: '静态索引（legacy）', value: 'STATIC_INDEX' },
 ]
+const statusFilterOptions = [
+  { label: '全部状态', value: 'ALL' as const },
+  { label: '已启用', value: 'ENABLED' as const },
+  { label: '已禁用', value: 'DISABLED' as const },
+]
+const typeFilterOptions = [
+  { label: '全部类型', value: 'ALL' as const },
+  { label: '本机源', value: 'LOCAL' as const },
+  { label: 'v2 协议源', value: 'V2_API' as const },
+  { label: '静态索引', value: 'STATIC_INDEX' as const },
+]
 
-const columns = computed<TableColumn<PluginMarketSource>[]>(() => [
-  { accessorKey: 'name', header: '名称', width: 200, fixed: 'left' },
-  { id: 'type', header: '类型', width: 140 },
+const tableColumns: TableColumn<PluginMarketSource>[] = [
+  { id: 'source', header: '市场源', width: 240, fixed: 'left' },
   { accessorKey: 'rootUrl', header: '源地址', width: 320 },
-  { id: 'enabled', header: '状态', width: 90, align: 'center' },
-  { id: 'sync', header: '同步', width: 170 },
+  { id: 'enabled', header: '状态', width: 100 },
+  { id: 'sync', header: '同步', width: 180 },
   { accessorKey: 'pluginCount', header: '插件数', width: 90, align: 'right' },
-  { accessorKey: 'sortOrder', header: '排序', width: 80, align: 'right' },
-  { accessorKey: 'syncedAt', header: '同步时间', width: 180 },
-  { id: 'operation', header: '操作', width: 210, align: 'center', fixed: 'right' },
+  { accessorKey: 'sortOrder', header: '排序', width: 80, align: 'right', defaultHidden: true },
+  { accessorKey: 'syncedAt', header: '同步时间', width: 170, defaultHidden: true },
+]
+
+/** 行操作统一收进操作菜单：同步只对远程源可见，删除对内置源不可用。 */
+const sourceActions: ActionMenuItem<PluginMarketSource>[] = [
+  {
+    label: '同步目录',
+    icon: 'morph:refresh-cw',
+    visible: row => canSync(row) && auth('platform:plugin-market-source:run'),
+    onClick: confirmSync,
+  },
+  {
+    label: row => (row.enabled ? '禁用' : '启用'),
+    icon: 'morph:power',
+    visible: () => auth('platform:plugin-market-source:edit'),
+    onClick: confirmToggle,
+  },
+  {
+    label: '编辑',
+    icon: 'morph:pencil',
+    visible: () => auth('platform:plugin-market-source:edit'),
+    onClick: row => openForm(row),
+  },
+  {
+    label: '删除',
+    icon: 'morph:trash-2',
+    danger: true,
+    visible: row => !row.builtIn && auth('platform:plugin-market-source:delete'),
+    onClick: confirmRemove,
+  },
+]
+
+/** 页头操作：全部同步属不常用动作，超出阈值时收进「更多」。 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('platform:plugin-market-source:run')
+    ? [{
+        label: '全部同步',
+        icon: 'morph:refresh-cw',
+        variant: 'outline' as const,
+        autoFold: true,
+        disabled: syncing.value,
+        onClick: confirmSyncAll,
+      }]
+    : []),
+  ...(auth('platform:plugin-market-source:create')
+    ? [{ label: '添加市场源', icon: 'morph:plus', onClick: () => openForm() }]
+    : []),
 ])
+
+/**
+ * 市场源是有界小集合（通常个位数）：关键词与筛选在本地完成，
+ * 不为一次筛选多打一次往返，因此本页不提供分页。
+ */
+const filteredRows = computed(() => {
+  const query = keyword.value.trim().toLowerCase()
+  return rows.value.filter((row) => {
+    const matchesKeyword = !query
+      || [row.name, row.code, row.rootUrl].some(value => value?.toLowerCase().includes(query))
+    const matchesStatus = statusFilter.value === 'ALL'
+      || (statusFilter.value === 'ENABLED') === row.enabled
+    const matchesType = typeFilter.value === 'ALL' || sourceTypeOf(row) === typeFilter.value
+    return matchesKeyword && matchesStatus && matchesType
+  })
+})
+const hasFilters = computed(() =>
+  Boolean(keyword.value.trim()) || statusFilter.value !== 'ALL' || typeFilter.value !== 'ALL',
+)
+const enabledCount = computed(() => rows.value.filter(row => row.enabled).length)
+const syncErrorCount = computed(() => rows.value.filter(row => row.syncedAt && row.syncStatus !== 'OK').length)
+const summaryText = computed(() => `共 ${rows.value.length} 个市场源 · 启用 ${enabledCount.value}${syncErrorCount.value ? ` · 同步异常 ${syncErrorCount.value}` : ''}`)
 
 const publicIndexUrl = `${window.location.origin}/api/public/plugin-market/index.json`
 const publicV2Url = `${window.location.origin}/api/public/plugin-market`
@@ -86,6 +162,12 @@ async function load() {
   finally {
     loading.value = false
   }
+}
+
+function resetFilters() {
+  keyword.value = ''
+  statusFilter.value = 'ALL'
+  typeFilter.value = 'ALL'
 }
 
 function openForm(row?: PluginMarketSource) {
@@ -173,8 +255,12 @@ function confirmToggle(row: PluginMarketSource) {
   })
 }
 
+function canSync(row: PluginMarketSource) {
+  return row.type !== 'LOCAL' && !row.builtIn
+}
+
 function confirmSync(row: PluginMarketSource) {
-  if (row.type === 'LOCAL' || row.builtIn) {
+  if (!canSync(row)) {
     toast.success('本机源无需同步，目录实时读取本机发布物')
     return
   }
@@ -234,12 +320,11 @@ function syncText(row: PluginMarketSource) {
 }
 
 function formatTime(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '—'
-}
-
-async function copyPublicUrl() {
-  await navigator.clipboard.writeText(publicV2Url)
-  toast.success('已复制')
+  if (!value) {
+    return '—'
+  }
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
+  return match ? `${match[1]} ${match[2]}` : value
 }
 
 async function togglePublicEnabled(value: boolean | undefined) {
@@ -254,11 +339,24 @@ async function togglePublicEnabled(value: boolean | undefined) {
   }
 }
 
-function sourceTypeText(row: PluginMarketSource) {
+function sourceTypeOf(row: PluginMarketSource): MarketSourceType {
   if (row.builtIn || row.type === 'LOCAL') {
-    return '本机源'
+    return 'LOCAL'
   }
-  return row.type === 'V2_API' ? 'v2 协议' : '静态索引'
+  return row.type === 'V2_API' ? 'V2_API' : 'STATIC_INDEX'
+}
+
+function sourceTypeText(row: PluginMarketSource) {
+  const map: Record<MarketSourceType, string> = {
+    LOCAL: '本机源',
+    V2_API: 'v2 协议',
+    STATIC_INDEX: '静态索引',
+  }
+  return map[sourceTypeOf(row)]
+}
+
+function sourceAddress(row: PluginMarketSource) {
+  return sourceTypeOf(row) === 'LOCAL' ? '本机发布物（进程内直读）' : row.rootUrl
 }
 
 function openPublicMarket() {
@@ -267,247 +365,245 @@ function openPublicMarket() {
 </script>
 
 <template>
-  <div>
-    <YdPageHeader title="市场源管理" class="mb-0">
-      <template #description>
-        管理插件市场的订阅来源。远程源随时可添加；本机源、公开社区与对外 v2 协议需启用「插件市场源」能力。发布与审核已拆到独立菜单。
-      </template>
-      <YdButton v-auth="'platform:plugin-market-source:run'" variant="outline" :loading="syncing" @click="confirmSyncAll">
-        <YdIcon name="morph:refresh-cw" />
-        全部同步
-      </YdButton>
-      <YdButton v-auth="'platform:plugin-market-source:create'" @click="openForm()">
-        <YdIcon name="morph:plus" />
-        添加市场源
-      </YdButton>
-    </YdPageHeader>
-    <YdPageMain>
-      <div v-if="localSourceEnabled" class="mb-3 px-3 py-2 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-fill-1)] flex flex-wrap gap-3 items-center justify-between">
-        <div class="text-sm">
-          <div class="font-medium">
-            公开插件市场
-          </div>
-          <div class="text-xs text-secondary-foreground/60 mt-1">
-            开启后对外提供 /market 社区页与 v2 源协议；关闭后公开入口与协议停止服务，后台发布、审核与订阅源不受影响。
-          </div>
-        </div>
-        <div class="flex gap-2 items-center">
-          <span class="text-sm text-secondary-foreground/60">{{ publicEnabled ? '已开启' : '已关闭' }}</span>
-          <YdSwitch
-            v-auth="'platform:plugin-market-source:edit'"
-            :model-value="publicEnabled"
-            :disabled="publicSaving"
-            @update:model-value="togglePublicEnabled"
-          />
-        </div>
-      </div>
-      <div v-if="localSourceEnabled" class="text-sm mb-3 px-3 py-2 border border-[var(--color-border-2)] rounded-lg flex flex-wrap gap-x-2 gap-y-1 items-center">
-        <YdIcon name="morph:link" class="shrink-0" />
-        <span class="text-secondary-foreground/60 shrink-0">对外 v2 源基址</span>
-        <code class="min-w-0 break-all">{{ publicV2Url }}</code>
-        <YdButton variant="link" size="sm" @click="copyPublicUrl">
-          复制
-        </YdButton>
-        <YdButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
-          <YdIcon name="morph:external-link" />
-          公开社区
-        </YdButton>
-        <span class="text-xs text-secondary-foreground/60 w-full">
-          其他实例添加源时类型选「v2 协议源」，地址填该基址。legacy 静态索引仍可用：{{ publicIndexUrl }}
-        </span>
-      </div>
+  <YdTablePageLayout
+    title="市场源管理"
+    :actions="pageActions"
+    :actions-threshold="3"
+    :show-stats="localSourceEnabled"
+    stats-title="对外入口"
+    :stats-default-expanded="true"
+  >
+    <!-- 页头只放只读情报：按钮一律走 actions -->
+    <template #page-title>
+      <span class="text-sm text-muted-foreground">{{ summaryText }}</span>
+    </template>
 
-      <div class="mb-3 flex flex-wrap gap-2 items-center justify-between">
-        <YdInput v-model="search" placeholder="搜索名称、标识或地址" aria-label="搜索市场源" class="w-full sm:max-w-xs" />
-        <span class="text-xs text-secondary-foreground/60">{{ filteredRows.length }} 个市场源</span>
+    <template #stats>
+      <div class="external-panel">
+        <div class="external-item">
+          <div class="external-item__body">
+            <strong>公开插件市场</strong>
+            <p>开启后对外提供 /market 社区页与 v2 源协议；关闭后公开入口与协议停止服务，后台发布、审核与订阅源不受影响。</p>
+          </div>
+          <div class="external-item__action">
+            <YdTag :variant="publicEnabled ? 'default' : 'secondary'">
+              {{ publicEnabled ? '已开启' : '已关闭' }}
+            </YdTag>
+            <YdSwitch
+              v-auth="'platform:plugin-market-source:edit'"
+              :model-value="publicEnabled"
+              :disabled="publicSaving"
+              aria-label="公开插件市场开关"
+              @update:model-value="togglePublicEnabled"
+            />
+          </div>
+        </div>
+
+        <div class="external-item">
+          <div class="external-item__body">
+            <strong>对外 v2 源基址</strong>
+            <p>其他实例添加源时类型选「v2 协议源」，地址填该基址。</p>
+            <code>{{ publicV2Url }}</code>
+          </div>
+          <div class="external-item__action">
+            <YdCopyButton :text="publicV2Url" label="复制" />
+            <YdButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
+              <YdIcon name="morph:external-link" />
+              公开社区
+            </YdButton>
+          </div>
+        </div>
+
+        <div class="external-item">
+          <div class="external-item__body">
+            <strong>legacy 静态索引</strong>
+            <p>仍可用的 index.json 完整地址，仅供旧客户端订阅。</p>
+            <code>{{ publicIndexUrl }}</code>
+          </div>
+          <div class="external-item__action">
+            <YdCopyButton :text="publicIndexUrl" label="复制" />
+          </div>
+        </div>
       </div>
+    </template>
+
+    <template #search>
+      <!-- 有界小集合：本地过滤，控件与表格页筛选行同版式 -->
+      <div class="source-search">
+        <label class="source-search__field">
+          <span>关键词</span>
+          <YdInput v-model="keyword" placeholder="名称 / 标识 / 地址" clearable />
+        </label>
+        <label class="source-search__field">
+          <span>状态</span>
+          <YdFilterSelect v-model="statusFilter" :options="statusFilterOptions" width="100%" placeholder="全部状态" />
+        </label>
+        <label class="source-search__field">
+          <span>类型</span>
+          <YdFilterSelect v-model="typeFilter" :options="typeFilterOptions" width="100%" placeholder="全部类型" />
+        </label>
+        <div class="source-search__actions">
+          <YdButton v-if="hasFilters" variant="outline" @click="resetFilters">
+            重置
+          </YdButton>
+        </div>
+      </div>
+    </template>
+
+    <template #table>
       <YdLoadingOverlay :loading="loading">
-        <YdEmpty v-if="!loading && loadFailed" title="市场源加载失败" description="请检查网络后重试。" illustration="error">
-          <template #action>
-            <YdButton variant="outline" size="sm" @click="load">
-              重新加载
-            </YdButton>
-          </template>
-        </YdEmpty>
-        <YdEmpty v-else-if="!loading && !filteredRows.length" :title="search ? '没有匹配的市场源' : '还没有市场源'" :description="search ? '试试其他名称、标识或地址。' : '添加订阅源后可同步插件目录。'" :illustration="search ? 'no-result' : 'empty'">
-          <template #action>
-            <YdButton v-if="!search" v-auth="'platform:plugin-market-source:create'" size="sm" @click="openForm()">
-              添加市场源
-            </YdButton>
-          </template>
-        </YdEmpty>
-        <YdResponsiveTable
-          v-else
+        <YdResponsiveEnhancedTable
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1080px]"
-
-          stripe border
-          :columns="columns"
+          table-class="min-w-[1040px]"
+          column-visibility
+          :actions="sourceActions"
+          :columns="tableColumns"
           :data="filteredRows"
         >
-          <template #cell-name="{ row }">
-            <div class="flex flex-col gap-1">
-              <div class="flex gap-2 items-center">
-                <span class="font-medium">{{ row.original.name }}</span>
+          <template #empty>
+            <span class="text-muted-foreground">
+              {{ hasFilters ? '没有匹配的市场源，试试调整筛选条件' : (loadFailed ? '市场源加载失败，请稍后重试' : '还没有市场源，添加订阅源后可同步插件目录') }}
+            </span>
+          </template>
+
+          <template #cell-source="{ row }">
+            <div class="source-identity">
+              <span class="source-identity__name">{{ row.original.name }}</span>
+              <span class="source-identity__meta">
                 <YdTag v-if="row.original.builtIn" variant="secondary">
                   内置
                 </YdTag>
                 <YdTag variant="secondary">
                   {{ sourceTypeText(row.original) }}
                 </YdTag>
-              </div>
-              <span class="text-xs text-secondary-foreground/60">{{ row.original.code }}</span>
+                <code>{{ row.original.code }}</code>
+              </span>
             </div>
           </template>
-          <template #cell-type="{ row }">
-            <YdTag variant="secondary">
-              {{ sourceTypeText(row.original) }}
-            </YdTag>
-          </template>
+
           <template #cell-rootUrl="{ row }">
-            <span class="text-sm break-all">{{ row.original.builtIn || row.original.type === 'LOCAL' ? '本机发布物（进程内直读）' : row.original.rootUrl }}</span>
-            <div v-if="row.original.tokenConfigured" class="text-xs text-secondary-foreground/60">
-              <YdIcon name="morph:key-round" />
-              已配置访问令牌
+            <div class="source-address">
+              <span>{{ sourceAddress(row.original) }}</span>
+              <span v-if="row.original.tokenConfigured" class="source-address__token">
+                <YdIcon name="morph:key-round" />
+                已配置访问令牌
+              </span>
             </div>
           </template>
+
           <template #cell-enabled="{ row }">
             <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
               {{ row.original.enabled ? '启用' : '禁用' }}
             </YdTag>
           </template>
+
           <template #cell-sync="{ row }">
-            <YdTag :variant="syncVariant(row.original)">
-              {{ syncText(row.original) }}
-            </YdTag>
-            <div v-if="row.original.syncErrorMessage" class="mt-1 flex gap-1 max-w-[200px] items-center" :title="row.original.syncErrorMessage">
-              <YdTag variant="destructive">
-                失败
+            <div class="source-sync">
+              <YdTag :variant="syncVariant(row.original)">
+                {{ syncText(row.original) }}
               </YdTag>
-              <span class="text-xs text-secondary-foreground/60 truncate">{{ row.original.syncErrorMessage }}</span>
-            </div>
-          </template>
-          <template #cell-operation="{ row }">
-            <div class="flex gap-2 justify-center">
-              <YdButton v-if="row.original.type !== 'LOCAL' && !row.original.builtIn" v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row.original)">
-                同步
-              </YdButton>
-              <YdButton v-auth="'platform:plugin-market-source:edit'" variant="outline" size="sm" @click="confirmToggle(row.original)">
-                {{ row.original.enabled ? '禁用' : '启用' }}
-              </YdButton>
-              <YdButton v-auth="'platform:plugin-market-source:edit'" variant="link" size="sm" @click="openForm(row.original)">
-                编辑
-              </YdButton>
-              <YdButton v-if="!row.original.builtIn" v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" @click="confirmRemove(row.original)">
-                删除
-              </YdButton>
+              <span
+                v-if="row.original.syncErrorMessage"
+                class="source-sync__error"
+                :title="row.original.syncErrorMessage"
+              >{{ row.original.syncErrorMessage }}</span>
             </div>
           </template>
 
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex gap-2 items-center justify-between">
-                  <span class="text-base font-semibold break-all">{{ row.name }}</span>
-                  <YdTag :variant="row.enabled ? 'default' : 'secondary'">
-                    {{ row.enabled ? '启用' : '禁用' }}
-                  </YdTag>
-                </div>
-                <div class="text-sm flex flex-col gap-1">
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">标识</span>
-                    <span class="break-all">{{ row.code }}<template v-if="row.builtIn">（内置）</template></span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">地址</span>
-                    <span class="break-all">{{ row.builtIn || row.type === 'LOCAL' ? '本机发布物（进程内直读）' : row.rootUrl }}</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">同步</span>
-                    <span>{{ syncText(row) }} · {{ formatTime(row.syncedAt) }}</span>
-                  </div>
-                  <div v-if="row.syncErrorMessage" class="flex gap-1 items-center">
-                    <YdTag variant="destructive">
-                      失败
-                    </YdTag>
-                    <span class="text-xs text-secondary-foreground/60 break-all">{{ row.syncErrorMessage }}</span>
-                  </div>
-                </div>
-                <div class="pt-3 border-t flex flex-wrap gap-2">
-                  <YdButton v-if="row.type !== 'LOCAL' && !row.builtIn" v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row)">
-                    同步
-                  </YdButton>
-                  <YdButton v-auth="'platform:plugin-market-source:edit'" variant="outline" size="sm" @click="confirmToggle(row)">
-                    {{ row.enabled ? '禁用' : '启用' }}
-                  </YdButton>
-                  <YdButton v-auth="'platform:plugin-market-source:edit'" variant="link" size="sm" @click="openForm(row)">
-                    编辑
-                  </YdButton>
-                  <YdButton v-if="!row.builtIn" v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" @click="confirmRemove(row)">
-                    删除
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
+          <template #cell-syncedAt="{ row }">
+            {{ formatTime(row.original.syncedAt) }}
           </template>
-        </YdResponsiveTable>
+        </YdResponsiveEnhancedTable>
       </YdLoadingOverlay>
+    </template>
 
-      <YdModal
-        v-model="formVisible"
-        :title="editing ? '编辑市场源' : '添加市场源'"
-        show-cancel-button
-        class="sm:max-w-2xl"
-        :confirm-loading="formSaving"
-        @confirm="saveForm"
-      >
-        <YdForm :model="form" layout="vertical">
-          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
-            <YdFormItem label="市场源标识">
-              <YdInput v-model="form.code" :disabled="!!editing" placeholder="小写字母、数字或连字符，如 company-mirror" />
-            </YdFormItem>
-            <YdFormItem label="名称">
-              <YdInput v-model="form.name" placeholder="市场源显示名称" />
-            </YdFormItem>
+    <YdModal
+      v-model="formVisible"
+      :title="editing ? '编辑市场源' : '添加市场源'"
+      show-cancel-button
+      class="sm:max-w-2xl"
+      :confirm-loading="formSaving"
+      @confirm="saveForm"
+    >
+      <YdForm :model="form" layout="vertical">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
+          <YdFormItem label="市场源标识">
+            <YdInput v-model="form.code" :disabled="!!editing" placeholder="小写字母、数字或连字符，如 company-mirror" />
+          </YdFormItem>
+          <YdFormItem label="名称">
+            <YdInput v-model="form.name" placeholder="市场源显示名称" />
+          </YdFormItem>
+        </div>
+        <YdFormItem v-if="!editing?.builtIn" label="源类型">
+          <YdSelect v-model="form.type" :options="sourceTypeOptions" :disabled="!!editing?.builtIn" />
+        </YdFormItem>
+        <YdFormItem v-if="editing?.builtIn" label="源类型">
+          <YdInput model-value="本机源" disabled />
+          <div class="text-xs text-secondary-foreground/60 mt-1">
+            内置源固定为本机发布物，进程内直读，无需地址与同步。
           </div>
-          <YdFormItem v-if="!editing?.builtIn" label="源类型">
-            <YdSelect v-model="form.type" :options="sourceTypeOptions" :disabled="!!editing?.builtIn" />
-          </YdFormItem>
-          <YdFormItem v-if="editing?.builtIn" label="源类型">
-            <YdInput model-value="本机源" disabled />
-            <div class="text-xs text-secondary-foreground/60 mt-1">
-              内置源固定为本机发布物，进程内直读，无需地址与同步。
-            </div>
-          </YdFormItem>
-          <YdFormItem v-if="!editing?.builtIn" :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'">
-            <div class="flex gap-2">
-              <YdInput
-                v-model="form.rootUrl"
-                :placeholder="form.type === 'V2_API' ? 'https://example.com/api/public/plugin-market' : 'https://example.com/market/index.json'"
-                class="flex-1"
-              />
-              <YdButton variant="outline" :loading="testing" @click="testForm">
-                测试连接
-              </YdButton>
-            </div>
-            <div v-if="testMessage" class="mt-1 flex gap-1 items-center">
-              <YdTag :variant="testOk ? 'default' : 'destructive'">
-                {{ testOk ? '成功' : '失败' }}
-              </YdTag>
-              <span class="text-xs text-secondary-foreground/60">{{ testMessage }}</span>
-            </div>
-          </YdFormItem>
-          <div class="gap-x-4 grid grid-cols-1 md:grid-cols-[1fr_140px]">
-            <YdFormItem label="访问令牌（可选）">
-              <YdInput v-model="form.token" type="password" :placeholder="editing?.tokenConfigured ? '已配置，留白表示保留' : '私有源的 Bearer 令牌'" />
-            </YdFormItem>
-            <YdFormItem label="排序">
-              <YdNumberField :model-value="form.sortOrder ?? 100" :min="0" class="w-full" @update:model-value="form.sortOrder = $event" />
-            </YdFormItem>
+        </YdFormItem>
+        <YdFormItem v-if="!editing?.builtIn" :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'">
+          <div class="flex gap-2">
+            <YdInput
+              v-model="form.rootUrl"
+              :placeholder="form.type === 'V2_API' ? 'https://example.com/api/public/plugin-market' : 'https://example.com/market/index.json'"
+              class="flex-1"
+            />
+            <YdButton variant="outline" :loading="testing" @click="testForm">
+              测试连接
+            </YdButton>
           </div>
-        </YdForm>
-      </YdModal>
-    </YdPageMain>
-  </div>
+          <div v-if="testMessage" class="mt-1 flex gap-1 items-center">
+            <YdTag :variant="testOk ? 'default' : 'destructive'">
+              {{ testOk ? '成功' : '失败' }}
+            </YdTag>
+            <span class="text-xs text-secondary-foreground/60">{{ testMessage }}</span>
+          </div>
+        </YdFormItem>
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-[1fr_140px]">
+          <YdFormItem label="访问令牌（可选）">
+            <YdInput v-model="form.token" type="password" :placeholder="editing?.tokenConfigured ? '已配置，留白表示保留' : '私有源的 Bearer 令牌'" />
+          </YdFormItem>
+          <YdFormItem label="排序">
+            <YdNumberField :model-value="form.sortOrder ?? 100" :min="0" class="w-full" @update:model-value="form.sortOrder = $event" />
+          </YdFormItem>
+        </div>
+      </YdForm>
+    </YdModal>
+  </YdTablePageLayout>
 </template>
+
+<style scoped>
+/* 对外入口情报板：开关与对外地址各占一行，读起来像一条条事实而不是卡片墙 */
+.external-panel { display: grid; gap: 12px; }
+.external-item { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.external-item__body { display: grid; gap: 4px; min-width: 0; flex: 1 1 320px; }
+.external-item__body strong { color: var(--color-text-1); font-size: 14px; }
+.external-item__body p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
+.external-item__body code { color: var(--color-text-2); font-size: 12px; overflow-wrap: anywhere; }
+.external-item__action { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* 搜索区：与 YdDynamicSearchForm 同版式（字段等宽、窄屏单列、操作按钮整行居右） */
+.source-search { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: end; }
+.source-search__field { display: grid; gap: 6px; min-width: 0; }
+.source-search__field > span { color: var(--color-text-3); font-size: 12px; }
+.source-search__actions { display: flex; grid-column: 1 / -1; gap: 8px; justify-content: flex-end; padding-top: 4px; }
+
+.source-identity { display: grid; gap: 3px; min-width: 0; }
+.source-identity__name { color: var(--color-text-1); font-weight: 600; overflow-wrap: anywhere; }
+.source-identity__meta { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.source-identity__meta code { color: var(--color-text-3); font-size: 11.5px; overflow-wrap: anywhere; }
+
+.source-address { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.source-address__token { display: inline-flex; gap: 4px; align-items: center; color: var(--color-text-3); font-size: 11.5px; }
+
+.source-sync { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.source-sync__error { display: block; max-width: 220px; overflow: hidden; color: var(--color-danger-6); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .source-search__actions { justify-content: stretch; }
+  .source-search__actions > * { flex: 1; }
+}
+</style>

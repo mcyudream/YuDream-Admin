@@ -1,74 +1,123 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
-import type { PluginMarketPublication, PluginPublicationChannel, PluginPublicationStatus } from '@/api/modules/platform-plugin-market-source'
+import type { ActionMenuItem, SearchOptionsSource, TableColumn, YdTablePageAction } from '@yudream/components'
+import type { PluginMarketPublication } from '@/api/modules/platform-plugin-market-source'
+import { useTablePage } from '@yudream/components'
 import apiMarketSource, { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
+import { formatPublicationSize, formatPublicationTime, publicationChannelText, publicationStatusText, publicationStatusVariant, publicationTitle } from '../plugin-market-source/publication-format'
 
 const modal = useYdModal()
 const toast = useYdToast()
+const { auth } = useAppAuth()
 
-const loading = ref(false)
-const loadFailed = ref(false)
-const publications = ref<PluginMarketPublication[]>([])
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const statusFilter = ref<PluginPublicationStatus | ''>('PENDING')
 const reviewRequired = ref(true)
 const reviewSaving = ref(false)
 const actingPublicationId = ref('')
 
-const statusOptions = computed(() => [
-  { label: '全部状态', value: '' },
-  ...PLUGIN_PUBLICATION_STATUS_OPTIONS,
-])
+/** 状态下拉：标识与 PluginMarketPublicationPageQuery#status 的 optionsSource 对应 */
+const optionsSources: SearchOptionsSource[] = [
+  {
+    id: 'publicationStatusOptions',
+    loader: () => [
+      { label: '全部状态', value: '' },
+      ...PLUGIN_PUBLICATION_STATUS_OPTIONS,
+    ],
+  },
+]
 
-const columns = computed<TableColumn<PluginMarketPublication>[]>(() => [
-  { id: 'plugin', header: '插件', width: 240, fixed: 'left' },
+const tableColumns: TableColumn<PluginMarketPublication>[] = [
+  { id: 'publication', header: '发布物', width: 260, fixed: 'left' },
   { accessorKey: 'pluginVersion', header: '版本', width: 110 },
-  { id: 'channel', header: '通道', width: 100, align: 'center' },
+  { id: 'channel', header: '通道', width: 110 },
   { accessorKey: 'category', header: '分类', width: 120 },
-  { id: 'pubStatus', header: '状态', width: 110, align: 'center' },
-  { accessorKey: 'createTime', header: '提交时间', width: 170 },
-  { id: 'pubOperation', header: '操作', width: 280, align: 'center', fixed: 'right' },
-])
+  { id: 'pubStatus', header: '状态', width: 170 },
+  { accessorKey: 'downloadCount', header: '下载', width: 90, align: 'right', defaultHidden: true },
+  { accessorKey: 'createTime', header: '提交时间', width: 160 },
+]
 
-onMounted(load)
+/**
+ * 审核默认只看向待审核：页面进来就能处理待办，其它状态通过搜索区切换。
+ * 搜索条件来自 PluginMarketPublicationPageQuery 的 @Searchable 注解（关键词 + 状态）。
+ */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<PluginMarketPublication>({
+  queryClass: 'online.yudream.base.application.platform.plugin.query.PluginMarketPublicationPageQuery',
+  loadApi: async (query) => {
+    const res = await apiMarketSource.publications({
+      status: query.status || undefined,
+      keyword: query.keyword || undefined,
+      page: query.page,
+      size: query.size,
+    })
+    return {
+      records: res.data.records,
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  initialQuery: { status: 'PENDING' },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
 
-async function load() {
-  loading.value = true
-  loadFailed.value = false
+/** 行操作按状态与权限收敛：待审核才可通过/拒绝，已发布才可下架，删除始终可用。 */
+const publicationActions: ActionMenuItem<PluginMarketPublication>[] = [
+  {
+    label: '通过',
+    icon: 'morph:circle-check',
+    visible: row => row.status === 'PENDING' && auth('platform:plugin-market-source:accept'),
+    onClick: confirmAccept,
+  },
+  {
+    label: '拒绝',
+    icon: 'morph:circle-slash',
+    danger: true,
+    visible: row => row.status === 'PENDING' && auth('platform:plugin-market-source:accept'),
+    onClick: confirmReject,
+  },
+  {
+    label: '下架',
+    icon: 'morph:archive',
+    danger: true,
+    visible: row => row.status === 'PUBLISHED' && auth('platform:plugin-market-source:delete'),
+    onClick: confirmUnpublish,
+  },
+  {
+    label: '删除',
+    icon: 'morph:trash-2',
+    danger: true,
+    visible: () => auth('platform:plugin-market-source:delete'),
+    onClick: confirmDelete,
+  },
+]
+
+/** 页头操作：刷新待审核列表由搜索与翻页承担，本页只保留审核开关所在的设置区。 */
+const pageActions = computed<YdTablePageAction[]>(() => [])
+
+const pendingCountText = computed(() =>
+  searchQuery.status === 'PENDING' ? `待审核 ${pagination.total} 条` : `共 ${pagination.total} 条记录`,
+)
+
+onMounted(loadReviewRequired)
+
+async function loadReviewRequired() {
   try {
-    const [pageRes, reviewRes] = await Promise.all([
-      apiMarketSource.publications({
-        status: statusFilter.value || undefined,
-        page: pagination.page,
-        size: pagination.size,
-      }),
-      apiMarketSource.reviewRequired(),
-    ])
-    publications.value = pageRes.data.records || []
-    pagination.total = pageRes.data.total || 0
-    reviewRequired.value = reviewRes.data
+    const res = await apiMarketSource.reviewRequired()
+    reviewRequired.value = res.data
   }
   catch {
-    loadFailed.value = true
-    toast.error('加载审核列表失败')
+    // 拦截器已提示；保留当前开关，避免失败时回落成错误状态
   }
-  finally {
-    loading.value = false
-  }
-}
-
-function onPageChange() {
-  void load()
-}
-
-function onSizeChange() {
-  pagination.page = 1
-  void load()
-}
-
-function onStatusChange() {
-  pagination.page = 1
-  void load()
 }
 
 async function toggleReviewRequired(value: boolean | undefined) {
@@ -126,186 +175,128 @@ async function actOnPublication(row: PluginMarketPublication, action: (api: type
     actingPublicationId.value = ''
   }
 }
-
-function publicationStatusVariant(status: PluginPublicationStatus) {
-  return status === 'PUBLISHED' ? 'default' : status === 'PENDING' ? 'secondary' : 'destructive'
-}
-
-function publicationStatusText(status: PluginPublicationStatus) {
-  return PLUGIN_PUBLICATION_STATUS_OPTIONS.find(item => item.value === status)?.label || status
-}
-
-function channelText(channel: PluginPublicationChannel) {
-  return channel === 'PIPELINE' ? '流水线' : '界面上传'
-}
-
-function formatTime(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '—'
-}
 </script>
 
 <template>
-  <div>
-    <YdPageHeader title="发布审核" class="mb-0">
-      <template #description>
-        审核本机市场源的待发布插件。通过后对外可见；拒绝与下架后同版本不可覆盖。
-      </template>
-    </YdPageHeader>
-    <YdPageMain>
-      <div class="mb-3 px-3 py-2 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-fill-1)] flex flex-wrap gap-3 items-center justify-between">
-        <div class="text-sm">
-          <div class="font-medium">
-            发布需审核
-          </div>
-          <div class="text-xs text-secondary-foreground/60 mt-1">
-            开启后新上传进入待审核；关闭后界面与流水线发布直接对外可见。持有跳过审核权限的作者仍可直接发布。
-          </div>
+  <YdTablePageLayout
+    title="发布审核"
+    :actions="pageActions"
+    :show-stats="auth('platform:plugin-market-source:edit')"
+    stats-title="审核开关"
+    :stats-default-expanded="true"
+  >
+    <template #page-title>
+      <span class="text-sm text-muted-foreground">{{ pendingCountText }}</span>
+    </template>
+
+    <template #stats>
+      <div class="review-switch">
+        <div class="review-switch__body">
+          <strong>发布需审核</strong>
+          <p>开启后新上传进入待审核；关闭后界面与流水线发布直接对外可见。持有跳过审核权限的作者仍可直接发布。</p>
         </div>
-        <div class="flex gap-2 items-center">
-          <span class="text-sm text-secondary-foreground/60">{{ reviewRequired ? '已开启' : '已关闭' }}</span>
+        <div class="review-switch__action">
+          <YdTag :variant="reviewRequired ? 'default' : 'secondary'">
+            {{ reviewRequired ? '已开启' : '已关闭' }}
+          </YdTag>
           <YdSwitch
-            v-auth="'platform:plugin-market-source:edit'"
             :model-value="reviewRequired"
             :disabled="reviewSaving"
+            aria-label="发布需审核开关"
             @update:model-value="toggleReviewRequired"
           />
         </div>
       </div>
+    </template>
 
-      <div class="mb-3 flex flex-wrap gap-2 items-center justify-between">
-        <YdSelect v-model="statusFilter" :options="statusOptions" class="w-full sm:w-44" aria-label="筛选审核状态" @update:model-value="onStatusChange" />
-        <span class="text-xs text-secondary-foreground/60">共 {{ pagination.total }} 条记录</span>
-      </div>
+    <template #search>
+      <YdDynamicSearchForm
+        v-model="searchQuery"
+        :config="searchConfig"
+        :options-sources="optionsSources"
+        @search="search"
+        @reset="resetSearch"
+      />
+    </template>
 
+    <template #table>
       <YdLoadingOverlay :loading="loading">
-        <YdEmpty v-if="!loading && loadFailed" title="审核列表加载失败" description="请检查网络后重试。" illustration="error">
-          <template #action>
-            <YdButton variant="outline" size="sm" @click="load">
-              重新加载
-            </YdButton>
-          </template>
-        </YdEmpty>
-        <YdEmpty v-else-if="!loading && !publications.length" :title="statusFilter === 'PENDING' ? '暂无待审核发布物' : '当前状态没有发布物'" :description="statusFilter === 'PENDING' ? '新的发布申请会出现在这里。' : '切换状态筛选查看其他记录。'" :illustration="statusFilter === 'PENDING' ? 'empty' : 'no-result'" />
-        <YdResponsiveTable
-          v-else
+        <YdResponsiveEnhancedTable
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[980px]"
-
-          stripe border
-          :columns="columns"
-          :data="publications"
+          table-class="min-w-[1000px]"
+          column-visibility
+          :actions="publicationActions"
+          :columns="tableColumns"
+          :data="rows"
         >
-          <template #cell-plugin="{ row }">
-            <div class="flex flex-col gap-1">
-              <span class="font-medium">{{ row.original.displayName || row.original.code }}</span>
-              <span class="text-xs text-secondary-foreground/60">{{ row.original.code }}</span>
+          <template #empty>
+            <span class="text-muted-foreground">
+              {{ searchQuery.status === 'PENDING' ? '暂无待审核发布物，新的发布申请会出现在这里' : '当前条件下没有发布物' }}
+            </span>
+          </template>
+
+          <template #cell-publication="{ row }">
+            <div class="publication-identity">
+              <span class="publication-identity__name">{{ publicationTitle(row.original) }}</span>
+              <span class="publication-identity__meta">
+                <code>{{ row.original.code }}</code>
+                <span>· {{ formatPublicationSize(row.original.sizeBytes) }}</span>
+              </span>
             </div>
           </template>
+
           <template #cell-channel="{ row }">
             <YdTag variant="secondary">
-              {{ channelText(row.original.channel) }}
+              {{ publicationChannelText(row.original.channel) }}
             </YdTag>
           </template>
+
           <template #cell-pubStatus="{ row }">
-            <YdTag :variant="publicationStatusVariant(row.original.status)">
-              {{ publicationStatusText(row.original.status) }}
-            </YdTag>
-            <div v-if="row.original.reviewNote" class="text-xs text-secondary-foreground/60 mt-1 max-w-[160px] truncate" :title="row.original.reviewNote">
-              {{ row.original.reviewNote }}
-            </div>
-          </template>
-          <template #cell-pubOperation="{ row }">
-            <div class="flex gap-2 justify-center">
-              <template v-if="row.original.status === 'PENDING'">
-                <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmAccept(row.original)">
-                  通过
-                </YdButton>
-                <YdButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmReject(row.original)">
-                  拒绝
-                </YdButton>
-              </template>
-              <YdButton
-                v-if="row.original.status === 'PUBLISHED'"
-                v-auth="'platform:plugin-market-source:delete'"
-                variant="destructive"
-                size="sm"
-                :disabled="actingPublicationId === row.original.id"
-                @click="confirmUnpublish(row.original)"
-              >
-                下架
-              </YdButton>
-              <YdButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmDelete(row.original)">
-                删除
-              </YdButton>
+            <div class="publication-status">
+              <YdTag :variant="publicationStatusVariant(row.original.status)">
+                {{ publicationStatusText(row.original.status) }}
+              </YdTag>
+              <span
+                v-if="row.original.reviewNote"
+                class="publication-status__note"
+                :title="row.original.reviewNote"
+              >{{ row.original.reviewNote }}</span>
             </div>
           </template>
 
-          <template #card="{ row }">
-            <YdCard class="w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex gap-2 items-center justify-between">
-                  <span class="text-base font-semibold break-all">{{ row.displayName || row.code }} {{ row.pluginVersion }}</span>
-                  <YdTag :variant="publicationStatusVariant(row.status)">
-                    {{ publicationStatusText(row.status) }}
-                  </YdTag>
-                </div>
-                <div class="text-sm flex flex-col gap-1">
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">通道</span>
-                    <span>{{ channelText(row.channel) }}</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">分类</span>
-                    <span>{{ row.category || '—' }}</span>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">提交时间</span>
-                    <span>{{ formatTime(row.createTime) }}</span>
-                  </div>
-                  <div v-if="row.reviewNote" class="flex gap-2">
-                    <span class="text-secondary-foreground/60 shrink-0">备注</span>
-                    <span class="break-all">{{ row.reviewNote }}</span>
-                  </div>
-                </div>
-                <div class="pt-3 border-t flex flex-wrap gap-2">
-                  <template v-if="row.status === 'PENDING'">
-                    <YdButton v-auth="'platform:plugin-market-source:accept'" variant="outline" size="sm" :disabled="actingPublicationId === row.id" @click="confirmAccept(row)">
-                      通过
-                    </YdButton>
-                    <YdButton v-auth="'platform:plugin-market-source:accept'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmReject(row)">
-                      拒绝
-                    </YdButton>
-                  </template>
-                  <YdButton
-                    v-if="row.status === 'PUBLISHED'"
-                    v-auth="'platform:plugin-market-source:delete'"
-                    variant="destructive"
-                    size="sm"
-                    :disabled="actingPublicationId === row.id"
-                    @click="confirmUnpublish(row)"
-                  >
-                    下架
-                  </YdButton>
-                  <YdButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDelete(row)">
-                    删除
-                  </YdButton>
-                </div>
-              </div>
-            </YdCard>
+          <template #cell-createTime="{ row }">
+            {{ formatPublicationTime(row.original.createTime) }}
           </template>
-        </YdResponsiveTable>
+        </YdResponsiveEnhancedTable>
       </YdLoadingOverlay>
+    </template>
 
+    <template #footer>
       <YdPagination
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
         :sizes="[10, 20, 50]"
-        class="mt-3"
         @page-change="onPageChange"
         @size-change="onSizeChange"
       />
-    </YdPageMain>
-  </div>
+    </template>
+  </YdTablePageLayout>
 </template>
+
+<style scoped>
+.review-switch { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.review-switch__body { display: grid; gap: 4px; min-width: 0; flex: 1 1 320px; }
+.review-switch__body strong { color: var(--color-text-1); font-size: 14px; }
+.review-switch__body p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
+.review-switch__action { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.publication-identity { display: grid; gap: 3px; min-width: 0; }
+.publication-identity__name { color: var(--color-text-1); font-weight: 600; overflow-wrap: anywhere; }
+.publication-identity__meta { display: flex; gap: 4px; align-items: center; color: var(--color-text-3); font-size: 11.5px; }
+.publication-identity__meta code { color: var(--color-text-3); }
+
+.publication-status { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.publication-status__note { display: block; max-width: 180px; overflow: hidden; color: var(--color-text-3); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+</style>
