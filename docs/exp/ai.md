@@ -198,3 +198,10 @@
 - **根因**：只设计了布尔语义（通过/不通过），没有给「审核不可用」留位置；解析失败也没和模型判定分开处理。上游聚合网关常见 `No available channel for model xxx` 这类 500，看起来像「模型拒绝」其实根本没审。
 - **规避**：三态落库（approved / rejected / unavailable）并各自带理由摘要与模型标识，判定理由要能被治理端读到；只有明确 `approved: true` 才自动公开，其余一律回落人工；模型输出解析失败、缺字段、类型不对都必须抛异常（不是判定），由应用层记成 unavailable 并保住读者内容。判定端口在领域层，SQL/HTTP 细节留在基础设施实现。
 - **来源**：`ai-comment-review-three-state`（Wiki 评论 AI 审核：领域端口 + 治理端三态标签）。
+
+### 工具简写 schema 只在模型侧生效，管理端测试弹窗预填为空
+
+- **现象**：系统工具用「属性名 → 描述」简写声明输入参数时，模型侧调用正常，但管理端测试弹窗的参数骨架是空的（运行必然报「缺少 xxx 参数」）。
+- **根因**：归一化（包成 `type=object` + `properties`）只在运行期 `ToolSchemas.normalizeSimple` 里做过一次，管理端目录行直接透传原始简写 map，前端按 `properties` 找参数自然找不到。
+- **规避**：归一化收敛到领域 `AiAgentToolSchemas`，运行期与 `GET /agents/tools/catalog` 共用；前端骨架/必填提示只认标准 `properties` 形状，不为简写做第二套解析。
+- **来源**：系统工具表格页与测试弹窗联调（`AiAgentToolSchemas`）。

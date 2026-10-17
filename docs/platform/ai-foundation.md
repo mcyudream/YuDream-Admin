@@ -27,6 +27,13 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 - **按需加载（默认）**：`yudream.platform.agent.tool-loading=on-demand` 时，只有**常驻模块**的工具直接进入模型视野，其余模块由元工具 `load_tools` 加载后才可见：不带参数返回模块目录，带 `module` 返回该模块工具清单并标记加载。加载只改变 schema 可见性，**不授予权限**（执行层仍按权限快照与模块开关 fail-closed 复核）。`load_tools` 只注册在 Harness 路径的全局工具集上；调用方显式授权的 scoped 工具集（CMS 画布、前端工具、插件触发会话）与审批/恢复续跑不做按需过滤，避免把已授权工具或待确认调用挡在门外。`eager` 模式恢复旧行为（全部可见、不注册元工具）。
 - 按需模式在系统提示词末尾追加模块协议说明（`PerCallSystemPromptMiddleware`），模型不知道 `load_tools` 时会先看到模块目录提示，而不是臆造工具名。
 
+### 管理端工具目录与工具测试
+
+- 「系统工具」页按**表格页规范**落地：`YdTablePageLayout` + `YdDynamicSearchForm`（筛选来自 `AiToolCatalogPageQuery` 的 `@Searchable` 声明：关键词/来源/模块/状态）+ `YdResponsiveEnhancedTable`。系统、插件、MCP、Python 工具**合并成一张表**，用来源标签区分；行级操作统一进表格 `actions`（测试 / 编辑 / 删除，仅 Python 工具可编辑删除），模块开关集中在页头「工具模块开关」弹窗，表格里只表达模块名与「模块已关闭 / 按需加载」状态。`GET /api/platform/agents/tools/catalog` 提供分页行（含 `toolId`、`moduleEnabled`、`risk`、`inputSchema`），开关状态与运行期同源。
+- `POST /api/platform/agents/tools/test`（权限码 `platform:agent:tool:test`）按当前登录用户的权限快照**真实调用一次**工具：系统 → 插件 → MCP → Python 四条通道分别解析。与运行期的唯一差别是不要求工具被某个 Agent 应用授权（测试端点自身权限即授权来源）；模块开关、工具启用状态、工具权限码、Python 运行器可用性照旧全部复核，返回 `success/message/durationMillis/payload` 而非抛 500，失败原因直接给管理员看。写入类工具由前端在调用前二次确认。
+- 工具输入 schema 的归一化只有一处（领域 `AiAgentToolSchemas`，infra `ToolSchemas` 复用同一实现）：运行期模型侧与目录行共用同一换算，声明「属性名 → 描述」简写的工具也能在测试弹窗里生成参数骨架。
+- 删除 MCP 服务时同步清除其工具模块开关状态（`clearModuleState`），否则同编码重新登记会继承上一次的关闭状态。
+
 ## MCP 服务接入
 
 MCP（Model Context Protocol）作为独立平台能力 `mcp`（类型 AI，依赖 `ai`，配置闸门 `yudream.platform.capabilities.mcp.enabled`，运行期仍需 `CapabilityAppService.ensureEnabled("mcp")`）接入外部工具服务端。
