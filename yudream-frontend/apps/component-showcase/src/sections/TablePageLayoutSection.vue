@@ -16,12 +16,20 @@ interface ContentItem {
   updatedAt: string
 }
 
-const rows = ref<ContentItem[]>([
-  { id: '1', index: 1, title: '产品需求文档（2026 Q4）', code: 'DOC_0001', words: 2380, updatedAt: '2026-10-12' },
-  { id: '2', index: 2, title: '用户调研访谈纪要（八月）', code: 'DOC_0002', words: 1560, updatedAt: '2026-10-08' },
-  { id: '3', index: 3, title: '接口设计规范 v2.1', code: 'DOC_0003', words: 4120, updatedAt: '2026-09-30' },
-  { id: '4', index: 4, title: '版本发布检查清单', code: 'DOC_0004', words: 760, updatedAt: '2026-09-26' },
-])
+/** 内容条目：演示用虚构数据；行数足够多以展示表格卡内滚动与固定表头 */
+const titlePool = ['产品需求文档（2026 Q4）', '用户调研访谈纪要（八月）', '接口设计规范 v2.1', '版本发布检查清单', '运营活动复盘（九月）', '设计规范对照表']
+
+const rows = ref<ContentItem[]>(Array.from({ length: 24 }, (_, index) => {
+  const position = index + 1
+  return {
+    id: String(position),
+    index: position,
+    title: index < titlePool.length ? titlePool[index] : `${titlePool[index % titlePool.length]} #${position}`,
+    code: `DOC_${String(position).padStart(4, '0')}`,
+    words: 760 + position * 137,
+    updatedAt: `2026-10-${String(12 - (index % 10)).padStart(2, '0')}`,
+  }
+}))
 
 const columns: TableColumn<ContentItem>[] = [
   { accessorKey: 'index', header: '序号', width: 80, align: 'center' },
@@ -70,7 +78,7 @@ const actions: YdTablePageAction[] = [
 
 const page = ref(1)
 const size = ref(10)
-const total = ref(4)
+const total = ref(rows.value.length)
 
 const layoutCode = `<YdTablePageLayout
   title="内容管理"
@@ -125,48 +133,51 @@ const { searchConfig, searchQuery } = useTablePage({
     description="表格页标准版式：页头只放标题；搜索默认折叠、点击展开；Tab 在表格上方左侧、操作按钮在右侧，超过阈值自动收进「更多」，危险操作红色标识"
     :code="layoutCode"
   >
-    <YdTablePageLayout
-      v-model:active-tab="activeTab"
-      title="内容管理"
-      :tabs="tabs"
-      :actions="actions"
-      :actions-threshold="3"
-    >
-      <template #search="{ fold }">
-        <YdDynamicSearchForm
-          v-model="searchQuery"
-          :config="searchConfig"
-          :fold="fold"
-          :options-sources="optionsSources"
-          @search="() => toast.success('触发查询（示例未接后端）')"
-          @reset="() => { searchQuery = {} }"
-        />
-      </template>
-
-      <template #table>
-        <YdResponsiveEnhancedTable
-          :data="rows"
-          :columns="columns"
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-        />
-      </template>
-
-      <template #footer>
-        <div class="flex justify-end">
-          <YdPagination
-            v-model:page="page"
-            v-model:size="size"
-            :total="total"
+    <div class="h-[560px]">
+      <YdTablePageLayout
+        v-model:active-tab="activeTab"
+        title="内容管理"
+        :tabs="tabs"
+        :actions="actions"
+        :actions-threshold="3"
+      >
+        <template #search="{ fold }">
+          <YdDynamicSearchForm
+            v-model="searchQuery"
+            :config="searchConfig"
+            :fold="fold"
+            :options-sources="optionsSources"
+            @search="() => toast.success('触发查询（示例未接后端）')"
+            @reset="() => { searchQuery = {} }"
           />
-        </div>
-      </template>
-    </YdTablePageLayout>
+        </template>
+
+        <template #table>
+          <YdResponsiveEnhancedTable
+            :data="rows"
+            :columns="columns"
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+          />
+        </template>
+
+        <template #footer>
+          <div class="flex justify-end">
+            <YdPagination
+              v-model:page="page"
+              v-model:size="size"
+              :total="total"
+            />
+          </div>
+        </template>
+      </YdTablePageLayout>
+    </div>
 
     <ul class="text-xs text-muted-foreground mt-3 space-y-1">
       <li>折叠态只显示「搜索」行，点击整行平滑展开筛选表单；再次点击收起。</li>
       <li>操作按钮超过 <code>actionsThreshold</code> 时，标记 <code>autoFold</code> 的项收进「更多」下拉；<code>danger</code> 项红色标识且默认可二次确认。</li>
       <li>表格默认铺满可用宽度；移动端（≤768px）自动切换卡片视图。</li>
+      <li>给布局一个确定高度（示例为 <code>h-[560px]</code>）后，纵向滚动发生在表格卡内部：表头固定、固定列钉住，分页始终留在卡片底部。</li>
     </ul>
   </DemoCard>
 

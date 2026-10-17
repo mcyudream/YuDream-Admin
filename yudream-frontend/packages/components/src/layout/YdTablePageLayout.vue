@@ -342,13 +342,39 @@ const foldedActions = computed(() => {
   align-items: center;
 }
 
-/* 表格滚动区：整页不滚动，纵向滚动发生在这里 */
+/* 表格滚动区：整页不滚动，纵向滚动交给表格自身的滚动盒（下方高度链） */
 .yd-table-page-layout__table {
   flex: 1;
   min-height: 0;
-  padding: 0 16px;
+  /* 底部留 12px：表格外框被拉满时与分页顶边框拉开距离，避免贴成双线 */
+  padding: 0 16px 12px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+/* 表格滚动区：整页不滚动，纵向滚动发生在表格自身的滚动盒里。
+   插槽链路（加载遮罩 / 响应式外壳 / 增强外壳 / 表格壳）都是 auto 高度，
+   高度链不通时表格内部滚动盒拿不到确定高度，th 的 sticky 会解析到不滚动的
+   中间盒上——表头与固定列都会随内容滚走，这里把链路逐层拉满 */
+.yd-table-page-layout__table > :deep(*),
+.yd-table-page-layout__table :deep(.yd-loading-overlay),
+.yd-table-page-layout__table :deep(.yd-loading-overlay__content),
+.yd-table-page-layout__table :deep(.yd-responsive-enhanced-table),
+.yd-table-page-layout__table :deep(.yd-enhanced-table) {
+  height: 100%;
+  min-height: 0;
+}
+
+/* 表格壳是 flex 列（可选工具栏 + 表格本体），表格占满剩余高度并在内部滚动 */
+.yd-table-page-layout__table :deep(.yd-enhanced-table > :last-child) {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* 表头固定后内容会从其下方滚过，表头背景必须不透明（组件默认 60% 半透明会让行透出） */
+.yd-table-page-layout__table :deep(thead th) {
+  background-color: color-mix(in oklab, oklch(var(--muted)) 60%, var(--color-bg-1));
 }
 
 /* 分页固定于卡片底部 */
