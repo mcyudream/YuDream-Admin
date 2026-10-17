@@ -42,21 +42,14 @@ const testMessage = ref('平台能力测试消息')
 const keyword = ref('')
 const selectedType = ref<CapabilityType | 'ALL'>('ALL')
 const selectedStatus = ref<CapabilityStatus | 'ALL'>('ALL')
-const sseStatus = ref('未连接')
-const wsStatus = ref('未连接')
-let websocket: WebSocket | null = null
-let sseAbort: AbortController | null = null
 
 /**
  * 能力图标兜底：后端下发的 Remix 图标里 file-eye-line 不在离线集合中，会渲染成空白。
  * 这里按能力编码给 Morphicons 等价图标，避免任何能力出现"没有图标"的卡片。
  */
 const capabilityIconFallbacks: Record<string, string> = {
-  'sse': 'morph:radio-tower',
   'ai': 'morph:sparkles',
   'agent': 'morph:bot',
-  'websocket': 'morph:refresh-cw',
-  'dataviz': 'morph:pie-chart',
   'rabbitmq': 'morph:messages-square',
   'api-docs': 'morph:file-text',
   'milky': 'morph:message-circle',
@@ -151,8 +144,6 @@ watch(filteredRows, (list) => {
 
 onMounted(load)
 onBeforeUnmount(() => {
-  closeSse()
-  closeWs()
 })
 
 async function load() {
@@ -305,96 +296,11 @@ async function testCapability(item: CapabilityItem) {
   }
 }
 
-/** SSE 端点已要求登录：EventSource 无法携带 Authorization 头，改用 fetch 流式读取 */
-async function connectSse() {
-  closeSse()
-  sseStatus.value = '连接中'
-  const controller = new AbortController()
-  sseAbort = controller
-  try {
-    const response = await fetch(httpEndpoint('/api/platform/sse/connect'), {
-      headers: { Authorization: localStorage.getItem('token') || '', Accept: 'text/event-stream' },
-      signal: controller.signal,
-    })
-    if (!response.ok || !response.body) {
-      sseStatus.value = `连接失败（HTTP ${response.status}）`
-      return
-    }
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let eventName = 'message'
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      const rawLines = decoder.decode(value, { stream: true }).split('\n')
-      for (const rawLine of rawLines) {
-        const line = rawLine.replace(/\r$/, '')
-        if (line.startsWith('event:')) {
-          eventName = line.slice(6).trim()
-        }
-        else if (line.startsWith('data:')) {
-          const data = line.slice(5).trim()
-          if (eventName === 'connected') {
-            sseStatus.value = `已连接：${data}`
-          }
-          else if (eventName === 'capability-test') {
-            toast.info('SSE 消息', { description: data })
-          }
-          eventName = 'message'
-        }
-      }
-    }
-    sseStatus.value = '未连接'
-  }
-  catch {
-    if (!controller.signal.aborted) {
-      sseStatus.value = '连接异常'
-    }
-  }
-}
-
-function closeSse() {
-  sseAbort?.abort()
-  sseAbort = null
-  sseStatus.value = '未连接'
-}
-
-function connectWs() {
-  closeWs()
-  // WS 端点握手已要求登录：浏览器无法携带 Authorization 头，经查询参数传入令牌
-  const token = localStorage.getItem('token') || ''
-  websocket = new WebSocket(`${wsEndpoint('/api/platform/ws')}?token=${encodeURIComponent(token)}`)
-  wsStatus.value = '连接中'
-  websocket.onopen = () => wsStatus.value = '已连接'
-  websocket.onmessage = event => toast.info('WebSocket 消息', { description: event.data })
-  websocket.onerror = () => wsStatus.value = '连接异常'
-  websocket.onclose = () => wsStatus.value = '未连接'
-}
-
-function closeWs() {
-  websocket?.close()
-  websocket = null
-  wsStatus.value = '未连接'
-}
-
 function replaceItem(item: CapabilityItem) {
   const index = rows.value.findIndex(row => row.code === item.code)
   if (index >= 0) {
     rows.value[index] = item
   }
-}
-
-function httpEndpoint(path: string) {
-  const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
-  return `${base.replace(/\/$/, '')}${path}`
-}
-
-function wsEndpoint(path: string) {
-  const base = new URL(import.meta.env.VITE_APP_API_BASEURL || window.location.origin)
-  const protocol = base.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${base.host}${path}`
 }
 
 function typeText(type: CapabilityType) {
@@ -628,9 +534,6 @@ function focusCapability(code: string) {
 
 function fieldsOf(code?: string): CapabilityConfigField[] {
   const map: Record<string, CapabilityConfigField[]> = {
-    'sse': [
-      { key: 'timeout', label: '连接超时（毫秒）', placeholder: '300000', type: 'number' },
-    ],
     'neo4j': [
       { key: 'uri', label: 'Neo4j URI', placeholder: 'bolt://localhost:7687' },
       { key: 'username', label: '用户名', placeholder: 'neo4j' },
@@ -996,26 +899,6 @@ function parseJsonConfig() {
                     >打开</a>
                   </li>
                 </ul>
-              </div>
-            </div>
-
-            <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
-              <div class="section-title">
-                <span>连接调试</span>
-              </div>
-              <div v-if="selected.code === 'sse'" class="debug-row">
-                <span>SSE：{{ sseStatus }}</span><YdInput v-model="testMessage" placeholder="测试消息内容" class="debug-message" /><YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">
-                  连接
-                </YdButton><YdButton size="sm" variant="ghost" @click="closeSse">
-                  断开
-                </YdButton>
-              </div>
-              <div v-if="selected.code === 'websocket'" class="debug-row">
-                <span>WebSocket：{{ wsStatus }}</span><YdInput v-model="testMessage" placeholder="测试消息内容" class="debug-message" /><YdButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">
-                  连接
-                </YdButton><YdButton size="sm" variant="ghost" @click="closeWs">
-                  断开
-                </YdButton>
               </div>
             </div>
           </template>
