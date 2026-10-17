@@ -194,6 +194,7 @@ onMounted(loadGraphTables)
         :list="sectionList"
         surface
         scroll
+        width-class="max-w-[1280px]"
         class="set-layout"
       >
         <template #header>
@@ -479,6 +480,10 @@ onMounted(loadGraphTables)
   gap: 12px;
   align-items: center;
   justify-content: space-between;
+  /* 与正文同一列：页头不铺满全宽，标题左边缘、保存按钮右边缘都和正文对齐 */
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
 }
 
 .set-header__text {
@@ -504,7 +509,8 @@ onMounted(loadGraphTables)
 
 .set-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 短字段随可用宽度自动铺满一行的 2–3 列（auto-fill 保留空轨道，落单的字段不会被拉满整行） */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 18px 16px;
 }
 

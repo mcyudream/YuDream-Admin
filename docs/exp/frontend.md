@@ -54,6 +54,13 @@
 - **规避**：模型声明成 `ref<string[]>([])`，行对象字段（昵称/名称）在 fetcher 里另存标签表供回显；提交时用键值。另：`YdCheckboxGroup` 的每个选项是 `div`（`role=group` 的子元素，点容器即切换，无内层 input/button），驱动验收脚本时要点选项容器本身。
 - **来源**：`wiki-collaboration-panels`（成员与权限面板）。
 
+### 树里的长标题把整行撑出容器
+
+- **现象**：目录树/菜单树的标题不省略号、在面板右边缘被硬裁（半截字）；鼠标移上去时行尾的删除/操作按钮只剩半个白块露出在容器外。
+- **根因**：Arco 的树按内容定宽——`.arco-tree` 的宽度等于最长节点内容，容器只负责裁剪。行内的 `width: 100%` 只在「已经过宽的节点」内部生效，标题的 `text-overflow: ellipsis` 与行尾按钮都落在可见区之外；YdTree 的样式只改了字号/颜色，没约束宽度。
+- **规避**：在 YD 树样式里逐层约束 `.arco-tree`、`.arco-tree-node`、`.arco-tree-node-title`、`.arco-tree-node-title-text` 为 `width: 100%; min-width: 0`（title-text 另给 `flex: 1`）。验收看 `.yd-tree` 视口 `scrollWidth === clientWidth`，且没有节点的 `right` 超出树容器——只看标题是否带省略号会漏掉整棵树过宽的情况。
+- **来源**：`yd-tree-width-constraint`。
+
 ## 2. 布局与交互
 
 ### 表格表头 sticky 失效，跟着内容一起滚走

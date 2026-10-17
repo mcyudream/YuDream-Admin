@@ -345,6 +345,23 @@
   color: oklch(var(--foreground));
 }
 
+/*
+ * 节点宽度必须跟容器走：Arco 的树按内容定宽，长标题会把整棵树撑出容器——
+ * 行尾操作被裁在容器外（看起来像半截白块），标题也不再省略号。
+ * 逐层给到 100% 并允许收缩，标题的 ellipsis 才会在可见宽度内生效。
+ */
+.yd-tree .arco-tree,
+.yd-tree .arco-tree-node,
+.yd-tree .arco-tree-node-title,
+.yd-tree .arco-tree-node-title-text {
+  width: 100%;
+  min-width: 0;
+}
+
+.yd-tree .arco-tree-node-title-text {
+  flex: 1;
+}
+
 .yd-tree .arco-tree-node {
   align-items: center;
   margin: 3px 0;
