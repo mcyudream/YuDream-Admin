@@ -4,6 +4,7 @@ import type { RelatedEntityRef } from './registry'
 import type { UserManageItem } from '@/api/modules/system-user'
 import { YdEntityPeek } from '@yudream/components'
 import apiUser from '@/api/modules/system-user'
+import { requestEntityFocus } from './focus'
 
 const props = defineProps<RelatedEntityRef>()
 
@@ -178,6 +179,18 @@ async function save() {
   }
 }
 
+/**
+ * 「完整管理」：内存移交定位意图（目标页按 id 高亮、按用户名过滤），再跳到用户管理。
+ * 同时把 keyword 放进 URL 便于刷新/分享复现；focusUser 只在深链接力时使用。
+ */
+function openFullManage() {
+  const item = detail.value
+  const id = item?.id || props.entityId
+  const keyword = item?.username || props.label
+  requestEntityFocus({ id, keyword })
+  router.push({ path: '/system/user', query: { keyword: keyword || undefined, focusUser: id } })
+}
+
 function confirmToggle(item: UserManageItem, action: 'enable' | 'disable') {
   const enabling = action === 'enable'
   modal.confirm({
@@ -236,7 +249,7 @@ function writeUserCache(id: string, data: UserManageItem) {
     @update:editing="value => value ? startEdit() : (editing = false)"
     @save="save"
     @cancel="editing = false"
-    @detail="router.push('/system/user')"
+    @detail="openFullManage"
   >
     <template #trigger>
       <YdButton variant="ghost" class="related-entity" :title="name">

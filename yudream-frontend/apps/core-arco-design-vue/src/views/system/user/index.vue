@@ -10,6 +10,7 @@ import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
+import { consumeEntityFocus } from '@/components/RelatedEntity/focus'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
@@ -72,6 +73,11 @@ const roleOptions = computed(() => roles.value.map(item => ({
 
 const optionsReloadKey = ref(0)
 
+/** 关联导航带过来的检索词/定位 id：内存移交优先（应用内跳转可靠），URL 参数兜底（刷新/分享深链） */
+const linkFocus = consumeEntityFocus()
+const routeKeyword = computed(() => linkFocus?.keyword ?? (typeof route.query.keyword === 'string' ? route.query.keyword : undefined))
+const routeFocusUser = computed(() => linkFocus?.id ?? (typeof route.query.focusUser === 'string' ? route.query.focusUser : undefined))
+
 const {
   loading,
   rows,
@@ -107,6 +113,7 @@ const {
     }
   },
   loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+  initialQuery: routeKeyword.value ? { keyword: routeKeyword.value } : undefined,
   autoLoad: false,
 })
 
@@ -136,6 +143,38 @@ async function loadStats() {
 async function refreshAll() {
   await Promise.all([load(), loadStats()])
 }
+
+/**
+ * 落地后指出「就是这一行」：目标行出现在当前页即加定位类并滚到可视区，数秒后移除。
+ * 直接操作行元素而不是走 rowClass prop——行的渲染不会因行类函数变化而重刷，
+ * 应用内跳转（页面已挂载）时高亮会落空。定位参数保留在 URL，避免清理触发路由重建。
+ */
+let focusedFor = ''
+async function applyFocusHighlight() {
+  const id = routeFocusUser.value
+  if (!id || focusedFor === id || !rows.value.some(row => sameId(row.id, id))) {
+    return
+  }
+  focusedFor = id
+  const keyword = routeKeyword.value
+  // 表格行可能比数据晚一拍落地：短轮询等它出现，避免高亮落空后不再重试
+  for (let attempt = 0; attempt < 12; attempt++) {
+    await nextTick()
+    const el = [...document.querySelectorAll('.yd-table-page-layout__table tbody tr')]
+      .find(tr => !keyword || tr.textContent?.includes(keyword))
+    if (el) {
+      // 用 data-* 而不是 class：行上有 :class 绑定，表格每次重渲染都会把手工类名覆盖掉
+      el.setAttribute('data-yd-highlight', '')
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      setTimeout(() => el.removeAttribute('data-yd-highlight'), 5200)
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 120))
+  }
+  focusedFor = ''
+}
+
+watch([rows, routeFocusUser], applyFocusHighlight, { immediate: true })
 
 /** 搜索选项数据源：部门/角色从接口拉取（角色按当前部门收敛），状态词表本地定义 */
 const optionsSources: SearchOptionsSource[] = [

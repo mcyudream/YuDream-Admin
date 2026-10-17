@@ -167,6 +167,40 @@
   border-color: color-mix(in srgb, oklch(var(--muted-foreground)) 20%, transparent);
 }
 
+/*
+ * 关联导航定位行：从其他页面跳转过来并需要指出「就是这一行」时，
+ * 由页面给目标行打 data-yd-highlight 标记（属性不参与行上的 :class 绑定，
+ * 表格重渲染不会抹掉），短暂呼吸提亮后自行恢复。
+ */
+.yd-row-highlight > td,
+tr[data-yd-highlight] > td {
+  animation: yd-row-highlight-pulse 1.2s ease-in-out 4;
+  background: color-mix(in srgb, oklch(var(--primary)) 12%, transparent);
+}
+
+.yd-row-highlight > td:first-child,
+tr[data-yd-highlight] > td:first-child {
+  box-shadow: inset 3px 0 0 oklch(var(--primary));
+}
+
+@keyframes yd-row-highlight-pulse {
+  0%,
+  100% {
+    background: color-mix(in srgb, oklch(var(--primary)) 6%, transparent);
+  }
+
+  50% {
+    background: color-mix(in srgb, oklch(var(--primary)) 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yd-row-highlight > td,
+  tr[data-yd-highlight] > td {
+    animation: none;
+  }
+}
+
 .yd-toast-icon {
   scale: 1.2;
 }
