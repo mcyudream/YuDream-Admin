@@ -5,6 +5,7 @@ import { useTablePage } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()

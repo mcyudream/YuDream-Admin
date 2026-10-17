@@ -2,6 +2,7 @@
 import type { EntityPeekAction, EntityPeekFact } from '@yudream/components'
 import type { RelatedEntityRef } from './registry'
 import type { UserManageItem } from '@/api/modules/system-user'
+import { YdEntityPeek } from '@yudream/components'
 import apiUser from '@/api/modules/system-user'
 
 const props = defineProps<RelatedEntityRef>()
@@ -231,6 +232,7 @@ function writeUserCache(id: string, data: UserManageItem) {
     :detail-label="canView ? '完整管理' : ''"
     side="bottom"
     @open="load()"
+    @retry="load(true)"
     @update:editing="value => value ? startEdit() : (editing = false)"
     @save="save"
     @cancel="editing = false"

@@ -73,6 +73,7 @@ const emit = defineEmits<{
   'cancel': []
   'detail': []
   'open': []
+  'retry': []
 }>()
 
 const open = ref(false)
@@ -161,6 +162,10 @@ const fallbackText = computed(() => props.avatarFallback || props.title?.slice(0
               {{ detailLabel }}<FaIcon name="morph:arrow-up-right" />
             </button>
             <span class="grow" />
+            <!-- 加载失败时先给重试：请求可能只是被环境挤在后面，重开一次多半就好 -->
+            <FaButton v-if="error" variant="outline" size="sm" @click="emit('retry')">
+              <FaIcon name="morph:refresh-cw" />重试
+            </FaButton>
             <FaButton v-if="editable" variant="outline" size="sm" :disabled="loading || !!error" @click="emit('update:editing', true)">
               <FaIcon name="morph:pencil" />编辑
             </FaButton>
