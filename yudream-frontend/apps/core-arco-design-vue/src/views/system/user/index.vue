@@ -217,6 +217,7 @@ const userActions: ActionMenuItem<UserManageItem>[] = [
   { label: '伪装登录', icon: 'morph:user-cog', visible: () => auth('system:user:impersonate'), disabled: row => !canImpersonateRow(row), onClick: confirmImpersonate },
   { label: '启用', icon: 'morph:circle-check', visible: row => row.status === 'DISABLED' && auth('system:user:edit'), onClick: confirmEnable },
   { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status !== 'DISABLED' && auth('system:user:delete'), onClick: confirmDisable },
+  { label: '删除', icon: 'morph:trash-2', danger: true, visible: row => auth('system:user:purge') && row.username !== appAccountStore.account, onClick: confirmPurge },
 ]
 
 /** 时间列统一去掉 ISO 的 T 并截到秒 */
@@ -508,6 +509,22 @@ function confirmEnable(row: UserManageItem) {
     onConfirm: async () => {
       await apiUser.enable(row.id)
       toast.success('启用成功')
+      await refreshAll()
+    },
+  })
+}
+
+/**
+ * 永久删除不可恢复：确认文案必须写清回收范围（账号与账号级联数据），
+ * 并说明审计记录保留，避免用户按「停用」的心智理解这个动作。
+ */
+function confirmPurge(row: UserManageItem) {
+  modal.confirm({
+    title: '永久删除用户',
+    content: `确认永久删除「${row.username}」吗？账号记录、消息身份绑定、通行密钥与登录凭据、API Key、移动设备、站内通知、聊天记录会一并移除且不可恢复；登录日志等审计记录保留。`,
+    onConfirm: async () => {
+      await apiUser.purge(row.id)
+      toast.success('删除成功')
       await refreshAll()
     },
   })

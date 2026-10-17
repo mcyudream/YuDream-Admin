@@ -114,6 +114,8 @@ export default {
   create: (data: UserCreatePayload) => systemClient.post<unknown, ApiResponse<UserManageItem>>('api/system/users', data),
   update: (id: IdValue, data: UserUpdatePayload) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`, data),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/users/${id}`),
+  /** 永久删除：账号记录与账号级联数据一并回收，不可恢复 */
+  purge: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/users/${id}/permanent`),
   enable: (id: IdValue) => systemClient.post<unknown, ApiResponse<null>>(`api/system/users/${id}/enable`),
   uploadAvatar: (id: IdValue, data: FormData) => systemClient.post<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/avatar`, data),
   changePassword: (id: IdValue, password: string) => systemClient.put<unknown, ApiResponse<null>>(`api/system/users/${id}/password`, { password }),

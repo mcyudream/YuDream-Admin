@@ -36,7 +36,7 @@
 
 普通业务优先基础 YD；阶段用 `YdSteps`、异步进度 `YdMultiStepLoader`/`YdProgress`、履历 `YdTimeline`；层级 `YdTree`；少量选项 `YdSelect`、搜索单选 `YdCombobox`、级联 `YdCascader`、远程分页资源 `YdTablePicker`；短任务 `YdModal`、上下文详情 `YdDrawer`、轻量锚点信息 `YdPopover`、独立长流程用路由页；Coding 会话 `YdAgentWorkbench`。装饰动效仅用于迎宾、重点提示或可视化，不遮挡表单、表格、错误和危险确认。
 
-- 后台有行级操作的管理列表统一优先 `YdResponsiveEnhancedTable`：身份/名称列固定左，组件唯一“操作”菜单列固定右，行操作集中到 `actions` 且桌面/卡片共用；危险动作继续走原有确认流程。只读或需要完全自绘移动卡片时可用 `YdResponsiveTable` + `#card`。筛选、加载和 `YdPagination` 由页面组合，不重复手写双端操作行为。系统可查询的内部 ID 用带标签选择器，长 ID 保持字符串。
+- 后台有行级操作的管理列表统一优先 `YdResponsiveEnhancedTable`：身份/名称列固定左，组件唯一“操作”菜单列固定右，行操作集中到 `actions` 且桌面/卡片共用；危险动作继续走原有确认流程，**不可恢复的永久删除（purge）确认文案必须写清回收范围与保留范围**（例如账号级联数据会移除、审计记录保留），不能只写“删除后无法恢复”。只读或需要完全自绘移动卡片时可用 `YdResponsiveTable` + `#card`。筛选、加载和 `YdPagination` 由页面组合，不重复手写双端操作行为。系统可查询的内部 ID 用带标签选择器，长 ID 保持字符串。
 - 移动端断点统一 768px；`YdPageMain` 手机端已全出血，页面不重复加外边距。
 - `FaInput/FaTextarea/FaSelect` 不渲染 label 属性：业务表单**必须**显式 label/字段标题并提供 placeholder 或帮助文本。
 - `YdSelect` 按真实模型回显：空值不回落第一项；multiple 全部标签在触发器内展示并可取消；`allowSearch` 默认关、开启仅本地过滤不清已选；保留分组/禁用/标量/数组与字符串长 ID；远程分页用 `YdTablePicker`。详见 `docs/yd-select-components.md`。
