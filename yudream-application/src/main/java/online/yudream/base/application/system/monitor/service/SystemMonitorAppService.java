@@ -55,6 +55,13 @@ public class SystemMonitorAppService {
         return loginLogRepo.clear();
     }
 
+    public PageResult<OnlineUserDTO> pageOnlineUsers(String keyword, int page, int size) {
+        PageResult<OnlineUserDTO> result = onlineUserGateway.page(keyword, page, size);
+        enrichOnlineUserAvatars(result.getRecords());
+        return result;
+    }
+
+    /** 导出等一次性取数场景：需要全量会话而非单页。 */
     public List<OnlineUserDTO> onlineUsers(String keyword, int limit) {
         List<OnlineUserDTO> users = onlineUserGateway.list(keyword, limit);
         enrichOnlineUserAvatars(users);

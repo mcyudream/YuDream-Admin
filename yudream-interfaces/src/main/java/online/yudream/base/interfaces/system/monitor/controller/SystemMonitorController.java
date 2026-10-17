@@ -18,8 +18,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/system/monitor")
 @RequiredArgsConstructor
@@ -29,9 +27,9 @@ public class SystemMonitorController {
 
     @GetMapping("/online-users")
     @PermissionRegister(code = "system:monitor:online:view", name = "查看在线用户", module = "系统管理", desc = "查看在线用户会话")
-    public Result<List<OnlineUserRes>> onlineUsers(OnlineUserQuery query) {
-        return Result.ok(MonitorWebAssembler.toOnlineUserResList(
-                systemMonitorAppService.onlineUsers(query.getKeyword(), query.getLimit())));
+    public Result<PageResult<OnlineUserRes>> onlineUsers(OnlineUserQuery query) {
+        return Result.ok(MonitorWebAssembler.toOnlineUserPage(
+                systemMonitorAppService.pageOnlineUsers(query.getKeyword(), query.getPage(), query.getSize())));
     }
 
     @DeleteMapping("/online-users/{token}")

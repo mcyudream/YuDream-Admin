@@ -9,7 +9,6 @@ import { saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
 const toast = useYdToast()
-const appAccountStore = useAppAccountStore()
 
 const { auth } = useAppAuth()
 
@@ -38,26 +37,34 @@ const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
 ])
 
 /**
- * 在线会话由接口一次性返回（不分页，仅 limit 上限），因此不挂分页；
+ * 在线会话由后端分页（服务端在会话枚举结果上按最近活跃优先切片）；
  * 搜索条件来自 OnlineUserQuery 的 @Searchable 注解，页面无下拉字段故不登记选项数据源。
  */
 const {
   loading,
   rows,
+  pagination,
   searchQuery,
   searchConfig,
   load,
   search,
   resetSearch,
+  onPageChange,
+  onSizeChange,
 } = useTablePage<OnlineUser>({
   queryClass: 'online.yudream.base.application.system.monitor.query.OnlineUserQuery',
   loadApi: async (query) => {
     const res = await apiMonitor.onlineUsers({
       keyword: query.keyword || undefined,
-      limit: 100,
+      page: query.page,
+      size: query.size,
     })
-    const records = withCurrentSessionFallback(res.data)
-    return { records, total: records.length, page: 1, size: records.length || 1 }
+    return {
+      records: res.data.records,
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
   },
   loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
 })
@@ -69,21 +76,8 @@ const pageActions = computed<YdTablePageAction[]>(() => [
     : []),
 ])
 
-const onlineCountText = computed(() => `当前在线 ${rows.value.length} 人`)
-
-function withCurrentSessionFallback(data: OnlineUser[]) {
-  if (data.length || !appAccountStore.token) {
-    return data
-  }
-  return [{
-    token: appAccountStore.token,
-    username: appAccountStore.account,
-    nickname: appAccountStore.account,
-    avatar: appAccountStore.avatar || undefined,
-    device: '当前浏览器',
-    timeout: undefined,
-  }]
-}
+/** 在线人数取全量总数，而不是当前分页条数 */
+const onlineCountText = computed(() => `当前在线 ${pagination.total} 人`)
 
 function ttlText(value?: number) {
   if (value == null) {
@@ -204,6 +198,16 @@ async function exportOnlineUsers() {
             </template>
           </YdResponsiveEnhancedTable>
         </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
       </template>
     </YdTablePageLayout>
   </div>

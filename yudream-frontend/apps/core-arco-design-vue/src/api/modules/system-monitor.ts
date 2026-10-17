@@ -192,8 +192,8 @@ export default {
   redis: (params?: { pattern?: string, limit?: number }) => {
     return systemClient.get<unknown, ApiResponse<RedisMonitor>>('api/system/monitor/redis', { params })
   },
-  onlineUsers: (params?: { keyword?: string, limit?: number }) => {
-    return systemClient.get<unknown, ApiResponse<OnlineUser[]>>('api/system/monitor/online-users', { params })
+  onlineUsers: (params?: { keyword?: string, page?: number, size?: number }) => {
+    return systemClient.get<unknown, ApiResponse<PageResult<OnlineUser>>>('api/system/monitor/online-users', { params })
   },
   kickoutOnlineUser: (token: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/system/monitor/online-users/${encodeURIComponent(token)}`)

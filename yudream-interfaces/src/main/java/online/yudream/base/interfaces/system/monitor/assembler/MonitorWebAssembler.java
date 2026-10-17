@@ -39,6 +39,10 @@ public class MonitorWebAssembler {
         return items == null ? List.of() : items.stream().map(MonitorWebAssembler::toRes).toList();
     }
 
+    public static PageResult<OnlineUserRes> toOnlineUserPage(PageResult<OnlineUserDTO> page) {
+        return new PageResult<>(toOnlineUserResList(page.getRecords()), page.getTotal(), page.getPage(), page.getSize());
+    }
+
     public static PageResult<ApiLogRes> toApiLogPage(PageResult<ApiLogDTO> page) {
         return new PageResult<>(page.getRecords().stream().map(MonitorWebAssembler::toRes).toList(), page.getTotal(), page.getPage(), page.getSize());
     }

@@ -1,21 +1,19 @@
 package online.yudream.base.application.system.monitor.query;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import online.yudream.base.application.common.PageQuery;
 import online.yudream.base.application.common.search.Searchable;
 
-import java.io.Serial;
-import java.io.Serializable;
-
 /**
- * 在线会话列表查询。
+ * 在线会话分页查询。
  * <p>
- * 会话由 Sa-Token 会话缓存过滤后一次性返回（列表接口不分页），沿用既有 limit 上限语义；
- * 前端表格页按 @Searchable 注解生成筛选表单。
+ * 会话由 Sa-Token 令牌存储枚举，总量受令牌检索上限约束，因此服务端在枚举结果上按
+ * 「最近活跃优先」排序后切片；前端表格页按 @Searchable 注解生成筛选表单。
  */
 @Data
-public class OnlineUserQuery implements Serializable {
-    @Serial
-    private static final long serialVersionUID = 1L;
+@EqualsAndHashCode(callSuper = true)
+public class OnlineUserQuery extends PageQuery {
 
     @Searchable(
         label = "关键词",
@@ -25,7 +23,4 @@ public class OnlineUserQuery implements Serializable {
         width = "240px"
     )
     private String keyword;
-
-    /** 单次返回上限；沿用接口既有默认值（网关内按 200 条封顶）。 */
-    private int limit = 100;
 }

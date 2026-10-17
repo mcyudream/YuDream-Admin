@@ -43,8 +43,9 @@ async function loadStats() {
   try {
     const tasks: Promise<void>[] = []
     if (canReadOnline.value) {
-      tasks.push(apiMonitor.onlineUsers({ limit: 1000 }).then((res) => {
-        onlineCount.value = res.data.length
+      // 卡片只要人数：按最小页取一次，total 即全量会话数（Jackson 把 long 序列化成字符串）
+      tasks.push(apiMonitor.onlineUsers({ page: 1, size: 1 }).then((res) => {
+        onlineCount.value = Number(res.data.total)
       }))
     }
     if (canReadRedis.value) {
