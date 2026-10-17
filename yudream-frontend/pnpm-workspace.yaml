@@ -133,6 +133,7 @@ catalog:
   zod: ^4.4.3
   '@jboltai/tokui': ^0.1.4
   md-editor-v3: 7.1.0
+  mermaid: 11.12.0
   grapesjs-blocks-basic: 1.0.2
   grapesjs-plugin-forms: 2.0.6
   grapesjs-navbar: 1.0.2

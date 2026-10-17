@@ -43,6 +43,31 @@ test('Markdown sanitizer preserves md-editor collapsible code headers while remo
   assert.doesNotMatch(sanitized, /ontoggle|onclick/i)
 })
 
+test('Markdown sanitizer keeps md-editor mermaid trigger attributes so diagrams still render', () => {
+  const block = '<div class="md-editor-mermaid" data-mermaid-theme="dark" data-mermaid-block="12" data-mermaid-revision="0" data-closed="true" data-line="12">flowchart TD</div>'
+  const sanitized = sanitizeYdMarkdownHtml(block)
+  assert.match(sanitized, /class="md-editor-mermaid"/)
+  assert.match(sanitized, /data-mermaid-theme="dark"/)
+  assert.match(sanitized, /data-mermaid-block="12"/)
+  assert.match(sanitized, /data-mermaid-revision="0"/)
+  assert.match(sanitized, /data-closed="true"/)
+  assert.match(sanitized, /data-line="12"/)
+
+  const cached = '<p class="md-editor-mermaid" data-processed="" data-content="flowchart TD">cached</p>'
+  const sanitizedCached = sanitizeYdMarkdownHtml(cached)
+  assert.match(sanitizedCached, /data-processed=""/)
+  assert.match(sanitizedCached, /data-content="flowchart TD"/)
+})
+
+test('Markdown sanitizer rejects out-of-range mermaid trigger attribute values and injected handlers', () => {
+  const forged = '<div class="md-editor-mermaid" data-mermaid-revision="0&quot; onmouseover=&quot;alert(1)" data-mermaid-block="not-a-number" data-closed="maybe" onclick="alert(2)">x</div>'
+  const sanitized = sanitizeYdMarkdownHtml(forged)
+  assert.doesNotMatch(sanitized, /onmouseover|onclick/i)
+  assert.doesNotMatch(sanitized, /alert\(/i)
+  assert.doesNotMatch(sanitized, /data-mermaid-block="not-a-number"/)
+  assert.doesNotMatch(sanitized, /data-closed="maybe"/)
+})
+
 test('read-only and disabled Markdown editors cannot invoke image upload handlers', () => {
   assert.equal(shouldUploadYdMarkdownImages(true, false, 1), false)
   assert.equal(shouldUploadYdMarkdownImages(false, true, 1), false)

@@ -33,6 +33,13 @@
 - **规避**：函数式 ref 里目标未变时立即 return，绝不在渲染期读写响应式状态；定位手段是包装全树实例的 `effect.run` 计数——被拖死的组件计数远超 1，正常链路各 1 次（见 `tmp/probe-update-counts.cjs`）。
 - **来源**：`f19a2591`；验证脚本 `tmp/verify-pagination-fix.cjs`、`tmp/final-three-pages.cjs`。
 
+### Markdown 预览的 mermaid 图不渲染或变成乱码方块
+
+- **现象**：` ```mermaid ` 代码块在预览里始终是源码文本（DOM 只有 `<div class="md-editor-mermaid">`，没有 `data-processed`）；修好后首次渲图正常，重渲染后图表被替换成一块黑方块，DOM 里 svg 内出现被转义的 `&lt;marker&gt;`/`&lt;style&gt;` 文本。
+- **根因**：两层。① YdMarkdownEditor 的 `:sanitize` 白名单对 `div/p` 只放行 `class`，而 md-editor 的 mermaid 渲染器按 `data-mermaid-revision`/`data-mermaid-block`/`data-closed` 筛选待渲染块——属性被消毒删掉后过滤条件永不满足，块被静默跳过。② md-editor 的 mermaid **缓存命中分支**会把 SVG 字符串内联进 markdown HTML，而逐标签白名单消毒只认识 svg/g/path，`marker/defs/style/text` 全被转义成文本，图表就烂成方块。
+- **规避**：`markdown-render.ts` 里按值域放行这组 `data-*`（数字/枚举逐个校验，不放开任意属性）；同时在 `markdown-engine-config.ts` 用 `markdownItPlugins` 把 mermaid 插件的 `getCached` 置空，让图表只在运行期把 SVG 直接写进 DOM、永不经过字符串消毒——比放宽 SVG 白名单（要放 `foreignObject`/`style`）安全得多。验证看 `.md-editor-preview .md-editor-mermaid svg` 数量与 `<style>` 节点，别只看有没有 svg。
+- **来源**：`yd-mermaid-preview-sanitize`；验证脚本 `tmp/wiki-mermaid-verify.mjs`（`previewSvg>0`、无 CDN mermaid 脚本）。
+
 ## 2. 布局与交互
 
 ### 表格表头 sticky 失效，跟着内容一起滚走
