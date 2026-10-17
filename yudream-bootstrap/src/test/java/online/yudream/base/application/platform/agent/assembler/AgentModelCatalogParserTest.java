@@ -70,4 +70,27 @@ class AgentModelCatalogParserTest {
         assertThat(parser.parse(config)).extracting(item -> item.kind() + ":" + item.modelCode())
                 .containsExactly("embedding:BAAI/bge-m3", "chat:deepseek-v4-pro");
     }
+
+    @Test
+    void shouldNotDuplicateModelsDeclaredBothInKindArrayAndLegacyFields() {
+        Map<String, String> config = Map.of("providers", """
+                [{
+                  "code":"yudream",
+                  "name":"Yudream",
+                  "enabled":true,
+                  "apiKey":"secret-key",
+                  "defaultModel":"BAAI/bge-m3",
+                  "models":[
+                    {"code":"deepseek-v4-pro","name":"DeepSeek V4 Pro","kind":"chat"},
+                    {"code":"BAAI/bge-m3","name":"BGE M3","kind":"embedding"},
+                    {"code":"BAAI/bge-reranker-v2-m3","name":"BGE Reranker","kind":"rerank"}
+                  ],
+                  "embeddingModels":["BAAI/bge-m3"],
+                  "rerankModels":["BAAI/bge-reranker-v2-m3"]
+                }]
+                """);
+
+        assertThat(parser.parse(config)).extracting(item -> item.kind() + ":" + item.modelCode())
+                .containsExactly("chat:deepseek-v4-pro", "embedding:BAAI/bge-m3", "rerank:BAAI/bge-reranker-v2-m3");
+    }
 }

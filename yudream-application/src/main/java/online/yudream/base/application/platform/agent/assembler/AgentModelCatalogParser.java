@@ -9,8 +9,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -24,6 +26,9 @@ public class AgentModelCatalogParser {
         }
         try {
             List<AgentModelDTO> result = new ArrayList<>();
+            // 同一模型可能既在 models[] 里声明了 kind，又出现在旧字段 embeddingModels/rerankModels 中：
+            // 按「供应商 + 归类 + 模型码」去重，避免目录与下拉里出现重复项。
+            Set<String> seen = new HashSet<>();
             for (JsonNode provider : objectMapper.readTree(providersJson)) {
                 if (!provider.path("enabled").asBoolean(true)) {
                     continue;
@@ -37,11 +42,11 @@ public class AgentModelCatalogParser {
                 boolean configured = StringUtils.hasText(provider.path("apiKey").asText());
                 // 端点用途决定模型归类：向量化/重排序端点不再把模型混入聊天清单。
                 String usage = normalizedUsage(provider.path("usage").asText(""));
-                append(result, provider.path("models"), providerCode, providerName, usage, defaultModel, configured);
+                append(result, seen, provider.path("models"), providerCode, providerName, usage, defaultModel, configured);
                 if ("chat".equals(usage)) {
                     // 旧配置把 embeddingModels/rerankModels 挂在聊天端点上，继续读取以保持兼容。
-                    append(result, provider.path("embeddingModels"), providerCode, providerName, "embedding", defaultModel, configured);
-                    append(result, provider.path("rerankModels"), providerCode, providerName, "rerank", defaultModel, configured);
+                    append(result, seen, provider.path("embeddingModels"), providerCode, providerName, "embedding", defaultModel, configured);
+                    append(result, seen, provider.path("rerankModels"), providerCode, providerName, "rerank", defaultModel, configured);
                 }
             }
             return List.copyOf(result);
@@ -57,6 +62,7 @@ public class AgentModelCatalogParser {
 
     private void append(
             List<AgentModelDTO> target,
+            Set<String> seen,
             JsonNode models,
             String providerCode,
             String providerName,
@@ -78,6 +84,9 @@ public class AgentModelCatalogParser {
             String modelKind = model.isTextual()
                     ? kind
                     : normalizedKind(model.path("kind").asText(), kind);
+            if (!seen.add(providerCode + '\u0000' + modelKind + '\u0000' + code)) {
+                continue;
+            }
             boolean vision = "chat".equals(modelKind) && !model.isTextual() && model.path("vision").asBoolean(false);
             target.add(new AgentModelDTO(
                     providerCode,
