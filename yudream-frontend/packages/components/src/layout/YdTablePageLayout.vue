@@ -198,12 +198,13 @@ const foldedActions = computed(() => {
           :aria-expanded="!searchFolded"
           @click="searchFolded = !searchFolded"
         >
+          <YdIcon name="morph:search" class="yd-table-page-layout__search-icon" />
+          <span>搜索</span>
           <YdIcon
             name="morph:chevron-down"
             class="yd-table-page-layout__search-chevron"
             :class="{ 'is-folded': searchFolded }"
           />
-          <span>搜索</span>
         </button>
 
         <!-- 展开动画：grid-template-rows 0fr↔1fr 平滑过渡，内层裁剪高度 -->
@@ -328,7 +329,9 @@ const foldedActions = computed(() => {
   border-radius: 8px;
 }
 
-.yd-table-page-layout__stats-toggle {
+/* 统计卡与搜索卡的折叠行共用同一套排版：前置语义图标 + 标题 + 行尾箭头 */
+.yd-table-page-layout__stats-toggle,
+.yd-table-page-layout__search-toggle {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -346,19 +349,23 @@ const foldedActions = computed(() => {
   transition: background-color 0.15s ease;
 }
 
-.yd-table-page-layout__stats-toggle:hover {
+.yd-table-page-layout__stats-toggle:hover,
+.yd-table-page-layout__search-toggle:hover {
   background: var(--color-fill-1);
 }
 
-.yd-table-page-layout__stats-icon {
+.yd-table-page-layout__stats-icon,
+.yd-table-page-layout__search-icon {
   color: var(--yd-emphasis);
 }
 
-.yd-table-page-layout__stats-chevron {
+.yd-table-page-layout__stats-chevron,
+.yd-table-page-layout__search-chevron {
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.yd-table-page-layout__stats-chevron.is-folded {
+.yd-table-page-layout__stats-chevron.is-folded,
+.yd-table-page-layout__search-chevron.is-folded {
   transform: rotate(-90deg);
 }
 
@@ -385,37 +392,6 @@ const foldedActions = computed(() => {
   padding: 0 16px 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-.yd-table-page-layout__search-toggle {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  padding: 12px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  transition: background-color 0.15s ease;
-}
-
-.yd-table-page-layout__search-toggle:hover {
-  background: var(--color-fill-1);
-}
-
-/* 箭头折叠时顺时针转回 -90°，与展开动作呼应 */
-.yd-table-page-layout__search-chevron {
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.yd-table-page-layout__search-chevron.is-folded {
-  transform: rotate(-90deg);
 }
 
 /* 展开/收起：grid 轨道 0fr↔1fr 平滑过渡（无需测量内容高度） */
