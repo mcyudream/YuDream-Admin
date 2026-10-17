@@ -25,6 +25,9 @@ const provider = computed(() => resolveRelatedEntity(props.entityType))
     :avatar="avatar"
     :avatar-only="avatarOnly"
     @changed="emit('changed')"
-  />
+  >
+    <!-- 自定义触发器（部门/角色色标签等）：走默认插槽，卡片能力不变 -->
+    <slot />
+  </component>
   <span v-else>{{ label || entityId }}</span>
 </template>

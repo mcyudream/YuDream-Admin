@@ -1,0 +1,76 @@
+/*
+ * 关联实体触发器和就地编辑器的共用样式。
+ * 三个实体预览卡（用户/部门/角色）共用同一套触发外观：图标或头像 + 名称（+ 次行标识），
+ * 悬停给底色、指针为手型；卡片内的紧凑表单同构。类名以 related-entity 前缀集中在此。
+ */
+.related-entity {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  max-width: 100%;
+  height: auto;
+  padding: 0.15rem 0.3rem;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--yd-control-radius, 6px);
+}
+
+/* 自定义触发器（如部门色标签、角色色标签）直接包住业务元素时用这个类补交互语义 */
+.yd-entity-trigger {
+  cursor: pointer;
+  border-radius: var(--yd-control-radius, 6px);
+}
+
+.yd-entity-trigger:hover {
+  background: color-mix(in oklab, currentcolor 8%, transparent);
+}
+
+.related-entity__body {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+
+.related-entity__name {
+  overflow: hidden;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-entity__secondary {
+  overflow: hidden;
+  font-size: 0.72rem;
+  color: var(--color-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-entity__editor {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.related-entity__editor label {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.related-entity__editor label > span {
+  font-size: 0.7rem;
+  color: var(--color-text-3);
+}
+
+.related-entity__editor .related-entity__wide {
+  grid-column: span 2;
+}
+
+.related-entity__switch {
+  grid-column: span 2;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}

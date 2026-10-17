@@ -292,61 +292,6 @@ function writeUserCache(id: string, data: UserManageItem) {
   </YdEntityPeek>
 </template>
 
-<style scoped>
-.related-entity {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  max-width: 100%;
-  height: auto;
-  padding: 0.15rem 0.3rem;
-  font: inherit;
-  color: inherit;
-  border-radius: var(--yd-control-radius, 6px);
-}
-
-.related-entity__body {
-  display: grid;
-  min-width: 0;
-  text-align: left;
-}
-
-.related-entity__name {
-  overflow: hidden;
-  font-size: 0.875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.related-entity__secondary {
-  overflow: hidden;
-  font-size: 0.72rem;
-  color: var(--color-text-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.related-entity__editor {
-  display: grid;
-  gap: 0.5rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.related-entity__editor label {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.related-entity__editor label > span {
-  font-size: 0.7rem;
-  color: var(--color-text-3);
-}
-
-.related-entity__switch {
-  grid-column: span 2;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
+<style>
+@import './related-entity.css';
 </style>

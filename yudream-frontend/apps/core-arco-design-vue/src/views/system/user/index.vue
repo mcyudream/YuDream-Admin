@@ -10,7 +10,7 @@ import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
-import { consumeEntityFocus } from '@/components/RelatedEntity/focus'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
@@ -73,11 +73,6 @@ const roleOptions = computed(() => roles.value.map(item => ({
 
 const optionsReloadKey = ref(0)
 
-/** 关联导航带过来的检索词/定位 id：内存移交优先（应用内跳转可靠），URL 参数兜底（刷新/分享深链） */
-const linkFocus = consumeEntityFocus()
-const routeKeyword = computed(() => linkFocus?.keyword ?? (typeof route.query.keyword === 'string' ? route.query.keyword : undefined))
-const routeFocusUser = computed(() => linkFocus?.id ?? (typeof route.query.focusUser === 'string' ? route.query.focusUser : undefined))
-
 const {
   loading,
   rows,
@@ -113,7 +108,6 @@ const {
     }
   },
   loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
-  initialQuery: routeKeyword.value ? { keyword: routeKeyword.value } : undefined,
   autoLoad: false,
 })
 
@@ -144,37 +138,15 @@ async function refreshAll() {
   await Promise.all([load(), loadStats()])
 }
 
-/**
- * 落地后指出「就是这一行」：目标行出现在当前页即加定位类并滚到可视区，数秒后移除。
- * 直接操作行元素而不是走 rowClass prop——行的渲染不会因行类函数变化而重刷，
- * 应用内跳转（页面已挂载）时高亮会落空。定位参数保留在 URL，避免清理触发路由重建。
- */
-let focusedFor = ''
-async function applyFocusHighlight() {
-  const id = routeFocusUser.value
-  if (!id || focusedFor === id || !rows.value.some(row => sameId(row.id, id))) {
-    return
-  }
-  focusedFor = id
-  const keyword = routeKeyword.value
-  // 表格行可能比数据晚一拍落地：短轮询等它出现，避免高亮落空后不再重试
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await nextTick()
-    const el = [...document.querySelectorAll('.yd-table-page-layout__table tbody tr')]
-      .find(tr => !keyword || tr.textContent?.includes(keyword))
-    if (el) {
-      // 用 data-* 而不是 class：行上有 :class 绑定，表格每次重渲染都会把手工类名覆盖掉
-      el.setAttribute('data-yd-highlight', '')
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      setTimeout(() => el.removeAttribute('data-yd-highlight'), 5200)
-      return
-    }
-    await new Promise(resolve => setTimeout(resolve, 120))
-  }
-  focusedFor = ''
-}
-
-watch([rows, routeFocusUser], applyFocusHighlight, { immediate: true })
+/** 关联导航落地：检索词写入搜索模型、目标行定位高亮（宿主统一实现，见 useLinkedFocus） */
+useLinkedFocus<UserManageItem>({
+  rows,
+  idOf: row => row.id,
+  queryKey: 'focusUser',
+  applyKeyword: (keyword) => {
+    searchQuery.keyword = keyword
+  },
+})
 
 /** 搜索选项数据源：部门/角色从接口拉取（角色按当前部门收敛），状态词表本地定义 */
 const optionsSources: SearchOptionsSource[] = [
@@ -787,29 +759,50 @@ function importUsers() {
             </template>
             <template #cell-deptNames="{ row }">
               <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
-                <YdTag
+                <!-- 部门是关联实体：保留部门色标签的视觉，点击就地开卡（查看/编辑/停用）并可就地跳完整管理 -->
+                <RelatedEntity
                   v-for="(deptId, index) in row.original.deptIds"
                   :key="deptId"
-                  :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'"
+                  entity-type="dept"
+                  :entity-id="deptId"
+                  :label="row.original.deptNames?.[index] || deptId"
+                  :avatar="deptAvatarOf(row.original, deptId)"
+                  @changed="refreshAll"
                 >
-                  <YdAvatar
-                    v-if="deptAvatarOf(row.original, deptId)"
-                    :src="deptAvatarOf(row.original, deptId)"
-                    :fallback="deptChipFallback(deptId, row.original.deptNames?.[index])"
-                    :alt="row.original.deptNames?.[index] || deptId"
-                    class="shrink-0 size-4"
-                  />
-                  <span v-else class="dept-chip" :style="deptChipStyle(deptId)" aria-hidden="true">
-                    <YdIcon :name="deptChipIcon(deptId, row.original.deptNames?.[index])" />
-                  </span>
-                  {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
-                </YdTag>
+                  <YdTag
+                    class="yd-entity-trigger"
+                    :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'"
+                  >
+                    <YdAvatar
+                      v-if="deptAvatarOf(row.original, deptId)"
+                      :src="deptAvatarOf(row.original, deptId)"
+                      :fallback="deptChipFallback(deptId, row.original.deptNames?.[index])"
+                      :alt="row.original.deptNames?.[index] || deptId"
+                      class="shrink-0 size-4"
+                    />
+                    <span v-else class="dept-chip" :style="deptChipStyle(deptId)" aria-hidden="true">
+                      <YdIcon :name="deptChipIcon(deptId, row.original.deptNames?.[index])" />
+                    </span>
+                    {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
+                  </YdTag>
+                </RelatedEntity>
               </div>
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-roleNames="{ row }">
               <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1 items-center">
-                <YdTag :style="roleTagStyle(row.original.roleNames[0])">
+                <RelatedEntity
+                  v-if="row.original.roleIds?.[0]"
+                  entity-type="role"
+                  :entity-id="row.original.roleIds[0]"
+                  :label="row.original.roleNames[0]"
+                  @changed="refreshAll"
+                >
+                  <YdTag class="yd-entity-trigger" :style="roleTagStyle(row.original.roleNames[0])">
+                    {{ row.original.roleNames[0] }}
+                  </YdTag>
+                </RelatedEntity>
+                <YdTag v-else :style="roleTagStyle(row.original.roleNames[0])">
                   {{ row.original.roleNames[0] }}
                 </YdTag>
                 <!-- 多角色只显示第一个 + “+N”，悬浮展开完整清单，避免列被标签撑爆 -->

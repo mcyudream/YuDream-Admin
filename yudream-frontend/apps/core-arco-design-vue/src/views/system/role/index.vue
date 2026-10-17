@@ -164,6 +164,16 @@ const roleActions: ActionMenuItem<RoleManageItem>[] = [
   { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status === 'ACTIVE' && auth('system:role:delete'), disabled: row => Boolean(row.systemRole), onClick: confirmDisable },
 ]
 
+/** 关联导航落地：检索词写入搜索模型、目标行定位高亮（宿主统一实现，见 useLinkedFocus） */
+useLinkedFocus<RoleManageItem>({
+  rows,
+  idOf: row => row.id,
+  queryKey: 'focusRole',
+  applyKeyword: (keyword) => {
+    searchQuery.keyword = keyword
+  },
+})
+
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
   { id: 'visual', header: '标识', width: 88, align: 'center' },

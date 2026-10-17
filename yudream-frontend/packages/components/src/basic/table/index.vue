@@ -1109,6 +1109,7 @@ defineExpose({
               v-for="(row, rowIndex) in tableRows"
               :key="row.id"
               :class="getRowClass(row, rowIndex)"
+              :data-row-key="resolveRowId(row.original, rowIndex, row)"
               :data-state="row.getIsSelected() ? 'selected' : undefined"
               @click="handleRowClick(row, $event)"
             >

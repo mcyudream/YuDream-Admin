@@ -57,6 +57,27 @@ const {
   loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
 })
 
+/** 关联导航落地：检索词写入搜索模型、目标行定位高亮；部门是树，判断目标需摊平子节点 */
+useLinkedFocus<DeptManageItem>({
+  rows,
+  idOf: row => row.id,
+  queryKey: 'focusDept',
+  applyKeyword: (keyword) => {
+    searchQuery.keyword = keyword
+  },
+  flatten: (nodes) => {
+    const flat: DeptManageItem[] = []
+    const walk = (list: DeptManageItem[]) => {
+      for (const node of list || []) {
+        flat.push(node)
+        walk(node.children || [])
+      }
+    }
+    walk(nodes)
+    return flat
+  },
+})
+
 const formVisible = ref(false)
 const editing = ref<DeptManageItem | null>(null)
 const formAvatar = ref('')
@@ -322,6 +343,7 @@ function importDepts() {
       <template #table>
         <YdLoadingOverlay :loading="loading">
           <YdResponsiveEnhancedTable
+            row-key="id"
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[1120px]"
 
