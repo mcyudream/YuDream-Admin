@@ -1,52 +1,98 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { MentionBindingCode, MilkyConnection, MilkyConnectionPayload } from '@/api/modules/platform-milky'
-import apiMilky from '@/api/modules/platform-milky'
+import { useTablePage } from '@yudream/components'
 import {
   ALL_OFFICIAL_INTENTS,
-  OFFICIAL_QQ_BOT_INTENTS,
   OFFICIAL_QQ_BOT_INTENT_GROUPS,
-  RECOMMENDED_OFFICIAL_INTENTS,
+  OFFICIAL_QQ_BOT_INTENTS,
   officialIntentSelected,
+  RECOMMENDED_OFFICIAL_INTENTS,
   selectedOfficialIntentCount,
   setOfficialIntentGroup,
   toggleOfficialIntent,
 } from '@/api/modules/official-qqbot-intent-catalog'
+import apiMilky from '@/api/modules/platform-milky'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import MilkyChatWorkspace from './components/MilkyChatWorkspace.vue'
 
 const toast = useYdToast()
-const loading = ref(false)
+const { auth } = useAppAuth()
+
 const formVisible = ref(false)
-const rows = ref<MilkyConnection[]>([])
 const editing = ref<MilkyConnection | null>(null)
 const chatConnection = ref<MilkyConnection | null>(null)
 const chatVisible = ref(false)
 const mentionBindVisible = ref(false)
 const mentionBindConnection = ref<MilkyConnection | null>(null)
 const mentionCode = ref<MentionBindingCode | null>(null)
-const page = reactive({ page: 1, size: 20, total: 0 })
 const form = reactive<MilkyConnectionPayload>({ name: '', protocol: 'milky', baseUrl: 'http://127.0.0.1:3010', token: '', appId: '', appSecret: '', sandbox: false, intents: RECOMMENDED_OFFICIAL_INTENTS, commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
 
+/** 列表：连接是 Mongo 持久化集合，分页由后端切片；搜索字段来自 MilkyConnectionPageQuery 的 @Searchable */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<MilkyConnection>({
+  queryClass: 'online.yudream.base.application.platform.milky.query.MilkyConnectionPageQuery',
+  loadApi: async (query) => {
+    const res = await apiMilky.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+    })
+    return {
+      records: res.data.records,
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+/** 列：连接名称是行标识固定左侧；更新时间是审计字段，可勾选但默认不展示 */
 const columns: TableColumn<MilkyConnection>[] = [
-  { accessorKey: 'name', header: '连接名称', width: 180 },
-  { id: 'protocol', header: '协议', width: 120 },
-  { accessorKey: 'baseUrl', header: '服务地址', width: 280 },
-  { id: 'status', header: '状态', width: 100 },
-  { accessorKey: 'updateTime', header: '更新时间', width: 180 },
-  { id: 'actions', header: '操作', width: 240, fixed: 'right' },
+  { accessorKey: 'name', header: '连接名称', minWidth: 180, fixed: 'left' },
+  { id: 'protocol', header: '协议', width: 120, align: 'center' },
+  { accessorKey: 'baseUrl', header: '服务地址', minWidth: 260 },
+  { accessorKey: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ]
 
-async function load() {
-  loading.value = true
-  try {
-    const result = await apiMilky.page({ page: page.page, size: page.size })
-    rows.value = result.data.records
-    page.total = result.data.total
-  }
-  finally {
-    loading.value = false
-  }
+/** 状态：enabled 是布尔字段，键走字符串，语义色胶囊在桌面与卡片共用 */
+const statusColumn: StatusColumn<MilkyConnection> = {
+  statusKey: 'enabled',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    true: { label: '已启用', variant: 'default', tone: 'success' },
+    false: { label: '已停用', variant: 'secondary', tone: 'neutral' },
+  },
 }
+
+/** 行操作统一收进表格内置操作列（桌面与移动卡片共用），原按钮的启用状态依赖保留 */
+const rowActions: ActionMenuItem<MilkyConnection>[] = [
+  { label: '编辑', icon: 'morph:pencil', onClick: openEdit },
+  { label: '测试连接', icon: 'morph:radar', onClick: test },
+  { label: '回填 @ 身份', icon: 'morph:at-sign', visible: row => row.protocol === 'official', onClick: openMentionBind },
+  { label: '启用', icon: 'morph:circle-play', visible: row => !row.enabled, onClick: toggle },
+  { label: '停用', icon: 'morph:circle-pause', visible: row => row.enabled, onClick: toggle },
+  { label: 'WebQQ', icon: 'morph:message-circle', disabled: row => !row.enabled, onClick: openChat },
+]
+
+/** 页头操作：新增连接沿用原 v-auth 语义，仅有配置权限时出现 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('platform:milky:config')
+    ? [{ label: '新增连接', icon: 'morph:plus', onClick: openCreate }]
+    : []),
+])
 
 function onProtocolChange(value: string | number | bigint | Record<string, any> | null | undefined) {
   if (editing.value || typeof value !== 'string' || (value !== 'milky' && value !== 'official')) {
@@ -174,91 +220,116 @@ async function openMentionBind(connection: MilkyConnection) {
   mentionBindVisible.value = true
 }
 
-onMounted(load)
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : '-'
+}
 </script>
 
 <template>
   <div>
-    <YdPageHeader title="QQ 消息平台">
-      <YdButton v-auth="'platform:milky:config'" @click="openCreate">
-        <YdIcon name="morph:plus" />
-        新增连接
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="QQ 消息平台"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 连接总数是只读情报，按规范放页头而不占操作位 -->
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">共 {{ pagination.total }} 个连接</span>
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable  :columns="columns" :data="rows" row-key="id" border stripe>
-        <template #cell-protocol="{ row }">
-          <YdTag variant="secondary">
-            {{ row.original.protocol === 'official' ? '官方机器人' : 'Milky' }}
-          </YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
-            {{ row.original.enabled ? '已启用' : '已停用' }}
-          </YdTag>
-        </template>
-        <template #cell-actions="{ row }">
-          <div class="flex items-center gap-1">
-            <YdButton size="sm" variant="ghost" title="编辑" @click="openEdit(row.original)">
-              <YdIcon name="morph:pencil" />
-            </YdButton>
-            <YdButton size="sm" variant="ghost" title="测试连接" @click="test(row.original)">
-              <YdIcon name="morph:radar" />
-            </YdButton>
-            <YdButton v-if="row.original.protocol === 'official'" size="sm" variant="ghost" title="回填 @ 身份" @click="openMentionBind(row.original)">
-              <YdIcon name="morph:at-sign" />
-            </YdButton>
-            <YdButton size="sm" variant="ghost" :title="row.original.enabled ? '停用' : '启用'" @click="toggle(row.original)">
-              <YdIcon :name="row.original.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
-            </YdButton>
-            <YdButton size="sm" variant="ghost" :disabled="!row.original.enabled" title="WebQQ" @click="openChat(row.original)">
-              <YdIcon name="morph:message-circle" />
-            </YdButton>
-          </div>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <YdTag :variant="row.enabled ? 'default' : 'secondary'">
-                  {{ row.enabled ? '已启用' : '已停用' }}
-                </YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">服务地址</span>
-                  <span class="break-all">{{ row.baseUrl }}</span>
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
+
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[880px]"
+            column-visibility
+            stripe
+            border
+            :status-column="statusColumn"
+            :actions="rowActions"
+            :columns="columns"
+            :data="rows"
+          >
+            <template #cell-name="{ row }">
+              <span class="font-medium break-all">{{ row.original.name }}</span>
+            </template>
+            <template #cell-protocol="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.protocol === 'official' ? '官方机器人' : 'Milky' }}
+              </YdTag>
+            </template>
+            <template #cell-baseUrl="{ row }">
+              <span v-if="row.original.baseUrl" class="min-w-0 whitespace-normal break-all">{{ row.original.baseUrl }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-updateTime="{ row }">
+              <span v-if="row.original.updateTime">{{ dateText(row.original.updateTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.name }}</span>
+                    <YdTag :variant="row.enabled ? 'default' : 'secondary'">
+                      {{ row.enabled ? '已启用' : '已停用' }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">服务地址</span>
+                      <span class="break-all">{{ row.baseUrl }}</span>
+                    </div>
+                    <div v-if="row.updateTime" class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">更新时间</span>
+                      <span>{{ dateText(row.updateTime) }}</span>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t flex flex-wrap gap-2">
+                    <YdButton size="sm" variant="outline" @click="openEdit(row)">
+                      编辑
+                    </YdButton>
+                    <YdButton size="sm" variant="outline" @click="test(row)">
+                      测试
+                    </YdButton>
+                    <YdButton v-if="row.protocol === 'official'" size="sm" variant="outline" @click="openMentionBind(row)">
+                      回填@
+                    </YdButton>
+                    <YdButton size="sm" variant="outline" @click="toggle(row)">
+                      {{ row.enabled ? '停用' : '启用' }}
+                    </YdButton>
+                    <YdButton size="sm" variant="ghost" :disabled="!row.enabled" @click="openChat(row)">
+                      WebQQ
+                    </YdButton>
+                  </div>
                 </div>
-                <div v-if="row.updateTime" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">更新时间</span>
-                  <span>{{ row.updateTime }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton size="sm" variant="outline" @click="openEdit(row)">
-                  编辑
-                </YdButton>
-                <YdButton size="sm" variant="outline" @click="test(row)">
-                  测试
-                </YdButton>
-                <YdButton v-if="row.protocol === 'official'" size="sm" variant="outline" @click="openMentionBind(row)">
-                  回填@
-                </YdButton>
-                <YdButton size="sm" variant="outline" @click="toggle(row)">
-                  {{ row.enabled ? '停用' : '启用' }}
-                </YdButton>
-                <YdButton size="sm" variant="ghost" :disabled="!row.enabled" @click="openChat(row)">
-                  WebQQ
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
-      <YdPagination v-model:page="page.page" v-model:size="page.size" :total="page.total" class="mt-3" @page-change="load" @size-change="load" />
-    </YdPageMain>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑 QQ 连接' : '新增 QQ 连接'" show-cancel-button @confirm="save">
       <YdForm :model="form" layout="vertical">
@@ -294,8 +365,12 @@ onMounted(load)
               <div class="intent-picker-meta">
                 <span>已选 {{ officialIntentCount }} / {{ officialIntentTotal }} 类</span>
                 <div class="intent-picker-actions">
-                  <YdButton size="sm" variant="ghost" @click="selectRecommendedOfficialIntents">推荐</YdButton>
-                  <YdButton size="sm" variant="ghost" @click="selectAllOfficialIntents">全选</YdButton>
+                  <YdButton size="sm" variant="ghost" @click="selectRecommendedOfficialIntents">
+                    推荐
+                  </YdButton>
+                  <YdButton size="sm" variant="ghost" @click="selectAllOfficialIntents">
+                    全选
+                  </YdButton>
                 </div>
               </div>
               <div v-for="group in OFFICIAL_QQ_BOT_INTENT_GROUPS" :key="group.label" class="intent-group">
@@ -351,14 +426,14 @@ onMounted(load)
     </YdModal>
 
     <YdModal v-model="mentionBindVisible" title="回填机器人 @ 身份" :show-cancel-button="false">
-      <div class="flex flex-col gap-3 text-sm">
+      <div class="text-sm flex flex-col gap-3">
         <p>开通「接收所有消息」后，群里所有消息都以普通消息推送，机器人无法自动得知自己在群内被 @ 时的身份。按以下步骤一次性回填：</p>
-        <ol class="flex flex-col gap-1 pl-5 list-decimal">
+        <ol class="pl-5 list-decimal flex flex-col gap-1">
           <li>在目标群里 @ 机器人发送指令：<code class="font-mono">/绑定机器人 {{ mentionCode?.code }}</code></li>
           <li>机器人回复「已记录机器人提及身份」即完成，之后 @ 机器人即可触发对话；多个群各回填一次。</li>
         </ol>
-        <div v-if="mentionCode" class="flex flex-col gap-1 rounded-lg border border-[var(--color-border-2)] bg-[var(--color-bg-2)] p-3">
-          <span>回填码：<span class="font-mono text-base font-semibold tracking-widest">{{ mentionCode.code }}</span>（15 分钟内有效、一次性）</span>
+        <div v-if="mentionCode" class="p-3 border border-[var(--color-border-2)] rounded-lg bg-[var(--color-bg-2)] flex flex-col gap-1">
+          <span>回填码：<span class="text-base tracking-widest font-mono font-semibold">{{ mentionCode.code }}</span>（15 分钟内有效、一次性）</span>
           <span class="text-secondary-foreground/60">连接：{{ mentionBindConnection?.name }}</span>
         </div>
         <div v-if="mentionBindConnection?.mentionOpenIds?.length" class="text-secondary-foreground/60">

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
 import type { DynamicForm, DynamicFormStatus, FormStatistics } from '@/api/modules/platform-form'
+import { useTablePage } from '@yudream/components'
 import apiForm from '@/api/modules/platform-form'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import DynamicFormRenderer from './components/DynamicFormRenderer.vue'
 import FormSubmissionPanel from './components/FormSubmissionPanel.vue'
 
@@ -10,13 +12,11 @@ const modal = useYdModal()
 const toast = useYdToast()
 const { auth } = useAppAuth()
 
-const loading = ref(false)
 const previewLoading = ref(false)
 const statisticsLoading = ref(false)
 const actionLoading = ref('')
 const loadError = ref('')
 const statisticsError = ref('')
-const rows = ref<DynamicForm[]>([])
 const selected = ref<DynamicForm | null>(null)
 const previewForm = ref<DynamicForm | null>(null)
 const previewVisible = ref(false)
@@ -24,17 +24,69 @@ const submissionVisible = ref(false)
 const statisticsVisible = ref(false)
 const statistics = ref<FormStatistics | null>(null)
 
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string, status: DynamicFormStatus | '' }>({ keyword: '', status: '' })
-
-const statusOptions: { label: string, value: DynamicFormStatus | '' }[] = [
-  { label: '全部状态', value: '' },
+/** 状态词表：与后端 DynamicFormStatus 枚举一一对应，搜索下拉与状态列共用 */
+const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' },
   { label: '已停用', value: 'DISABLED' },
 ]
 
-const hasFilters = computed(() => Boolean(search.keyword.trim() || search.status))
+/** 搜索选项数据源：标识与 DynamicFormPageQuery#status 的 optionsSource 对应 */
+const optionsSources: SearchOptionsSource[] = [
+  { id: 'formStatusOptions', loader: () => statusOptions },
+]
+
+/** 最近一次成功加载的分页快照：刷新失败时回填，保留已读数据而不是清空表格 */
+const lastLoadedPage = shallowRef<{ records: DynamicForm[], total: number, page: number, size: number } | null>(null)
+
+/** 列表：搜索条件来自 DynamicFormPageQuery 的 @Searchable 注解，分页由后端切片 */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<DynamicForm>({
+  queryClass: 'online.yudream.base.application.platform.form.query.DynamicFormPageQuery',
+  initialSize: 10,
+  loadApi: async (query) => {
+    try {
+      const res = await apiForm.page({
+        page: query.page,
+        size: query.size,
+        keyword: query.keyword || undefined,
+        status: query.status || undefined,
+      })
+      loadError.value = ''
+      const pageResult = {
+        records: res.data.records,
+        total: Number(res.data.total || 0),
+        page: res.data.page,
+        size: res.data.size,
+      }
+      lastLoadedPage.value = pageResult
+      return pageResult
+    }
+    catch (error) {
+      // 刷新失败时保留已读数据；首次加载失败返回空结果，由错误结果页兜底。
+      loadError.value = errorText(error, '请求表单列表失败，请稍后重试。')
+      return lastLoadedPage.value ?? {
+        records: [],
+        total: 0,
+        page: query.page,
+        size: query.size,
+      }
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+const hasFilters = computed(() => Boolean(String(searchQuery.keyword || '').trim() || searchQuery.status))
 
 // Long 计数经全局 ToStringSerializer 落为字符串，动画数值必须先转回有限数字。
 const statisticTiles = computed(() => [
@@ -43,10 +95,9 @@ const statisticTiles = computed(() => [
   { key: 'last7Days', title: '近 7 天', hint: '最近 7 个自然日', icon: 'morph:trending-up', value: toCountNumber(statistics.value?.last7Days) },
 ])
 
-/** 名称身份列固定左侧（桌面），移动卡片头部复用；公开编码作为副标题随名称展示 */
+/** 名称身份列固定左侧（桌面），移动卡片头部复用 */
 const formUserColumn: UserColumn<DynamicForm> = {
   nameKey: 'name',
-  emailKey: 'code',
   header: '表单名称',
   width: 220,
   fixed: 'left',
@@ -58,16 +109,18 @@ const formStatusColumn: StatusColumn<DynamicForm> = {
   header: '状态',
   width: 100,
   statusMap: {
-    DRAFT: { label: '草稿', variant: 'secondary' },
-    PUBLISHED: { label: '已发布', variant: 'default' },
-    DISABLED: { label: '已停用', variant: 'destructive' },
+    DRAFT: { label: '草稿', variant: 'secondary', tone: 'neutral' },
+    PUBLISHED: { label: '已发布', variant: 'default', tone: 'success' },
+    DISABLED: { label: '已停用', variant: 'destructive', tone: 'danger' },
   },
 }
 
+/** 列：公开编码是技术字段、更新时间是审计字段，都可勾选但默认不展示 */
 const tableColumns: TableColumn<DynamicForm>[] = [
+  { accessorKey: 'code', header: '编码', width: 180, defaultHidden: true },
   { id: 'allowAnonymous', header: '公开填写', width: 110, align: 'center' },
   { accessorKey: 'publishedAt', header: '发布时间', width: 180 },
-  { accessorKey: 'updateTime', header: '更新时间', width: 180 },
+  { accessorKey: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ]
 
 /** 行操作统一收进内置操作下拉：权限决定菜单项是否出现，行状态只决定是否禁用 */
@@ -82,47 +135,12 @@ const formActions: ActionMenuItem<DynamicForm>[] = [
   { label: '删除', icon: 'morph:trash-2', danger: true, visible: () => auth('platform:form:delete'), onClick: confirmDelete },
 ]
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  try {
-    const res = await apiForm.page({
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-      status: search.status || undefined,
-    })
-    rows.value = res.data.records
-    pagination.total = Number(res.data.total || 0)
-  }
-  catch (error) {
-    // 刷新失败时保留已读数据，只在列表为空时替换为错误结果页。
-    loadError.value = errorText(error, '请求表单列表失败，请稍后重试。')
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.status = ''
-  pagination.page = 1
-  load()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
-}
+/** 页头操作：新建表单是常用操作直接显示，权限语义沿用原页头按钮 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('platform:form:edit')
+    ? [{ label: '新建表单', icon: 'morph:plus', onClick: openCreate }]
+    : []),
+])
 
 function openCreate() {
   router.push('/platform/form/designer')
@@ -259,113 +277,102 @@ function errorText(error: unknown, fallback: string) {
 
 <template>
   <div>
-    <YdPageHeader title="动态表单" class="mb-0">
-      <template #description>
-        设计并发布公开表单，跟踪提交结果与字段统计；发布后可通过公开链接或接口收集填写。
+    <YdTablePageLayout
+      title="动态表单"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 表单总数与说明是只读情报，按规范放页头而不占操作位 -->
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">共 {{ pagination.total }} 个表单 · 设计并发布公开表单，跟踪提交结果与字段统计；发布后可通过公开链接或接口收集填写。</span>
       </template>
-      <YdButton v-auth="'platform:form:edit'" @click="openCreate">
-        <YdIcon name="morph:plus" />
-        新建表单
-      </YdButton>
-    </YdPageHeader>
 
-    <YdPageMain>
-      <template v-if="loadError && !rows.length">
-        <div class="form-surface">
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
+
+      <template #table>
+        <!-- 首次加载失败：没有可展示数据时以结果页兜底 -->
+        <div v-if="loadError && !rows.length" class="form-surface">
           <YdResult status="error" title="表单列表加载失败" :description="loadError">
             <YdButton @click="load">
               重新加载
             </YdButton>
           </YdResult>
         </div>
+
+        <div v-else-if="!loading && !rows.length" class="form-surface">
+          <YdEmpty
+            :illustration="hasFilters ? 'no-result' : 'empty'"
+            :title="hasFilters ? '没有匹配的表单' : '还没有动态表单'"
+            :description="hasFilters ? '调整关键字或状态筛选后重试。' : '创建第一个表单，设计字段并发布后即可收集提交。'"
+          >
+            <YdButton v-if="hasFilters" variant="outline" @click="resetSearch">
+              清除筛选
+            </YdButton>
+            <YdButton v-else v-auth="'platform:form:edit'" @click="openCreate">
+              <YdIcon name="morph:plus" />
+              新建表单
+            </YdButton>
+          </YdEmpty>
+        </div>
+
+        <div v-else class="flex flex-col h-full min-h-0">
+          <YdAlert
+            v-if="loadError"
+            class="mb-3 shrink-0"
+            variant="destructive"
+            icon="morph:triangle-alert"
+            title="列表刷新失败"
+            :description="`${loadError}当前展示的是最近一次成功加载的数据。`"
+          />
+          <YdLoadingOverlay :loading="loading || Boolean(actionLoading)" class="flex-1 min-h-0">
+            <YdResponsiveEnhancedTable
+              row-key="id"
+              table-root-class="rounded-lg overflow-hidden"
+              table-class="min-w-[820px]"
+              column-visibility
+              :user-column="formUserColumn"
+              :status-column="formStatusColumn"
+              :actions="formActions"
+              :columns="tableColumns"
+              :data="rows"
+            >
+              <template #cell-code="{ row }">
+                <span v-if="row.original.code" class="break-all">{{ row.original.code }}</span>
+                <span v-else class="text-muted-foreground/40">-</span>
+              </template>
+              <template #cell-allowAnonymous="{ row }">
+                {{ row.original.allowAnonymous ? '是' : '登录后填写' }}
+              </template>
+              <template #cell-publishedAt="{ row }">
+                {{ dateText(row.original.publishedAt) }}
+              </template>
+              <template #cell-updateTime="{ row }">
+                {{ dateText(row.original.updateTime) }}
+              </template>
+            </YdResponsiveEnhancedTable>
+          </YdLoadingOverlay>
+        </div>
       </template>
 
-      <template v-else>
-        <YdAlert
-          v-if="loadError"
-          class="mb-3"
-          variant="destructive"
-          icon="morph:triangle-alert"
-          title="列表刷新失败"
-          :description="`${loadError}当前展示的是最近一次成功加载的数据。`"
-        />
-
-        <YdLoadingOverlay :loading="loading || Boolean(actionLoading)">
-          <YdResponsiveEnhancedTable
-            v-if="rows.length || loading"
-            row-key="id"
-            table-root-class="rounded-lg overflow-hidden"
-            table-class="min-w-[1000px]"
-            column-visibility
-            :user-column="formUserColumn"
-            :status-column="formStatusColumn"
-            :actions="formActions"
-            :columns="tableColumns"
-            :data="rows"
-          >
-            <template #toolbar>
-              <YdListToolbar
-                v-model:keyword="search.keyword"
-                title="表单目录"
-                placeholder="表单名称 / 编码 / 描述"
-                @search="load"
-                @clear="load"
-              >
-                <template #views>
-                  <span class="form-toolbar__count">共 {{ pagination.total }} 个表单</span>
-                </template>
-                <template #filters>
-                  <YdFilterSelect v-model="search.status" :options="statusOptions" placeholder="全部状态" />
-                </template>
-                <template #actions>
-                  <YdButton variant="outline" @click="resetSearch">
-                    重置
-                  </YdButton>
-                  <YdButton :loading="loading" @click="load">
-                    <YdIcon name="morph:search" />
-                    筛选
-                  </YdButton>
-                </template>
-              </YdListToolbar>
-            </template>
-            <template #cell-allowAnonymous="{ row }">
-              {{ row.original.allowAnonymous ? '是' : '登录后填写' }}
-            </template>
-            <template #cell-publishedAt="{ row }">
-              {{ dateText(row.original.publishedAt) }}
-            </template>
-            <template #cell-updateTime="{ row }">
-              {{ dateText(row.original.updateTime) }}
-            </template>
-          </YdResponsiveEnhancedTable>
-          <div v-else class="form-surface">
-            <YdEmpty
-              :illustration="hasFilters ? 'no-result' : 'empty'"
-              :title="hasFilters ? '没有匹配的表单' : '还没有动态表单'"
-              :description="hasFilters ? '调整关键字或状态筛选后重试。' : '创建第一个表单，设计字段并发布后即可收集提交。'"
-            >
-              <YdButton v-if="hasFilters" variant="outline" @click="resetSearch">
-                清除筛选
-              </YdButton>
-              <YdButton v-else v-auth="'platform:form:edit'" @click="openCreate">
-                <YdIcon name="morph:plus" />
-                新建表单
-              </YdButton>
-            </YdEmpty>
-          </div>
-        </YdLoadingOverlay>
-
+      <template #footer>
         <YdPagination
-          v-if="rows.length"
           v-model:page="pagination.page"
           v-model:size="pagination.size"
           :total="pagination.total"
-          class="mt-3"
           @page-change="onPageChange"
           @size-change="onSizeChange"
         />
       </template>
-    </YdPageMain>
+    </YdTablePageLayout>
 
     <YdModal v-model="previewVisible" :title="previewForm ? `${previewForm.name} / 表单详情` : '表单详情'" class="sm:max-w-4xl">
       <YdLoadingOverlay :loading="previewLoading">
@@ -452,11 +459,6 @@ function errorText(error: unknown, fallback: string) {
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: 12px;
-}
-
-.form-toolbar__count {
-  font-size: 12px;
-  color: var(--color-text-3);
 }
 
 .preview-panel {

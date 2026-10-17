@@ -1,70 +1,71 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn } from '@yudream/components'
 import type { InboundMailDetail, InboundMailSummary } from '@/api/modules/platform-inbound-mail'
+import { useTablePage } from '@yudream/components'
 import apiInboundMail from '@/api/modules/platform-inbound-mail'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 
 const toast = useYdToast()
+const { auth } = useAppAuth()
 
-const loading = ref(false)
 const detailLoading = ref(false)
-const rows = ref<InboundMailSummary[]>([])
 const selected = ref<InboundMailDetail | null>(null)
 const detailVisible = ref(false)
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive({ keyword: '' })
 
-const tableColumns = computed<TableColumn<InboundMailSummary>[]>(() => [
-  { id: 'seen', header: '状态', width: 90, align: 'center' },
-  { accessorKey: 'subject', header: '主题', width: 280, fixed: 'left' },
-  { accessorKey: 'from', header: '发件人', width: 240 },
-  { accessorKey: 'to', header: '收件人', width: 220 },
+/** 列表：搜索条件来自 InboundMailPageQuery 的 @Searchable 注解，分页由后端切片（每页上限 50） */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<InboundMailSummary>({
+  queryClass: 'online.yudream.base.application.platform.mail.query.InboundMailPageQuery',
+  // 与迁移前一致：默认每页 10 条
+  initialSize: 10,
+  loadApi: async (query) => {
+    const res = await apiInboundMail.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+    })
+    return {
+      records: res.data.records,
+      total: Number(res.data.total || 0),
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+/** 行操作：详情统一走表格内置操作列，移动端卡片底部保留同一入口 */
+const rowActions: ActionMenuItem<InboundMailSummary>[] = [
+  { label: '详情', icon: 'morph:eye', visible: () => auth('platform:inbound-mail:view'), onClick: openDetail },
+]
+
+/** 主题是行标识，固定左侧；长串（主题/收发件人）在单元格内换行 */
+const tableColumns: TableColumn<InboundMailSummary>[] = [
+  { accessorKey: 'subject', header: '主题', minWidth: 280, fixed: 'left' },
+  { accessorKey: 'from', header: '发件人', minWidth: 220 },
+  { accessorKey: 'to', header: '收件人', minWidth: 200 },
   { id: 'hasAttachment', header: '附件', width: 90, align: 'center' },
   { id: 'receivedAt', header: '收件时间', width: 180 },
-  { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
-])
+]
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  try {
-    const res = await apiInboundMail.page({
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-    })
-    rows.value = res.data.records
-    pagination.total = Number(res.data.total || 0)
-  }
-  catch {
-    rows.value = []
-    pagination.total = 0
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  pagination.page = 1
-  load()
-}
-
-function applySearch() {
-  pagination.page = 1
-  load()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
+/** 已读/未读是行的唯一状态：布尔值走字符串键，未读给信息色便于扫读 */
+const statusColumn: StatusColumn<InboundMailSummary> = {
+  statusKey: 'seen',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    true: { label: '已读', variant: 'secondary', tone: 'neutral' },
+    false: { label: '未读', variant: 'default', tone: 'info' },
+  },
 }
 
 async function openDetail(row: InboundMailSummary) {
@@ -113,154 +114,148 @@ const htmlSrcdoc = computed(() => {
 
 <template>
   <div>
-    <YdPageHeader title="入站邮箱" class="mb-0" />
+    <YdTablePageLayout title="入站邮箱">
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="uid"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1180px]"
-        border
-        stripe
-        column-visibility
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="主题 / 发件人 / 正文关键词" @keydown.enter="applySearch" @clear="applySearch" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  重置
-                </YdButton>
-                <YdButton :loading="loading" @click="applySearch">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-seen="{ row }">
-          <YdTag :variant="row.original.seen ? 'secondary' : 'default'">
-            {{ row.original.seen ? '已读' : '未读' }}
-          </YdTag>
-        </template>
-        <template #cell-hasAttachment="{ row }">
-          {{ row.original.hasAttachment ? '有' : '-' }}
-        </template>
-        <template #cell-receivedAt="{ row }">
-          {{ dateText(row.original.receivedAt) }}
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="table-actions">
-            <YdButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row.original)">
-              详情
-            </YdButton>
-          </div>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.subject }}</span>
-                <YdTag :variant="row.seen ? 'secondary' : 'default'">
-                  {{ row.seen ? '已读' : '未读' }}
-                </YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">发件人</span>
-                  <span class="min-w-0 break-all">{{ row.from || '-' }}</span>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="uid"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1180px]"
+            stripe
+            column-visibility
+            border
+            :status-column="statusColumn"
+            :actions="rowActions"
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #cell-subject="{ row }">
+              <span v-if="row.original.subject" class="min-w-0 whitespace-normal break-all">{{ row.original.subject }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-from="{ row }">
+              <span v-if="row.original.from" class="min-w-0 whitespace-normal break-all">{{ row.original.from }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-to="{ row }">
+              <span v-if="row.original.to" class="min-w-0 whitespace-normal break-all">{{ row.original.to }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-hasAttachment="{ row }">
+              {{ row.original.hasAttachment ? '有' : '-' }}
+            </template>
+            <template #cell-receivedAt="{ row }">
+              {{ dateText(row.original.receivedAt) }}
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.subject }}</span>
+                    <YdTag :variant="row.seen ? 'secondary' : 'default'">
+                      {{ row.seen ? '已读' : '未读' }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">发件人</span>
+                      <span class="min-w-0 break-all">{{ row.from || '-' }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">收件人</span>
+                      <span class="min-w-0 break-all">{{ row.to || '-' }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">收件时间</span>
+                      <span>{{ dateText(row.receivedAt) }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">附件</span>
+                      <span>{{ row.hasAttachment ? '有' : '无' }}</span>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t flex flex-wrap gap-2">
+                    <YdButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row)">
+                      详情
+                    </YdButton>
+                  </div>
                 </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">收件人</span>
-                  <span class="min-w-0 break-all">{{ row.to || '-' }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">收件时间</span>
-                  <span>{{ dateText(row.receivedAt) }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">附件</span>
-                  <span>{{ row.hasAttachment ? '有' : '无' }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'platform:inbound-mail:view'" size="sm" variant="outline" @click="openDetail(row)">
-                  详情
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        :sizes="[10, 20, 50]"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          :sizes="[10, 20, 50]"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="detailVisible" :title="selected ? selected.subject : '邮件详情'" class="sm:max-w-5xl">
-      <YdLoadingOverlay :loading="detailLoading"><section  class="detail-panel">
-        <template v-if="selected">
-          <div class="meta-grid">
-            <div>
-              <span>发件人</span>
-              <strong>{{ selected.from || '-' }}</strong>
+      <YdLoadingOverlay :loading="detailLoading">
+        <section class="detail-panel">
+          <template v-if="selected">
+            <div class="meta-grid">
+              <div>
+                <span>发件人</span>
+                <strong>{{ selected.from || '-' }}</strong>
+              </div>
+              <div>
+                <span>收件人</span>
+                <strong>{{ selected.to || '-' }}</strong>
+              </div>
+              <div>
+                <span>抄送</span>
+                <strong>{{ selected.cc || '-' }}</strong>
+              </div>
+              <div>
+                <span>收件时间</span>
+                <strong>{{ dateText(selected.receivedAt) }}</strong>
+              </div>
             </div>
-            <div>
-              <span>收件人</span>
-              <strong>{{ selected.to || '-' }}</strong>
+            <iframe
+              v-if="htmlSrcdoc"
+              class="html-frame"
+              sandbox=""
+              referrerpolicy="no-referrer"
+              :srcdoc="htmlSrcdoc"
+              title="邮件正文"
+            />
+            <pre v-else class="text-body">{{ selected.textBody || '（无正文）' }}</pre>
+            <div v-if="selected.attachments?.length" class="attachments">
+              <h4>附件</h4>
+              <ul>
+                <li v-for="item in selected.attachments" :key="`${item.filename}-${item.size}`">
+                  <span>{{ item.filename }}</span>
+                  <em>{{ item.contentType || 'application/octet-stream' }} · {{ sizeText(item.size) }}{{ item.inline ? ' · 内嵌' : '' }}</em>
+                </li>
+              </ul>
             </div>
-            <div>
-              <span>抄送</span>
-              <strong>{{ selected.cc || '-' }}</strong>
-            </div>
-            <div>
-              <span>收件时间</span>
-              <strong>{{ dateText(selected.receivedAt) }}</strong>
-            </div>
-          </div>
-          <iframe
-            v-if="htmlSrcdoc"
-            class="html-frame"
-            sandbox=""
-            referrerpolicy="no-referrer"
-            :srcdoc="htmlSrcdoc"
-            title="邮件正文"
-          />
-          <pre v-else class="text-body">{{ selected.textBody || '（无正文）' }}</pre>
-          <div v-if="selected.attachments?.length" class="attachments">
-            <h4>附件</h4>
-            <ul>
-              <li v-for="item in selected.attachments" :key="`${item.filename}-${item.size}`">
-                <span>{{ item.filename }}</span>
-                <em>{{ item.contentType || 'application/octet-stream' }} · {{ sizeText(item.size) }}{{ item.inline ? ' · 内嵌' : '' }}</em>
-              </li>
-            </ul>
-          </div>
-        </template>
-      </section></YdLoadingOverlay>
+          </template>
+        </section>
+      </YdLoadingOverlay>
     </YdModal>
   </div>
 </template>
 
 <style scoped>
-.table-actions {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
 .detail-panel {
   display: grid;
   gap: 16px;

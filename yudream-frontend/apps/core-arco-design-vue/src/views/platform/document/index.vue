@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdCodeEditorInstance, YdSegmentedOption } from '@yudream/components'
-import type { GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
-import { YdListToolbar } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdCodeEditorInstance, YdSegmentedOption, YdTablePageAction } from '@yudream/components'
+import type { DocumentPageParams, GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
+import { useTablePage } from '@yudream/components'
 import apiDocument from '@/api/modules/platform-document'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 
 const modal = useYdModal()
 const toast = useYdToast()
@@ -10,13 +12,56 @@ const isMobile = useIsMobile()
 const { auth } = useAppAuth()
 const tour = useTourStore()
 
-const activeTab = ref<'templates' | 'records'>('templates')
-const loading = ref(false)
+type DocumentTab = 'templates' | 'records'
+/** 模板与生成记录共用同一查询类、搜索条件与分页；行数据类型按当前标签页取用 */
+type DocumentRow = WordTemplate | WordGenerationRecord
+
+const activeTab = ref<DocumentTab>('templates')
 const actionLoading = ref('')
-const rows = ref<WordTemplate[]>([])
-const recordRows = ref<WordGenerationRecord[]>([])
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive({ keyword: '' })
+
+/** 视图切换：模板与生成记录走各自的端点，版式统一由 YdTablePageLayout 承载 */
+function requestPage(tab: DocumentTab, params: DocumentPageParams) {
+  return tab === 'templates' ? apiDocument.pageTemplates(params) : apiDocument.pageRecords(params)
+}
+
+/** 列表：搜索条件来自 WordDocumentPageQuery 的 @Searchable 注解，分页由后端切片 */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<DocumentRow>({
+  queryClass: 'online.yudream.base.application.platform.document.query.WordDocumentPageQuery',
+  loadApi: async (query) => {
+    const page = await requestPage(activeTab.value, {
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+    })
+    return {
+      records: page.data.records,
+      total: page.data.total,
+      page: page.data.page,
+      size: page.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+/** 当前视图的数据：查询结果只属于当前标签页，另一个表格拿空数组兜底 */
+const templateRows = computed(() => (activeTab.value === 'templates' ? rows.value as WordTemplate[] : []))
+const recordRows = computed(() => (activeTab.value === 'records' ? rows.value as WordGenerationRecord[] : []))
+
+watch(activeTab, () => {
+  pagination.page = 1
+  load()
+})
 
 const fileInput = ref<InstanceType<typeof YdFilePicker>>()
 const replaceInput = ref<InstanceType<typeof YdFilePicker>>()
@@ -108,8 +153,8 @@ const templateStatusColumn: StatusColumn<WordTemplate> = {
   header: '状态',
   width: 100,
   statusMap: {
-    ACTIVE: { label: '启用', variant: 'default' },
-    DISABLED: { label: '停用', variant: 'secondary' },
+    ACTIVE: { label: '启用', variant: 'default', tone: 'success' },
+    DISABLED: { label: '停用', variant: 'secondary', tone: 'neutral' },
   },
 }
 
@@ -155,11 +200,12 @@ const templateActions: ActionMenuItem<WordTemplate>[] = [
   },
 ]
 
+// 模板编码与更新时间属于技术字段与审计字段，列显隐菜单里可展开
 const templateColumns = computed<TableColumn<WordTemplate>[]>(() => [
-  { accessorKey: 'code', header: '模板编码', width: 160 },
-  { accessorKey: 'originalFilename', header: '模板文件', width: 220 },
-  { id: 'placeholders', header: '占位符', width: 260 },
-  { id: 'updateTime', header: '更新时间', width: 180 },
+  { accessorKey: 'code', header: '模板编码', width: 160, defaultHidden: true },
+  { accessorKey: 'originalFilename', header: '模板文件', width: 220, minWidth: 180 },
+  { id: 'placeholders', header: '占位符', width: 260, minWidth: 200 },
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ])
 
 /** 记录身份列：模板编码，桌面固定首位，移动卡片复用为标题 */
@@ -174,8 +220,8 @@ const recordStatusColumn: StatusColumn<WordGenerationRecord> = {
   header: '状态',
   width: 100,
   statusMap: {
-    SUCCESS: { label: '成功', variant: 'default' },
-    FAILED: { label: '失败', variant: 'destructive' },
+    SUCCESS: { label: '成功', variant: 'default', tone: 'success' },
+    FAILED: { label: '失败', variant: 'destructive', tone: 'danger' },
   },
 }
 
@@ -190,64 +236,48 @@ const recordActions: ActionMenuItem<WordGenerationRecord>[] = [
 ]
 
 const recordColumns = computed<TableColumn<WordGenerationRecord>[]>(() => [
-  { accessorKey: 'outputFilename', header: '生成文件', width: 260 },
-  { accessorKey: 'operatorId', header: '操作人', width: 140 },
+  { accessorKey: 'outputFilename', header: '生成文件', minWidth: 220 },
+  { accessorKey: 'operatorId', header: '操作人', width: 180 },
   { id: 'generatedAt', header: '生成时间', width: 180 },
-  { id: 'errorMessage', header: '异常', width: 300 },
+  { id: 'errorMessage', header: '异常', minWidth: 200 },
 ])
 
 const placeholdersIssue = computed(() => jsonIssue(placeholdersJson.value))
 const generateIssue = computed(() => jsonIssue(generateDataJson.value))
 const lastRecordJson = computed(() => (lastRecord.value ? JSON.stringify(lastRecord.value, null, 2) : ''))
-const trimmedKeyword = computed(() => search.keyword.trim())
+const trimmedKeyword = computed(() => String(searchQuery.keyword || '').trim())
 
-onMounted(load)
+/** 页头操作：上传模板常用直接显示，教程与操作引导收进「更多」 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('platform:document:edit')
+    ? [
+        {
+          label: '上传模板',
+          icon: 'morph:cloud-upload',
+          ref: (el: unknown) => markTourAnchor(el, 'document-upload'),
+          onClick: pickCreateFile,
+        },
+      ]
+    : []),
+  {
+    label: '写法教程',
+    icon: 'morph:book-open',
+    variant: 'outline' as const,
+    autoFold: true,
+    ref: (el: unknown) => markTourAnchor(el, 'document-guide'),
+    onClick: openGuide,
+  },
+  ...(tour.isCompleted('platform.document.word-template')
+    ? [{ label: '操作引导', icon: 'morph:circle-help', variant: 'ghost' as const, autoFold: true, onClick: replayGuide }]
+    : []),
+])
 
-watch(activeTab, () => {
-  pagination.page = 1
-  pagination.total = 0
-  load()
-})
-
-async function load() {
-  loading.value = true
-  try {
-    const params = {
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-    }
-    if (activeTab.value === 'templates') {
-      const res = await apiDocument.pageTemplates(params)
-      rows.value = res.data.records
-      pagination.total = res.data.total
-    }
-    else {
-      const res = await apiDocument.pageRecords(params)
-      recordRows.value = res.data.records
-      pagination.total = res.data.total
-    }
+/** 新手引导锚点：按钮由布局按配置渲染，data-tour 经 ref 回填到按钮根元素（引导选择器依赖该属性） */
+function markTourAnchor(el: unknown, name: string) {
+  const node = (el as { $el?: unknown } | null)?.$el ?? el
+  if (node instanceof HTMLElement) {
+    node.setAttribute('data-tour', name)
   }
-  finally {
-    loading.value = false
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  pagination.page = 1
-  load()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
 }
 
 function openGuide() {
@@ -529,71 +559,43 @@ function tabIcon(value: string | number) {
 
 <template>
   <div>
-    <!-- data-tour 锚点固定挂在页头操作上：切标签页不影响引导定位，教程入口也不再依赖教程内容是否展开 -->
-    <YdPageHeader title="Word 模板" class="mb-0">
-      <template #description>
-        维护 DOCX 模板文件与占位符说明，生成记录可回溯每一次导出的结果与异常。
+    <!-- data-tour 锚点跟着操作按钮走：切标签页不影响引导定位，教程入口也不再依赖教程内容是否展开 -->
+    <YdTablePageLayout
+      title="Word 模板"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">
+          维护 DOCX 模板文件与占位符说明，生成记录可回溯每一次导出的结果与异常 · 共 {{ pagination.total }} 条
+        </span>
       </template>
-      <YdButton data-tour="document-guide" variant="outline" @click="openGuide">
-        <YdIcon name="morph:book-open" />
-        写法教程
-      </YdButton>
-      <YdButton v-if="tour.isCompleted('platform.document.word-template')" variant="ghost" @click="replayGuide">
-        <YdIcon name="morph:circle-help" />
-        操作引导
-      </YdButton>
-      <YdButton v-auth="'platform:document:edit'" data-tour="document-upload" @click="pickCreateFile">
-        <YdIcon name="morph:cloud-upload" />
-        上传模板
-      </YdButton>
-      <YdFilePicker ref="fileInput" accept=".docx" label="选择 DOCX 模板" class="hidden" @select="onCreateFileChange">
-        <template #default />
-      </YdFilePicker>
-      <YdFilePicker ref="replaceInput" accept=".docx" label="替换 DOCX 模板" class="hidden" @select="onReplaceFileChange">
-        <template #default />
-      </YdFilePicker>
-    </YdPageHeader>
 
-    <YdPageMain>
-      <YdListToolbar
-        v-model:keyword="search.keyword"
-        title="文档中心"
-        placeholder="模板名称 / 编码 / 文件名"
-        @search="load"
-        @clear="load"
-      >
-        <template #views>
-          <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
-            <template #option="{ option }">
-              <span class="doc-tab">
-                <YdIcon :name="tabIcon(option.value)" />
-                {{ option.label }}
-              </span>
-            </template>
-          </YdSegmented>
-        </template>
-        <template #actions>
-          <YdButton variant="outline" @click="resetSearch">
-            重置
-          </YdButton>
-          <YdButton :loading="loading" @click="load">
-            <YdIcon name="morph:search" />
-            筛选
-          </YdButton>
-        </template>
-      </YdListToolbar>
+      <template #tabs>
+        <YdSegmented v-model="activeTab" data-tour="document-tabs" :options="tabOptions" :block="isMobile" size="sm" aria-label="模板与生成记录视图">
+          <template #option="{ option }">
+            <span class="doc-tab">
+              <YdIcon :name="tabIcon(option.value)" />
+              {{ option.label }}
+            </span>
+          </template>
+        </YdSegmented>
+      </template>
 
-      <section :key="activeTab" class="doc-list doc-pane">
-        <header class="doc-list__head">
-          <div class="doc-list__heading">
-            <h2>{{ activeTab === 'templates' ? '模板列表' : '生成记录' }}</h2>
-            <span class="doc-list__count">共 {{ pagination.total }} 条</span>
-          </div>
-        </header>
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
+      <template #table>
         <YdLoadingOverlay :loading="loading">
           <YdResponsiveEnhancedTable
-            v-if="activeTab === 'templates' && rows.length"
+            v-if="activeTab === 'templates' && templateRows.length"
             row-key="id"
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[1200px]"
@@ -604,7 +606,7 @@ function tabIcon(value: string | number) {
             :status-column="templateStatusColumn"
             :actions="templateActions"
             :columns="templateColumns"
-            :data="rows"
+            :data="templateRows"
           >
             <template #cell-placeholders="{ row }">
               <div class="placeholder-tags">
@@ -616,6 +618,9 @@ function tabIcon(value: string | number) {
                 </YdTag>
                 <span v-if="!placeholderKeys(row.original).length" class="doc-muted">-</span>
               </div>
+            </template>
+            <template #cell-originalFilename="{ row }">
+              <span class="whitespace-normal break-all">{{ row.original.originalFilename || '-' }}</span>
             </template>
             <template #cell-updateTime="{ row }">
               {{ dateText(row.original.updateTime) }}
@@ -636,6 +641,19 @@ function tabIcon(value: string | number) {
             :columns="recordColumns"
             :data="recordRows"
           >
+            <template #cell-outputFilename="{ row }">
+              <span class="whitespace-normal break-all">{{ row.original.outputFilename || '-' }}</span>
+            </template>
+            <!-- 操作人是已登记的用户实体：头像 + 名称，就地查看/编辑；没有 id 的行退化为纯文本 -->
+            <template #cell-operatorId="{ row }">
+              <RelatedEntity
+                v-if="row.original.operatorId"
+                entity-type="user"
+                :entity-id="row.original.operatorId"
+                @changed="load"
+              />
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
             <template #cell-generatedAt="{ row }">
               {{ dateText(row.original.generatedAt) }}
             </template>
@@ -676,20 +694,26 @@ function tabIcon(value: string | number) {
               去模板管理生成
             </YdButton>
           </YdEmpty>
-
-          <div v-else class="doc-list__placeholder" aria-hidden="true" />
         </YdLoadingOverlay>
+      </template>
 
+      <template #footer>
         <YdPagination
           v-model:page="pagination.page"
           v-model:size="pagination.size"
           :total="pagination.total"
-          class="mt-1"
           @page-change="onPageChange"
           @size-change="onSizeChange"
         />
-      </section>
-    </YdPageMain>
+      </template>
+    </YdTablePageLayout>
+
+    <YdFilePicker ref="fileInput" accept=".docx" label="选择 DOCX 模板" class="hidden" @select="onCreateFileChange">
+      <template #default />
+    </YdFilePicker>
+    <YdFilePicker ref="replaceInput" accept=".docx" label="替换 DOCX 模板" class="hidden" @select="onReplaceFileChange">
+      <template #default />
+    </YdFilePicker>
 
     <!-- 写法教程按需打开：长内容进弹窗，主体滚动由弹窗内容区承担，底部不再挂默认按钮 -->
     <YdModal
@@ -914,11 +938,6 @@ function tabIcon(value: string | number) {
 </template>
 
 <style scoped>
-/* 工具条：视图切换 + 查询 + 筛选收在一条窄带里，切标签页不再重复整个查询区 */
-.doc-toolbar {
-  margin-bottom: 14px;
-}
-
 .doc-tab {
   display: inline-flex;
   gap: 6px;
@@ -1058,44 +1077,6 @@ function tabIcon(value: string | number) {
   max-height: 260px;
 }
 
-/* 数据区：标题 + 计数 + 刷新，然后是表格或空态 */
-.doc-list {
-  display: grid;
-  gap: 12px;
-}
-
-.doc-list__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.doc-list__heading {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.doc-list__heading h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
-  color: var(--color-text-1);
-}
-
-.doc-list__count {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-3);
-}
-
-/* 首次加载时占位，保证 YdLoadingOverlay 有稳定尺寸 */
-.doc-list__placeholder {
-  min-height: 280px;
-}
-
 .placeholder-tags {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1195,28 +1176,6 @@ function tabIcon(value: string | number) {
   max-height: 260px;
 }
 
-/* 内容揭示只保留一次轻微淡入；雅致/紧凑与减少动态效果偏好下直接出现 */
-.doc-pane {
-  animation: doc-pane-in 0.24s cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
-@keyframes doc-pane-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-:global([data-admin-style="calm"]) .doc-pane,
-:global([data-admin-style="compact"]) .doc-pane {
-  animation: none;
-}
-
 @media (width <= 900px) {
   .guide-data-grid,
   .generate-grid {
@@ -1235,12 +1194,6 @@ function tabIcon(value: string | number) {
   .result-panel__meta > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .doc-pane {
-    animation: none;
   }
 }
 </style>

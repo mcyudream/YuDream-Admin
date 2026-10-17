@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, StatusColumn, TableColumn, YdSegmentedOption, YdTablePageAction } from '@yudream/components'
 import type {
   ConnectorStatus,
   ExecutionStatus,
@@ -7,25 +7,82 @@ import type {
   HttpConnectorPayload,
   HttpInvocationLog,
   HttpMethodType,
+  IntegrationPageParams,
   RuntimeExecutionLog,
   RuntimeLanguage,
   RuntimeScript,
   RuntimeScriptPayload,
 } from '@/api/modules/platform-integration'
+import { useTablePage } from '@yudream/components'
 import apiIntegration from '@/api/modules/platform-integration'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 
 const modal = useYdModal()
 const toast = useYdToast()
+const { auth } = useAppAuth()
+const isMobile = useIsMobile()
 
-const activeTab = ref<'connectors' | 'httpLogs' | 'scripts' | 'runtimeLogs'>('connectors')
-const loading = ref(false)
+type IntegrationTab = 'connectors' | 'httpLogs' | 'scripts' | 'runtimeLogs'
+/** 四个标签页共用同一查询类、搜索条件与分页；行数据类型按当前标签页取用 */
+type IntegrationRow = HttpConnector | HttpInvocationLog | RuntimeScript | RuntimeExecutionLog
+
+const activeTab = ref<IntegrationTab>('connectors')
 const actionLoading = ref('')
-const connectorRows = ref<HttpConnector[]>([])
-const httpLogRows = ref<HttpInvocationLog[]>([])
-const scriptRows = ref<RuntimeScript[]>([])
-const runtimeLogRows = ref<RuntimeExecutionLog[]>([])
-const search = reactive({ keyword: '' })
-const pagination = reactive({ page: 1, size: 10, total: 0 })
+
+/** 标签页切换：数据源随视图切换，版式统一由 YdTablePageLayout 承载 */
+function requestPage(tab: IntegrationTab, params: IntegrationPageParams) {
+  if (tab === 'connectors') {
+    return apiIntegration.pageConnectors(params)
+  }
+  if (tab === 'httpLogs') {
+    return apiIntegration.pageHttpLogs(params)
+  }
+  if (tab === 'scripts') {
+    return apiIntegration.pageScripts(params)
+  }
+  return apiIntegration.pageRuntimeLogs(params)
+}
+
+/** 列表：搜索条件来自 IntegrationPageQuery 的 @Searchable 注解，分页由后端切片 */
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<IntegrationRow>({
+  queryClass: 'online.yudream.base.application.platform.integration.query.IntegrationPageQuery',
+  loadApi: async (query) => {
+    const page = await requestPage(activeTab.value, {
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+    })
+    return {
+      records: page.data.records,
+      total: page.data.total,
+      page: page.data.page,
+      size: page.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+/** 当前标签页的数据：查询结果只属于当前视图，其余表格拿空数组兜底 */
+const connectorRows = computed(() => (activeTab.value === 'connectors' ? rows.value as HttpConnector[] : []))
+const httpLogRows = computed(() => (activeTab.value === 'httpLogs' ? rows.value as HttpInvocationLog[] : []))
+const scriptRows = computed(() => (activeTab.value === 'scripts' ? rows.value as RuntimeScript[] : []))
+const runtimeLogRows = computed(() => (activeTab.value === 'runtimeLogs' ? rows.value as RuntimeExecutionLog[] : []))
+
+watch(activeTab, () => {
+  pagination.page = 1
+  load()
+})
 
 const connectorVisible = ref(false)
 const connectorEditing = ref<HttpConnector | null>(null)
@@ -67,121 +124,177 @@ const executeStdin = ref('')
 const lastRuntimeLog = ref<RuntimeExecutionLog | null>(null)
 
 const methodOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(value => ({ label: value, value }))
-const statusOptions: { label: string; value: ConnectorStatus }[] = [
+const statusOptions: { label: string, value: ConnectorStatus }[] = [
   { label: '启用', value: 'ACTIVE' },
   { label: '停用', value: 'DISABLED' },
 ]
-const languageOptions: { label: string; value: RuntimeLanguage }[] = [
+const languageOptions: { label: string, value: RuntimeLanguage }[] = [
   { label: 'Python', value: 'PYTHON' },
 ]
-const tabs = [
-  { key: 'connectors', label: 'HTTP 连接器', icon: 'morph:link' },
-  { key: 'httpLogs', label: 'HTTP 日志', icon: 'morph:file-text' },
-  { key: 'scripts', label: '运行脚本', icon: 'morph:square-terminal' },
-  { key: 'runtimeLogs', label: '运行日志', icon: 'morph:bug' },
-] as const
+const tabOptions: YdSegmentedOption<IntegrationTab>[] = [
+  { label: 'HTTP 连接器', value: 'connectors' },
+  { label: 'HTTP 日志', value: 'httpLogs' },
+  { label: '运行脚本', value: 'scripts' },
+  { label: '运行日志', value: 'runtimeLogs' },
+]
+const tabIcons: Record<string, string> = {
+  connectors: 'morph:link',
+  httpLogs: 'morph:file-text',
+  scripts: 'morph:square-terminal',
+  runtimeLogs: 'morph:bug',
+}
 
-const connectorColumns = computed<TableColumn<HttpConnector>[]>(() => [
-  { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
-  { accessorKey: 'code', header: '编码', width: 160 },
+function tabIcon(value: string | number) {
+  return tabIcons[String(value)] || 'morph:link'
+}
+
+/** 启停状态词表：字段值是 ACTIVE / DISABLED，statusMap 的键用字段值字符串 */
+const connectorStatusMap = {
+  ACTIVE: { label: '启用', variant: 'default' as const, tone: 'success' as const },
+  DISABLED: { label: '停用', variant: 'secondary' as const, tone: 'neutral' as const },
+}
+/** 执行结果词表：成功 / 失败 / 超时共用一套语义色 */
+const executionStatusMap = {
+  SUCCESS: { label: '成功', variant: 'default' as const, tone: 'success' as const },
+  FAILED: { label: '失败', variant: 'destructive' as const, tone: 'danger' as const },
+  TIMEOUT: { label: '超时', variant: 'secondary' as const, tone: 'warning' as const },
+}
+
+const connectorStatusColumn: StatusColumn<HttpConnector> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 100,
+  statusMap: connectorStatusMap,
+}
+
+const httpLogStatusColumn: StatusColumn<HttpInvocationLog> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 100,
+  statusMap: executionStatusMap,
+}
+
+const scriptStatusColumn: StatusColumn<RuntimeScript> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 100,
+  statusMap: connectorStatusMap,
+}
+
+const runtimeLogStatusColumn: StatusColumn<RuntimeExecutionLog> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 100,
+  statusMap: executionStatusMap,
+}
+
+// 编码 / 更新时间 / 输出属于技术字段与审计字段，列显隐菜单里可展开
+const connectorColumns: TableColumn<HttpConnector>[] = [
+  { accessorKey: 'name', header: '名称', width: 180, minWidth: 140, fixed: 'left' },
+  { accessorKey: 'code', header: '编码', width: 160, defaultHidden: true },
   { id: 'method', header: '方法', width: 90, align: 'center' },
-  { accessorKey: 'url', header: '请求地址', width: 360 },
+  { accessorKey: 'url', header: '请求地址', minWidth: 280 },
   { accessorKey: 'timeoutMillis', header: '超时', width: 100, align: 'right' },
   { accessorKey: 'retryTimes', header: '重试', width: 90, align: 'right' },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
-  { id: 'operation', header: '操作', width: 260, align: 'center', fixed: 'right' },
-])
+]
 
-const httpLogColumns = computed<TableColumn<HttpInvocationLog>[]>(() => [
-  { accessorKey: 'connectorCode', header: '连接器', width: 160, fixed: 'left' },
+const httpLogColumns: TableColumn<HttpInvocationLog>[] = [
+  { accessorKey: 'connectorCode', header: '连接器', width: 160, minWidth: 140, fixed: 'left' },
   { id: 'method', header: '方法', width: 90, align: 'center' },
-  { accessorKey: 'url', header: '请求地址', width: 360 },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
+  { accessorKey: 'url', header: '请求地址', minWidth: 280 },
   { accessorKey: 'responseStatus', header: '响应码', width: 90, align: 'center' },
   { accessorKey: 'durationMillis', header: '耗时', width: 100, align: 'right' },
   { id: 'invokedAt', header: '调用时间', width: 180 },
-  { id: 'errorMessage', header: '异常', width: 260 },
-])
+  { id: 'errorMessage', header: '异常', minWidth: 200 },
+]
 
-const scriptColumns = computed<TableColumn<RuntimeScript>[]>(() => [
-  { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
-  { accessorKey: 'code', header: '编码', width: 160 },
+const scriptColumns: TableColumn<RuntimeScript>[] = [
+  { accessorKey: 'name', header: '名称', width: 180, minWidth: 140, fixed: 'left' },
+  { accessorKey: 'code', header: '编码', width: 160, defaultHidden: true },
   { id: 'language', header: '语言', width: 100, align: 'center' },
   { accessorKey: 'timeoutMillis', header: '超时', width: 100, align: 'right' },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
-  { id: 'updateTime', header: '更新时间', width: 180 },
-  { id: 'operation', header: '操作', width: 240, align: 'center', fixed: 'right' },
-])
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
+]
 
-const runtimeLogColumns = computed<TableColumn<RuntimeExecutionLog>[]>(() => [
-  { accessorKey: 'scriptCode', header: '脚本', width: 160, fixed: 'left' },
+const runtimeLogColumns: TableColumn<RuntimeExecutionLog>[] = [
+  { accessorKey: 'scriptCode', header: '脚本', width: 160, minWidth: 140, fixed: 'left' },
   { id: 'language', header: '语言', width: 100, align: 'center' },
-  { id: 'status', header: '状态', width: 100, align: 'center' },
   { accessorKey: 'exitCode', header: '退出码', width: 90, align: 'center' },
   { accessorKey: 'durationMillis', header: '耗时', width: 100, align: 'right' },
   { id: 'executedAt', header: '执行时间', width: 180 },
-  { id: 'stdout', header: '输出', width: 320 },
-  { id: 'errorMessage', header: '异常', width: 260 },
+  { id: 'stdout', header: '输出', minWidth: 240, defaultHidden: true },
+  { id: 'errorMessage', header: '异常', minWidth: 200 },
+]
+
+/** 连接器行操作：调用 / 编辑 / 启停统一走表格内置操作列，移动端卡片保留原位按钮 */
+const connectorRowActions: ActionMenuItem<HttpConnector>[] = [
+  {
+    label: '调用',
+    icon: 'morph:play',
+    visible: () => auth('platform:integration:invoke'),
+    disabled: row => row.status !== 'ACTIVE',
+    onClick: openInvoke,
+  },
+  {
+    label: '编辑',
+    icon: 'morph:pencil',
+    visible: () => auth('platform:integration:edit'),
+    onClick: openEditConnector,
+  },
+  {
+    label: '停用',
+    icon: 'morph:ban',
+    danger: true,
+    visible: row => row.status === 'ACTIVE' && auth('platform:integration:edit'),
+    onClick: confirmDisableConnector,
+  },
+  {
+    label: '启用',
+    icon: 'morph:circle-check',
+    visible: row => row.status !== 'ACTIVE' && auth('platform:integration:edit'),
+    onClick: confirmEnableConnector,
+  },
+]
+
+/** 脚本行操作：执行 / 编辑 / 启停；停用态脚本不可执行，用 disabled 表达 */
+const scriptRowActions: ActionMenuItem<RuntimeScript>[] = [
+  {
+    label: '执行',
+    icon: 'morph:square-terminal',
+    visible: () => auth('platform:integration:execute'),
+    disabled: row => row.status !== 'ACTIVE',
+    onClick: openExecute,
+  },
+  {
+    label: '编辑',
+    icon: 'morph:pencil',
+    visible: () => auth('platform:integration:edit'),
+    onClick: openEditScript,
+  },
+  {
+    label: '停用',
+    icon: 'morph:ban',
+    danger: true,
+    visible: row => row.status === 'ACTIVE' && auth('platform:integration:edit'),
+    onClick: confirmDisableScript,
+  },
+  {
+    label: '启用',
+    icon: 'morph:circle-check',
+    visible: row => row.status !== 'ACTIVE' && auth('platform:integration:edit'),
+    onClick: confirmEnableScript,
+  },
+]
+
+/** 页头操作：只有连接器与脚本视图可新建，权限与视图条件在这里收敛 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(activeTab.value === 'connectors' && auth('platform:integration:edit')
+    ? [{ label: '新增连接器', icon: 'morph:plus', onClick: openCreateConnector }]
+    : []),
+  ...(activeTab.value === 'scripts' && auth('platform:integration:edit')
+    ? [{ label: '新增脚本', icon: 'morph:plus', onClick: openCreateScript }]
+    : []),
 ])
-
-onMounted(load)
-
-watch(activeTab, () => {
-  pagination.page = 1
-  pagination.total = 0
-  load()
-})
-
-async function load() {
-  loading.value = true
-  try {
-    const params = {
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-    }
-    if (activeTab.value === 'connectors') {
-      const res = await apiIntegration.pageConnectors(params)
-      connectorRows.value = res.data.records
-      pagination.total = res.data.total
-    }
-    else if (activeTab.value === 'httpLogs') {
-      const res = await apiIntegration.pageHttpLogs(params)
-      httpLogRows.value = res.data.records
-      pagination.total = res.data.total
-    }
-    else if (activeTab.value === 'scripts') {
-      const res = await apiIntegration.pageScripts(params)
-      scriptRows.value = res.data.records
-      pagination.total = res.data.total
-    }
-    else {
-      const res = await apiIntegration.pageRuntimeLogs(params)
-      runtimeLogRows.value = res.data.records
-      pagination.total = res.data.total
-    }
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  pagination.page = 1
-  load()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
-}
 
 function openCreateConnector() {
   connectorEditing.value = null
@@ -443,396 +556,325 @@ function executionVariant(status: ExecutionStatus) {
 
 <template>
   <div>
-    <YdPageHeader title="集成调用" class="mb-0">
-      <YdButton v-if="activeTab === 'connectors'" v-auth="'platform:integration:edit'" @click="openCreateConnector">
-        <YdIcon name="morph:plus" />
-        新增连接器
-      </YdButton>
-      <YdButton v-if="activeTab === 'scripts'" v-auth="'platform:integration:edit'" @click="openCreateScript">
-        <YdIcon name="morph:plus" />
-        新增脚本
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="集成调用"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 四个视图共用同一套筛选与分页：Tab 只切换数据源，外壳由布局统一承载 -->
+      <template #tabs>
+        <YdSegmented v-model="activeTab" :options="tabOptions" :block="isMobile" size="sm" aria-label="集成调用视图切换">
+          <template #option="{ option }">
+            <span class="inline-flex gap-1.5 items-center">
+              <YdIcon :name="tabIcon(option.value)" />
+              {{ option.label }}
+            </span>
+          </template>
+        </YdSegmented>
+      </template>
 
-    <YdPageMain>
-      <div class="integration-tabs">
-        <YdAction
-          v-for="tab in tabs"
-          :key="tab.key"
-          type="button"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
-        >
-          <YdIcon :name="tab.icon" />
-          <span>{{ tab.label }}</span>
-        </YdAction>
-      </div>
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-      <YdLoadingOverlay v-if="activeTab === 'connectors'" :loading="loading"><YdResponsiveTable
-        
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1280px]"
-        border
-        stripe
-        column-visibility
-        :columns="connectorColumns"
-        :data="connectorRows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
-                <YdButton :loading="loading" @click="load">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-method="{ row }">
-          <YdTag variant="secondary">{{ row.original.method }}</YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="table-actions">
-            <YdButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openInvoke(row.original)">
-              调用
-            </YdButton>
-            <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row.original)">
-              编辑
-            </YdButton>
-            <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row.original)">
-              停用
-            </YdButton>
-            <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row.original)">
-              启用
-            </YdButton>
-          </div>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
-                  <span>{{ row.code }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">方法</span>
-                  <span>{{ row.method }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">地址</span>
-                  <span class="break-all">{{ row.url }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">超时</span>
-                  <span>{{ row.timeoutMillis }}ms</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">重试</span>
-                  <span>{{ row.retryTimes }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openInvoke(row)">
-                  调用
-                </YdButton>
-                <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row)">
-                  编辑
-                </YdButton>
-                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row)">
-                  停用
-                </YdButton>
-                <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row)">
-                  启用
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            v-if="activeTab === 'connectors'"
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
 
-      <YdLoadingOverlay v-else-if="activeTab === 'httpLogs'" :loading="loading"><YdResponsiveTable
-        
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1320px]"
-        border
-        stripe
-        column-visibility
-        :columns="httpLogColumns"
-        :data="httpLogRows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
-                <YdButton :loading="loading" @click="load">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-method="{ row }">
-          <YdTag variant="secondary">{{ row.original.method }}</YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</YdTag>
-        </template>
-        <template #cell-invokedAt="{ row }">
-          {{ dateText(row.original.invokedAt) }}
-        </template>
-        <template #cell-errorMessage="{ row }">
-          <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.connectorCode }}</span>
-                <YdTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">方法</span>
-                  <span>{{ row.method }}</span>
+            stripe column-visibility border
+            :status-column="connectorStatusColumn"
+            :actions="connectorRowActions"
+            :columns="connectorColumns"
+            :data="connectorRows"
+          >
+            <template #cell-method="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.method }}
+              </YdTag>
+            </template>
+            <template #cell-url="{ row }">
+              <span class="whitespace-normal break-all">{{ row.original.url }}</span>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.name }}</span>
+                    <YdTag :variant="statusVariant(row.status)">
+                      {{ statusText(row.status) }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">编码</span>
+                      <span>{{ row.code }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">方法</span>
+                      <span>{{ row.method }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">地址</span>
+                      <span class="break-all">{{ row.url }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">超时</span>
+                      <span>{{ row.timeoutMillis }}ms</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">重试</span>
+                      <span>{{ row.retryTimes }}</span>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t flex flex-wrap gap-2">
+                    <YdButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openInvoke(row)">
+                      调用
+                    </YdButton>
+                    <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row)">
+                      编辑
+                    </YdButton>
+                    <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row)">
+                      停用
+                    </YdButton>
+                    <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row)">
+                      启用
+                    </YdButton>
+                  </div>
                 </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">地址</span>
-                  <span class="break-all">{{ row.url }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">响应码</span>
-                  <span>{{ row.responseStatus }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">耗时</span>
-                  <span>{{ row.durationMillis }}ms</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">调用时间</span>
-                  <span>{{ dateText(row.invokedAt) }}</span>
-                </div>
-                <div v-if="row.errorMessage" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">异常</span>
-                  <span class="break-all">{{ row.errorMessage }}</span>
-                </div>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
 
-      <YdLoadingOverlay v-else-if="activeTab === 'scripts'" :loading="loading"><YdResponsiveTable
-        
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1080px]"
-        border
-        stripe
-        column-visibility
-        :columns="scriptColumns"
-        :data="scriptRows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
-                <YdButton :loading="loading" @click="load">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-language="{ row }">
-          <YdTag variant="secondary">{{ row.original.language }}</YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</YdTag>
-        </template>
-        <template #cell-updateTime="{ row }">
-          {{ dateText(row.original.updateTime) }}
-        </template>
-        <template #cell-operation="{ row }">
-          <div class="table-actions">
-            <YdButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.original.status !== 'ACTIVE'" @click="openExecute(row.original)">
-              执行
-            </YdButton>
-            <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row.original)">
-              编辑
-            </YdButton>
-            <YdButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row.original)">
-              停用
-            </YdButton>
-            <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row.original)">
-              启用
-            </YdButton>
-          </div>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
-                <YdTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
-                  <span>{{ row.code }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">语言</span>
-                  <span>{{ row.language }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">超时</span>
-                  <span>{{ row.timeoutMillis }}ms</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">更新时间</span>
-                  <span>{{ dateText(row.updateTime) }}</span>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 border-t pt-3">
-                <YdButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openExecute(row)">
-                  执行
-                </YdButton>
-                <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row)">
-                  编辑
-                </YdButton>
-                <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row)">
-                  停用
-                </YdButton>
-                <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row)">
-                  启用
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+          <YdResponsiveEnhancedTable
+            v-else-if="activeTab === 'httpLogs'"
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
 
-      <YdLoadingOverlay v-else :loading="loading"><YdResponsiveTable
-        
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1280px]"
-        border
-        stripe
-        column-visibility
-        :columns="runtimeLogColumns"
-        :data="runtimeLogRows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / 日志关键字" @keydown.enter="load" @clear="load" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">重置</YdButton>
-                <YdButton :loading="loading" @click="load">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-language="{ row }">
-          <YdTag variant="secondary">{{ row.original.language }}</YdTag>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="executionVariant(row.original.status)">{{ executionText(row.original.status) }}</YdTag>
-        </template>
-        <template #cell-executedAt="{ row }">
-          {{ dateText(row.original.executedAt) }}
-        </template>
-        <template #cell-stdout="{ row }">
-          <span class="line-clamp-1">{{ row.original.stdout || row.original.stderr || '-' }}</span>
-        </template>
-        <template #cell-errorMessage="{ row }">
-          <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.scriptCode }}</span>
-                <YdTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</YdTag>
-              </div>
-              <div class="flex flex-col gap-1 text-sm">
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">语言</span>
-                  <span>{{ row.language }}</span>
+            stripe column-visibility border
+            :status-column="httpLogStatusColumn"
+            :columns="httpLogColumns"
+            :data="httpLogRows"
+          >
+            <template #cell-method="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.method }}
+              </YdTag>
+            </template>
+            <template #cell-url="{ row }">
+              <span class="whitespace-normal break-all">{{ row.original.url }}</span>
+            </template>
+            <template #cell-invokedAt="{ row }">
+              {{ dateText(row.original.invokedAt) }}
+            </template>
+            <template #cell-errorMessage="{ row }">
+              <span class="line-clamp-1" :title="row.original.errorMessage || undefined">{{ row.original.errorMessage || '-' }}</span>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.connectorCode }}</span>
+                    <YdTag :variant="executionVariant(row.status)">
+                      {{ executionText(row.status) }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">方法</span>
+                      <span>{{ row.method }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">地址</span>
+                      <span class="break-all">{{ row.url }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">响应码</span>
+                      <span>{{ row.responseStatus }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">耗时</span>
+                      <span>{{ row.durationMillis }}ms</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">调用时间</span>
+                      <span>{{ dateText(row.invokedAt) }}</span>
+                    </div>
+                    <div v-if="row.errorMessage" class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">异常</span>
+                      <span class="break-all">{{ row.errorMessage }}</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">退出码</span>
-                  <span>{{ row.exitCode }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">耗时</span>
-                  <span>{{ row.durationMillis }}ms</span>
-                </div>
-                <div class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">执行时间</span>
-                  <span>{{ dateText(row.executedAt) }}</span>
-                </div>
-                <div v-if="row.stdout || row.stderr" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">输出</span>
-                  <span class="break-all">{{ row.stdout || row.stderr }}</span>
-                </div>
-                <div v-if="row.errorMessage" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">异常</span>
-                  <span class="break-all">{{ row.errorMessage }}</span>
-                </div>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+          <YdResponsiveEnhancedTable
+            v-else-if="activeTab === 'scripts'"
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+
+            stripe column-visibility border
+            :status-column="scriptStatusColumn"
+            :actions="scriptRowActions"
+            :columns="scriptColumns"
+            :data="scriptRows"
+          >
+            <template #cell-language="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.language }}
+              </YdTag>
+            </template>
+            <template #cell-updateTime="{ row }">
+              {{ dateText(row.original.updateTime) }}
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.name }}</span>
+                    <YdTag :variant="statusVariant(row.status)">
+                      {{ statusText(row.status) }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">编码</span>
+                      <span>{{ row.code }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">语言</span>
+                      <span>{{ row.language }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">超时</span>
+                      <span>{{ row.timeoutMillis }}ms</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">更新时间</span>
+                      <span>{{ dateText(row.updateTime) }}</span>
+                    </div>
+                  </div>
+                  <div class="pt-3 border-t flex flex-wrap gap-2">
+                    <YdButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openExecute(row)">
+                      执行
+                    </YdButton>
+                    <YdButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row)">
+                      编辑
+                    </YdButton>
+                    <YdButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row)">
+                      停用
+                    </YdButton>
+                    <YdButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row)">
+                      启用
+                    </YdButton>
+                  </div>
+                </div>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
+
+          <YdResponsiveEnhancedTable
+            v-else
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+
+            stripe column-visibility border
+            :status-column="runtimeLogStatusColumn"
+            :columns="runtimeLogColumns"
+            :data="runtimeLogRows"
+          >
+            <template #cell-language="{ row }">
+              <YdTag variant="secondary">
+                {{ row.original.language }}
+              </YdTag>
+            </template>
+            <template #cell-executedAt="{ row }">
+              {{ dateText(row.original.executedAt) }}
+            </template>
+            <template #cell-stdout="{ row }">
+              <span class="line-clamp-1" :title="row.original.stdout || row.original.stderr || undefined">{{ row.original.stdout || row.original.stderr || '-' }}</span>
+            </template>
+            <template #cell-errorMessage="{ row }">
+              <span class="line-clamp-1" :title="row.original.errorMessage || undefined">{{ row.original.errorMessage || '-' }}</span>
+            </template>
+            <template #card="{ row }">
+              <YdCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex gap-2 items-center justify-between">
+                    <span class="text-base font-semibold min-w-0 break-words">{{ row.scriptCode }}</span>
+                    <YdTag :variant="executionVariant(row.status)">
+                      {{ executionText(row.status) }}
+                    </YdTag>
+                  </div>
+                  <div class="text-sm flex flex-col gap-1">
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">语言</span>
+                      <span>{{ row.language }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">退出码</span>
+                      <span>{{ row.exitCode }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">耗时</span>
+                      <span>{{ row.durationMillis }}ms</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">执行时间</span>
+                      <span>{{ dateText(row.executedAt) }}</span>
+                    </div>
+                    <div v-if="row.stdout || row.stderr" class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">输出</span>
+                      <span class="break-all">{{ row.stdout || row.stderr }}</span>
+                    </div>
+                    <div v-if="row.errorMessage" class="flex gap-2">
+                      <span class="text-secondary-foreground/60 shrink-0">异常</span>
+                      <span class="break-all">{{ row.errorMessage }}</span>
+                    </div>
+                  </div>
+                </div>
+              </YdCard>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="connectorVisible" :title="connectorEditing ? '编辑 HTTP 连接器' : '新增 HTTP 连接器'" show-cancel-button class="sm:max-w-4xl" @confirm="saveConnector">
       <YdForm :model="connectorForm" layout="vertical">
-        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
           <YdFormItem label="名称" required>
             <YdInput v-model="connectorForm.name" />
           </YdFormItem>
           <YdFormItem label="编码" required>
             <YdInput v-model="connectorForm.code" :disabled="!!connectorEditing" />
-            <div v-if="connectorEditing" class="field-tip">编码用于日志和调用关联，创建后不可修改。</div>
+            <div v-if="connectorEditing" class="field-tip">
+              编码用于日志和调用关联，创建后不可修改。
+            </div>
           </YdFormItem>
           <YdFormItem label="请求地址" required class="md:col-span-2">
             <YdInput v-model="connectorForm.url" placeholder="https://api.example.com/resource" />
@@ -876,7 +918,9 @@ function executionVariant(status: ExecutionStatus) {
           </YdFormItem>
         </YdForm>
         <section class="result-panel">
-          <div class="section-title">最近结果</div>
+          <div class="section-title">
+            最近结果
+          </div>
           <pre>{{ lastHttpLog ? JSON.stringify(lastHttpLog, null, 2) : '尚未执行' }}</pre>
         </section>
       </div>
@@ -884,13 +928,15 @@ function executionVariant(status: ExecutionStatus) {
 
     <YdModal v-model="scriptVisible" :title="scriptEditing ? '编辑运行脚本' : '新增运行脚本'" show-cancel-button class="sm:max-w-4xl" @confirm="saveScript">
       <YdForm :model="scriptForm" layout="vertical">
-        <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+        <div class="gap-x-4 grid grid-cols-1 md:grid-cols-2">
           <YdFormItem label="名称" required>
             <YdInput v-model="scriptForm.name" />
           </YdFormItem>
           <YdFormItem label="编码" required>
             <YdInput v-model="scriptForm.code" :disabled="!!scriptEditing" />
-            <div v-if="scriptEditing" class="field-tip">编码用于执行记录关联，创建后不可修改。</div>
+            <div v-if="scriptEditing" class="field-tip">
+              编码用于执行记录关联，创建后不可修改。
+            </div>
           </YdFormItem>
           <YdFormItem label="语言">
             <YdSelect v-model="scriptForm.language" :options="languageOptions" />
@@ -919,7 +965,9 @@ function executionVariant(status: ExecutionStatus) {
           </YdFormItem>
         </YdForm>
         <section class="result-panel">
-          <div class="section-title">最近结果</div>
+          <div class="section-title">
+            最近结果
+          </div>
           <pre>{{ lastRuntimeLog ? JSON.stringify(lastRuntimeLog, null, 2) : '尚未执行' }}</pre>
         </section>
       </div>
@@ -928,38 +976,6 @@ function executionVariant(status: ExecutionStatus) {
 </template>
 
 <style scoped>
-.integration-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.integration-tabs button {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-  color: var(--color-text-2);
-}
-
-.integration-tabs button.active,
-.integration-tabs button:hover {
-  border-color: var(--color-text-1);
-  color: var(--color-text-1);
-}
-
-.table-actions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-}
-
 .modal-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
