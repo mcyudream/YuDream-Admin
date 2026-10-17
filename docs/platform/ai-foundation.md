@@ -18,6 +18,24 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 
 普通聊天禁用文件系统和 shell。CMS 文件工作区与明确授权的工作流可使用隔离工作区，编辑与发布分别进行。工具由技能库和运行范围提供，经过 schema 过滤、框架规则/模式、执行时权限复核及沙箱守卫。隐藏工具即使被模型伪造调用也不能执行。
 
+## 工具模块与按需加载
+
+系统工具按**模块**组织，模块是开关与可见性的唯一单位：宿主工具按工具名前缀（`web`/`cms`/`wiki`/`ui`…，`load_tools` 归 `meta`），插件工具归 `plugin:<pluginCode>`，MCP 工具归 `mcp:<serverCode>`，工作流自定义 Python 工具归 `custom`。管理端「系统工具」页按模块展示与开关，不再逐工具列卡。
+
+- **总开关 + 模块开关**：`platformAiToolSettings`（单文档）保存全局总开关与逐模块开关，默认全开；生效值 = 部署配置 `yudream.platform.agent.system-tools-enabled` **且** 持久总开关。`meta`（工具目录）不可关闭。
+- **闸门落在所有装配点**，缺一即越权：Harness 装配（`HarnessAgentRuntime.toolkit`，关闭模块的工具不注册）、工作流解析（`AgentToolExecutor.resolve`，`ensureToolAvailable`）、模型可见性（`PerCallToolFilterMiddleware` 同时校验加载状态）、管理端列表与发布校验（`AgentAppService` 的候选/授权并集）。工具页只展示开关，不绕过任何一层。
+- **按需加载（默认）**：`yudream.platform.agent.tool-loading=on-demand` 时，只有**常驻模块**的工具直接进入模型视野，其余模块由元工具 `load_tools` 加载后才可见：不带参数返回模块目录，带 `module` 返回该模块工具清单并标记加载。加载只改变 schema 可见性，**不授予权限**（执行层仍按权限快照与模块开关 fail-closed 复核）。`load_tools` 只注册在 Harness 路径的全局工具集上；调用方显式授权的 scoped 工具集（CMS 画布、前端工具、插件触发会话）与审批/恢复续跑不做按需过滤，避免把已授权工具或待确认调用挡在门外。`eager` 模式恢复旧行为（全部可见、不注册元工具）。
+- 按需模式在系统提示词末尾追加模块协议说明（`PerCallSystemPromptMiddleware`），模型不知道 `load_tools` 时会先看到模块目录提示，而不是臆造工具名。
+
+## MCP 服务接入
+
+MCP（Model Context Protocol）作为独立平台能力 `mcp`（类型 AI，依赖 `ai`，配置闸门 `yudream.platform.capabilities.mcp.enabled`，运行期仍需 `CapabilityAppService.ensureEnabled("mcp")`）接入外部工具服务端。
+
+- **传输**：v1 只实现规范的 **Streamable HTTP**（POST JSON-RPC，响应 `application/json` 或 `text/event-stream`）；旧版 HTTP+SSE 与 stdio 未实现，管理端不提供选项。每次操作执行完整 `initialize → notifications/initialized → 业务请求` 序列，不持有长连接；`Mcp-Session-Id` 只在单次序列内回传，初始化失败时按协议版本回退重试一次。
+- **工具桥接**：连接测试/刷新时缓存 `tools/list`（含游标分页）；缓存工具按 `mcp.<serverCode>.<toolName>` 桥接为 Agent 工具，模块 `mcp:<serverCode>`，统一权限码 `platform:mcp:server:use`（只为登记动态生成权限会污染权限树）。`annotations.readOnlyHint` 推导只读，`destructiveHint` 需要确认；未标注一律按写入处理。工具执行时按需建连，服务端离线只影响该次调用。
+- **管理端**：`/api/platform/mcp/servers`（`platform:mcp:server:view/create/edit/delete/test`）维护名称、编码、地址、请求头、超时、启用、常驻与允许私网；请求头值回显为掩码 `••••••`，保存时保持掩码或留空即保留原凭据。创建时自动做一次连接测试，失败不阻塞保存但会在卡片上显示 `lastError`。
+- **私网**：MCP 地址由管理员登记（非模型可控），因此按服务记录显式允许私网/回环，默认允许；仍必须是 http/https 且经 `OutboundUrlGuard` 校验。
+
 QQ 沙箱中的内置工具也受捕获的原沙箱守卫约束。即使外部消息已绑定本站用户，模拟运行仍使用 SESSION 工作区和记忆隔离，避免后台压缩/记忆污染真实用户的 USER 工作区；用户身份、额度账户和原生日志寻址保持原值。
 
 原生待办保留真实工具名、请求 ID、参数和种类，前端工具回复返回模型。前端断开期间保留外部请求，重新打开合适页面再处理；客户端必须验证页面准备状态与保存的回复，避免重复执行。

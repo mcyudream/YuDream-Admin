@@ -43,3 +43,4 @@
 - `docs/yd-ui-guidelines.md` §7 目录新增 `YdTablePageLayout`、`YdDynamicSearchForm`、`YdNumberRange` 与表格页版式约定（宿主表格页规范落地），SDK `host-components.ts` 已同步导出：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
 - `docs/dev/backend-architecture.md` 第 5.8 节内置基础设施（SSE/WebSocket/数据可视化直接内置为底层能力、取消双闸门与 sse 依赖声明）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
 - `docs/yd-ui-guidelines.md` §5 新增「关联实体触发器/跨页定位行」视觉约定（头像/图标 + 名称、`yd-entity-trigger` 自定义触发器交互语义、命中行主色呼吸提亮）：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
+- 系统工具模块化与 MCP 服务接入（`docs/platform/ai-foundation.md` 新增「工具模块与按需加载」「MCP 服务接入」两节 + 宿主 `platform:mcp:server:*` 权限码与 `mcp:<serverCode>` 工具模块开关）：宿主侧新增能力，插件不新增 SPI/SDK 契约，插件工具只是被动归入 `plugin:<pluginCode>` 模块并受总开关/模块开关约束；待同步插件仓 AI 消费方文档一节（插件仓当前有大量未提交 WIP，先保留不动）。
