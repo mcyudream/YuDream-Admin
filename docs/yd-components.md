@@ -392,6 +392,46 @@ const filters = ref({ keyword: '', status: 'enabled' })
 </template>
 ```
 
+### 关联实体预览卡
+
+表格里的「关联数据」（操作用户、所属部门、来源插件等）不再整页跳转：单元格渲染 `YdEntityPeek` 触发器，点击就地弹出摘要卡，可直接查看与编辑。
+
+| 入口 | 参数与输出 |
+| --- | --- |
+| `YdEntityPeek` | title、subtitle、avatar、avatarFallback、status、facts、chips、loading、error、actions、editable、`v-model:editing`、saving、width、detailLabel、align、side；emit `open`、`save`、`cancel`、`detail`；槽 `#trigger`（触发器，默认头像+名称+箭头）、`#editor`（编辑态表单）、`#extra`；`actions[].danger` 自动红色 |
+| `EntityPeekFact` / `EntityPeekChip` / `EntityPeekAction` | 事实清单（label/value/tone/mono）、芯片分组（label/items）、操作（label/icon/variant/danger/disabled/loading/onClick） |
+
+组件只负责卡片外观与「查看↔编辑」状态机：细节加载、权限判定、保存动作全部由使用方在 `#editor` 与 `actions` 里提供，因此同一外壳既能用于用户，也能用于部门、插件等实体。
+
+宿主把「实体类型 → 预览卡」注册在 `src/components/RelatedEntity/registry.ts`，页面用 `<RelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件侧沿用同一个入口注册自己的实体类型（SDK 导出同名注册函数后生效），宿主不硬编码插件实体。
+
+```vue
+<script setup lang="ts">
+import type { EntityPeekFact } from '@yudream/components'
+import { ref } from 'vue'
+
+const editing = ref(false)
+const facts: EntityPeekFact[] = [
+  { label: '邮箱', value: 'a@b.com' },
+  { label: '状态', value: '启用', tone: 'success' },
+]
+</script>
+
+<template>
+  <YdEntityPeek
+    v-model:editing="editing"
+    title="husky"
+    :facts="facts"
+    editable
+    detail-label="完整管理"
+    @save="editing = false"
+    @detail="() => {}"
+  >
+    <template #editor><p>业务自己的编辑表单</p></template>
+  </YdEntityPeek>
+</template>
+```
+
 ### 数字、文本与装饰动效参数
 
 | 入口 | 核心参数 / 内容 |

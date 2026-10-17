@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SearchConfig, SearchOptionsSource, TableColumn, YdTablePageAction } from '@yudream/components'
-import { useYdToast, YdResponsiveEnhancedTable, YdTablePageLayout } from '@yudream/components'
-import { ref } from 'vue'
+import { useYdToast, YdEntityPeek, YdInput, YdResponsiveEnhancedTable, YdTablePageLayout } from '@yudream/components'
+import { computed, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
 
 const toast = useYdToast()
@@ -187,6 +187,62 @@ const { searchConfig, searchQuery } = useTablePage({
   loadApi: apiContent.page,
   optionsSources,
 })`
+
+/** 关联实体预览卡：事实清单与操作由使用方给出，外壳只管查看↔编辑状态机 */
+const peekEditing = ref(false)
+const peekStatus = ref<'ACTIVE' | 'DISABLED'>('ACTIVE')
+const peekForm = ref({ username: 'husky', nickname: 'SiberianHusky' })
+const peekFacts = computed(() => [
+  { label: '邮箱', value: '3088506834@qq.com' },
+  { label: '邮箱验证', value: '已验证', tone: 'success' as const },
+  { label: '手机', value: '', mono: true },
+  { label: '注册时间', value: '2026-07-02 10:15:08' },
+])
+const peekChips = [
+  { label: '角色', items: [{ label: '超级管理员' }] },
+  { label: '部门', items: [{ label: '系统管理' }, { label: '根部门（默认）' }] },
+]
+const peekActions = computed(() => [
+  peekStatus.value === 'DISABLED'
+    ? {
+        label: '启用',
+        icon: 'morph:circle-check',
+        onClick: () => {
+          peekStatus.value = 'ACTIVE'
+          toast.success('已启用')
+        },
+      }
+    : {
+        label: '停用',
+        icon: 'morph:ban',
+        danger: true,
+        onClick: () => {
+          peekStatus.value = 'DISABLED'
+          toast.success('已停用')
+        },
+      },
+])
+function savePeek() {
+  peekEditing.value = false
+  toast.success('已保存')
+}
+
+const entityPeekCode = `<YdEntityPeek
+  v-model:editing="editing"
+  title="husky"
+  :status="{ label: '启用', tone: 'success' }"
+  :facts="facts"
+  :chips="chips"
+  :actions="actions"
+  editable
+  detail-label="完整管理"
+  @save="save"
+  @detail="router.push('/system/user')"
+>
+  <template #editor>
+    <!-- 业务自己的编辑表单：字段、校验、保存动作都由使用方决定 -->
+  </template>
+</YdEntityPeek>`
 </script>
 
 <template>
@@ -337,6 +393,42 @@ const { searchConfig, searchQuery } = useTablePage({
       <li>控件按 <code>controlType</code> 渲染：TEXT 输入框、SELECT 下拉、DATE_RANGE 双日期、NUMBER_RANGE 最小-最大区间。</li>
       <li>下拉选项由 <code>optionsSource</code> 对应前端 <code>SearchOptionsSource</code> 的 loader 提供，支持同步与异步。</li>
       <li><code>useTablePage</code> 封装「拉配置 + 查询 + 分页 + 重置」，见上方代码示例。</li>
+    </ul>
+  </DemoCard>
+
+  <DemoCard
+    title="YdEntityPeek 关联实体预览卡"
+    description="列表里的关联数据（操作用户、所属部门等）点击就地展开摘要卡，可查看并直接编辑，不再整页跳转"
+    :code="entityPeekCode"
+  >
+    <div class="flex flex-wrap gap-6 items-center">
+      <YdEntityPeek
+        v-model:editing="peekEditing"
+        title="husky"
+        subtitle="3088506834@qq.com"
+        avatar-fallback="husky"
+        :status="{ label: peekStatus === 'DISABLED' ? '停用' : '启用', tone: peekStatus === 'DISABLED' ? 'neutral' : 'success' }"
+        :facts="peekFacts"
+        :chips="peekChips"
+        :actions="peekActions"
+        editable
+        detail-label="完整管理"
+        @save="savePeek"
+        @detail="() => toast.success('跳转完整管理页')"
+      >
+        <template #editor>
+          <div class="gap-2 grid grid-cols-2">
+            <YdInput v-model="peekForm.username" class="w-full" />
+            <YdInput v-model="peekForm.nickname" class="w-full" />
+          </div>
+        </template>
+      </YdEntityPeek>
+      <span class="text-xs text-muted-foreground">点标题展开；卡片内「编辑」切换就地编辑，保存/取消都在卡内完成</span>
+    </div>
+    <ul class="text-xs text-muted-foreground mt-3 space-y-1">
+      <li>外壳只管卡片外观与「查看 ↔ 编辑」状态机；细节加载、权限、保存动作由使用方通过 <code>facts</code> / <code>actions</code> / <code>#editor</code> 提供。</li>
+      <li><code>actions[].danger</code> 自动渲染为红色，排在低位；<code>detailLabel</code> 给「完整管理」这类逃生入口。</li>
+      <li>宿主用 <code>&lt;RelatedEntity entity-type="user" /&gt;</code> 按实体类型解析预览卡，未注册类型降级为纯文本，插件可注册自己的实体类型。</li>
     </ul>
   </DemoCard>
 </template>

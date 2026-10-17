@@ -13,6 +13,8 @@ import router from './router'
 import { applyStartupBranding, initializeStartupBranding } from './startup-branding'
 import pinia from './store'
 import uiProvider from './ui/provider'
+// 关联实体预览卡（内置类型注册，必须先于页面渲染）
+import './components/RelatedEntity/register'
 import '@/utils/storage'
 
 // UnoCSS

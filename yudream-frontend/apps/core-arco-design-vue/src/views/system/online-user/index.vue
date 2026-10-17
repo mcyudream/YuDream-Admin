@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ActionMenuItem, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
+import type { ActionMenuItem, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { OnlineUser } from '@/api/modules/system-monitor'
 import { useTablePage } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
@@ -12,21 +12,14 @@ const toast = useYdToast()
 
 const { auth } = useAppAuth()
 
-/** 会话身份列：用户名 + 邮箱，卡片头部与桌面首列共用 */
-const sessionUserColumn: UserColumn<OnlineUser> = {
-  nameKey: 'username',
-  emailKey: 'email',
-  avatarKey: 'avatar',
-  header: '用户',
-  width: 220,
-}
-
 /** 会话操作统一收进下拉 */
 const sessionActions: ActionMenuItem<OnlineUser>[] = [
   { label: '强制下线', icon: 'morph:log-out', danger: true, visible: () => auth('system:monitor:online:kickout'), onClick: confirmKickout },
 ]
 
 const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
+  // 用户列自带头像与就地预览/编辑（替代只读的 userColumn，能力只增不减）
+  { id: 'sessionUser', header: '用户', width: 220, fixed: 'left' },
   { accessorKey: 'username', header: '用户名', width: 140 },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
   { accessorKey: 'email', header: '邮箱', width: 220 },
@@ -161,7 +154,6 @@ async function exportOnlineUsers() {
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[1080px]"
             column-visibility
-            :user-column="sessionUserColumn"
             :actions="sessionActions"
             :columns="tableColumns"
             :data="rows"
@@ -170,6 +162,19 @@ async function exportOnlineUsers() {
               <div class="empty-state">
                 暂无在线会话，请确认已重启后端并重新登录
               </div>
+            </template>
+            <!-- 会话用户：头像 + 就地预览/编辑（同一用户多会话时复用详情缓存） -->
+            <template #cell-sessionUser="{ row }">
+              <RelatedEntity
+                v-if="row.original.userId"
+                entity-type="user"
+                :entity-id="row.original.userId"
+                :label="row.original.username || row.original.nickname"
+                :secondary="row.original.email"
+                :avatar="row.original.avatar"
+                @changed="load"
+              />
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-username="{ row }">
               <span v-if="row.original.username">{{ row.original.username }}</span>

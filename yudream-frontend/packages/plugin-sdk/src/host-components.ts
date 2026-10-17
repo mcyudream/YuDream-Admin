@@ -160,6 +160,7 @@ export const YdGlowyCard = components.YdGlowyCard
 export const YdGlowyCardWrapper = components.YdGlowyCardWrapper
 export const YdGradientButton = components.YdGradientButton
 export const YdInteractiveButton = components.YdInteractiveButton
+export const YdEntityPeek = components.YdEntityPeek
 export const YdLinkPreview = components.YdLinkPreview
 export const YdLoading = components.YdLoading
 export const YdMarquee = components.YdMarquee

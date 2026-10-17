@@ -196,8 +196,18 @@ async function clearApiLogs() {
               <span v-if="row.original.costMs != null">{{ row.original.costMs }}</span>
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
+            <!-- 操作用户：头像 + 就地预览/编辑，未登录调用没有 loginId 时退化为纯文本 -->
             <template #cell-user="{ row }">
-              <span v-if="userText(row.original)">{{ userText(row.original) }}</span>
+              <RelatedEntity
+                v-if="row.original.loginId"
+                entity-type="user"
+                :entity-id="row.original.loginId"
+                :label="row.original.nickname || row.original.username"
+                :secondary="row.original.nickname ? row.original.username : undefined"
+                :avatar="row.original.avatarUrl"
+                @changed="load"
+              />
+              <span v-else-if="userText(row.original)">{{ userText(row.original) }}</span>
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-ip="{ row }">

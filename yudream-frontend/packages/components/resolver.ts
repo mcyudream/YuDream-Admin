@@ -105,6 +105,7 @@ const YD_COMPONENT_NAMES = [
   'YdDivider',
   'YdDrawer',
   'YdDropdown',
+  'YdEntityPeek',
   'YdFileUpload',
   'YdFixedBar',
   'YdHoverCard',

@@ -68,7 +68,7 @@ const pageActions = computed<YdTablePageAction[]>(() => [
 
 /** 用户名（人可读标识）钉在左侧，状态列紧随后便于纵向扫读成败 */
 const tableColumns = computed<TableColumn<LoginLog>[]>(() => [
-  { accessorKey: 'username', header: '用户名', width: 160, fixed: 'left' },
+  { id: 'username', header: '用户名', width: 180, fixed: 'left' },
   { id: 'success', header: '状态', width: 90, align: 'center' },
   { accessorKey: 'userId', header: '用户ID', width: 160 },
   { accessorKey: 'ip', header: 'IP', width: 150 },
@@ -162,8 +162,17 @@ async function clearLoginLogs() {
             :columns="tableColumns"
             :data="rows"
           >
+            <!-- 登录人：头像 + 就地预览/编辑，登录失败没有 userId 时退化为纯文本 -->
             <template #cell-username="{ row }">
-              <span v-if="row.original.username">{{ row.original.username }}</span>
+              <RelatedEntity
+                v-if="row.original.userId"
+                entity-type="user"
+                :entity-id="row.original.userId"
+                :label="row.original.username"
+                :avatar="row.original.avatarUrl"
+                @changed="load"
+              />
+              <span v-else-if="row.original.username">{{ row.original.username }}</span>
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <!-- 状态胶囊：成败一眼可辨（success 是布尔字段，语义色在这里直接给） -->

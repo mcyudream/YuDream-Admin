@@ -50,6 +50,8 @@ export interface ApiLog {
   loginId?: string
   username?: string
   nickname?: string
+  /** 会话用户头像 URL，可空（未上传头像时为 undefined） */
+  avatarUrl?: string
   ip?: string
   userAgent?: string
   errorMessage?: string
@@ -65,6 +67,8 @@ export interface LoginLog {
   ip?: string
   userAgent?: string
   token?: string
+  /** 会话用户头像 URL，可空（未上传头像时为 undefined） */
+  avatarUrl?: string
   createTime?: string
 }
 
