@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
 import type { PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
@@ -10,6 +10,7 @@ import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
 import apiRole, { ROLE_COLOR_PRESETS } from '@/api/modules/system-role'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
@@ -71,8 +72,6 @@ const levelOptions = [
 ]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
-const roleUserColumn: UserColumn<RoleManageItem> = { nameKey: 'name', emailKey: 'code', header: '角色', width: 220 }
-
 /** 搜索选项数据源：部门从部门树展开，状态用本地词表 */
 const optionsSources: SearchOptionsSource[] = [
   {
@@ -175,10 +174,11 @@ useLinkedFocus<RoleManageItem>({
 })
 
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
-  { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
+  // 角色名/部门都是关联实体入口：点开就地查看编辑、可跳完整管理
+  { id: 'name', header: '角色名称', width: 220, fixed: 'left' },
   { id: 'visual', header: '标识', width: 88, align: 'center' },
   { accessorKey: 'code', header: '编码', width: 180 },
-  { accessorKey: 'deptName', header: '部门', width: 160 },
+  { id: 'deptName', header: '部门', width: 180 },
   { accessorKey: 'level', header: '等级', width: 120 },
   { accessorKey: 'permissionCount', header: '权限数', width: 100, align: 'center' },
   { id: 'systemRole', header: '类型', width: 110, align: 'center' },
@@ -515,13 +515,32 @@ function importRoles() {
               table-class="min-w-[1128px]"
 
               column-visibility stripe border
-              :user-column="roleUserColumn"
               :status-column="roleStatusColumn"
               :actions="roleActions"
               :card-hidden-columns="['systemRole']"
               :columns="tableColumns"
               :data="rows"
             >
+              <template #cell-name="{ row }">
+                <RelatedEntity
+                  entity-type="role"
+                  :entity-id="row.original.id"
+                  :label="row.original.name"
+                  :secondary="row.original.code"
+                  @changed="load"
+                />
+              </template>
+              <template #cell-deptName="{ row }">
+                <RelatedEntity
+                  v-if="row.original.deptId"
+                  entity-type="dept"
+                  :entity-id="row.original.deptId"
+                  :label="row.original.deptName"
+                  @changed="load"
+                />
+                <span v-else-if="row.original.deptName">{{ row.original.deptName }}</span>
+                <span v-else class="text-muted-foreground/40">-</span>
+              </template>
               <template #cell-visual="{ row }">
                 <span class="role-chip" :style="entityTintStyle(row.original.color)">
                   <YdIcon v-if="row.original.icon" :name="row.original.icon" aria-hidden="true" />

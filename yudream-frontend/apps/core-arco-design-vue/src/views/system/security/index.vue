@@ -18,6 +18,7 @@ import type {
 } from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
 import apiSecurity from '@/api/modules/system-security'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
 type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'external' | 'passkey'
@@ -327,7 +328,7 @@ const oauthProviderActions = computed<ActionMenuItem<OAuthProvider>[]>(() => [
 
 const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
   { accessorKey: 'deviceName', header: '设备名称', width: 180, fixed: 'left' },
-  { accessorKey: 'userId', header: '用户 ID', width: 140 },
+  { id: 'userId', header: '账号', width: 180 },
   { accessorKey: 'credentialId', header: '凭据 ID', width: 260 },
   { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right' },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
@@ -1079,6 +1080,15 @@ function normalizeDateTime(value?: string) {
             :columns="passkeyColumns"
             :data="passkeyRows"
           >
+            <template #cell-userId="{ row }">
+              <RelatedEntity
+                v-if="row.original.userId"
+                entity-type="user"
+                :entity-id="row.original.userId"
+                @changed="loadPasskeys"
+              />
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
             <template #toolbar>
               <YdSearchBar class="w-full">
                 <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">

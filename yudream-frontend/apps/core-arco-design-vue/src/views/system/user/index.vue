@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
@@ -181,13 +181,6 @@ const canAssignDept = computed(() => auth('system:user:assign-dept'))
 const canImpersonate = computed(() => auth('system:user:impersonate'))
 
 /** 身份列：用户名 + 邮箱组合，卡片头部与桌面首列共用 */
-const userColumn: UserColumn<UserManageItem> = {
-  nameKey: 'username',
-  emailKey: 'email',
-  avatarKey: 'avatar',
-  header: '用户',
-  width: 240,
-}
 
 const userStatusColumn: StatusColumn<UserManageItem> = {
   statusKey: 'status',
@@ -227,6 +220,8 @@ const userActions: ActionMenuItem<UserManageItem>[] = [
 ]
 
 const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
+  // 用户列自绘为关联实体入口：点开就地查看/编辑（替代只读 userColumn，能力只增不减）
+  { id: 'user', header: '用户', width: 240, fixed: 'left' },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
   { id: 'identities', header: '消息身份', width: 280 },
   { id: 'fields', header: '扩展资料', width: 240 },
@@ -717,13 +712,22 @@ function importUsers() {
             table-root-class="rounded-lg overflow-hidden"
             table-class="min-w-[1280px]"
             column-visibility
-            :user-column="userColumn"
             :status-column="userStatusColumn"
             :actions="userActions"
             :card-hidden-columns="['identities', 'fields']"
             :columns="tableColumns"
             :data="rows"
           >
+            <template #cell-user="{ row }">
+              <RelatedEntity
+                entity-type="user"
+                :entity-id="row.original.id"
+                :label="row.original.username"
+                :secondary="row.original.email"
+                :avatar="row.original.avatar"
+                @changed="refreshAll"
+              />
+            </template>
             <template #cell-identities="{ row }">
               <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1">
                 <div v-if="row.original.qq" class="flex gap-2">

@@ -7,6 +7,7 @@ import apiDept, { DEPT_COLOR_PRESETS } from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
+import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
@@ -185,7 +186,7 @@ const pageActions = computed<YdTablePageAction[]>(() => [
 
 const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { id: 'name', header: '部门名称', width: 220, fixed: 'left' },
-  { accessorKey: 'leaderName', header: '负责人', width: 140 },
+  { id: 'leaderName', header: '负责人', width: 160 },
   { accessorKey: 'phone', header: '电话', width: 140 },
   { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center' },
   { id: 'systemDept', header: '类型', width: 110, align: 'center' },
@@ -356,19 +357,38 @@ function importDepts() {
             :data="rows"
           >
             <template #cell-name="{ row }">
-              <div class="flex gap-2 min-w-0 items-center">
-                <YdAvatar
-                  v-if="row.original.avatar"
-                  :src="row.original.avatar"
-                  :fallback="deptAvatarFallback(row.original)"
-                  :alt="row.original.name"
-                  class="shrink-0 size-9"
-                />
-                <span v-else class="dept-chip" :style="entityTintStyle(row.original.color)" aria-hidden="true">
-                  <YdIcon :name="deptFallbackIcon(row.original.name)" />
-                </span>
-                <span class="font-medium truncate">{{ row.original.name }}</span>
-              </div>
+              <RelatedEntity
+                entity-type="dept"
+                :entity-id="row.original.id"
+                :label="row.original.name"
+                :avatar="row.original.avatar"
+                @changed="load"
+              >
+                <div class="yd-entity-trigger flex gap-2 min-w-0 items-center">
+                  <YdAvatar
+                    v-if="row.original.avatar"
+                    :src="row.original.avatar"
+                    :fallback="deptAvatarFallback(row.original)"
+                    :alt="row.original.name"
+                    class="shrink-0 size-9"
+                  />
+                  <span v-else class="dept-chip" :style="entityTintStyle(row.original.color)" aria-hidden="true">
+                    <YdIcon :name="deptFallbackIcon(row.original.name)" />
+                  </span>
+                  <span class="font-medium truncate">{{ row.original.name }}</span>
+                </div>
+              </RelatedEntity>
+            </template>
+            <template #cell-leaderName="{ row }">
+              <RelatedEntity
+                v-if="row.original.leaderId"
+                entity-type="user"
+                :entity-id="row.original.leaderId"
+                :label="row.original.leaderName"
+                @changed="load"
+              />
+              <span v-else-if="row.original.leaderName">{{ row.original.leaderName }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-systemDept="{ row }">
               <YdTag :variant="row.original.systemDept ? 'default' : 'secondary'">
