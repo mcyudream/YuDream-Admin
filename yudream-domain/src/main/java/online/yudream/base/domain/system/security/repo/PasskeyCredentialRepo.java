@@ -16,4 +16,7 @@ public interface PasskeyCredentialRepo {
     List<PasskeyCredential> findAll();
 
     List<PasskeyCredential> findByUserId(Long userId);
+
+    /** 删除该用户的全部通行密钥（账号删除级联）。 */
+    void deleteByUserId(Long userId);
 }

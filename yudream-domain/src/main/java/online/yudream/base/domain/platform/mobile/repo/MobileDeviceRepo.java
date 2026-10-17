@@ -16,4 +16,7 @@ public interface MobileDeviceRepo {
 
     /** 当前用户的未注销设备列表，按注册时间倒序。 */
     List<MobileDevice> findByUserId(Long userId);
+
+    /** 删除该用户的全部设备注册（账号删除级联，停止向其推送）。 */
+    void deleteByUserId(Long userId);
 }

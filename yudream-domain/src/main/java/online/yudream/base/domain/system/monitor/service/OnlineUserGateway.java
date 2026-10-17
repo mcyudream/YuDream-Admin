@@ -18,4 +18,7 @@ public interface OnlineUserGateway {
     List<OnlineUserDTO> list(String keyword, int limit);
 
     void kickout(String token);
+
+    /** 强制某账号全部会话下线（账号删除等身份已失效场景，按登录号一次性注销）。 */
+    void kickoutByUserId(Long userId);
 }

@@ -37,4 +37,12 @@ public class OAuthAuthorizationCodeRepoImpl implements OAuthAuthorizationCodeRep
         Query query = Query.query(Criteria.where("code").is(code));
         return Optional.ofNullable(OAuthSecurityInfraMapper.toDomain(mongoTemplate.findOne(query, OAuthAuthorizationCodeDO.class)));
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), OAuthAuthorizationCodeDO.class);
+    }
 }

@@ -463,6 +463,11 @@ class MessagingIdentityAppServiceTest {
         public void deleteMilkyQqByUserId(Long userId) {
             rows.removeIf(item -> item.getUserId().equals(userId) && item.getIdentityType() == MessagingIdentityType.QQ);
         }
+
+        @Override
+        public void deleteByUserId(Long userId) {
+            rows.removeIf(item -> item.getUserId().equals(userId));
+        }
     }
 
     private static final class EmptyConnections implements MilkyConnectionRepo {

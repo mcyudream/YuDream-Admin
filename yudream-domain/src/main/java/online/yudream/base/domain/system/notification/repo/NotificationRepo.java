@@ -27,4 +27,7 @@ public interface NotificationRepo {
 
     /** 全部标记已读，返回受影响条数。 */
     int markAllRead(Long userId);
+
+    /** 删除该用户的全部站内通知（账号删除级联）。 */
+    int deleteByUserId(Long userId);
 }

@@ -64,6 +64,14 @@ public class ApiKeyCredentialRepoImpl implements ApiKeyCredentialRepo {
         return mongoTemplate.count(buildPageQuery(keyword, creatorUserId), ApiKeyCredentialDO.class);
     }
 
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("creatorUserId").is(userId)), ApiKeyCredentialDO.class);
+    }
+
     private Query buildPageQuery(String keyword, Long creatorUserId) {
         Query query = new Query();
         if (creatorUserId != null) {

@@ -14,4 +14,7 @@ public interface ChatSessionRepo {
     List<ChatSession> findByUserId(Long userId);
 
     void deleteById(Long id);
+
+    /** 删除该用户的全部会话（账号删除级联）。 */
+    void deleteByUserId(Long userId);
 }

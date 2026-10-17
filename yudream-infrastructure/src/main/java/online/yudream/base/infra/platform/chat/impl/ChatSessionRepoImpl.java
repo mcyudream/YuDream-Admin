@@ -50,4 +50,12 @@ public class ChatSessionRepoImpl implements ChatSessionRepo {
     public void deleteById(Long id) {
         mongo.remove(Query.query(Criteria.where("id").is(id)), ChatSessionDO.class);
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongo.remove(Query.query(Criteria.where("userId").is(userId)), ChatSessionDO.class);
+    }
 }

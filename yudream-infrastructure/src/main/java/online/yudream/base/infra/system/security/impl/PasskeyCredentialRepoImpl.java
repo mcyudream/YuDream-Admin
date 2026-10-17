@@ -60,4 +60,12 @@ public class PasskeyCredentialRepoImpl implements PasskeyCredentialRepo {
                 .map(OAuthSecurityInfraMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), PasskeyCredentialDO.class);
+    }
 }

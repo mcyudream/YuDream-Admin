@@ -27,4 +27,7 @@ public interface ChatQuotaRepo {
 
     /** 按预占标识核销一次；真实已发生用量不得因超额而丢失。 */
     Optional<UserChatQuota> settle(Long userId, LocalDate usageDate, String reservationId, long reservedTokens, long usedTokens);
+
+    /** 删除该用户的全部配额记录（账号删除级联）。 */
+    void deleteByUserId(Long userId);
 }

@@ -196,5 +196,10 @@ class ChatQuotaAppServiceTest {
             return uncertain.values().stream().filter(r->r.userId().equals(user)&&r.usageDate().equals(date)).toList();
         }
         void expire(String id){var old=reservations.get(id);renew(old.userId(),old.usageDate(),id,java.time.Instant.now().minusSeconds(1));}
+        public synchronized void deleteByUserId(Long user){
+            quotas.keySet().removeIf(key->key.startsWith(user+"/"));
+            reservations.values().removeIf(r->r.userId().equals(user));
+            uncertain.values().removeIf(r->r.userId().equals(user));
+        }
     }
 }

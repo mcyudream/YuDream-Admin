@@ -188,6 +188,7 @@ class ExternalLoginAutoBindingTest {
         public List<ExternalAccount> findByUserId(Long id) { return List.of(); }
         public Optional<ExternalAccount> findByIdAndUserId(Long id, Long uid) { return Optional.empty(); }
         public void deleteById(Long id) { throw new AssertionError("unexpected delete"); }
+        public void deleteByUserId(Long id) { throw new AssertionError("unexpected delete"); }
     }
     private static class Tickets implements ExternalLoginTicketStore {
         final Map<String, State> states = new HashMap<>();

@@ -86,6 +86,15 @@ public class SaTokenOnlineUserGateway implements OnlineUserGateway {
         StpUtil.kickoutByTokenValue(handle);
     }
 
+    @Override
+    public void kickoutByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        // 按登录号注销全部端会话：账号已被删除时，其已发出的令牌必须同步失效。
+        StpUtil.logout(userId);
+    }
+
     /** 存活会话，最近活跃优先（剩余有效期越长说明越晚活跃），同值按会话句柄稳定排序。 */
     private List<Session> liveSessions() {
         List<Session> sessions = new ArrayList<>();

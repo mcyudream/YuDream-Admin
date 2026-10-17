@@ -181,4 +181,12 @@ public class ChatQuotaRepoImpl implements ChatQuotaRepo {
         return quota.getUncertainReservations().entrySet().stream().map(entry -> new online.yudream.base.domain.platform.ai.valobj.AiUsageReservation(
                 entry.getKey(), userId, date, entry.getValue().getTokens(), entry.getValue().getRunId(), null, true, entry.getValue().getKnownTokens())).toList();
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongo.remove(Query.query(Criteria.where("userId").is(userId)), UserChatQuotaDO.class);
+    }
 }

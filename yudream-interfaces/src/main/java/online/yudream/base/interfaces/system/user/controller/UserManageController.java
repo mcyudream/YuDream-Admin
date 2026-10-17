@@ -7,6 +7,7 @@ import online.yudream.base.application.system.security.dto.LoginTokenDTO;
 import online.yudream.base.application.system.security.service.LoginTokenAppService;
 import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.UserAppService;
+import online.yudream.base.application.system.user.service.UserDeletionAppService;
 import online.yudream.base.application.system.user.service.UserManageAppService;
 import online.yudream.base.application.system.user.service.UserRoleChangesAppService;
 import online.yudream.base.application.system.user.service.UserStatsAppService;
@@ -49,6 +50,7 @@ public class UserManageController {
     private final LoginTokenAppService loginTokenAppService;
     private final UserRoleChangesAppService userRoleChangesAppService;
     private final UserStatsAppService userStatsAppService;
+    private final UserDeletionAppService userDeletionAppService;
 
     @PutMapping("/{id}/role-changes")
     @PermissionRegister(code = "system:user:assign-role", name = "分配用户角色", module = "系统管理", desc = "增量分配或移除用户角色")
@@ -103,7 +105,7 @@ public class UserManageController {
     }
 
     @DeleteMapping("/{id}")
-    @PermissionRegister(code = "system:user:delete", name = "删除用户", module = "系统管理", desc = "停用用户")
+    @PermissionRegister(code = "system:user:delete", name = "停用用户", module = "系统管理", desc = "停用用户（可再启用）")
     public Result<Void> disable(@PathVariable Long id) {
         userManageAppService.disable(id);
         return Result.ok();
@@ -113,6 +115,13 @@ public class UserManageController {
     @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "编辑用户资料")
     public Result<Void> enable(@PathVariable Long id) {
         userManageAppService.enable(id);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    @PermissionRegister(code = "system:user:purge", name = "删除用户", module = "系统管理", desc = "永久删除用户及账号级联数据（不可恢复）")
+    public Result<Void> purge(@PathVariable Long id) {
+        userDeletionAppService.delete(StpUtil.getLoginIdAsLong(), id);
         return Result.ok();
     }
 

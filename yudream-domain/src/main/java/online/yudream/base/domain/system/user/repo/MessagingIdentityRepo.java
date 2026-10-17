@@ -31,4 +31,7 @@ public interface MessagingIdentityRepo {
     void deleteById(Long id);
 
     void deleteMilkyQqByUserId(Long userId);
+
+    /** 删除该用户的全部消息身份（账号删除级联，含 Milky QQ 绑定）。 */
+    void deleteByUserId(Long userId);
 }

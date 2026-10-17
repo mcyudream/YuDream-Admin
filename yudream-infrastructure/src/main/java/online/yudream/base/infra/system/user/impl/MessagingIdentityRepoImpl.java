@@ -151,4 +151,12 @@ public class MessagingIdentityRepoImpl implements MessagingIdentityRepo {
         mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)
                 .and("identityType").is(MessagingIdentityType.QQ.code())), MessagingIdentityDO.class);
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), MessagingIdentityDO.class);
+    }
 }

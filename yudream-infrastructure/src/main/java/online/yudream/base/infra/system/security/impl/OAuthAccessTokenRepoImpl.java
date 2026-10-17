@@ -46,4 +46,12 @@ public class OAuthAccessTokenRepoImpl implements OAuthAccessTokenRepo {
         Query query = Query.query(Criteria.where("accessTokenHash").is(accessTokenHash));
         return Optional.ofNullable(OAuthSecurityInfraMapper.toDomain(mongoTemplate.findOne(query, OAuthAccessTokenDO.class)));
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), OAuthAccessTokenDO.class);
+    }
 }

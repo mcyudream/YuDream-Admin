@@ -52,7 +52,7 @@ class PermissionOverviewControllerTest {
     @Test
     void userDetailRequiresUserViewAndReusesTheOriginalResponse() {
         UserManageAppService service = mock(UserManageAppService.class);
-        UserManageController controller = new UserManageController(service, null, null, null, null);
+        UserManageController controller = new UserManageController(service, null, null, null, null, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.checkPermission("system:user:view")).thenThrow(new IllegalStateException("禁止查看"));
             assertThrows(IllegalStateException.class, () -> controller.get(9007199254740993L));

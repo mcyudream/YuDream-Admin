@@ -395,6 +395,11 @@ class MobileAppServiceTest {
                         .filter(device -> !device.deleted() && userId.equals(device.getUserId()))
                         .toList();
             }
+
+            @Override
+            public void deleteByUserId(Long userId) {
+                devices.removeIf(device -> userId.equals(device.getUserId()));
+            }
         }
     }
 

@@ -75,6 +75,15 @@ public class MobileDeviceRepoImpl implements MobileDeviceRepo {
                 .toList();
     }
 
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        // 账号删除级联：含已软删除的记录一并回收，不按 activeCriteria 过滤。
+        mongo.remove(Query.query(Criteria.where("userId").is(userId)), MobileDeviceDO.class);
+    }
+
     private Criteria activeCriteria() {
         return new Criteria().orOperator(
                 Criteria.where("deleted").is(false),

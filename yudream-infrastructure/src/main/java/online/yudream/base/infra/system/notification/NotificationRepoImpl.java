@@ -83,6 +83,12 @@ public class NotificationRepoImpl implements NotificationRepo {
         return (int) result.getModifiedCount();
     }
 
+    @Override
+    public int deleteByUserId(Long userId) {
+        var result = mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), NotificationDO.class);
+        return (int) result.getDeletedCount();
+    }
+
     private NotificationDO toDataObj(Notification notification) {
         NotificationDO notificationDO = new NotificationDO();
         notificationDO.setId(notification.getId());

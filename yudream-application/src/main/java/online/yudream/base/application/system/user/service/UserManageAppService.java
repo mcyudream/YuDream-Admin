@@ -23,6 +23,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.domain.system.user.service.UserAuthorityLevels;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.system.user.valobj.UserDept;
@@ -192,10 +193,7 @@ public class UserManageAppService {
             return 0;
         }
         List<Role> roles = roleRepo.findByIds(user.getRoles().stream().map(RoleID::getValue).distinct().toList());
-        return roles.stream()
-                .mapToInt(role -> role.getLevel() == null ? 0 : role.getLevel().getWeight())
-                .max()
-                .orElse(0);
+        return UserAuthorityLevels.highestWeight(roles);
     }
 
     private User getUser(Long id) {

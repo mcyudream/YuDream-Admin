@@ -9,4 +9,7 @@ public interface RefreshTokenCredentialRepo {
     RefreshTokenCredential save(RefreshTokenCredential credential);
 
     Optional<RefreshTokenCredential> findByTokenHash(String tokenHash);
+
+    /** 删除该用户的全部刷新令牌（账号删除级联）。 */
+    void deleteByUserId(Long userId);
 }

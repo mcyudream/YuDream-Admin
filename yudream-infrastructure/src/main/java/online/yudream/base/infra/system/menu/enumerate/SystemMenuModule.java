@@ -36,9 +36,13 @@ public enum SystemMenuModule {
             parentName = "USER", permission = "system:user:impersonate")
     USER_IMPERSONATE,
 
-    @MenuNode(code = "system:user:delete", name = "删除用户", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "system:user:delete", name = "停用用户", type = MenuNodeType.BUTTON,
             parentName = "USER", permission = "system:user:delete")
     USER_DELETE,
+
+    @MenuNode(code = "system:user:purge", name = "删除用户", type = MenuNodeType.BUTTON,
+            parentName = "USER", permission = "system:user:purge")
+    USER_PURGE,
 
     @MenuNode(code = "system:user:export", name = "导出用户", type = MenuNodeType.BUTTON,
             parentName = "USER", permission = "system:user:export")

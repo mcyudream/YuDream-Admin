@@ -10,4 +10,7 @@ public interface ExternalAccountRepo {
     List<ExternalAccount> findByUserId(Long userId);
     Optional<ExternalAccount> findByIdAndUserId(Long id, Long userId);
     void deleteById(Long id);
+
+    /** 删除该用户的全部外部登录绑定（账号删除级联，释放第三方身份）。 */
+    void deleteByUserId(Long userId);
 }

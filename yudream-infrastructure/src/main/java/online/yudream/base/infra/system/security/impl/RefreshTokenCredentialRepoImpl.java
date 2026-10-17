@@ -37,4 +37,12 @@ public class RefreshTokenCredentialRepoImpl implements RefreshTokenCredentialRep
         Query query = Query.query(Criteria.where("tokenHash").is(tokenHash));
         return Optional.ofNullable(ApiKeyCredentialInfraMapper.toDomain(mongoTemplate.findOne(query, RefreshTokenCredentialDO.class)));
     }
+
+    @Override
+    public void deleteByUserId(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("userId").is(userId)), RefreshTokenCredentialDO.class);
+    }
 }
