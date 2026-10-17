@@ -1,4 +1,4 @@
-import type { ApiResponse } from './system-client'
+import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export interface PluginBlobResponse {
@@ -247,8 +247,26 @@ export interface PluginBackupTargetCatalog {
   type: string
 }
 
+/** 插件目录概览：后端 Long 走全局 ToString 序列化，total 与计数在响应里是字符串，用前需 Number()。 */
+export interface PluginModuleSummary {
+  total: number
+  statusCounts: Record<PluginStatus, number>
+}
+
+/** 插件目录分页查询条件：筛选、排序与分页都在服务端完成。 */
+export interface PluginModulePageParams {
+  page?: number
+  size?: number
+  keyword?: string
+  status?: PluginStatus | 'ALL'
+  updateState?: 'ALL' | 'AVAILABLE' | 'BLOCKED'
+  sort?: 'DEFAULT' | 'NAME' | 'STATUS' | 'RECENT'
+}
+
 export default {
   list: () => systemClient.get<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins'),
+  page: (params: PluginModulePageParams = {}) => systemClient.get<unknown, ApiResponse<PageResult<PluginModule>>>('api/platform/plugins/page', { params }),
+  summary: () => systemClient.get<unknown, ApiResponse<PluginModuleSummary>>('api/platform/plugins/summary'),
   refresh: () => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/refresh'),
   upload: (data: FormData) => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/upload', data),
   load: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/load`),

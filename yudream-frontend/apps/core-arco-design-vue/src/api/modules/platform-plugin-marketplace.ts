@@ -185,6 +185,13 @@ export interface PluginMarketplaceUpdateResult {
   requiresRestart: boolean
 }
 
+/** 批量更新结果：成功的编码清单与逐项失败原因；已完成的更新不回滚。 */
+export interface PluginMarketplaceBatchUpdateResult {
+  updatedCodes: string[]
+  failures: { code: string, reason: string }[]
+  requiresRestart: boolean
+}
+
 export default {
   list: () => systemClient.get<unknown, ApiResponse<PluginStorePlugin[]>>('api/platform/plugin-marketplace'),
   detail: (code: string) => systemClient.get<unknown, ApiResponse<PluginStorePluginDetail>>(`api/platform/plugin-marketplace/${code}`),
@@ -192,6 +199,7 @@ export default {
   updatePlans: () => systemClient.get<unknown, ApiResponse<PluginMarketplaceUpdatePlan[]>>('api/platform/plugin-marketplace/update-plan'),
   updatePlan: (code: string, targetVersion?: string) => systemClient.get<unknown, ApiResponse<PluginMarketplaceUpdatePlan>>(`api/platform/plugin-marketplace/${code}/update-plan`, { params: { targetVersion } }),
   update: (code: string, data: PluginMarketplaceUpdateRequest) => systemClient.post<unknown, ApiResponse<PluginMarketplaceUpdateResult>>(`api/platform/plugin-marketplace/${code}/update`, data),
+  updateBatch: (items: PluginMarketplaceBatchInstallItem[]) => systemClient.post<unknown, ApiResponse<PluginMarketplaceBatchUpdateResult>>('api/platform/plugin-marketplace/update-batch', { items }),
   rollback: (code: string, cascade = false) => systemClient.post<unknown, ApiResponse<PluginMarketplaceUpdateResult>>(`api/platform/plugin-marketplace/${code}/rollback`, undefined, { params: { cascade } }),
   install: (code: string, data: PluginMarketplaceInstallRequest) => systemClient.post<unknown, ApiResponse<PluginMarketplaceInstallResponse>>(`api/platform/plugin-marketplace/${code}/install`, data),
   installPlan: (code: string, releaseVersion: string, sourceCode?: string) => systemClient.get<unknown, ApiResponse<PluginMarketplaceInstallPlan>>(`api/platform/plugin-marketplace/${code}/install-plan`, { params: { releaseVersion, sourceCode } }),

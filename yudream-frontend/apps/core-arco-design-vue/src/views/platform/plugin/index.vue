@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { TableColumn, YdFilePickerInstance } from '@yudream/components'
-import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
+import type { YdFilePickerInstance, YdListToolbarStatusItem } from '@yudream/components'
+import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginModulePageParams, PluginModuleSummary, PluginStatus } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
-import { YdFilterSelect } from '@yudream/components'
+import { YdFilterSelect, YdListToolbar } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import { refreshPluginThemes } from '@/plugins/theme-runtime'
@@ -11,20 +11,42 @@ import { refreshDynamicRoutes } from '@/router/dynamic'
 import DependentsConfirmDialog from './dependents-confirm-dialog.vue'
 import EnableDependencyDialog from './enable-dependency-dialog.vue'
 
-type PluginFilterStatus = 'all' | PluginStatus | 'update'
+type PluginFilterStatus = 'ALL' | PluginStatus
+type PluginUpdateFilter = NonNullable<PluginModulePageParams['updateState']>
+type PluginSortKey = NonNullable<PluginModulePageParams['sort']>
+
+interface PluginDependencyRow {
+  code: string
+  name: string
+  icon: string
+  required: boolean
+  available: boolean
+  loaded: boolean
+  enabled: boolean
+  version?: string
+}
 
 const toast = useYdToast()
 const modal = useYdModal()
 const loading = ref(false)
 const uploading = ref(false)
 const checkingUpdates = ref(false)
+const updatingAll = ref(false)
+/** 更新计划已检查过（含进页面时的静默检查）：未检查前不谎报「可更新」数量。 */
+const updatesChecked = ref(false)
 const actionLoading = ref('')
 const rows = ref<PluginModule[]>([])
+const summary = ref<PluginModuleSummary>({ total: 0, statusCounts: { INSTALLED: 0, LOADED: 0, ENABLED: 0, DISABLED: 0, ERROR: 0 } })
 const updatePlans = ref<PluginMarketplaceUpdatePlan[]>([])
 const selectedCode = ref('')
+/** 选中插件的最后已知快照：翻页或筛选后目标不在当前页时，详情仍保持可用。 */
+const selectedSnapshot = ref<PluginModule | null>(null)
+const detailOpen = ref(false)
 const keyword = ref('')
-const filterStatus = ref<PluginFilterStatus>('all')
-const pagination = reactive({ page: 1, size: 12, total: 0 })
+const filterStatus = ref<PluginFilterStatus>('ALL')
+const updateFilter = ref<PluginUpdateFilter>('ALL')
+const sortKey = ref<PluginSortKey>('DEFAULT')
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 const uploadInput = ref<YdFilePickerInstance | null>(null)
 const enableDialogOpen = ref(false)
 const enableDependencyStatus = ref<PluginDependencyStatus | null>(null)
@@ -33,96 +55,207 @@ const dependentsDialogOpen = ref(false)
 const dependentsInfo = ref<PluginDependents | null>(null)
 const dependentsAction = ref<'unload' | 'delete'>('unload')
 
-const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
-const detailOpen = ref(false)
-const columns: TableColumn<PluginModule>[] = [
-  { accessorKey: 'name', header: '插件', minWidth: 300 },
-  { accessorKey: 'version', header: '版本', width: 125 },
-  { accessorKey: 'status', header: '运行状态', width: 130 },
-  { id: 'update', header: '更新', width: 155 },
-  { id: 'actions', header: '操作', width: 160 },
-]
-const filterOptions: { label: string, value: PluginFilterStatus }[] = [
-  { label: '全部状态', value: 'all' },
-  { label: '可更新', value: 'update' },
-  { label: '运行中', value: 'ENABLED' },
-  { label: '已加载', value: 'LOADED' },
-  { label: '已安装', value: 'INSTALLED' },
-  { label: '已禁用', value: 'DISABLED' },
-  { label: '异常', value: 'ERROR' },
-]
-const filteredRows = computed(() => {
-  const value = keyword.value.trim().toLowerCase()
-  return rows.value.filter((item) => {
-    const matchesKeyword = !value || [item.name, item.code, item.version, item.description]
-      .some(field => field?.toLowerCase().includes(value))
-    const matchesStatus = filterStatus.value === 'all'
-      || (filterStatus.value === 'update' && Boolean(updatePlanFor(item.code)))
-      || item.status === filterStatus.value
-    return matchesKeyword && matchesStatus
-  })
-})
-const pagedRows = computed(() => {
-  const start = (pagination.page - 1) * pagination.size
-  return filteredRows.value.slice(start, start + pagination.size)
-})
-const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || filterStatus.value !== 'all')
-const summary = computed(() => {
-  const enabled = rows.value.filter(item => item.enabled).length
-  const loaded = rows.value.filter(item => item.loaded).length
-  const error = rows.value.filter(item => item.status === 'ERROR').length
+const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) ?? selectedSnapshot.value)
+const catalogRef = ref<HTMLElement>()
+const workbenchRef = ref<HTMLElement>()
+const hasMoreBelow = ref(false)
+let keywordTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * 两栏高度按真实位置算：页头 + 工具栏的行数会随视口宽度变化（按钮换行、状态胶囊换行），
+ * 用固定减法会让工作台超出可视区，底部翻页条被挤到屏幕外。
+ */
+function syncPaneHeight() {
+  const element = workbenchRef.value
+  if (!element) {
+    return
+  }
+  if (window.innerWidth <= 900) {
+    element.style.removeProperty('--plugin-pane-max-height')
+    return
+  }
+  // 预留页面容器自身的内边距与外边距（YdPageMain 的 p-4/m-4），否则文档仍会多出一小段滚动。
+  const available = Math.round(window.innerHeight - element.getBoundingClientRect().top - 34)
+  element.style.setProperty('--plugin-pane-max-height', `${Math.max(320, available)}px`)
+}
+
+const availableUpdateCount = computed(() => updatePlans.value.filter(plan => !plan.blockedReason).length)
+const blockedUpdateCount = computed(() => updatePlans.value.filter(plan => Boolean(plan.blockedReason)).length)
+const updatablePlans = computed(() => updatePlans.value.filter(plan => !plan.blockedReason))
+const errorCount = computed(() => summary.value.statusCounts?.ERROR || 0)
+
+/** 状态计数胶囊：计数即筛选，一行取代四张统计卡；六个取值互斥，比例条不会被重复计数。 */
+const statusChips = computed<YdListToolbarStatusItem[]>(() => {
+  const counts = summary.value.statusCounts
   return [
-    { label: '插件总数', value: rows.value.length, icon: 'morph:puzzle' },
-    { label: '已加载', value: loaded, icon: 'morph:cloud-download' },
-    { label: '已启用', value: enabled, icon: 'morph:circle-check', tone: 'ok' },
-    { label: '异常', value: error, icon: 'morph:triangle-alert', tone: error > 0 ? 'bad' : 'ok' },
+    { value: 'ALL', label: '全部', count: summary.value.total, tone: 'neutral' },
+    { value: 'ENABLED', label: '运行中', count: counts.ENABLED || 0, tone: 'ok' },
+    { value: 'LOADED', label: '已加载', count: counts.LOADED || 0, tone: 'muted' },
+    { value: 'INSTALLED', label: '已安装', count: counts.INSTALLED || 0, tone: 'muted' },
+    { value: 'DISABLED', label: '已禁用', count: counts.DISABLED || 0, tone: 'muted' },
+    { value: 'ERROR', label: '异常', count: counts.ERROR || 0, tone: errorCount.value > 0 ? 'bad' : 'muted' },
   ]
 })
 
-onMounted(load)
+const updateOptions = computed(() => [
+  { label: `全部更新状态 (${updatePlans.value.length})`, value: 'ALL' as const },
+  { label: `可更新 (${availableUpdateCount.value})`, value: 'AVAILABLE' as const },
+  { label: `更新受阻 (${blockedUpdateCount.value})`, value: 'BLOCKED' as const },
+])
+const sortOptions: { label: string, value: PluginSortKey }[] = [
+  { label: '默认顺序', value: 'DEFAULT' },
+  { label: '按状态', value: 'STATUS' },
+  { label: '按名称', value: 'NAME' },
+  { label: '最近加载', value: 'RECENT' },
+]
 
-watch([keyword, filterStatus], () => {
-  pagination.page = 1
-})
-watch(filteredRows, clampPage, { immediate: true })
-watch(() => pagination.size, clampPage)
-watch([pagedRows, selectedCode], () => {
-  if (detailOpen.value && !pagedRows.value.some(item => item.code === selectedCode.value)) {
-    detailOpen.value = false
-    selectedCode.value = ''
+const hasActiveFilters = computed(() =>
+  Boolean(keyword.value.trim())
+  || filterStatus.value !== 'ALL'
+  || updateFilter.value !== 'ALL',
+)
+
+/** 依赖（硬依赖 + 软依赖）：标注是否已安装/启用，缺失项排前面。 */
+const dependencyRows = computed<PluginDependencyRow[]>(() => {
+  const item = selected.value
+  if (!item) {
+    return []
   }
-}, { flush: 'sync' })
+  const build = (code: string, required: boolean): PluginDependencyRow => {
+    const dependency = rows.value.find(row => row.code === code)
+    return {
+      code,
+      required,
+      name: dependency?.name || code,
+      icon: dependency ? pluginIcon(dependency) : 'morph:puzzle',
+      available: Boolean(dependency),
+      loaded: Boolean(dependency?.loaded),
+      enabled: Boolean(dependency?.enabled),
+      version: dependency?.version,
+    }
+  }
+  return [
+    ...(item.dependencies || []).map(code => build(code, true)),
+    ...(item.softDependencies || []).map(code => build(code, false)),
+  ].sort((a, b) => dependencyWeight(a) - dependencyWeight(b) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+})
 
-function clampPage() {
-  pagination.total = filteredRows.value.length
-  const maxPage = Math.max(1, Math.ceil(pagination.total / pagination.size))
-  pagination.page = Math.min(Math.max(1, pagination.page), maxPage)
+function dependencyWeight(row: PluginDependencyRow) {
+  if (!row.available) {
+    return 0
+  }
+  return row.enabled ? 2 : 1
 }
 
-function resetFilters() {
-  keyword.value = ''
-  filterStatus.value = 'all'
+const dependencyReady = computed(() => dependencyRows.value.filter(item => item.enabled).length)
+const missingRequired = computed(() => dependencyRows.value.filter(item => item.required && !item.enabled))
+
+onMounted(async () => {
+  await Promise.all([loadPage(), loadSummary()])
+  syncPaneHeight()
+  window.addEventListener('resize', syncPaneHeight)
+  // 更新检查只读市场源索引，进页面就静默跑一次：可更新徽标与筛选计数无需先点按钮。
+  await checkUpdates({ silent: true })
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(keywordTimer)
+  window.removeEventListener('resize', syncPaneHeight)
+})
+
+// 关键词输入防抖：服务端搜索不必每敲一个字就打一次接口。
+watch(keyword, () => {
+  clearTimeout(keywordTimer)
+  keywordTimer = setTimeout(() => {
+    pagination.page = 1
+    loadPage()
+  }, 300)
+})
+
+watch([filterStatus, updateFilter, sortKey], () => {
+  pagination.page = 1
+  loadPage()
+})
+
+watch([() => pagination.page, () => pagination.size], () => {
+  loadPage({ keepSelection: true })
+})
+
+function pageParams(): PluginModulePageParams {
+  return {
+    page: pagination.page,
+    size: pagination.size,
+    keyword: keyword.value.trim() || undefined,
+    status: filterStatus.value,
+    updateState: updateFilter.value,
+    sort: sortKey.value,
+  }
 }
 
-async function load() {
+/** 目录按页拉取：筛选、排序与分页都在服务端完成，前端只渲染当前页。 */
+async function loadPage(options: { keepSelection?: boolean } = {}) {
   loading.value = true
   try {
-    const res = await apiPlugin.list()
-    rows.value = res.data
-    updatePlans.value = []
-    syncSelectedCode()
+    const res = await apiPlugin.page(pageParams())
+    rows.value = res.data.records
+    // 全局 Long -> String 序列化：分页数字必须转回 number，否则计数与比例条会拼字符串。
+    pagination.total = Number(res.data.total)
+    pagination.page = Number(res.data.page) || 1
+    pagination.size = Number(res.data.size) || pagination.size
+    if (!options.keepSelection || !selectedCode.value) {
+      const target = rows.value[0]
+      if (target) {
+        // 自动选中只换详情内容，不切窄屏窗格：移动端进页面仍先看到列表。
+        applySelection(target)
+      }
+      else if (!options.keepSelection) {
+        // 筛选后无结果：详情清空，避免展示与列表无关的插件。
+        selectedCode.value = ''
+        selectedSnapshot.value = null
+        detailOpen.value = false
+      }
+    }
+    syncSelectedSnapshot()
+    nextTick(syncCatalogOverflow)
   }
   finally {
     loading.value = false
   }
 }
 
-async function checkUpdates() {
+async function loadSummary() {
+  const res = await apiPlugin.summary()
+  summary.value = {
+    total: Number(res.data.total) || 0,
+    statusCounts: {
+      ENABLED: Number(res.data.statusCounts?.ENABLED) || 0,
+      LOADED: Number(res.data.statusCounts?.LOADED) || 0,
+      INSTALLED: Number(res.data.statusCounts?.INSTALLED) || 0,
+      DISABLED: Number(res.data.statusCounts?.DISABLED) || 0,
+      ERROR: Number(res.data.statusCounts?.ERROR) || 0,
+    },
+  }
+}
+
+async function checkUpdates(options: { silent?: boolean } = {}) {
   checkingUpdates.value = true
   try {
     const res = await apiPluginMarketplace.updatePlans()
     updatePlans.value = res.data
-    toast.success(updatePlans.value.length ? `已生成 ${updatePlans.value.length} 个插件更新计划` : '已检查，没有可用更新计划')
+    updatesChecked.value = true
+    if (!options.silent) {
+      toast.success(updatePlans.value.length
+        ? `已生成 ${updatePlans.value.length} 个插件更新计划`
+        : '已检查，没有可用更新计划')
+    }
+  }
+  catch (error) {
+    updatePlans.value = []
+    updatesChecked.value = false
+    // 静默检查失败不打断进页面：仍可用按钮手动重试并看到失败原因。
+    if (!options.silent) {
+      throw error
+    }
   }
   finally {
     checkingUpdates.value = false
@@ -175,10 +308,8 @@ function confirmRollback(item = selected.value) {
     onConfirm: async () => {
       actionLoading.value = `${item.code}:rollback`
       try {
-        const res = await apiPluginMarketplace.rollback(item.code, cascade)
-        rows.value = res.data.modules
-        syncSelectedCode()
-        await refreshDynamicRoutes(router)
+        await apiPluginMarketplace.rollback(item.code, cascade)
+        await refreshAfterMutation()
         toast.success('插件已回滚，请重启服务后生效；未自动启用插件')
       }
       finally {
@@ -199,11 +330,9 @@ function confirmUpdate(item = selected.value) {
     onConfirm: async () => {
       actionLoading.value = `${item.code}:update`
       try {
-        const res = await apiPluginMarketplace.update(item.code, { releaseVersion: plan.toVersion })
-        rows.value = res.data.modules
-        syncSelectedCode()
-        await checkUpdates()
-        toast.success(res.data.requiresRestart ? '插件已更新，相关插件已尝试自动恢复；如仍有插件未恢复，请重启服务' : '插件已更新')
+        await apiPluginMarketplace.update(item.code, { releaseVersion: plan.toVersion })
+        await refreshAfterMutation()
+        toast.success('插件已更新，必须重启服务后生效')
       }
       finally {
         actionLoading.value = ''
@@ -212,19 +341,59 @@ function confirmUpdate(item = selected.value) {
   })
 }
 
+/** 一键更新全部：只提交更新计划中未受阻的插件，逐项更新，单项失败不中断其余。 */
+function confirmUpdateAll() {
+  const plans = updatablePlans.value
+  if (!plans.length || updatingAll.value) {
+    return
+  }
+  const preview = plans.slice(0, 4).map(plan => `${plan.code} ${plan.fromVersion} → ${plan.toVersion}`).join('、')
+  modal.confirm({
+    title: `一键更新 ${plans.length} 个插件`,
+    content: `确认把 ${plans.length} 个插件更新到市场最新版本吗？涉及：${preview}${plans.length > 4 ? ' 等' : ''}。系统会受控停用并卸载目标插件及其依赖方；必须重启，且仅恢复更新前已启用的插件；单项失败不会中断其余插件，更新受阻的插件不会包含在内。`,
+    onConfirm: async () => {
+      updatingAll.value = true
+      try {
+        const res = await apiPluginMarketplace.updateBatch(
+          plans.map(plan => ({ code: plan.code, releaseVersion: plan.toVersion })),
+        )
+        const { updatedCodes, failures, requiresRestart } = res.data
+        await refreshAfterMutation()
+        if (failures.length) {
+          toast.error(`已更新 ${updatedCodes.length} 个插件，${failures.length} 个未完成`, {
+            description: failures.map(failure => `${failure.code}：${failure.reason}`).join('；'),
+          })
+        }
+        else {
+          toast.success(requiresRestart
+            ? `已更新 ${updatedCodes.length} 个插件，必须重启服务后生效`
+            : '插件已是市场最新版本')
+        }
+      }
+      finally {
+        updatingAll.value = false
+      }
+    },
+  })
+}
+
+/** 目录类操作后的统一刷新：当前页、状态概览与更新计划一起对齐。 */
+async function refreshAfterMutation() {
+  await Promise.all([loadPage({ keepSelection: true }), loadSummary(), checkUpdates({ silent: true })])
+  await refreshDynamicRoutes(router)
+}
+
 async function refresh() {
   loading.value = true
   try {
-    const res = await apiPlugin.refresh()
-    rows.value = res.data
-    updatePlans.value = []
-    syncSelectedCode()
-    await refreshDynamicRoutes(router)
-    toast.success('插件目录已扫描')
+    await apiPlugin.refresh()
   }
   finally {
     loading.value = false
   }
+  pagination.page = 1
+  await refreshAfterMutation()
+  toast.success('插件目录已扫描')
 }
 
 async function uploadJar(files: File[]) {
@@ -241,11 +410,16 @@ async function uploadJar(files: File[]) {
   try {
     const data = new FormData()
     data.append('file', file)
-    const res = await apiPlugin.upload(data)
-    rows.value = res.data
-    updatePlans.value = []
-    syncSelectedCode()
-    await refreshDynamicRoutes(router)
+    const uploaded = await apiPlugin.upload(data)
+    pagination.page = 1
+    await refreshAfterMutation()
+    // 上传会替换同编码插件：直接把详情切到刚上传的那个，省去在目录里再找。
+    const baseName = file.name.replace(/\.jar$/i, '')
+    const target = uploaded.data.find(item => item.code === baseName)
+      ?? uploaded.data.find(item => item.jarPath?.replace(/\\/g, '/').endsWith(`/${file.name}`))
+    if (target) {
+      selectPlugin(target)
+    }
     toast.success('插件 JAR 已上传并扫描')
   }
   finally {
@@ -270,6 +444,7 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
       await refreshDynamicRoutes(router)
       await refreshPluginThemes()
     }
+    await loadSummary()
     toast.success(actionText(action))
   }
   finally {
@@ -279,7 +454,7 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
 
 /** 启用前依赖预览：有依赖时弹窗（硬缺失引导安装、软依赖可选启用），无依赖直接启用。 */
 async function previewEnable(code: string) {
-  const item = rows.value.find(row => row.code === code)
+  const item = rows.value.find(row => row.code === code) ?? (selected.value?.code === code ? selected.value : undefined)
   if (!item || item.enabled) {
     return
   }
@@ -333,12 +508,13 @@ async function enablePlugin(code: string, includeSoft: string[]) {
     replaceItem(res.data)
     await refreshDynamicRoutes(router)
     await refreshPluginThemes()
+    await loadSummary()
     toast.success(includeSoft.length
       ? `插件已启用，并一并启用了 ${includeSoft.length} 个软依赖`
       : '插件已启用，动态菜单已同步')
   }
   catch {
-    await load()
+    await loadPage({ keepSelection: true })
   }
   finally {
     actionLoading.value = ''
@@ -347,7 +523,7 @@ async function enablePlugin(code: string, includeSoft: string[]) {
 
 /** 卸载前依赖方预览：有运行中依赖方时弹窗提供级联，否则直接卸载。 */
 async function previewUnload(code: string) {
-  const item = rows.value.find(row => row.code === code)
+  const item = rows.value.find(row => row.code === code) ?? (selected.value?.code === code ? selected.value : undefined)
   if (!item || !item.loaded) {
     return
   }
@@ -378,10 +554,11 @@ async function unloadPlugin(code: string, cascade: boolean) {
     replaceItem(res.data)
     await refreshDynamicRoutes(router)
     await refreshPluginThemes()
+    await loadSummary()
     toast.success(cascade ? '插件已级联卸载；软依赖方已自动降级恢复，硬依赖方保持禁用' : '插件已卸载，动态菜单已同步')
   }
   catch {
-    await load()
+    await loadPage({ keepSelection: true })
   }
   finally {
     actionLoading.value = ''
@@ -423,10 +600,12 @@ async function removePluginRecord(item: PluginModule, cascade: boolean) {
   actionLoading.value = `${item.code}:remove`
   try {
     await apiPlugin.remove(item.code, cascade)
-    rows.value = rows.value.filter(row => row.code !== item.code)
-    syncSelectedCode()
-    await refreshDynamicRoutes(router)
-    await refreshPluginThemes()
+    if (selectedCode.value === item.code) {
+      selectedCode.value = ''
+      selectedSnapshot.value = null
+      detailOpen.value = false
+    }
+    await refreshAfterMutation()
     toast.success(cascade ? '插件记录已级联删除；软依赖方已自动降级恢复' : '插件记录已删除')
   }
   finally {
@@ -466,9 +645,29 @@ async function openPluginPage(code: string) {
   }
 }
 
-function selectPlugin(item: PluginModule) {
+/** 只切换详情内容（自动选中用）：窄屏窗格由用户点击决定，不在这里改。 */
+function applySelection(item: PluginModule) {
   selectedCode.value = item.code
+  selectedSnapshot.value = item
+}
+
+function selectPlugin(item: PluginModule) {
+  applySelection(item)
   detailOpen.value = true
+}
+
+/** 依赖项点击：直接把详情切到被依赖的插件，省去回目录里再找一次。 */
+function focusPlugin(code: string) {
+  const target = rows.value.find(row => row.code === code)
+  if (!target) {
+    return
+  }
+  selectPlugin(target)
+  nextTick(() => {
+    if (catalogRef.value) {
+      catalogRef.value.scrollTop = 0
+    }
+  })
 }
 
 /** 卸载/删除依赖方弹窗确认：级联执行并自动恢复软依赖方。 */
@@ -479,7 +678,7 @@ async function handleDependentsConfirm(cascade: boolean) {
   }
   dependentsDialogOpen.value = false
   if (dependentsAction.value === 'delete') {
-    const item = rows.value.find(row => row.code === code)
+    const item = rows.value.find(row => row.code === code) ?? (selected.value?.code === code ? selected.value : null)
     if (item) {
       await removePluginRecord(item, cascade)
     }
@@ -493,13 +692,28 @@ function replaceItem(item: PluginModule) {
   if (index >= 0) {
     rows.value[index] = item
   }
+  if (selectedCode.value === item.code) {
+    selectedSnapshot.value = item
+  }
 }
 
-function syncSelectedCode() {
-  if (selectedCode.value && !rows.value.some(item => item.code === selectedCode.value)) {
-    detailOpen.value = false
-    selectedCode.value = ''
+function syncSelectedSnapshot() {
+  const current = rows.value.find(item => item.code === selectedCode.value)
+  if (current) {
+    selectedSnapshot.value = current
   }
+}
+
+function resetFilters() {
+  keyword.value = ''
+  filterStatus.value = 'ALL'
+  updateFilter.value = 'ALL'
+}
+
+/** 目录未滚到底时显示底部渐隐，提示还有插件没露出。 */
+function syncCatalogOverflow() {
+  const element = catalogRef.value
+  hasMoreBelow.value = Boolean(element) && element!.scrollHeight - element!.scrollTop - element!.clientHeight > 8
 }
 
 function statusText(status: PluginStatus) {
@@ -513,8 +727,67 @@ function statusText(status: PluginStatus) {
   return map[status]
 }
 
+/** 状态说明：把「这个状态意味着什么、下一步做什么」写清楚，而不是只给一个词。 */
+function statusHint(item?: PluginModule) {
+  const map: Record<PluginStatus, string> = {
+    ENABLED: '已启用：接口、权限与前端页面已注册，菜单已同步。',
+    LOADED: '已加载但未启用：类已进入运行时，启用后才会注册接口与页面。',
+    INSTALLED: '已发现并登记，尚未加载到运行时。',
+    DISABLED: '已禁用：运行已停止，动态菜单与接口已回收。',
+    ERROR: '加载或启用失败：查看下方错误信息，修正后重新加载。',
+  }
+  return item ? map[item.status] : ''
+}
+
+function statusIcon(status: PluginStatus) {
+  const map: Record<PluginStatus, string> = {
+    ENABLED: 'morph:circle-check',
+    LOADED: 'morph:cloud-download',
+    INSTALLED: 'morph:package',
+    DISABLED: 'morph:circle-pause',
+    ERROR: 'morph:triangle-alert',
+  }
+  return map[status]
+}
+
 function statusVariant(status: PluginStatus) {
   return status === 'ENABLED' ? 'default' : status === 'ERROR' ? 'destructive' : 'secondary'
+}
+
+function dependencyText(row: PluginDependencyRow) {
+  if (!row.available) {
+    return '未安装'
+  }
+  if (row.enabled) {
+    return '已启用'
+  }
+  return row.loaded ? '已加载未启用' : '已安装未加载'
+}
+
+function dependencyVariant(row: PluginDependencyRow) {
+  if (!row.available) {
+    return 'destructive'
+  }
+  return row.enabled ? 'default' : 'secondary'
+}
+
+function dependencySummary() {
+  if (!dependencyRows.value.length) {
+    return ''
+  }
+  if (missingRequired.value.length) {
+    return `有 ${missingRequired.value.length} 项依赖未启用，启用时会先引导安装或启用。`
+  }
+  return '依赖已满足，可以直接启用。'
+}
+
+/** 加载/启用时间截断到分钟：秒与 7 位小数只会撑破信息格。 */
+function formatTime(value?: string) {
+  if (!value) {
+    return '—'
+  }
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
+  return match ? `${match[1]} ${match[2]}` : value
 }
 
 function actionText(action: string) {
@@ -537,191 +810,277 @@ function actionText(action: string) {
     </YdPageHeader>
 
     <YdPageMain>
-      <div class="plugin-toolbar">
-        <div class="plugin-toolbar-actions">
-          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.open()">
-            <YdIcon name="morph:cloud-upload" />
-            上传 JAR
+      <YdListToolbar
+        v-model:keyword="keyword"
+        v-model:status="filterStatus"
+        class="plugin-toolbar"
+        title="插件目录"
+        placeholder="搜索名称、编码、版本或描述"
+        :status-items="statusChips"
+      >
+        <template #views>
+          <span class="plugin-toolbar__summary">{{ hasActiveFilters ? '筛选出' : '共' }} {{ pagination.total }} 个插件</span>
+          <YdTag v-if="errorCount" variant="destructive">
+            <YdIcon name="morph:triangle-alert" />{{ errorCount }} 个异常
+          </YdTag>
+          <YdTag v-else-if="availableUpdateCount" variant="secondary">
+            <YdIcon name="morph:circle-arrow-up" />{{ availableUpdateCount }} 个可更新
+          </YdTag>
+        </template>
+        <template #filters>
+          <YdFilterSelect v-model="updateFilter" :options="updateOptions" :width="180" :disabled="!updatesChecked && !updatePlans.length" placeholder="全部更新状态" />
+          <YdFilterSelect v-model="sortKey" class="plugin-sort-filter" :options="sortOptions" :width="160" placeholder="默认顺序" />
+        </template>
+        <template #actions>
+          <YdButton v-if="hasActiveFilters" variant="ghost" @click="resetFilters">
+            重置
           </YdButton>
-          <YdFilePicker ref="uploadInput" accept=".jar,application/java-archive" label="选择插件 JAR" @select="uploadJar">
-            <template #default />
-          </YdFilePicker>
-          <YdButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
-            <YdIcon name="morph:circle-arrow-up" />
-            检查更新
-          </YdButton>
-          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
+          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" :disabled="uploading || checkingUpdates" @click="refresh">
             <YdIcon name="morph:folder-open" />
             扫描目录
           </YdButton>
-        </div>
-        <div class="plugin-filters">
-          <YdInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
-          <YdFilterSelect v-model="filterStatus" :options="filterOptions" :width="150" placeholder="全部状态" />
-          <YdButton v-if="hasActiveFilters" variant="link" @click="resetFilters">
-            重置筛选
+          <YdButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates()">
+            <YdIcon name="morph:circle-arrow-up" />
+            检查更新
           </YdButton>
-        </div>
-      </div>
-
-      <div class="summary-grid">
-        <div v-for="item in summary" :key="item.label" class="summary-item">
-          <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
-            <YdIcon :name="item.icon" />
-          </div>
-          <div class="summary-body">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="plugin-browser">
-        <div class="plugin-browser-header">
-          <div>
-            <h2>已发现的插件</h2>
-            <p>共 {{ pagination.total }} 个插件，可查看运行状态和更新计划。</p>
-          </div>
-        </div>
-        <YdLoadingOverlay :loading="loading">
-          <YdResponsiveTable
-            row-key="code"
-            :columns="columns"
-            :data="pagedRows"
-            :empty-text="rows.length ? '暂无符合当前筛选条件的插件' : '暂无插件；将 JAR 放入 plugins 目录后扫描目录'"
-            table-root-class="plugin-table-root"
-            table-class="plugin-table"
-            stripe
+          <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" :disabled="loading" @click="uploadInput?.open()">
+            <YdIcon name="morph:cloud-upload" />
+            上传 JAR
+          </YdButton>
+          <YdButton
+            v-if="availableUpdateCount"
+            v-auth="'platform:plugin:manage'"
+            :loading="updatingAll"
+            :disabled="Boolean(actionLoading)"
+            @click="confirmUpdateAll"
           >
-            <template #cell-name="{ row }">
-              <div class="plugin-identity">
-                <YdIcon :name="pluginIcon(row.original)" class="plugin-identity-icon" />
-                <div class="plugin-identity-text">
-                  <strong>{{ row.original.name }}</strong>
-                  <span class="plugin-code">{{ row.original.code }}</span>
-                  <span class="plugin-description">{{ row.original.description || '暂无描述' }}</span>
-                </div>
-              </div>
-            </template>
-            <template #cell-version="{ row }">
-              {{ row.original.version || '未知版本' }}
-            </template>
-            <template #cell-status="{ row }">
-              <YdTag :variant="statusVariant(row.original.status)">
-                {{ statusText(row.original.status) }}
-              </YdTag>
-            </template>
-            <template #cell-update="{ row }">
-              <YdTag v-if="updatePlanFor(row.original.code)?.blockedReason" variant="destructive">
-                更新受阻
-              </YdTag>
-              <YdTag v-else-if="updatePlanFor(row.original.code)" variant="secondary">
-                可更新至 {{ updatePlanFor(row.original.code)?.toVersion }}
-              </YdTag>
-              <span v-else class="plugin-muted">—</span>
-            </template>
-            <template #cell-actions="{ row }">
-              <YdButton size="sm" variant="outline" @click="selectPlugin(row.original)">
-                查看详情
-              </YdButton>
-            </template>
-            <template #card="{ row }">
-              <YdCard class="plugin-mobile-card">
-                <div class="plugin-card-heading">
-                  <div class="plugin-identity">
-                    <YdIcon :name="pluginIcon(row)" class="plugin-identity-icon" />
-                    <div class="plugin-identity-text">
-                      <strong>{{ row.name }}</strong>
-                      <span class="plugin-code">{{ row.code }}</span>
-                    </div>
-                  </div>
-                  <YdTag :variant="statusVariant(row.status)">
-                    {{ statusText(row.status) }}
-                  </YdTag>
-                </div>
-                <p class="plugin-card-description">
-                  {{ row.description || '暂无描述' }}
-                </p>
-                <div class="plugin-card-meta">
-                  <span>版本 {{ row.version || '未知版本' }}</span>
-                  <YdTag v-if="updatePlanFor(row.code)?.blockedReason" variant="destructive">
+            <YdIcon name="morph:layers" />
+            一键更新 {{ availableUpdateCount }} 个
+          </YdButton>
+          <YdFilePicker ref="uploadInput" class="hidden" accept=".jar,application/java-archive" label="选择插件 JAR" @select="uploadJar">
+            <template #default />
+          </YdFilePicker>
+        </template>
+      </YdListToolbar>
+
+      <div ref="workbenchRef" class="plugin-workbench" :class="{ 'is-detail': detailOpen, 'is-single': !selected }">
+        <section class="plugin-browser" :class="{ 'has-more': hasMoreBelow }">
+          <YdLoadingOverlay :loading="loading">
+            <div v-if="rows.length" ref="catalogRef" class="plugin-catalog" @scroll="syncCatalogOverflow">
+              <YdAction
+                v-for="(item, index) in rows"
+                :key="item.code"
+                class="plugin-row"
+                :class="{ 'is-selected': selected?.code === item.code }"
+                :style="{ '--row-index': Math.min(index, 12) }"
+                :data-status="item.status"
+                :aria-pressed="selected?.code === item.code"
+                @click="selectPlugin(item)"
+              >
+                <span class="plugin-row__icon"><YdIcon :name="pluginIcon(item)" /></span>
+                <span class="plugin-row__name">
+                  <strong>{{ item.name }}</strong>
+                  <small v-if="item.version">v{{ item.version }}</small>
+                </span>
+                <span class="plugin-row__code">{{ item.code }}</span>
+                <span class="plugin-row__description" :class="{ 'is-error': item.status === 'ERROR' && item.errorMessage }">
+                  {{ item.status === 'ERROR' && item.errorMessage ? item.errorMessage : (item.description || '暂无描述') }}
+                </span>
+                <span class="plugin-row__side">
+                  <YdTag v-if="updatePlanFor(item.code)?.blockedReason" class="plugin-row__update" variant="destructive">
                     更新受阻
                   </YdTag>
-                  <YdTag v-else-if="updatePlanFor(row.code)" variant="secondary">
-                    可更新至 {{ updatePlanFor(row.code)?.toVersion }}
+                  <YdTag v-else-if="updatePlanFor(item.code)" class="plugin-row__update" variant="outline">
+                    可更新至 {{ updatePlanFor(item.code)?.toVersion }}
                   </YdTag>
-                </div>
-                <YdButton size="sm" variant="outline" @click="selectPlugin(row)">
-                  查看详情
+                  <span class="plugin-row__state">
+                    {{ statusText(item.status) }}
+                    <YdIcon name="morph:chevron-right" class="plugin-row__chevron" />
+                  </span>
+                </span>
+              </YdAction>
+            </div>
+            <YdEmpty v-else-if="hasActiveFilters" title="没有匹配的插件" description="调整搜索词或筛选条件后重试。">
+              <YdButton variant="outline" @click="resetFilters">
+                清除筛选
+              </YdButton>
+            </YdEmpty>
+            <YdEmpty v-else title="暂无插件" description="把插件 JAR 放入服务端 plugins 目录后扫描目录，或直接上传 JAR。">
+              <div class="plugin-empty-actions">
+                <YdButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
+                  <YdIcon name="morph:folder-open" />
+                  扫描目录
                 </YdButton>
-              </YdCard>
-            </template>
-          </YdResponsiveTable>
-        </YdLoadingOverlay>
-        <div v-if="!loading && !pagedRows.length && rows.length" class="plugin-empty-action">
-          <YdButton variant="link" @click="resetFilters">
-            重置筛选
-          </YdButton>
-        </div>
-        <YdPagination
-          v-if="pagination.total > pagination.size"
-          v-model:page="pagination.page"
-          v-model:size="pagination.size"
-          :total="pagination.total"
-          class="plugin-pagination"
-        />
-      </div>
+                <YdButton v-auth="'platform:plugin:manage'" :loading="uploading" @click="uploadInput?.open()">
+                  <YdIcon name="morph:cloud-upload" />
+                  上传 JAR
+                </YdButton>
+              </div>
+            </YdEmpty>
+          </YdLoadingOverlay>
+          <div v-if="pagination.total > 0" class="plugin-pagination">
+            <!-- 目录栏比整页窄：去掉「前往页码」，翻页控件才在一条线上排开 -->
+            <YdPagination
+              v-model:page="pagination.page"
+              v-model:size="pagination.size"
+              layout="total, sizes, ->, pager"
+              :total="pagination.total"
+            />
+          </div>
+        </section>
 
-      <YdDrawer v-model="detailOpen" :title="selected?.name || '插件详情'" :footer="false" content-class="w-full max-w-full sm:w-[760px] sm:max-w-[760px]">
         <section v-if="selected" class="plugin-detail">
-          <div class="detail-header">
-            <div class="plugin-detail-title">
-              <YdIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
-              <div>
-                <h2>{{ selected.name }}</h2>
-                <p>{{ selected.description || '-' }}</p>
+          <header class="detail-header">
+            <div class="detail-title">
+              <div class="detail-icon">
+                <YdIcon :name="pluginIcon(selected)" />
+              </div>
+              <div class="detail-title__text">
+                <h2>
+                  {{ selected.name }}
+                  <YdTag :variant="statusVariant(selected.status)">
+                    {{ statusText(selected.status) }}
+                  </YdTag>
+                </h2>
+                <p>{{ selected.description || '暂无描述' }}</p>
               </div>
             </div>
-            <YdTag :variant="statusVariant(selected.status)">
-              {{ statusText(selected.status) }}
-            </YdTag>
-          </div>
+            <div class="detail-actions">
+              <YdButton
+                variant="ghost"
+                class="detail-back"
+                @click="detailOpen = false"
+              >
+                <YdIcon name="morph:arrow-left" />
+                返回列表
+              </YdButton>
+              <YdButton
+                v-if="!selected.enabled"
+                v-auth="'platform:plugin:manage'"
+                :loading="actionLoading === `${selected.code}:enable`"
+                @click="runAction(selected.code, 'enable')"
+              >
+                <YdIcon name="morph:circle-play" />
+                启用
+              </YdButton>
+              <YdButton
+                v-if="selected.enabled"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:disable`"
+                @click="runAction(selected.code, 'disable')"
+              >
+                <YdIcon name="morph:circle-pause" />
+                禁用
+              </YdButton>
+              <YdButton
+                v-if="!selected.loaded"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:load`"
+                @click="runAction(selected.code, 'load')"
+              >
+                <YdIcon name="morph:cloud-download" />
+                加载
+              </YdButton>
+              <YdButton
+                v-if="!selected.enabled && selected.loaded"
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :loading="actionLoading === `${selected.code}:unload`"
+                @click="runAction(selected.code, 'unload')"
+              >
+                <YdIcon name="i-ri:eject-line" />
+                卸载
+              </YdButton>
+              <YdButton
+                variant="ghost"
+                :loading="actionLoading === `${selected.code}:open`"
+                @click="openPluginPage(selected.code)"
+              >
+                <YdIcon name="morph:external-link" />
+                打开插件页面
+              </YdButton>
+            </div>
+          </header>
+
+          <p class="detail-note" :data-status="selected.status">
+            <span class="detail-note__icon"><YdIcon :name="statusIcon(selected.status)" /></span>
+            {{ statusHint(selected) }}
+          </p>
+
+          <YdAlert
+            v-if="selected.errorMessage"
+            variant="destructive"
+            icon="morph:triangle-alert"
+            title="插件运行异常"
+          >
+            <template #description>
+              {{ selected.errorMessage }}
+            </template>
+          </YdAlert>
 
           <div class="detail-grid">
-            <div>
-              <span>插件编码</span>
-              <strong>{{ selected.code }}</strong>
+            <div class="info-cell">
+              <span>运行状态</span>
+              <YdTag :variant="statusVariant(selected.status)">
+                {{ statusText(selected.status) }}
+              </YdTag>
             </div>
-            <div>
+            <div class="info-cell">
               <span>版本</span>
-              <strong>{{ selected.version || '-' }}</strong>
+              <strong>{{ selected.version || '未知版本' }}</strong>
             </div>
-            <div v-if="selected.gitUrl">
-              <span>源码仓库</span>
-              <strong>
-                <YdButton variant="link" class="detail-git-link" @click="openGitUrl(selected.gitUrl)">
-                  <YdIcon name="i-ri:github-line" />
-                  {{ selected.gitUrl }}
-                </YdButton>
-              </strong>
+            <div class="info-cell">
+              <span>加载时间</span>
+              <strong>{{ formatTime(selected.loadedAt) }}</strong>
+            </div>
+            <div class="info-cell">
+              <span>启用时间</span>
+              <strong>{{ formatTime(selected.enabledAt) }}</strong>
             </div>
           </div>
 
-          <div v-if="updatePlanFor(selected.code)" class="update-panel" :class="{ blocked: updatePlanFor(selected.code)?.blockedReason }">
+          <div class="detail-plain">
+            <span>插件编码</span>
+            <code>{{ selected.code }}</code>
+            <YdCopyButton :text="selected.code" label="" />
+          </div>
+
+          <div v-if="selected.gitUrl" class="detail-plain">
+            <span>源码仓库</span>
+            <YdButton variant="link" class="detail-git-link" @click="openGitUrl(selected.gitUrl)">
+              <YdIcon name="i-ri:github-line" />
+              {{ selected.gitUrl }}
+            </YdButton>
+            <YdCopyButton :text="selected.gitUrl" label="" />
+          </div>
+
+          <div v-if="updatePlanFor(selected.code)" class="update-panel" :data-blocked="Boolean(updatePlanFor(selected.code)?.blockedReason)">
             <div class="section-title">
-              更新计划（只读）
+              <span>更新计划</span>
+              <YdTag :variant="updatePlanFor(selected.code)?.blockedReason ? 'destructive' : 'default'">
+                {{ updatePlanFor(selected.code)?.blockedReason ? '更新受阻' : '可更新' }}
+              </YdTag>
             </div>
-            <p>版本变化：{{ updatePlanFor(selected.code)?.fromVersion || '-' }} → {{ updatePlanFor(selected.code)?.toVersion || '-' }}</p>
-            <p>变更类型：{{ updatePlanFor(selected.code)?.changeType || '-' }}</p>
-            <p>需要重启：{{ updatePlanFor(selected.code)?.requiresRestart ? '是' : '否' }}</p>
-            <p v-if="updatePlanFor(selected.code)?.blockedReason">
-              阻断原因：{{ updatePlanFor(selected.code)?.blockedReason }}
-            </p>
+            <div class="update-version">
+              <strong>{{ updatePlanFor(selected.code)?.fromVersion || '未知' }}</strong>
+              <YdIcon name="morph:arrow-right" />
+              <strong>{{ updatePlanFor(selected.code)?.toVersion || '未知' }}</strong>
+            </div>
+            <ul class="update-facts">
+              <li>
+                <span>变更类型</span><strong>{{ updatePlanFor(selected.code)?.changeType || '—' }}</strong>
+              </li>
+              <li>
+                <span>需要重启</span><strong>{{ updatePlanFor(selected.code)?.requiresRestart ? '是' : '否' }}</strong>
+              </li>
+            </ul>
 
             <div v-if="updatePlanFor(selected.code)?.requiredDependencies?.length" class="plan-section">
               <strong>必需依赖</strong>
               <div class="dependency-list">
-                <YdTag v-for="dependency in updatePlanFor(selected.code)?.requiredDependencies" :key="`required-${dependency.code}`" variant="secondary">
+                <YdTag v-for="dependency in updatePlanFor(selected.code)?.requiredDependencies" :key="`required-${dependency.code}`" :variant="dependency.warning ? 'destructive' : 'secondary'">
                   {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }}{{ dependency.warning ? `：${dependency.warningReason || '存在告警'}` : '' }}
                 </YdTag>
               </div>
@@ -754,28 +1113,50 @@ function actionText(action: string) {
               </ul>
             </div>
 
-            <div v-if="!updatePlanFor(selected.code)?.blockedReason" class="detail-actions">
-              <YdButton
-                v-if="!updatePlanFor(selected.code)?.blockedReason"
-                v-auth="'platform:plugin:manage'"
-                :loading="actionLoading === `${selected.code}:update`"
-                :disabled="Boolean(actionLoading)"
-                @click="confirmUpdate(selected)"
-              >
-                <YdIcon name="morph:circle-arrow-up" />
-                确认更新
-              </YdButton>
-            </div>
-            <p v-if="!updatePlanFor(selected.code)?.blockedReason && (selected.enabled || updatePlanFor(selected.code)?.affectedEnabledPlugins?.length)" class="plan-warning">
-              确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。
-            </p>
+            <YdAlert
+              v-if="updatePlanFor(selected.code)?.blockedReason"
+              variant="destructive"
+              icon="morph:ban"
+              title="更新被阻断"
+            >
+              <template #description>
+                {{ updatePlanFor(selected.code)?.blockedReason }}
+              </template>
+            </YdAlert>
+            <template v-else>
+              <div class="detail-actions detail-actions--inline">
+                <YdButton
+                  v-auth="'platform:plugin:manage'"
+                  :loading="actionLoading === `${selected.code}:update`"
+                  :disabled="Boolean(actionLoading) || updatingAll"
+                  @click="confirmUpdate(selected)"
+                >
+                  <YdIcon name="morph:circle-arrow-up" />
+                  确认更新至 {{ updatePlanFor(selected.code)?.toVersion }}
+                </YdButton>
+                <YdButton
+                  v-if="availableUpdateCount > 1"
+                  v-auth="'platform:plugin:manage'"
+                  variant="outline"
+                  :disabled="Boolean(actionLoading) || updatingAll"
+                  @click="confirmUpdateAll"
+                >
+                  <YdIcon name="morph:layers" />
+                  一并更新其余 {{ availableUpdateCount - 1 }} 个
+                </YdButton>
+              </div>
+              <p class="plan-warning">
+                确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。
+              </p>
+            </template>
           </div>
 
-          <div v-if="selected.rollbackAvailable" class="detail-actions-group">
+          <div v-if="selected.rollbackAvailable" class="detail-section">
             <div class="section-title">
-              可用备份
+              <span>可用备份</span>
+              <YdTag variant="secondary">{{ selected.rollbackVersion || '本地备份' }}</YdTag>
             </div>
-            <div class="detail-actions">
+            <div class="detail-actions detail-actions--inline">
               <YdButton
                 v-auth="'platform:plugin:manage'"
                 variant="outline"
@@ -787,83 +1168,48 @@ function actionText(action: string) {
                 回滚到 {{ selected.rollbackVersion || '备份版本' }}
               </YdButton>
             </div>
+            <p class="section-hint">
+              回滚会按依赖顺序级联停机，回滚后不会自动启用；需要重启服务生效。
+            </p>
           </div>
 
-          <div v-if="selected.dependencies?.length" class="dependency-panel">
+          <div v-if="dependencyRows.length" class="detail-section">
             <div class="section-title">
-              插件依赖
-            </div>
-            <div class="dependency-list">
-              <YdTag v-for="dependency in selected.dependencies" :key="dependency" variant="secondary">
-                {{ dependency }}
+              <span>插件依赖</span>
+              <YdTag :variant="missingRequired.length ? 'destructive' : 'default'">
+                {{ dependencyReady }} / {{ dependencyRows.length }} 已启用
               </YdTag>
             </div>
+            <div class="dependency-rows">
+              <YdAction
+                v-for="dependency in dependencyRows"
+                :key="dependency.code"
+                class="dependency-row"
+                :class="{ 'is-missing': !dependency.available }"
+                @click="dependency.available ? focusPlugin(dependency.code) : undefined"
+              >
+                <span class="dependency-row__icon"><YdIcon :name="dependency.icon" /></span>
+                <span class="dependency-row__body">
+                  <strong>{{ dependency.name }}</strong>
+                  <code>{{ dependency.code }}{{ dependency.version ? ` · v${dependency.version}` : '' }}</code>
+                </span>
+                <YdTag variant="outline">{{ dependency.required ? '硬依赖' : '软依赖' }}</YdTag>
+                <YdTag :variant="dependencyVariant(dependency)">
+                  {{ dependencyText(dependency) }}
+                </YdTag>
+                <YdIcon v-if="dependency.available" name="morph:arrow-right" class="dependency-row__jump" />
+              </YdAction>
+            </div>
+            <p class="section-hint" :class="{ 'is-warning': missingRequired.length }">
+              {{ dependencySummary() }}
+            </p>
           </div>
 
-          <div v-if="selected.errorMessage" class="error-panel">
-            {{ selected.errorMessage }}
-          </div>
-
-          <div class="detail-actions-group">
+          <div class="detail-section detail-section--danger">
             <div class="section-title">
-              生命周期动作
+              <span>危险操作</span>
             </div>
-            <div class="detail-actions">
-              <YdButton
-                variant="outline"
-                :loading="actionLoading === `${selected.code}:open`"
-                @click="openPluginPage(selected.code)"
-              >
-                <YdIcon name="morph:external-link" />
-                打开插件页面
-              </YdButton>
-              <YdButton
-                v-if="!selected.loaded"
-                v-auth="'platform:plugin:manage'"
-                variant="outline"
-                :loading="actionLoading === `${selected.code}:load`"
-                @click="runAction(selected.code, 'load')"
-              >
-                <YdIcon name="morph:cloud-download" />
-                加载
-              </YdButton>
-              <YdButton
-                v-if="!selected.enabled"
-                v-auth="'platform:plugin:manage'"
-                :loading="actionLoading === `${selected.code}:enable`"
-                @click="runAction(selected.code, 'enable')"
-              >
-                <YdIcon name="morph:circle-play" />
-                启用
-              </YdButton>
-              <YdButton
-                v-if="selected.enabled"
-                v-auth="'platform:plugin:manage'"
-                variant="outline"
-                :loading="actionLoading === `${selected.code}:disable`"
-                @click="runAction(selected.code, 'disable')"
-              >
-                <YdIcon name="morph:circle-pause" />
-                禁用
-              </YdButton>
-              <YdButton
-                v-if="!selected.enabled && selected.loaded"
-                v-auth="'platform:plugin:manage'"
-                variant="outline"
-                :loading="actionLoading === `${selected.code}:unload`"
-                @click="runAction(selected.code, 'unload')"
-              >
-                <YdIcon name="i-ri:eject-line" />
-                卸载
-              </YdButton>
-            </div>
-          </div>
-
-          <div class="detail-actions-group detail-actions-group--danger">
-            <div class="section-title">
-              危险操作
-            </div>
-            <div class="detail-actions">
+            <div class="detail-actions detail-actions--inline">
               <YdButton
                 v-auth="'platform:plugin:manage'"
                 variant="destructive"
@@ -873,13 +1219,13 @@ function actionText(action: string) {
                 <YdIcon name="morph:trash-2" />
                 删除记录
               </YdButton>
-              <p class="detail-danger-hint">
-                删除只移除管理记录，不删除磁盘 JAR；有运行中依赖方时会先要求级联确认。
-              </p>
             </div>
+            <p class="section-hint">
+              删除只移除管理记录，不删除磁盘 JAR；磁盘上的 JAR 会在下次扫描后重新出现。
+            </p>
           </div>
         </section>
-      </YdDrawer>
+      </div>
 
       <EnableDependencyDialog
         v-model="enableDialogOpen"
@@ -899,143 +1245,161 @@ function actionText(action: string) {
 </template>
 
 <style scoped>
-.plugin-toolbar,
-.plugin-toolbar-actions,
-.plugin-filters,
-.detail-header,
-.detail-actions,
-.plugin-identity,
-.plugin-card-heading,
-.plugin-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.plugin-toolbar { margin-bottom: 16px; }
+.plugin-toolbar__summary { color: var(--color-text-3); font-size: 13px; }
+.plugin-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+/* 目录与详情各自限高、独立滚动：列表滚动不再带动详情，页面不超出可视区。 */
+.plugin-workbench { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: stretch; }
+.plugin-workbench > * { max-height: var(--plugin-pane-max-height, calc(100dvh - 272px)); min-height: 320px; }
+.plugin-workbench.is-single { grid-template-columns: minmax(0, 1fr); }
+
+.plugin-browser { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 12px; min-width: 0; min-height: 0; }
+/* 底部渐隐：提示目录还有更多插件，滚到底自动消失 */
+.plugin-browser::after { position: absolute; right: 0; bottom: 56px; left: 0; height: 36px; background: linear-gradient(to top, var(--color-bg-2), transparent); content: ''; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+.plugin-browser.has-more::after { opacity: 1; }
+.plugin-browser :deep(.yd-loading-overlay) { min-height: 0; height: 100%; }
+.plugin-browser :deep(.yd-loading-overlay__content) { display: grid; grid-template-rows: minmax(0, 1fr); min-height: 0; height: 100%; }
+.plugin-catalog { display: grid; align-content: start; gap: 6px; max-height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 8px 2px 2px; }
+.plugin-pagination { display: flex; justify-content: center; padding-top: 4px; border-top: 1px solid var(--color-border-2); }
+
+/* 插件行：左侧色条代表状态，名称行末尾声明状态，第三行放描述/错误信息 */
+.plugin-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'icon name side' 'icon code side' 'icon desc side'; column-gap: 10px; row-gap: 2px; align-items: center; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--color-border-2); border-left-width: 3px; border-radius: 10px; background: var(--color-bg-1); color: var(--color-text-1); text-align: left; transition: border-color .18s ease, background-color .18s ease, transform .18s cubic-bezier(.32, .72, 0, 1), box-shadow .18s ease; animation: plugin-row-in .32s cubic-bezier(.32, .72, 0, 1) both; animation-delay: calc(var(--row-index, 0) * 22ms); }
+.plugin-row:hover { transform: translateY(-2px); background: var(--color-fill-1); box-shadow: 0 6px 18px -12px oklch(0 0 0 / 45%); }
+.plugin-row:hover .plugin-row__icon { transform: scale(1.06) rotate(-2deg); }
+.plugin-row.is-selected { background: var(--color-fill-2); border-color: var(--color-text-3); }
+.plugin-row__icon { display: grid; grid-area: icon; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--color-fill-2); color: var(--color-text-2); font-size: 18px; transition: transform .18s cubic-bezier(.32, .72, 0, 1); }
+.plugin-row__name { display: flex; grid-area: name; align-items: baseline; gap: 6px; min-width: 0; }
+.plugin-row__name strong { overflow: hidden; color: var(--color-text-1); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.plugin-row__name small { flex: none; color: var(--color-text-3); font-size: 11px; }
+.plugin-row__code { grid-area: code; overflow: hidden; color: var(--color-text-3); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.plugin-row__description { grid-area: desc; overflow: hidden; color: var(--color-text-3); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.plugin-row__description.is-error { color: var(--color-danger-6); }
+.plugin-row__side { display: flex; grid-area: side; flex-direction: column; align-items: flex-end; align-self: center; gap: 4px; min-width: 0; white-space: nowrap; }
+.plugin-row__update { max-width: 132px; overflow: hidden; }
+.plugin-row__state { display: inline-flex; align-items: center; gap: 2px; color: var(--color-text-3); font-size: 11.5px; }
+.plugin-row__chevron { color: var(--color-text-3); transition: transform .18s cubic-bezier(.32, .72, 0, 1); }
+.plugin-row:hover .plugin-row__chevron { transform: translateX(3px); color: var(--color-text-1); }
+
+/* 状态即配色：运行中用强调色，未启用走中性弱化，异常用危险色并轻微染色 */
+.plugin-row[data-status='ENABLED'] { border-left-color: var(--yd-emphasis, var(--color-text-1)); }
+.plugin-row[data-status='ENABLED'] .plugin-row__state { color: var(--yd-emphasis, var(--color-text-1)); font-weight: 600; }
+.plugin-row[data-status='LOADED'] { border-left-color: var(--color-border-3); }
+.plugin-row[data-status='INSTALLED'] { border-left-color: var(--color-border-2); }
+.plugin-row[data-status='INSTALLED'] .plugin-row__icon { opacity: .78; }
+.plugin-row[data-status='DISABLED'] { border-left-color: var(--color-border-2); }
+.plugin-row[data-status='DISABLED'] .plugin-row__icon { opacity: .62; }
+.plugin-row[data-status='ERROR'] { border-left-color: var(--color-danger-6); background: color-mix(in oklab, var(--color-danger-6) 6%, var(--color-bg-1)); }
+.plugin-row[data-status='ERROR'] .plugin-row__state { color: var(--color-danger-6); font-weight: 600; }
+@keyframes plugin-row-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.plugin-detail { display: grid; gap: 16px; align-content: start; container-type: inline-size; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-2); scrollbar-gutter: stable; }
+/* 标题与动作各占一行：动作按钮多且互斥，挤在标题右侧会折成两三行 */
+.detail-header { display: grid; gap: 14px; }
+.detail-title { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.detail-title__text { min-width: 0; }
+.detail-title h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--color-text-1); font-size: 18px; font-weight: 650; }
+.detail-title p { margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }
+.detail-icon { display: grid; width: 46px; height: 46px; flex: none; place-items: center; border-radius: 12px; background: var(--color-fill-2); color: var(--color-text-2); font-size: 24px; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.detail-actions--inline { justify-content: flex-start; }
+.detail-back { display: none; }
+
+/* 状态说明条：状态词之外补一句「这意味着什么、下一步做什么」 */
+.detail-note { display: flex; gap: 8px; align-items: center; margin: 0; padding: 10px 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-fill-1); color: var(--color-text-2); font-size: 13px; line-height: 1.6; }
+.detail-note[data-status='ENABLED'] { color: var(--color-text-1); }
+.detail-note__icon { display: inline-flex; flex: none; color: var(--color-text-3); font-size: 16px; }
+.detail-note[data-status='ENABLED'] .detail-note__icon { color: var(--yd-emphasis, var(--color-text-1)); }
+.detail-note[data-status='ERROR'] { border-color: color-mix(in oklab, var(--color-danger-6) 40%, var(--color-border-2)); color: var(--color-text-1); }
+.detail-note[data-status='ERROR'] .detail-note__icon { color: var(--color-danger-6); }
+
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+@container (min-width: 520px) {
+  .detail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-.plugin-toolbar {
-  flex-wrap: wrap;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
+/* 信息格：值是标签时必须靠上靠左，grid 默认拉伸会把标签撑成大色块 */
+.info-cell { display: grid; gap: 8px; align-content: start; justify-items: start; padding: 12px 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.info-cell > span { color: var(--color-text-3); font-size: 12px; }
+.info-cell > strong { color: var(--color-text-1); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 
-.plugin-toolbar-actions,
-.plugin-filters {
-  flex-wrap: wrap;
-}
-
-.plugin-search { width: min(100%, 340px); }
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.summary-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 10px;
-  background: var(--color-bg-2);
-}
-
-.summary-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-  font-size: 20px;
-}
-
-.summary-body { display: grid; gap: 3px; }
-.summary-body span,
-.detail-grid span,
-.plugin-muted { color: var(--color-text-3); font-size: 12px; }
-.summary-body strong,
-.detail-grid strong { color: var(--color-text-1); font-weight: 700; }
-
-.plugin-browser {
-  min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 10px;
-  background: var(--color-bg-2);
-}
-
-.plugin-browser-header { margin-bottom: 16px; }
-.plugin-browser-header h2 { margin: 0 0 4px; color: var(--color-text-1); font-size: 16px; }
-.plugin-browser-header p { margin: 0; color: var(--color-text-3); font-size: 13px; }
-.plugin-browser :deep(.plugin-table-root) { overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 8px; }
-.plugin-browser :deep(.plugin-table) { width: 100%; }
-
-.plugin-identity { min-width: 0; align-items: flex-start; }
-.plugin-identity-icon {
-  width: 36px;
-  height: 36px;
-  flex: none;
-  padding: 7px;
-  border-radius: 8px;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-}
-.plugin-identity-text { display: grid; min-width: 0; gap: 3px; }
-.plugin-identity-text strong { color: var(--color-text-1); font-weight: 600; }
-.plugin-code, .plugin-description { color: var(--color-text-3); font-size: 12px; overflow-wrap: anywhere; }
-.plugin-description { max-width: 520px; line-height: 1.5; }
-.plugin-pagination { margin-top: 20px; }
-.plugin-empty-action { display: flex; justify-content: center; padding-top: 8px; }
-
-.plugin-mobile-card { width: 100%; }
-.plugin-card-heading { align-items: flex-start; justify-content: space-between; }
-.plugin-card-heading .plugin-identity { flex: 1; }
-.plugin-card-description { margin: 12px 0; color: var(--color-text-2); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-.plugin-card-meta { flex-wrap: wrap; margin-bottom: 14px; color: var(--color-text-3); font-size: 12px; }
-
-.plugin-detail { min-width: 0; padding: 6px 4px 24px; }
-.detail-header { align-items: flex-start; justify-content: space-between; }
-.plugin-detail-title { display: flex; min-width: 0; align-items: flex-start; gap: 12px; }
-.plugin-detail-icon {
-  width: 44px;
-  height: 44px;
-  flex: none;
-  padding: 8px;
-  border-radius: 8px;
-  background: var(--color-fill-2);
-}
-.detail-header h2 { margin: 0 0 4px; color: var(--color-text-1); font-size: 18px; }
-.detail-header p { margin: 0; color: var(--color-text-3); font-size: 13px; line-height: 1.6; }
-.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 20px; }
-.detail-grid > div { display: grid; min-width: 0; gap: 6px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
-.detail-grid strong { overflow-wrap: anywhere; }
+/* 单值信息行：编码/源码仓库这类长值独占一行，避免撑破格子 */
+.detail-plain { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
+.detail-plain > span { color: var(--color-text-3); font-size: 12px; }
+.detail-plain code { overflow: hidden; color: var(--color-text-1); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-git-link { justify-self: start; max-width: 100%; padding: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 
-.update-panel, .dependency-panel, .detail-actions-group, .error-panel { margin-top: 20px; }
-.update-panel { padding: 16px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
-.update-panel.blocked { border-color: var(--color-border-3); }
-.update-panel p { margin: 6px 0 0; color: var(--color-text-2); line-height: 1.6; }
-.plan-section { margin-top: 16px; }
-.plan-section strong { display: block; margin-bottom: 8px; }
-.plan-warning { color: var(--color-text-2); font-size: 13px; }
-.warning-list { margin: 0; padding-left: 20px; color: var(--color-text-2); }
-.section-title { margin-bottom: 8px; color: var(--color-text-1); font-weight: 700; }
-.dependency-list, .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.detail-actions { margin-top: 16px; }
-.detail-actions-group { padding-top: 18px; border-top: 1px solid var(--color-border-2); }
-.detail-danger-hint { flex: 1 1 240px; margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
-.error-panel { padding: 12px 14px; border: 1px solid var(--color-border-3); border-radius: 8px; background: var(--color-bg-1); color: var(--color-text-1); overflow-wrap: anywhere; }
+.update-panel { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--color-border-2); border-radius: 10px; background: linear-gradient(180deg, var(--color-fill-1), var(--color-bg-1)); }
+.update-panel[data-blocked='true'] { border-color: color-mix(in oklab, var(--color-danger-6) 40%, var(--color-border-2)); }
+.update-version { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--color-text-3); font-size: 13px; }
+.update-version strong { color: var(--color-text-1); font-size: 15px; font-weight: 650; }
+.update-facts { display: flex; flex-wrap: wrap; gap: 24px; margin: 0; padding: 0; list-style: none; }
+.update-facts li { display: grid; gap: 2px; }
+.update-facts span { color: var(--color-text-3); font-size: 12px; }
+.update-facts strong { color: var(--color-text-1); font-size: 14px; font-weight: 600; }
+.plan-section { display: grid; gap: 8px; }
+.plan-section > strong { color: var(--color-text-2); font-size: 13px; font-weight: 600; }
+.warning-list { display: grid; gap: 4px; margin: 0; padding-left: 20px; color: var(--color-text-2); font-size: 13px; line-height: 1.6; }
+.plan-warning { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
 
-@media (max-width: 768px) {
-  .plugin-toolbar, .plugin-toolbar-actions, .plugin-filters, .detail-header { align-items: stretch; flex-direction: column; }
-.plugin-search { width: 100%; }
-  .plugin-browser { padding: 14px; }
+.detail-section { display: grid; gap: 12px; padding-top: 18px; border-top: 1px solid var(--color-border-2); }
+.section-title { display: flex; gap: 8px; align-items: center; justify-content: space-between; color: var(--color-text-1); font-weight: 650; }
+.section-title span { display: inline-flex; gap: 6px; align-items: center; }
+.section-hint { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.6; }
+.section-hint.is-warning { color: var(--color-danger-6); }
+.dependency-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 依赖行：状态一目了然，可直接跳到被依赖插件 */
+.dependency-rows { display: grid; gap: 8px; }
+.dependency-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto 16px; gap: 10px; align-items: center; width: 100%; min-width: 0; padding: 9px 12px; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); text-align: left; transition: border-color .16s ease, background-color .16s ease, transform .16s cubic-bezier(.32, .72, 0, 1); }
+.dependency-row:hover { transform: translateX(2px); border-color: var(--color-border-3); background: var(--color-fill-1); }
+.dependency-row:hover .dependency-row__jump { opacity: 1; transform: none; }
+.dependency-row.is-missing { border-style: dashed; }
+.dependency-row__icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--color-fill-2); color: var(--color-text-2); font-size: 15px; }
+.dependency-row__body { display: grid; gap: 2px; min-width: 0; }
+.dependency-row__body strong { color: var(--color-text-1); font-size: 13px; font-weight: 600; }
+.dependency-row__body code { color: var(--color-text-3); font-size: 11px; }
+.dependency-row__jump { opacity: 0; color: var(--color-text-3); transform: translateX(-3px); transition: opacity .16s ease, transform .16s cubic-bezier(.32, .72, 0, 1); }
+
+/* 雅致/紧凑外观与系统「减少动态效果」下关闭位移与入场动画 */
+:global([data-admin-style='calm']) .plugin-row,
+:global([data-admin-style='compact']) .plugin-row { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .plugin-row { animation: none; }
+  .plugin-row:hover,
+  .dependency-row:hover { transform: none; }
+  .plugin-row:hover .plugin-row__icon { transform: none; }
+  .plugin-row:hover .plugin-row__chevron { transform: none; }
+}
+
+/* 窄屏单窗格：选中插件后展示详情并提供返回列表，不再需要长距离滚动 */
+@media (max-width: 900px) {
+  .plugin-workbench { grid-template-columns: minmax(0, 1fr); }
+  .plugin-workbench.is-detail .plugin-browser { display: none; }
+  .plugin-workbench:not(.is-detail) .plugin-detail { display: none; }
+  .plugin-workbench > * { max-height: none; min-height: 0; }
+  .plugin-browser { max-height: none; }
+  .plugin-catalog { max-height: min(560px, 58dvh); }
+  .plugin-browser::after { bottom: 64px; }
+  .detail-back { display: inline-flex; }
+  .detail-title { align-items: flex-start; }
+  .detail-title__text h2 { overflow-wrap: anywhere; }
+  .dependency-row { grid-template-columns: 30px minmax(0, 1fr) auto; row-gap: 6px; }
+  .dependency-row__jump { display: none; }
   .plugin-pagination { overflow-x: auto; }
+}
+@media (max-width: 560px) {
+  .plugin-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'icon name' 'icon code' 'icon desc' 'side side'; row-gap: 3px; }
+  .plugin-row__side { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid var(--color-border-2); }
+  .plugin-row__update { max-width: none; }
+  .plugin-detail { padding: 16px; }
+  .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .update-facts { gap: 16px; }
+  .detail-actions > * { flex: 1 1 auto; }
+}
+
+/* 窄屏工具栏已经占掉半屏：次级排序筛选收起，把高度让给列表与详情 */
+@media (max-width: 768px) {
+  .plugin-sort-filter { display: none; }
 }
 </style>
