@@ -101,6 +101,42 @@ export interface AiToolModuleCatalog {
   modules: AiToolModule[]
 }
 
+export interface AiToolCatalogRow {
+  /** Python 自定义工具主键（编辑/删除用）；其他来源为空 */
+  toolId?: string
+  code: string
+  name: string
+  description?: string
+  /** 来源：system（宿主系统工具）/ plugin（插件）/ mcp（MCP 服务）/ python（自定义） */
+  source: string
+  moduleCode: string
+  moduleName: string
+  /** 模块开关（受系统工具总开关影响） */
+  moduleEnabled: boolean
+  /** 常驻模块：无需 load_tools 加载 */
+  moduleAlwaysOn: boolean
+  risk?: string
+  requiresConfirmation?: boolean
+  /** 工具自身启用状态：Python 工具可停用；系统/插件/MCP 跟随模块与服务开关 */
+  enabled: boolean
+  editable: boolean
+  deletable: boolean
+  testable: boolean
+  permissionCode?: string
+  /** 工具输入 schema，用于测试调用时预填参数 */
+  inputSchema?: Record<string, unknown>
+}
+
+export interface AiToolTestResult {
+  success: boolean
+  message: string
+  action?: string
+  toolCode: string
+  source?: string
+  durationMillis: number
+  payload?: Record<string, unknown>
+}
+
 export interface AgentRunResult {
   content: string
   toolResults: Array<{ toolName: string, action: string, message: string, payload?: Record<string, unknown> }>
@@ -190,6 +226,8 @@ export default {
   models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
   toolModules: () => systemClient.get<unknown, ApiResponse<AiToolModuleCatalog>>('api/platform/agents/tools/modules'),
+  toolCatalog: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AiToolCatalogRow>>>('api/platform/agents/tools/catalog', { params }),
+  testTool: (data: { code: string, arguments?: Record<string, unknown> }) => systemClient.post<unknown, ApiResponse<AiToolTestResult>>('api/platform/agents/tools/test', data),
   updateSystemToolsEnabled: (enabled: boolean) => systemClient.put<unknown, ApiResponse<AiToolModuleCatalog>>(`api/platform/agents/tools/system/enabled/${enabled}`),
   updateToolModuleEnabled: (code: string, enabled: boolean) => systemClient.put<unknown, ApiResponse<AiToolModuleCatalog>>(`api/platform/agents/tools/modules/${encodeURIComponent(code)}/enabled/${enabled}`),
   createTool: (data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.post<unknown, ApiResponse<AgentTool>>('api/platform/agents/tools', data),
