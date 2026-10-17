@@ -21,9 +21,10 @@ public interface PluginMarketPublicationRepo {
     List<PluginMarketPublication> findAll();
 
     /**
-     * 管理端分页。status / publisherUserId 为空表示不限制。
+     * 管理端分页。status / publisherUserId / keyword 为空表示不限制；
+     * keyword 命中插件编码、显示名与版本号。
      */
-    PageResult<PluginMarketPublication> page(PluginPublicationStatus status, Long publisherUserId, int page, int size);
+    PageResult<PluginMarketPublication> page(PluginPublicationStatus status, Long publisherUserId, String keyword, int page, int size);
 
     /** 原子递增下载计数，返回递增后的值。 */
     long incrementDownloadCount(Long id);

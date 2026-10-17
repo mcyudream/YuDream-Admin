@@ -192,7 +192,7 @@ public class PluginMarketPublicationAppService {
         PluginPublicationStatus status = StringUtils.hasText(safe.getStatus()) ? parseStatus(safe.getStatus()) : null;
         boolean mine = Boolean.TRUE.equals(safe.getMine()) || !canViewAll;
         Long publisherUserId = mine ? operatorUserId : null;
-        PageResult<PluginMarketPublication> result = publicationRepo.page(status, publisherUserId, page, size);
+        PageResult<PluginMarketPublication> result = publicationRepo.page(status, publisherUserId, safe.getKeyword(), page, size);
         return new PageResult<>(result.getRecords().stream().map(this::toDTO).toList(),
                 result.getTotal(), result.getPage(), result.getSize());
     }

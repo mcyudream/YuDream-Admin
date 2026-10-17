@@ -253,11 +253,12 @@ class PluginMarketPublicationAppServiceTest {
     void pageFiltersMineAndStatus() {
         PluginMarketPublication mine = publication("demo", "1.0.0", PluginPublicationStatus.PENDING);
         mine.setPublisherUserId(9L);
-        when(publicationRepo.page(PluginPublicationStatus.PENDING, 9L, 1, 10))
+        when(publicationRepo.page(PluginPublicationStatus.PENDING, 9L, "demo", 1, 10))
                 .thenReturn(new PageResult<>(List.of(mine), 1, 1, 10));
 
         PluginMarketPublicationPageQuery query = new PluginMarketPublicationPageQuery();
         query.setStatus("PENDING");
+        query.setKeyword("demo");
         query.setMine(true);
         query.setPage(1);
         query.setSize(10);
@@ -265,17 +266,17 @@ class PluginMarketPublicationAppServiceTest {
         PageResult<PluginMarketPublicationDTO> page = service.page(query, 9L, true);
         assertEquals(1, page.getTotal());
         assertEquals("demo", page.getRecords().getFirst().getCode());
-        verify(publicationRepo).page(PluginPublicationStatus.PENDING, 9L, 1, 10);
+        verify(publicationRepo).page(PluginPublicationStatus.PENDING, 9L, "demo", 1, 10);
     }
 
     @Test
     void pageForcesMineWhenOperatorCannotViewAll() {
-        when(publicationRepo.page(null, 9L, 1, 10))
+        when(publicationRepo.page(null, 9L, null, 1, 10))
                 .thenReturn(new PageResult<>(List.of(), 0, 1, 10));
 
         service.page(new PluginMarketPublicationPageQuery(), 9L, false);
 
-        verify(publicationRepo).page(null, 9L, 1, 10);
+        verify(publicationRepo).page(null, 9L, null, 1, 10);
     }
 
     @Test

@@ -15,10 +15,12 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -71,13 +73,21 @@ public class PluginMarketPublicationRepoImpl implements PluginMarketPublicationR
     }
 
     @Override
-    public PageResult<PluginMarketPublication> page(PluginPublicationStatus status, Long publisherUserId, int page, int size) {
+    public PageResult<PluginMarketPublication> page(PluginPublicationStatus status, Long publisherUserId, String keyword, int page, int size) {
         Query query = new Query();
         if (status != null) {
             query.addCriteria(Criteria.where("status").is(status));
         }
         if (publisherUserId != null) {
             query.addCriteria(Criteria.where("publisherUserId").is(publisherUserId));
+        }
+        if (StringUtils.hasText(keyword)) {
+            // 用户输入按字面匹配：Pattern.quote 避免把 . * 等当成正则元字符
+            String pattern = Pattern.quote(keyword.trim());
+            query.addCriteria(new Criteria().orOperator(
+                    Criteria.where("code").regex(pattern, "i"),
+                    Criteria.where("displayName").regex(pattern, "i"),
+                    Criteria.where("pluginVersion").regex(pattern, "i")));
         }
         query.with(Sort.by(Sort.Direction.DESC, "createTime"));
         long total = mongoTemplate.count(query, PluginMarketPublicationDO.class);
