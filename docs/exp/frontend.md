@@ -105,6 +105,20 @@
 - **规避**：根节点 `height:100%; min-height:0; overflow:hidden`，内部滚动区 `min-height:0; overflow:auto`。
 - **来源**：`workflow-editor-scroll-container`。
 
+### 双栏工作台用「视口高度减固定值」定高，底部翻页条被挤出可视区
+
+- **现象**：插件管理页在 1280×800 到 1500×1180 的窗口下，两栏工作台比可视区高出 75–119px，页头/工具栏本身还要滚动才能看到底部的分页条；同一份 `calc(100dvh - 272px)` 在宽窗口“看起来没问题”，窄窗口工具栏按钮换行后就露馅。
+- **根因**：减去的常量只按某一组页头 + 工具栏高度调过；工具栏行数随宽度变化（按钮换行、状态胶囊换行），`dvh` 减常量与元素真实位置脱钩。
+- **规避**：挂载时实测工作台 `getBoundingClientRect().top`，用 `window.innerHeight - top - 34`（页面容器 p-4/m-4 各 16px）算可用高度写进 CSS 变量，并在 `resize` 时重算；窄屏单栏模式移除该变量。验收断言取工作台/分页条的 `bottom` 与 `innerHeight` 比较，以及 `documentElement.scrollHeight <= innerHeight`，别只看截图是否“看着居中”（见 `tmp/probe-workbench-fit.cjs`）。
+- **来源**：`plugin-workbench-pane-fit`。
+
+### 服务端分页的计数胶囊把数字拼成了字符串
+
+- **现象**：筛选胶囊的计数与底部比例条渲染成一长串数字或宽度明显失真——`total`、各状态计数在响应里是字符串，`count + count` 变成拼接。
+- **根因**：全局 Jackson `ToStringSerializer` 把 Long 序列化成字符串（`{"total":"12"}`），前端类型仍声明为 `number`；服务端分页后计数来自 `summary` 接口，不再是前端自己数的数字，问题才暴露。
+- **规避**：分页/概览响应里的 `total`、`page`、`size` 与每个计数值一律 `Number()` 归一化后再进状态；行数据全量下发时前端自己计数不会碰到这个坑，改服务端分页时是必检项。
+- **来源**：`plugin-directory-server-side-paging`。
+
 ### 浮动调试面板被侧栏/模态遮挡
 
 - **现象**：面板在布局容器里被侧栏压住；或抽屉打开时遮罩阻断系统操作。
