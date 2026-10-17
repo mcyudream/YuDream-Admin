@@ -56,7 +56,7 @@ class PermissionChangesControllerTest {
     @Test
     void userRoleChangesRequireAssignRoleAndPreserveStringIdsInTheCommand() {
         UserRoleChangesAppService service = mock(UserRoleChangesAppService.class);
-        UserManageController controller = new UserManageController(null, null, null, service);
+        UserManageController controller = new UserManageController(null, null, null, service, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.checkPermission("system:user:assign-role")).thenThrow(new IllegalStateException("无分配权限"));
             assertThrows(IllegalStateException.class, () -> controller.roleChanges(1L, new UserRoleChangesRequest()));
@@ -82,7 +82,7 @@ class PermissionChangesControllerTest {
         UserRoleChangesAppService service = mock(UserRoleChangesAppService.class);
         UserRoleChangesRequest request = new UserRoleChangesRequest();
         request.setExpectedRoleIds(List.of());
-        UserManageController controller = new UserManageController(null, null, null, service);
+        UserManageController controller = new UserManageController(null, null, null, service, null);
         try (MockedStatic<StpUtil> auth = mockStatic(StpUtil.class)) {
             auth.when(() -> StpUtil.checkPermission("system:user:view")).thenThrow(new IllegalStateException("无用户查看权限"));
             assertThrows(IllegalStateException.class, () -> controller.roleChanges(1L, request));

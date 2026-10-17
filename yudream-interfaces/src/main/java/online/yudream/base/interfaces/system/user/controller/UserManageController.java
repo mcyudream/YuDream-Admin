@@ -9,11 +9,13 @@ import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserManageAppService;
 import online.yudream.base.application.system.user.service.UserRoleChangesAppService;
+import online.yudream.base.application.system.user.service.UserStatsAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.user.assembler.UserManageWebAssembler;
+import online.yudream.base.interfaces.system.user.assembler.UserStatsWebAssembler;
 import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
 import online.yudream.base.interfaces.system.user.request.UserAssignDeptsRequest;
 import online.yudream.base.interfaces.system.user.request.UserAssignRolesRequest;
@@ -23,6 +25,7 @@ import online.yudream.base.interfaces.system.user.request.UserUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRoleChangesRequest;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserManageRes;
+import online.yudream.base.interfaces.system.user.res.UserStatsRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,6 +48,7 @@ public class UserManageController {
     private final UserAppService userAppService;
     private final LoginTokenAppService loginTokenAppService;
     private final UserRoleChangesAppService userRoleChangesAppService;
+    private final UserStatsAppService userStatsAppService;
 
     @PutMapping("/{id}/role-changes")
     @PermissionRegister(code = "system:user:assign-role", name = "分配用户角色", module = "系统管理", desc = "增量分配或移除用户角色")
@@ -66,6 +70,13 @@ public class UserManageController {
     public Result<PageResult<UserManageRes>> page(UserPageQuery query) {
         StpUtil.checkPermission("system:user:view");
         return Result.ok(UserManageWebAssembler.toUserPage(userManageAppService.page(query)));
+    }
+
+    @GetMapping("/stats")
+    @PermissionRegister(code = "system:user:view", name = "查看用户", module = "系统管理", desc = "用户统计概览")
+    public Result<UserStatsRes> stats() {
+        StpUtil.checkPermission("system:user:view");
+        return Result.ok(UserStatsWebAssembler.toRes(userStatsAppService.statistics()));
     }
 
     @PostMapping
