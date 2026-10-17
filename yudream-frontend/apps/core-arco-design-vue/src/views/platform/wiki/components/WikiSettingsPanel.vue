@@ -6,12 +6,13 @@ import type { WikiSpace } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import apiAgent from '@/api/modules/platform-agent'
 import apiGraph from '@/api/modules/platform-graph'
-import { saveWikiSpace } from '@/api/modules/platform-wiki'
+import { fetchWikiManagedComments, saveWikiSpace } from '@/api/modules/platform-wiki'
 import { wikiWorkbenchKey } from '../wiki-utils'
 import WikiCoverPanel from './WikiCoverPanel.vue'
 
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
+const { auth } = useAppAuth()
 
 const form = ref<Partial<WikiSpace>>({})
 const saving = ref(false)
@@ -28,6 +29,7 @@ const sectionList = [
   { label: '封面', value: 'cover', icon: 'morph:image' },
   { label: 'AI 模型', value: 'models', icon: 'morph:cpu' },
   { label: '检索与切分', value: 'retrieval', icon: 'morph:search' },
+  { label: '评论区', value: 'comments', icon: 'morph:message-square' },
   { label: '网络搜索', value: 'websearch', icon: 'morph:globe' },
   { label: '目录监听', value: 'watch', icon: 'morph:folder-sync' },
 ]
@@ -56,6 +58,43 @@ async function fetchGraphTables(query: YdTablePickerQuery): Promise<YdTablePicke
 watch(() => store.space.value, (space) => {
   form.value = space ? { ...space } : {}
 }, { immediate: true })
+
+// ---- 评论区：开关本身在设置表单里，审核队列数量只做提示，读写都走治理接口 ----
+const canReviewComments = computed(() => auth('platform:wiki:comment:view'))
+const commentStats = ref<{ pending: number, published: number } | null>(null)
+
+async function loadCommentStats(spaceId: string) {
+  if (!canReviewComments.value) {
+    commentStats.value = null
+    return
+  }
+  try {
+    const [pending, published] = await Promise.all([
+      fetchWikiManagedComments(spaceId, { page: 1, size: 1, status: 'PENDING' }),
+      fetchWikiManagedComments(spaceId, { page: 1, size: 1, status: 'PUBLISHED' }),
+    ])
+    // total 是服务端 Long，JSON 里是字符串：显示前统一归一化
+    commentStats.value = {
+      pending: Number(pending.data?.total ?? 0),
+      published: Number(published.data?.total ?? 0),
+    }
+  }
+  catch {
+    // 数量只是提示，权限或接口不可用时静默省略；审核队列本身会给出真实结果与错误
+    commentStats.value = null
+  }
+}
+
+watch(() => store.space.value?.id, (spaceId) => {
+  if (spaceId) {
+    void loadCommentStats(spaceId)
+  }
+}, { immediate: true })
+
+/** 评论依赖公开访问：依赖未满足时直接把分区导航切到「检索与切分」 */
+function goPublicRead() {
+  activeSection.value = 'retrieval'
+}
 
 /** 表单是否偏离当前知识库配置：治理区离开设置分区前的确认依据 */
 const dirty = computed(() => {
@@ -407,6 +446,35 @@ onMounted(loadGraphTables)
           </YdSettingsSection>
         </template>
 
+        <template #comments>
+          <YdSettingsSection title="评论区" description="公开页面的读者评论：提交后进入待审核，通过后才对外可见；开关随「保存设置」提交">
+            <div class="set-grid">
+              <label class="set-switch">
+                <YdSwitch v-model="form.commentEnabled" :disabled="!form.publicReadEnabled" />
+                <span>公开评论<small>读者可在公开页面与引用线程发表评论，提交后进入待审核</small></span>
+              </label>
+              <div v-if="!form.publicReadEnabled" class="set-depend">
+                <p class="set-hint">
+                  <YdIcon name="morph:info" /> 评论读写的都是公开接口，需要先开启「公开访问」
+                </p>
+                <YdButton variant="outline" size="sm" @click="goPublicRead">
+                  <YdIcon name="morph:arrow-right" /> 去开启公开访问
+                </YdButton>
+              </div>
+              <div v-else-if="canReviewComments && commentStats" class="set-queue">
+                <span class="set-queue__label"><YdIcon name="morph:list-checks" /> 审核队列</span>
+                <span class="set-fact">待审核 {{ commentStats.pending }} 条 · 已公开 {{ commentStats.published }} 条</span>
+                <YdButton variant="outline" size="sm" @click="store.openManage('comments')">
+                  <YdIcon name="morph:external-link" /> 去审核
+                </YdButton>
+              </div>
+              <p v-else class="set-hint set-field--full">
+                <YdIcon name="morph:shield-check" /> 读者评论一律先落待审核，通过后才出现在公开页面与引用线程。
+              </p>
+            </div>
+          </YdSettingsSection>
+        </template>
+
         <template #websearch>
           <YdSettingsSection title="网络搜索" description="深度研究使用的外部搜索通道">
             <div class="set-grid">
@@ -618,6 +686,50 @@ onMounted(loadGraphTables)
 .set-switch small {
   font-size: 11px;
   color: var(--color-text-3);
+}
+
+/* 评论开关依赖「公开访问」：依赖未满足时给一行说明 + 直达动作，不留下一个禁用却说不清原因的开关 */
+.set-depend {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+/* 审核队列数量：行内文本，横跨整行时不与按钮抢列宽 */
+.set-fact {
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+/* 审核队列行：标签 / 数量 / 动作同一行，横跨整行；窄屏折行，按钮不越出卡片 */
+.set-queue {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+.set-queue__label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.set-queue__label :deep(svg) {
+  color: var(--color-text-2);
 }
 
 .set-empty {

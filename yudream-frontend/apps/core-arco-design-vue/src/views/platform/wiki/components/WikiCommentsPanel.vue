@@ -17,6 +17,8 @@ const { auth } = useAppAuth()
 
 const canManage = computed(() => auth('platform:wiki:comment:manage'))
 const canDelete = computed(() => auth('platform:wiki:comment:delete'))
+/** 开关公开评论属于空间设置（保存走 platform:wiki:manage）：没有该权限时只说明状态，不给跳转按钮 */
+const canManageSettings = computed(() => auth('platform:wiki:manage'))
 const commentEnabled = computed(() => store.space.value?.commentEnabled !== false)
 
 type StatusFilter = 'ALL' | 'PENDING' | 'PUBLISHED' | 'HIDDEN' | 'DELETED'
@@ -200,7 +202,10 @@ defineExpose({ reload: refresh })
         </div>
 
         <p v-if="!commentEnabled" class="cmt-note">
-          <YdIcon name="morph:message-square-off" /> 本知识库当前关闭了公开评论：已有评论仍可在此审核，读者无法发表新评论。可在「设置 → 评论区」开启。
+          <YdIcon name="morph:message-square-off" /> 本知识库当前关闭了公开评论：已有评论仍可在此审核，读者无法发表新评论。
+          <YdButton v-if="canManageSettings" variant="outline" size="sm" @click="store.openManage('settings')">
+            <YdIcon name="morph:settings" /> 去「设置 → 评论区」开启
+          </YdButton>
         </p>
         <p v-else-if="!canManage" class="cmt-note">
           <YdIcon name="morph:lock" /> 你当前没有评论审核权限（platform:wiki:comment:manage），只能查看；需要处理请联系管理员。
@@ -230,9 +235,8 @@ defineExpose({ reload: refresh })
         <template v-else-if="comments.length">
           <YdResponsiveEnhancedTable
             row-key="id"
-            stripe
-            border
-            column-visibility
+
+            stripe column-visibility border
             table-class="min-w-[980px]"
             :columns="commentColumns"
             :actions="commentActions"
@@ -264,7 +268,9 @@ defineExpose({ reload: refresh })
                   <span class="cmt-status__dot" :style="{ background: wikiCommentStatusLabel(row.original.status).color }" />
                   {{ wikiCommentStatusLabel(row.original.status).label }}
                 </span>
-                <YdTag v-if="row.original.pinned" variant="default">置顶</YdTag>
+                <YdTag v-if="row.original.pinned" variant="default">
+                  置顶
+                </YdTag>
               </div>
             </template>
             <template #cell-createTime="{ row }">
@@ -305,9 +311,9 @@ defineExpose({ reload: refresh })
 
 .cmt-head {
   display: flex;
+  gap: 16px;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
 }
 
 .cmt-head__title {
@@ -318,8 +324,8 @@ defineExpose({ reload: refresh })
 }
 
 .cmt-head__desc {
-  margin: 4px 0 0;
   max-width: 70ch;
+  margin: 4px 0 0;
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text-3);
@@ -379,24 +385,24 @@ defineExpose({ reload: refresh })
 }
 
 .cmt-content__text {
-  color: var(--color-text-1);
   /* 长评论必须在列内折行截断：不设限会横穿到相邻列 */
   display: -webkit-box;
   overflow: hidden;
-  word-break: break-word;
-  -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  color: var(--color-text-1);
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
 }
 
 .cmt-content__quote {
+  padding-left: 10px;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  padding-left: 10px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--color-text-3);
+  white-space: nowrap;
   border-left: 2px solid rgb(var(--gray-4));
 }
 

@@ -669,10 +669,24 @@ const accountStore = useAppAccountStore()
 const isLogin = computed(() => accountStore.isLogin)
 
 /** 空间评论能力：公开阅读 + 评论开关都由服务端空间配置下发（共享 WikiSpace 类型未声明，运行时字段在） */
-const spaceCommentEnabled = computed(() => {
+const spacePublicReadEnabled = computed(() => {
   const current = space.value as (WikiSpace & WikiSpaceCoverFields) | null
-  return current?.publicReadEnabled === true && current.commentEnabled === true
+  return current?.publicReadEnabled === true
 })
+
+const spaceCommentEnabled = computed(() => spacePublicReadEnabled.value
+  && (space.value as (WikiSpace & WikiSpaceCoverFields) | null)?.commentEnabled === true)
+
+/**
+ * 评论不可用的原因：公开访问与评论开关分别对应治理区两处设置，
+ * 提示要说清是哪一层没开、去哪里开——不能把「空间没开」写成「接口不可用」。
+ */
+function commentUnavailableReason(): string {
+  if (!spacePublicReadEnabled.value) {
+    return '知识库未开启公开访问：评论读写的都是公开接口，先到治理区「设置 → 检索与切分」开启「公开访问」。'
+  }
+  return '知识库未开启公开评论：到治理区「设置 → 评论区」开启后即可查看与发表评论。'
+}
 
 /** 评论入口（顶栏按钮 / 属性栏标签）只对开启评论的页面出现，避免给未开放能力做假入口 */
 const commentEntryVisible = computed(() => isPage.value && spaceCommentEnabled.value)
@@ -681,7 +695,7 @@ const commentPanelEnabled = computed(() => spaceCommentEnabled.value && Boolean(
 
 const commentDisabledHint = computed(() => {
   if (!spaceCommentEnabled.value) {
-    return '知识库未开启公开评论：评论接口不可用，界面不提供假入口。'
+    return commentUnavailableReason()
   }
   return '当前页面尚未发布：评论只针对已发布页面，发布后可查看与发表评论。'
 })
@@ -702,7 +716,7 @@ const commentCreateBlockedReason = computed(() => {
     return '目录节点没有正文，不能发表锚点评论。'
   }
   if (!spaceCommentEnabled.value) {
-    return '知识库未开放公开评论，暂不能发表评论。'
+    return commentUnavailableReason()
   }
   if (!current.publishedVersionId) {
     return '当前页面尚未发布：锚点评论只针对已发布版本，请先发布当前内容。'
@@ -993,7 +1007,7 @@ onBeforeUnmount(() => {
             :placeholder="node?.nodeType === 'DIRECTORY' ? '目录名称' : '页面标题'"
             aria-label="页面标题"
           />
-          <span :class="['wiki-author__status', statusToneClass]" role="status">
+          <span class="wiki-author__status" :class="[statusToneClass]" role="status">
             <YdIcon :name="statusIcon" :class="{ 'wiki-author__status-icon--pulse': dirty && !conflict }" />
             <span class="wiki-author__status-text">{{ statusText }}</span>
           </span>
@@ -1561,9 +1575,9 @@ onBeforeUnmount(() => {
 }
 
 .author-editor-card__path {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
   font-size: 12px;
   color: var(--color-text-3);
   white-space: nowrap;
@@ -1848,8 +1862,8 @@ onBeforeUnmount(() => {
 }
 
 .author-outline-view__empty {
-  margin: 0;
   padding: 0 4px;
+  margin: 0;
   font-size: 12px;
   color: var(--color-text-3);
 }
@@ -1869,14 +1883,14 @@ onBeforeUnmount(() => {
   min-height: 28px;
   padding: 4px 8px;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 400;
   line-height: 1.5;
   color: var(--color-text-2);
   text-align: left;
-  text-overflow: ellipsis;
-  border-radius: 6px;
   white-space: nowrap;
+  border-radius: 6px;
 }
 
 .author-outline__item.author-outline__item:hover {
@@ -2009,6 +2023,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-3);
 }
 </style>
+
 <style scoped>
 /* 工具条：一行三段（上下文 / 标题与状态 / 动作），用色阶与一条底边分隔，不用玻璃态、渐变与悬浮位移 */
 .author-bar {
@@ -2029,9 +2044,9 @@ onBeforeUnmount(() => {
 }
 
 .author-bar__space {
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-1);
@@ -2092,8 +2107,8 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 3px 10px;
   font-size: 12px;
-  border-radius: 999px;
   white-space: nowrap;
+  border-radius: 999px;
 }
 
 .wiki-author__status--saved {
@@ -2167,8 +2182,8 @@ onBeforeUnmount(() => {
 
 .author-aside__group-count {
   font-size: 11px;
-  color: var(--color-text-3);
   font-variant-numeric: tabular-nums;
+  color: var(--color-text-3);
 }
 
 .author-aside__group-chevron {

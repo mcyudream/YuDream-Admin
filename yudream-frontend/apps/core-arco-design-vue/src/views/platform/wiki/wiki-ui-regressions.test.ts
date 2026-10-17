@@ -302,3 +302,27 @@ test('collaboration area is real workbenches: space ACL members and comment revi
   assert.match(comments, /comment\.status === 'PUBLISHED' && !comment\.pinned/)
   assert.match(comments, /'HIDDEN', 'DELETED'\]\.includes\(comment\.status/)
 })
+
+test('public comments are switchable from space settings; hints never claim the interface is missing', () => {
+  const settings = wikiFile('components/WikiSettingsPanel.vue')
+  const author = wikiFile('components/WikiAuthorEditor.vue')
+  const comments = wikiFile('components/WikiCommentsPanel.vue')
+
+  // 「评论区」是设置里的真实分区：开关直接绑空间字段，依赖公开访问
+  assert.match(settings, /\{ label: '评论区', value: 'comments'/)
+  assert.match(settings, /<template #comments>/)
+  assert.match(settings, /<YdSwitch v-model="form\.commentEnabled" :disabled="!form\.publicReadEnabled" \/>/)
+  // 依赖未满足时给直达入口（切到检索与切分分区），不是留一个禁用开关
+  assert.match(settings, /function goPublicRead\(\) \{[\s\S]{0,90}activeSection\.value = 'retrieval'/)
+  // 审核队列数量走治理接口（total 是服务端 Long，显示前归一化），并可跳到协作 → 评论
+  assert.match(settings, /fetchWikiManagedComments\(spaceId, \{ page: 1, size: 1, status: 'PENDING' \}\)/)
+  assert.match(settings, /Number\(pending\.data\?\.total \?\? 0\)/)
+  assert.match(settings, /store\.openManage\('comments'\)/)
+
+  // 提示区分「未开公开访问 / 未开公开评论」并指向真实位置：不能把空间没开写成接口不可用
+  assert.match(author, /function commentUnavailableReason\(\)/)
+  assert.match(author, /设置 → 检索与切分/)
+  assert.match(author, /设置 → 评论区/)
+  assert.doesNotMatch(author, /评论接口不可用/)
+  assert.match(comments, /store\.openManage\('settings'\)/)
+})
