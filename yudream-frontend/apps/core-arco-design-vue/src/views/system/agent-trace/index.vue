@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, YdTablePageAction } from '@yudream/components'
+import type { ChartDataset } from '@yudream/dataviz'
 import type {
   AgentTraceDetail,
   AgentTraceQueryParams,
@@ -7,34 +8,26 @@ import type {
   AgentTraceStep,
   AgentTraceSummary,
 } from '@/api/modules/platform-agent-trace'
-import apiExcel from '@/api/modules/system-excel'
+import { useMediaQuery } from '@vueuse/core'
+import { useTablePage } from '@yudream/components'
+import { BarChart } from '@yudream/dataviz'
 import apiTrace from '@/api/modules/platform-agent-trace'
+import apiExcel from '@/api/modules/system-excel'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import { saveExcelResponse } from '@/utils/excel'
 
-const loading = ref(false)
-const statsLoading = ref(false)
+const modal = useYdModal()
+const toast = useYdToast()
+const { auth } = useAppAuth()
+
 const clearing = ref(false)
 const deleting = ref(false)
 const detailLoading = ref(false)
-const rows = ref<AgentTraceSummary[]>([])
-const stats = ref<AgentTraceStats | null>(null)
 const detail = ref<AgentTraceDetail | null>(null)
 const detailVisible = ref(false)
-const modal = useYdModal()
-const toast = useYdToast()
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive({
-  keyword: '',
-  source: '',
-  status: '',
-  agentCode: '',
-  pluginCode: '',
-  startTime: '',
-  endTime: '',
-})
 
+/** 来源词表：与 AgentTraceSource 枚举一一对应 */
 const sourceOptions = [
-  { label: '全部来源', value: '' },
   { label: '聊天', value: 'CHAT' },
   { label: 'Wiki', value: 'WIKI' },
   { label: 'CMS', value: 'CMS' },
@@ -42,15 +35,168 @@ const sourceOptions = [
   { label: '插件', value: 'PLUGIN' },
   { label: '系统', value: 'SYSTEM' },
 ]
+
+/** 状态词表：与 AgentTraceStatus 枚举一一对应 */
 const statusOptions = [
-  { label: '全部状态', value: '' },
   { label: '执行中', value: 'RUNNING' },
   { label: '成功', value: 'SUCCEEDED' },
   { label: '失败', value: 'FAILED' },
 ]
 
+/** 搜索选项数据源：标识与 AgentTracePageQuery 的 optionsSource 对应 */
+const optionsSources: SearchOptionsSource[] = [
+  { id: 'agentTraceSourceOptions', loader: () => sourceOptions },
+  { id: 'agentTraceStatusOptions', loader: () => statusOptions },
+]
+
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<AgentTraceSummary>({
+  queryClass: 'online.yudream.base.application.platform.agent.query.AgentTracePageQuery',
+  loadApi: async (query) => {
+    const res = await apiTrace.page({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+      source: query.source || undefined,
+      status: query.status || undefined,
+      agentCode: query.agentCode || undefined,
+      pluginCode: query.pluginCode || undefined,
+      startTime: query.timeRangeStart || undefined,
+      endTime: query.timeRangeEnd || undefined,
+    })
+    return {
+      records: res.data.list || [],
+      total: res.data.total || 0,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+  initialSize: 10,
+})
+
+/** 统计情报区：跟随当前筛选条件（stats 端点与列表同一套过滤参数） */
+const traceStats = ref<AgentTraceStats | null>(null)
+const traceStatsLoading = ref(false)
+const statsExpanded = ref(false)
+const statsEverExpanded = ref(false)
+
+/** 统计与列表共用同一套筛选参数 */
+function statsParams(query: Record<string, any>) {
+  return {
+    keyword: query.keyword || undefined,
+    source: query.source || undefined,
+    status: query.status || undefined,
+    agentCode: query.agentCode || undefined,
+    pluginCode: query.pluginCode || undefined,
+    startTime: query.timeRangeStart || undefined,
+    endTime: query.timeRangeEnd || undefined,
+  }
+}
+
+async function loadTraceStats() {
+  traceStatsLoading.value = true
+  try {
+    traceStats.value = (await apiTrace.stats(statsParams(searchQuery as Record<string, any>))).data
+  }
+  catch {
+    // 统计是情报板，不可用时不打断列表主流程
+    traceStats.value = null
+  }
+  finally {
+    traceStatsLoading.value = false
+  }
+}
+
+/** 窄屏判定：窄屏只留 KPI，图表不挂载 */
+const statsNarrow = useMediaQuery('(max-width: 768px)')
+
+/** 图表只在首次展开且宽屏时挂载，省掉折叠态的图表初始化开销 */
+const statsChartsMounted = computed(() => statsEverExpanded.value && !statsNarrow.value && Boolean(traceStats.value))
+watch(statsExpanded, (expanded) => {
+  if (expanded) {
+    statsEverExpanded.value = true
+    if (!traceStats.value) {
+      void loadTraceStats()
+    }
+  }
+}, { immediate: true })
+
+/** 图表主题跟随宿主明暗模式 */
+const chartTheme = computed<'light' | 'dark'>(() => {
+  if (typeof document === 'undefined') {
+    return 'light'
+  }
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+})
+
+function bucketDataset(label: string, buckets?: Array<{ label: string, count: number }>): ChartDataset {
+  return {
+    chartType: 'bar',
+    dimensions: ['分类', '次数'],
+    source: (buckets ?? []).map(item => [item.label, Number(item.count) || 0]),
+    label,
+  }
+}
+
+const sourceDataset = computed(() => bucketDataset('来源分布', traceStats.value?.sources))
+const agentDataset = computed(() => bucketDataset('Agent 分布', traceStats.value?.agents))
+
+/** 统计口径派生：成功率与 Token 合计 */
+const traceSuccessRate = computed(() => {
+  const total = Number(traceStats.value?.total) || 0
+  return total === 0 ? '—' : `${((Number(traceStats.value?.succeeded) || 0) / total * 100).toFixed(1)}%`
+})
+
+/** 状态语义色：执行中/成功/失败在长列表里一眼可辨 */
+const traceStatusColumn: StatusColumn<AgentTraceSummary> = {
+  statusKey: 'status',
+  header: '状态',
+  width: 90,
+  statusMap: {
+    RUNNING: { label: '执行中', variant: 'secondary', tone: 'warning' },
+    SUCCEEDED: { label: '成功', variant: 'default', tone: 'success' },
+    FAILED: { label: '失败', variant: 'destructive', tone: 'danger' },
+  },
+}
+
+/** 页头操作：刷新为主操作，导出收进「更多」；清空执行流是危险操作 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  { label: '刷新', icon: 'morph:refresh-cw', variant: 'outline', onClick: refresh },
+  ...(auth('system:monitor:agent-trace:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportExcel }]
+    : []),
+  ...(auth('system:monitor:agent-trace:delete')
+    ? [{ label: '清空', icon: 'morph:trash-2', variant: 'destructive' as const, danger: true, disabled: clearing.value, onClick: confirmClear }]
+    : []),
+])
+
+/** 行操作统一收进下拉，删除按权限显隐 */
+const traceActions: ActionMenuItem<AgentTraceSummary>[] = [
+  { label: '详情', icon: 'morph:eye', onClick: row => openDetail(row) },
+  {
+    label: '删除',
+    icon: 'morph:trash-2',
+    danger: true,
+    visible: () => auth('system:monitor:agent-trace:delete'),
+    disabled: () => deleting.value,
+    onClick: row => confirmDelete(row),
+  },
+]
+
+/** 追踪 ID 是行标识，固定左侧；其余列沿用原列表字段 */
 const tableColumns = computed<TableColumn<AgentTraceSummary>[]>(() => [
-  { id: 'status', header: '状态', width: 90, align: 'center' },
+  { id: 'traceId', header: '追踪 ID', width: 190, fixed: 'left' },
   { id: 'source', header: '来源', width: 90 },
   { id: 'agent', header: 'Agent', width: 220 },
   { accessorKey: 'ownerPluginCode', header: '插件', width: 140 },
@@ -59,83 +205,16 @@ const tableColumns = computed<TableColumn<AgentTraceSummary>[]>(() => [
   { id: 'input', header: '输入摘要', width: 280 },
   { id: 'startTime', header: '开始时间', width: 180 },
   { id: 'error', header: '错误', width: 220 },
-  { id: 'actions', header: '操作', width: 168, align: 'center' },
 ])
-
-onMounted(() => {
-  load()
-  loadStats()
-})
-
-function queryParams(extra?: Partial<AgentTraceQueryParams>): AgentTraceQueryParams {
-  return {
-    keyword: search.keyword || undefined,
-    source: search.source || undefined,
-    status: search.status || undefined,
-    agentCode: search.agentCode || undefined,
-    pluginCode: search.pluginCode || undefined,
-    startTime: search.startTime || undefined,
-    endTime: search.endTime || undefined,
-    ...extra,
-  }
-}
-
-async function load() {
-  loading.value = true
-  try {
-    const res = await apiTrace.page(queryParams({
-      page: pagination.page,
-      size: pagination.size,
-    }))
-    rows.value = res.data.list || []
-    pagination.total = res.data.total || 0
-  }
-  finally {
-    loading.value = false
-  }
-}
-
-async function loadStats() {
-  statsLoading.value = true
-  try {
-    const res = await apiTrace.stats(queryParams())
-    stats.value = res.data
-  }
-  finally {
-    statsLoading.value = false
-  }
-}
 
 function refresh() {
   pagination.page = 1
   load()
-  loadStats()
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.source = ''
-  search.status = ''
-  search.agentCode = ''
-  search.pluginCode = ''
-  search.startTime = ''
-  search.endTime = ''
-  refresh()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
+  void loadTraceStats()
 }
 
 function dateText(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '-'
+  return value ? value.replace('T', ' ').slice(0, 19) : ''
 }
 
 function formatDuration(ms?: number | null) {
@@ -162,19 +241,37 @@ function statusText(status?: string) {
 
 function sourceText(source?: string) {
   const map: Record<string, string> = { CHAT: '聊天', WIKI: 'Wiki', CMS: 'CMS', DEBUG: '调试', PLUGIN: '插件', SYSTEM: '系统' }
-  return map[source || ''] || source || '-'
+  return map[source || ''] || source || ''
 }
 
 function agentText(row: AgentTraceSummary) {
-  return row.agentName || row.agentCode || row.agentId || '-'
+  return row.agentName || row.agentCode || row.agentId || ''
 }
 
-function successRate() {
-  const total = stats.value?.total || 0
-  if (!total) {
-    return '-'
+/** 长文本（追踪 ID、输入摘要、错误摘要）中间截断，完整值靠 title 悬浮查看 */
+function truncateMiddle(value?: string | null, head = 8, tail = 4) {
+  if (!value) {
+    return ''
   }
-  return `${(((stats.value?.succeeded || 0) / total) * 100).toFixed(1)}%`
+  if (value.length <= head + tail + 1) {
+    return value
+  }
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
+/** 导出参数沿用接口既有的 startTime / endTime 字符串字段；导出接口不经过查询对象，结束日期需显式收口 */
+function queryParams(endOfDay = false): AgentTraceQueryParams {
+  return {
+    keyword: searchQuery.keyword || undefined,
+    source: searchQuery.source || undefined,
+    status: searchQuery.status || undefined,
+    agentCode: searchQuery.agentCode || undefined,
+    pluginCode: searchQuery.pluginCode || undefined,
+    startTime: searchQuery.timeRangeStart || undefined,
+    endTime: searchQuery.timeRangeEnd
+      ? `${searchQuery.timeRangeEnd}${endOfDay ? ' 23:59:59' : ''}`
+      : undefined,
+  }
 }
 
 async function openDetail(row: AgentTraceSummary) {
@@ -205,7 +302,7 @@ function exportJson(payload: AgentTraceSummary | AgentTraceDetail) {
 }
 
 async function exportExcel() {
-  const res = await apiExcel.exportAgentTraces({ ...queryParams() } as Record<string, unknown>)
+  const res = await apiExcel.exportAgentTraces({ ...queryParams(true) } as Record<string, unknown>)
   saveExcelResponse(res, 'Agent执行流.xlsx')
 }
 
@@ -227,7 +324,6 @@ async function deleteTrace(traceId: string) {
       detail.value = null
     }
     await load()
-    await loadStats()
   }
   finally {
     deleting.value = false
@@ -249,7 +345,6 @@ async function clearTraces() {
     toast.success(`已删除 ${res.data || 0} 条执行流`)
     pagination.page = 1
     await load()
-    await loadStats()
   }
   finally {
     clearing.value = false
@@ -261,173 +356,123 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
 
 <template>
   <div>
-    <YdPageHeader title="Agent 执行流" class="mb-0">
-      <YdButton variant="outline" :loading="loading || statsLoading" @click="refresh">
-        <YdIcon name="morph:refresh-cw" />
-        刷新
-      </YdButton>
-      <YdButton v-auth="'system:monitor:agent-trace:export'" variant="outline" @click="exportExcel">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-      <YdButton v-auth="'system:monitor:agent-trace:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
-        <YdIcon name="morph:trash-2" />
-        清空
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="Agent 执行流"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <template #stats="{ narrow, expanded }">
+        <div class="pt-1 flex flex-col gap-4">
+          <YdStats>
+            <YdStat title="总次数" :value="Number(traceStats?.total) || 0" description="按当前筛选统计" />
+            <YdStat
+              title="成功 / 失败 / 执行中"
+              :value="`${Number(traceStats?.succeeded) || 0} / ${Number(traceStats?.failed) || 0} / ${Number(traceStats?.running) || 0}`"
+            />
+            <YdStat title="成功率" :value="traceSuccessRate" />
+            <YdStat
+              title="平均 / 最长耗时"
+              :value="`${formatDuration(traceStats?.avgDurationMs)} / ${formatDuration(traceStats?.maxDurationMs)}`"
+            />
+            <YdStat
+              title="Token"
+              :value="Number(traceStats?.totalTokens) || 0"
+              :description="`输入 ${Number(traceStats?.promptTokens) || 0} · 输出 ${Number(traceStats?.completionTokens) || 0}`"
+            />
+          </YdStats>
 
-    <YdPageMain>
-      <div class="stats-grid mb-4">
-        <YdCard>
-          <div class="stat-label">总次数</div>
-          <div class="stat-value">{{ stats?.total ?? 0 }}</div>
-        </YdCard>
-        <YdCard>
-          <div class="stat-label">成功 / 失败 / 执行中</div>
-          <div class="stat-value">{{ stats?.succeeded ?? 0 }} / {{ stats?.failed ?? 0 }} / {{ stats?.running ?? 0 }}</div>
-        </YdCard>
-        <YdCard>
-          <div class="stat-label">成功率</div>
-          <div class="stat-value">{{ successRate() }}</div>
-        </YdCard>
-        <YdCard>
-          <div class="stat-label">平均 / 最长耗时</div>
-          <div class="stat-value">{{ formatDuration(stats?.avgDurationMs) }} / {{ formatDuration(stats?.maxDurationMs) }}</div>
-        </YdCard>
-        <YdCard>
-          <div class="stat-label">Token（prompt / completion / 合计）</div>
-          <div class="stat-value">{{ stats?.promptTokens ?? 0 }} / {{ stats?.completionTokens ?? 0 }} / {{ stats?.totalTokens ?? 0 }}</div>
-        </YdCard>
-      </div>
-
-      <div v-if="stats?.sources?.length || stats?.agents?.length" class="bucket-row mb-4">
-        <div v-if="stats?.sources?.length" class="bucket-group">
-          <span class="bucket-label">来源分布</span>
-          <YdTag v-for="item in stats.sources" :key="`source-${item.key}`" variant="outline">
-            {{ item.label }} {{ item.count }}
-          </YdTag>
-        </div>
-        <div v-if="stats?.agents?.length" class="bucket-group">
-          <span class="bucket-label">Agent 分布</span>
-          <YdTag v-for="item in stats.agents" :key="`agent-${item.key}`" variant="outline">
-            {{ item.label || item.key || '未标注' }} {{ item.count }}
-          </YdTag>
-        </div>
-      </div>
-
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="traceId"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1500px]"
-        border
-        stripe
-        column-visibility
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="search-grid">
-              <YdInput v-model="search.keyword" clearable placeholder="Agent / 插件 / 追踪ID / 输入 / 错误" @keydown.enter="refresh" @clear="refresh" />
-              <YdSelect v-model="search.source" :options="sourceOptions" placeholder="来源" />
-              <YdSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
-              <YdInput v-model="search.agentCode" clearable placeholder="Agent 编码" @keydown.enter="refresh" />
-              <YdInput v-model="search.pluginCode" clearable placeholder="插件编码" @keydown.enter="refresh" />
-              <YdInput v-model="search.startTime" type="datetime-local" />
-              <YdInput v-model="search.endTime" type="datetime-local" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  重置
-                </YdButton>
-                <YdButton :loading="loading" @click="refresh">
-                  <YdIcon name="morph:search" />
-                  筛选
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-status="{ row }">
-          <YdTag :variant="statusVariant(row.original.status)">
-            {{ statusText(row.original.status) }}
-          </YdTag>
-        </template>
-        <template #cell-source="{ row }">
-          {{ sourceText(row.original.source) }}
-        </template>
-        <template #cell-agent="{ row }">
-          <div class="path-cell">
-            <span>{{ agentText(row.original) }}</span>
-            <small v-if="row.original.agentCode && row.original.agentCode !== row.original.agentName">{{ row.original.agentCode }}</small>
+          <!-- 窄屏只留 KPI；图表首次展开才挂载 -->
+          <div v-if="statsChartsMounted" class="trace-stats__charts">
+            <section class="trace-stats__chart">
+              <BarChart :dataset="sourceDataset" :theme="chartTheme" :height="190" />
+            </section>
+            <section class="trace-stats__chart">
+              <BarChart :dataset="agentDataset" :theme="chartTheme" :height="190" />
+            </section>
           </div>
-        </template>
-        <template #cell-durationMs="{ row }">
-          {{ formatDuration(row.original.durationMs) }}
-        </template>
-        <template #cell-input="{ row }">
-          <span class="line-clamp-1">{{ row.original.input || '-' }}</span>
-        </template>
-        <template #cell-startTime="{ row }">
-          {{ dateText(row.original.startTime) }}
-        </template>
-        <template #cell-error="{ row }">
-          <span class="line-clamp-1">{{ row.original.error || '-' }}</span>
-        </template>
-        <template #cell-actions="{ row }">
-          <div class="flex justify-center gap-1">
-            <YdButton size="sm" variant="outline" @click="openDetail(row.original)">
-              详情
-            </YdButton>
-            <YdButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" :loading="deleting" @click="confirmDelete(row.original)">
-              删除
-            </YdButton>
+          <div v-else-if="expanded && !narrow && traceStatsLoading" class="text-sm text-muted-foreground">
+            统计加载中…
           </div>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-start justify-between gap-2">
-                <div class="flex min-w-0 flex-col gap-1">
-                  <span class="break-all text-base font-semibold">{{ agentText(row) }}</span>
-                  <span class="text-sm text-secondary-foreground/70">{{ sourceText(row.source) }} · {{ row.stepCount ?? 0 }} 步 · {{ formatDuration(row.durationMs) }}</span>
-                </div>
-                <YdTag :variant="statusVariant(row.status)">
-                  {{ statusText(row.status) }}
-                </YdTag>
-              </div>
-              <div v-if="row.input" class="line-clamp-2 text-sm">
-                {{ row.input }}
-              </div>
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                <span v-if="row.ownerPluginCode">插件：{{ row.ownerPluginCode }}</span>
-                <span>时间：{{ dateText(row.startTime) }}</span>
-              </div>
-              <div v-if="row.error" class="break-all text-sm">
-                错误：{{ row.error }}
-              </div>
-              <div class="flex gap-2">
-                <YdButton size="sm" variant="outline" @click="openDetail(row)">
-                  详情
-                </YdButton>
-                <YdButton v-auth="'system:monitor:agent-trace:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
-                  删除
-                </YdButton>
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+        </div>
+      </template>
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
+
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="traceId"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1500px]"
+
+            column-visibility stripe border
+            :columns="tableColumns"
+            :data="rows"
+            :status-column="traceStatusColumn"
+            :actions="traceActions"
+          >
+            <template #cell-traceId="{ row }">
+              <span v-if="row.original.traceId" :title="row.original.traceId">{{ truncateMiddle(row.original.traceId, 12, 8) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-source="{ row }">
+              <span v-if="sourceText(row.original.source)">{{ sourceText(row.original.source) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-agent="{ row }">
+              <div v-if="agentText(row.original)" class="path-cell">
+                <span :title="agentText(row.original)">{{ truncateMiddle(agentText(row.original), 20, 10) }}</span>
+                <small v-if="row.original.agentCode && row.original.agentCode !== row.original.agentName" :title="row.original.agentCode">{{ row.original.agentCode }}</small>
+              </div>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-ownerPluginCode="{ row }">
+              <span v-if="row.original.ownerPluginCode">{{ row.original.ownerPluginCode }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-stepCount="{ row }">
+              <span v-if="row.original.stepCount != null">{{ row.original.stepCount }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-durationMs="{ row }">
+              <span v-if="row.original.durationMs != null">{{ formatDuration(row.original.durationMs) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-input="{ row }">
+              <span v-if="row.original.input" :title="row.original.input">{{ truncateMiddle(row.original.input, 36, 12) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-startTime="{ row }">
+              <span v-if="row.original.startTime">{{ dateText(row.original.startTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-error="{ row }">
+              <span v-if="row.original.error" :title="row.original.error">{{ truncateMiddle(row.original.error, 24, 8) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="detailVisible" :title="detail ? `${detail.agentName || detail.agentCode || '执行流'} / 详情` : '执行流详情'" class="sm:max-w-5xl">
       <div v-if="detailLoading" class="panel-empty">
@@ -447,19 +492,27 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
           </YdButton>
         </div>
         <div v-if="detail.input" class="trace-io">
-          <div class="trace-io__label">输入</div>
+          <div class="trace-io__label">
+            输入
+          </div>
           <pre>{{ detail.input }}</pre>
         </div>
         <div v-if="detail.finalOutput" class="trace-io">
-          <div class="trace-io__label">最终输出</div>
+          <div class="trace-io__label">
+            最终输出
+          </div>
           <pre>{{ detail.finalOutput }}</pre>
         </div>
         <div v-if="detail.reasoning" class="trace-io">
-          <div class="trace-io__label">思考过程</div>
+          <div class="trace-io__label">
+            思考过程
+          </div>
           <pre>{{ detail.reasoning }}</pre>
         </div>
         <div v-if="detail.error" class="trace-io trace-io--error">
-          <div class="trace-io__label">错误</div>
+          <div class="trace-io__label">
+            错误
+          </div>
           <pre>{{ detail.error }}</pre>
         </div>
         <div v-if="detail.usage" class="trace-usage">
@@ -482,19 +535,27 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
             </template>
             <div class="trace-step__body">
               <div v-if="step.inputSummary" class="trace-io">
-                <div class="trace-io__label">输入</div>
+                <div class="trace-io__label">
+                  输入
+                </div>
                 <pre>{{ step.inputSummary }}</pre>
               </div>
               <div v-if="step.reasoning" class="trace-io">
-                <div class="trace-io__label">思考过程</div>
+                <div class="trace-io__label">
+                  思考过程
+                </div>
                 <pre>{{ step.reasoning }}</pre>
               </div>
               <div v-if="step.toolDetail" class="trace-io">
-                <div class="trace-io__label">工具调用 {{ step.toolName }}</div>
+                <div class="trace-io__label">
+                  工具调用 {{ step.toolName }}
+                </div>
                 <pre>{{ step.toolDetail }}</pre>
               </div>
               <div v-if="step.outputSummary" class="trace-io">
-                <div class="trace-io__label">输出</div>
+                <div class="trace-io__label">
+                  输出
+                </div>
                 <pre>{{ step.outputSummary }}</pre>
               </div>
               <div v-if="step.message" class="trace-io trace-io--error">
@@ -512,55 +573,6 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
 </template>
 
 <style scoped>
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.stat-label {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.stat-value {
-  margin-top: 6px;
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.bucket-row {
-  display: grid;
-  gap: 10px;
-}
-
-.bucket-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.bucket-label {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.search-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 768px) {
-  .search-grid {
-    grid-template-columns: minmax(220px, 1.4fr) 140px 140px minmax(140px, 1fr) minmax(140px, 1fr) 190px 190px auto;
-    align-items: center;
-  }
-}
-
 .path-cell {
   display: grid;
   min-width: 0;
@@ -644,5 +656,27 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
   padding: 24px 0;
   color: var(--color-text-3);
   text-align: center;
+}
+
+/* 统计区图表：auto-fit 自适应，宽屏一行两张 */
+.trace-stats__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.trace-stats__chart {
+  min-width: 0;
+  padding: 8px 12px 4px;
+  background: oklch(var(--card));
+  border: 1px solid oklch(var(--border));
+  border-radius: 8px;
+}
+
+.trace-stats__chart :deep(.dataviz-base-chart),
+.trace-stats__chart :deep(canvas) {
+  max-width: 100%;
+  min-width: 0;
 }
 </style>

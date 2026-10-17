@@ -1,93 +1,112 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { SearchOptionsSource, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { LoginLog } from '@/api/modules/system-monitor'
+import { useTablePage } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import { saveExcelResponse } from '@/utils/excel'
 
-const loading = ref(false)
-const clearing = ref(false)
-const rows = ref<LoginLog[]>([])
+const { auth } = useAppAuth()
 const modal = useYdModal()
 const toast = useYdToast()
-const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string; success: string }>({
-  keyword: '',
-  success: '',
+
+const clearing = ref(false)
+const successText = '成功'
+const failText = '失败'
+
+/** 登录结果词表：接口 success 是布尔，控件值走字符串，提交前再还原成布尔 */
+const successOptions = [
+  { label: successText, value: 'true' },
+  { label: failText, value: 'false' },
+]
+
+/** 搜索选项数据源：标识与 LoginLogPageQuery#success 的 optionsSource 对应 */
+const optionsSources: SearchOptionsSource[] = [
+  { id: 'logSuccessOptions', loader: () => successOptions },
+]
+
+const {
+  loading,
+  rows,
+  pagination,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+  onPageChange,
+  onSizeChange,
+} = useTablePage<LoginLog>({
+  queryClass: 'online.yudream.base.application.system.monitor.query.LoginLogPageQuery',
+  loadApi: async (query) => {
+    const res = await apiMonitor.loginLogs({
+      page: query.page,
+      size: query.size,
+      keyword: query.keyword || undefined,
+      success: resolveSuccessFilter(query.success),
+    })
+    return {
+      records: res.data.records,
+      total: res.data.total,
+      page: res.data.page,
+      size: res.data.size,
+    }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
 })
 
-const successOptions = [
-  { label: '\u6210\u529f', value: 'true' },
-  { label: '\u5931\u8d25', value: 'false' },
-]
-const successText = '\u6210\u529f'
-const failText = '\u5931\u8d25'
-
-const tableColumns = computed<TableColumn<LoginLog>[]>(() => [
-  { id: 'success', header: '\u72b6\u6001', width: 90, align: 'center' },
-  { accessorKey: 'username', header: '\u7528\u6237\u540d', width: 160 },
-  { accessorKey: 'userId', header: '\u7528\u6237ID', width: 120 },
-  { accessorKey: 'ip', header: 'IP', width: 150 },
-  { id: 'message', header: '\u7ed3\u679c', width: 260 },
-  { id: 'createTime', header: '\u767b\u5f55\u65f6\u95f4', width: 180 },
-  { id: 'userAgent', header: '\u5ba2\u6237\u7aef', width: 360 },
+/** 页头操作：导出属不常用动作收进「更多」；清空日志是危险操作单独标红 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:monitor:login-log:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportLoginLogs }]
+    : []),
+  ...(auth('system:monitor:login-log:delete')
+    ? [{ label: '清空日志', icon: 'morph:trash-2', variant: 'destructive' as const, danger: true, disabled: clearing.value, onClick: confirmClearLoginLogs }]
+    : []),
 ])
 
-onMounted(load)
+/** 用户名（人可读标识）钉在左侧，状态列紧随后便于纵向扫读成败 */
+const tableColumns = computed<TableColumn<LoginLog>[]>(() => [
+  { accessorKey: 'username', header: '用户名', width: 160, fixed: 'left' },
+  { id: 'success', header: '状态', width: 90, align: 'center' },
+  { accessorKey: 'userId', header: '用户ID', width: 160 },
+  { accessorKey: 'ip', header: 'IP', width: 150 },
+  { id: 'message', header: '结果', width: 260 },
+  { id: 'createTime', header: '登录时间', width: 180 },
+  { id: 'userAgent', header: '客户端', width: 360 },
+])
 
-async function load() {
-  loading.value = true
-  try {
-    const res = await apiMonitor.loginLogs({
-      page: pagination.page,
-      size: pagination.size,
-      keyword: search.keyword || undefined,
-      success: successValue(),
-    })
-    rows.value = res.data.records
-    pagination.total = res.data.total
+/** 搜索表单的成功/失败是字符串值，仅这两种取值转成接口需要的布尔 */
+function resolveSuccessFilter(value?: string) {
+  if (value === 'true') {
+    return true
   }
-  finally {
-    loading.value = false
+  if (value === 'false') {
+    return false
   }
-}
-
-function resetSearch() {
-  search.keyword = ''
-  search.success = ''
-  pagination.page = 1
-  load()
-}
-
-function onPageChange(page: number) {
-  pagination.page = page
-  load()
-}
-
-function onSizeChange(size: number) {
-  pagination.size = size
-  pagination.page = 1
-  load()
+  return undefined
 }
 
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
 
-function successValue() {
-  if (search.success === 'true') {
-    return true
+/** 长文本（结果摘要、客户端 UA）中间截断，完整值靠 title 悬浮查看 */
+function truncateMiddle(value?: string | null, head = 8, tail = 4) {
+  if (!value) {
+    return ''
   }
-  if (search.success === 'false') {
-    return false
+  if (value.length <= head + tail + 1) {
+    return value
   }
-  return undefined
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
 }
 
 async function exportLoginLogs() {
   const res = await apiExcel.exportLoginLogs({
-    keyword: search.keyword || undefined,
-    success: successValue(),
+    keyword: searchQuery.keyword || undefined,
+    success: resolveSuccessFilter(searchQuery.success),
   })
   saveExcelResponse(res, '登录日志.xlsx')
 }
@@ -116,93 +135,76 @@ async function clearLoginLogs() {
 
 <template>
   <div>
-    <YdPageHeader title="&#30331;&#24405;&#26085;&#24535;" class="mb-0">
-      <YdButton v-auth="'system:monitor:login-log:export'" variant="outline" @click="exportLoginLogs">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-      <YdButton v-auth="'system:monitor:login-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearLoginLogs">
-        <YdIcon name="morph:trash-2" />
-        清空日志
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="登录日志"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading"><YdResponsiveTable
-        
-        row-key="id"
-        table-root-class="rounded-lg overflow-hidden"
-        table-class="min-w-[1280px]"
-        border
-        stripe
-        column-visibility
-        :columns="tableColumns"
-        :data="rows"
-      >
-        <template #toolbar>
-          <YdSearchBar class="w-full">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
-              <YdInput v-model="search.keyword" clearable placeholder="&#29992;&#25143;&#21517; / IP / &#32467;&#26524;" @keydown.enter="load" @clear="load" />
-              <YdSelect v-model="search.success" :options="successOptions" placeholder="&#29366;&#24577;" />
-              <div class="flex gap-2 md:justify-end">
-                <YdButton variant="outline" @click="resetSearch">
-                  &#37325;&#32622;
-                </YdButton>
-                <YdButton :loading="loading" @click="load">
-                  <YdIcon name="morph:search" />
-                  &#31579;&#36873;
-                </YdButton>
-              </div>
-            </div>
-          </YdSearchBar>
-        </template>
-        <template #cell-success="{ row }">
-          <YdTag :variant="row.original.success ? 'default' : 'destructive'">
-            {{ row.original.success ? successText : failText }}
-          </YdTag>
-        </template>
-        <template #cell-message="{ row }">
-          <span class="line-clamp-1">{{ row.original.message || '-' }}</span>
-        </template>
-        <template #cell-createTime="{ row }">
-          {{ dateText(row.original.createTime) }}
-        </template>
-        <template #cell-userAgent="{ row }">
-          <span class="line-clamp-1">{{ row.original.userAgent || '-' }}</span>
-        </template>
-        <template #card="{ row }">
-          <YdCard class="w-full">
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0 break-words text-base font-semibold">{{ row.username }}</span>
-                <YdTag :variant="row.success ? 'default' : 'destructive'">
-                  {{ row.success ? successText : failText }}
-                </YdTag>
-              </div>
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                <span v-if="row.userId">用户ID：{{ row.userId }}</span>
-                <span v-if="row.ip">IP：{{ row.ip }}</span>
-                <span>时间：{{ dateText(row.createTime) }}</span>
-              </div>
-              <div v-if="row.message" class="text-sm text-secondary-foreground/80">
-                结果：{{ row.message }}
-              </div>
-              <div v-if="row.userAgent" class="break-all text-sm text-secondary-foreground/60">
-                客户端：{{ row.userAgent }}
-              </div>
-            </div>
-          </YdCard>
-        </template>
-      </YdResponsiveTable></YdLoadingOverlay>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1280px]"
 
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        class="mt-3"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </YdPageMain>
+            stripe column-visibility border
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #cell-username="{ row }">
+              <span v-if="row.original.username">{{ row.original.username }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <!-- 状态胶囊：成败一眼可辨（success 是布尔字段，语义色在这里直接给） -->
+            <template #cell-success="{ row }">
+              <span class="yd-status-tone" :data-tone="row.original.success ? 'success' : 'danger'">
+                {{ row.original.success ? successText : failText }}
+              </span>
+            </template>
+            <template #cell-userId="{ row }">
+              <span v-if="row.original.userId">{{ row.original.userId }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-ip="{ row }">
+              <span v-if="row.original.ip">{{ row.original.ip }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-message="{ row }">
+              <span v-if="row.original.message" :title="row.original.message">{{ truncateMiddle(row.original.message, 16, 6) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-createTime="{ row }">
+              <span v-if="row.original.createTime">{{ dateText(row.original.createTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-userAgent="{ row }">
+              <span v-if="row.original.userAgent" :title="row.original.userAgent">{{ truncateMiddle(row.original.userAgent, 32, 12) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
   </div>
 </template>

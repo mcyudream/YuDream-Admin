@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import type { ActionMenuItem, TableColumn, UserColumn } from '@yudream/components'
+import type { ActionMenuItem, TableColumn, UserColumn, YdTablePageAction } from '@yudream/components'
 import type { OnlineUser } from '@/api/modules/system-monitor'
+import { useTablePage } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import { saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
 const toast = useYdToast()
 const appAccountStore = useAppAccountStore()
-
-const loading = ref(false)
-const rows = ref<OnlineUser[]>([])
-const keyword = ref('')
 
 const { auth } = useAppAuth()
 
@@ -39,23 +37,39 @@ const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
   { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
 
-const onlineCountText = computed(() => `当前在线 ${rows.value.length} 人`)
-
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  try {
+/**
+ * 在线会话由接口一次性返回（不分页，仅 limit 上限），因此不挂分页；
+ * 搜索条件来自 OnlineUserQuery 的 @Searchable 注解，页面无下拉字段故不登记选项数据源。
+ */
+const {
+  loading,
+  rows,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+} = useTablePage<OnlineUser>({
+  queryClass: 'online.yudream.base.application.system.monitor.query.OnlineUserQuery',
+  loadApi: async (query) => {
     const res = await apiMonitor.onlineUsers({
-      keyword: keyword.value || undefined,
+      keyword: query.keyword || undefined,
       limit: 100,
     })
-    rows.value = withCurrentSessionFallback(res.data)
-  }
-  finally {
-    loading.value = false
-  }
-}
+    const records = withCurrentSessionFallback(res.data)
+    return { records, total: records.length, page: 1, size: records.length || 1 }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+})
+
+/** 页头操作：导出属不常用动作，超出阈值时收进「更多」 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:monitor:online:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportOnlineUsers }]
+    : []),
+])
+
+const onlineCountText = computed(() => `当前在线 ${rows.value.length} 人`)
 
 function withCurrentSessionFallback(data: OnlineUser[]) {
   if (data.length || !appAccountStore.token) {
@@ -69,11 +83,6 @@ function withCurrentSessionFallback(data: OnlineUser[]) {
     device: '当前浏览器',
     timeout: undefined,
   }]
-}
-
-function resetSearch() {
-  keyword.value = ''
-  load()
 }
 
 function ttlText(value?: number) {
@@ -92,11 +101,23 @@ function ttlText(value?: number) {
   return `${Math.floor(value / 3600)}h`
 }
 
-function shortToken(token?: string) {
-  if (!token) {
-    return '-'
+/** 剩余时间语义色：永久会话中性，不足 5 分钟提示即将失效，其余按有效态 */
+function ttlTone(value?: number): 'success' | 'warning' | 'neutral' {
+  if (value == null || value < 0) {
+    return 'neutral'
   }
-  return token.length > 28 ? `${token.slice(0, 16)}...${token.slice(-8)}` : token
+  return value < 300 ? 'warning' : 'success'
+}
+
+/** 长会话标识中间截断，完整值靠 title 悬浮查看 */
+function truncateMiddle(value?: string | null, head = 8, tail = 4) {
+  if (!value) {
+    return ''
+  }
+  if (value.length <= head + tail + 1) {
+    return value
+  }
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
 }
 
 function confirmKickout(row: OnlineUser) {
@@ -112,58 +133,79 @@ function confirmKickout(row: OnlineUser) {
 }
 
 async function exportOnlineUsers() {
-  const res = await apiExcel.exportOnlineUsers({ keyword: keyword.value || undefined })
+  const res = await apiExcel.exportOnlineUsers({ keyword: searchQuery.keyword || undefined })
   saveExcelResponse(res, '在线用户.xlsx')
 }
 </script>
 
 <template>
   <div>
-    <YdPageHeader :title="onlineCountText" class="mb-0">
-      <YdButton v-auth="'system:monitor:online:export'" variant="outline" @click="exportOnlineUsers">
-        <YdIcon name="morph:file-spreadsheet" />
-        导出
-      </YdButton>
-    </YdPageHeader>
+    <YdTablePageLayout
+      title="在线用户"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 在线人数是页面情报而非操作，按纯文本呈现，按钮一律走 actions -->
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">{{ onlineCountText }}</span>
+      </template>
 
-    <YdPageMain>
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
-          row-key="token"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1080px]"
-          column-visibility
-          :user-column="sessionUserColumn"
-          :actions="sessionActions"
-          :columns="tableColumns"
-          :data="rows"
-        >
-          <template #toolbar>
-            <YdSearchBar class="w-full">
-              <div class="gap-3 grid grid-cols-1 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-                <YdInput v-model="keyword" clearable placeholder="用户名 / 昵称 / 会话标识" @keydown.enter="load" @clear="load" />
-                <div class="flex gap-2 md:justify-end">
-                  <YdButton variant="outline" @click="resetSearch">
-                    重置
-                  </YdButton>
-                </div>
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
+
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="token"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+            column-visibility
+            :user-column="sessionUserColumn"
+            :actions="sessionActions"
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #empty>
+              <div class="empty-state">
+                暂无在线会话，请确认已重启后端并重新登录
               </div>
-            </YdSearchBar>
-          </template>
-          <template #empty>
-            <div class="empty-state">
-              暂无在线会话，请确认已重启后端并重新登录
-            </div>
-          </template>
-          <template #cell-timeout="{ row }">
-            {{ ttlText(row.original.timeout) }}
-          </template>
-          <template #cell-token="{ row }">
-            <code>{{ shortToken(row.original.token) }}</code>
-          </template>
-        </YdResponsiveEnhancedTable>
-      </YdLoadingOverlay>
-    </YdPageMain>
+            </template>
+            <template #cell-username="{ row }">
+              <span v-if="row.original.username">{{ row.original.username }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-nickname="{ row }">
+              <span v-if="row.original.nickname">{{ row.original.nickname }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-email="{ row }">
+              <span v-if="row.original.email">{{ row.original.email }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-device="{ row }">
+              <span v-if="row.original.device">{{ row.original.device }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-timeout="{ row }">
+              <span v-if="row.original.timeout == null" class="text-muted-foreground/40">-</span>
+              <span v-else class="yd-status-tone" :data-tone="ttlTone(row.original.timeout)">
+                {{ ttlText(row.original.timeout) }}
+              </span>
+            </template>
+            <template #cell-token="{ row }">
+              <code :title="row.original.token">{{ truncateMiddle(row.original.token) }}</code>
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+    </YdTablePageLayout>
   </div>
 </template>
 

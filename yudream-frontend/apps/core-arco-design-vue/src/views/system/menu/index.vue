@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdTablePickerQuery, YdTablePickerResult, YdTreeNode } from '@yudream/components'
+import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, UserColumn, YdTablePageAction, YdTablePickerQuery, YdTablePickerResult, YdTreeNode } from '@yudream/components'
 import type { MenuCandidate, MenuManageItem, MenuNodeType, MenuPayload, MenuSource, MenuStatus } from '@/api/modules/system-menu'
+import { useTablePage } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMenu from '@/api/modules/system-menu'
+import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
@@ -20,9 +22,6 @@ const router = useRouter()
 const route = useRoute()
 const { auth } = useAppAuth()
 
-const loading = ref(false)
-const rows = ref<MenuManageItem[]>([])
-const searchKeyword = ref('')
 const selectedKeys = ref<string[]>([])
 const formVisible = ref(false)
 const editing = ref<MenuManageItem | null>(null)
@@ -55,6 +54,39 @@ const statusOptions = [
   { label: '正常', value: 'ACTIVE' },
   { label: '停用', value: 'DISABLED' },
 ]
+
+/** 搜索选项数据源：菜单类型/状态用本地词表（与表单下拉共用同一份文案） */
+const optionsSources: SearchOptionsSource[] = [
+  { id: 'menuTypeOptions', loader: () => typeOptions },
+  { id: 'menuStatusOptions', loader: () => statusOptions },
+]
+
+/**
+ * 菜单管理是按树加载的列表（无分页），搜索条件来自 MenuTreeQuery 的 @Searchable 注解；
+ * 加载完成后的选中项校正见下方对 rows 的监听。
+ */
+const {
+  loading,
+  rows,
+  searchQuery,
+  searchConfig,
+  load,
+  search,
+  resetSearch,
+} = useTablePage<MenuManageItem>({
+  queryClass: 'online.yudream.base.application.system.menu.query.MenuTreeQuery',
+  loadApi: async (query) => {
+    const res = await apiMenu.tree({
+      keyword: query.keyword || undefined,
+      type: query.type || undefined,
+      status: query.status || undefined,
+    })
+    const tree = res.data
+    return { records: tree, total: tree.length, page: 1, size: tree.length || 1 }
+  },
+  loadSearchConfig: queryClass => fetchSearchConfig(queryClass).then(res => res.data),
+  autoLoad: false,
+})
 
 const selectedMenu = computed(() => findMenu(rows.value, selectedKeys.value[0]))
 const selectedDisplayParent = computed(() => selectedMenu.value
@@ -120,9 +152,10 @@ const buttonStatusColumn: StatusColumn<MenuManageItem> = {
   statusKey: 'status',
   header: '状态',
   width: 100,
+  // 语义色胶囊：按钮权限长列表里能一眼扫出停用项
   statusMap: {
-    ACTIVE: { label: '启用', variant: 'default' },
-    DISABLED: { label: '停用', variant: 'secondary' },
+    ACTIVE: { label: '启用', variant: 'default', tone: 'success' },
+    DISABLED: { label: '停用', variant: 'secondary', tone: 'neutral' },
   },
 }
 
@@ -141,12 +174,46 @@ const buttonColumns = computed<TableColumn<MenuManageItem>[]>(() => [
   { accessorKey: 'sort', header: '排序', width: 100, align: 'center' },
 ])
 
+/** 页头操作：新增/编辑/状态开关保持可见，导入导出模板收进「更多」，删除按危险操作收进「更多」 */
+const pageActions = computed<YdTablePageAction[]>(() => [
+  ...(auth('system:menu:create')
+    ? [
+        { label: '新增菜单', icon: 'morph:plus', onClick: () => openCreate() },
+        { label: '新增子菜单', icon: 'morph:git-branch-plus', variant: 'outline' as const, disabled: !canCreateChild.value, onClick: openCreateFromSelected },
+      ]
+    : []),
+  ...(auth('system:menu:edit')
+    ? [{ label: '编辑', icon: 'morph:pencil', variant: 'outline' as const, disabled: !selectedMenu.value, onClick: () => openEdit() }]
+    : []),
+  ...(auth('system:menu:edit') && selectedMenu.value?.status === 'DISABLED'
+    ? [{ label: '启用', icon: 'morph:circle-play', variant: 'outline' as const, onClick: () => confirmEnable() }]
+    : []),
+  ...(auth('system:menu:edit') && selectedMenu.value?.status === 'ACTIVE'
+    ? [{ label: '停用', icon: 'morph:circle-pause', variant: 'outline' as const, onClick: () => confirmDisable() }]
+    : []),
+  ...(auth('system:menu:export')
+    ? [{ label: '导出', icon: 'morph:file-spreadsheet', variant: 'outline' as const, autoFold: true, onClick: exportMenus }]
+    : []),
+  ...(auth('system:menu:import')
+    ? [
+        { label: '模板', icon: 'morph:download', variant: 'outline' as const, autoFold: true, onClick: downloadMenuTemplate },
+        { label: '导入', icon: 'morph:upload', variant: 'outline' as const, autoFold: true, onClick: importMenus },
+      ]
+    : []),
+  ...(auth('system:menu:delete')
+    ? [{ label: '删除', icon: 'morph:trash-2', variant: 'destructive' as const, autoFold: true, danger: true, disabled: !selectedMenu.value, onClick: () => confirmDelete() }]
+    : []),
+])
+
 onMounted(async () => {
-  await loadTree()
+  await load()
   await openLinkedMenu()
 })
 
 watch(() => route.query.editMenu, () => openLinkedMenu())
+
+/** 树形列表筛选后原选中项可能已不在树里：每次列表落地都校正一次详情面板的选中项 */
+watch(rows, () => syncSelectedMenu())
 let linkedMenuRequest = 0
 
 async function openLinkedMenu() {
@@ -163,7 +230,7 @@ async function openLinkedMenu() {
         return
       }
       rows.value = response.data
-      searchKeyword.value = ''
+      clearSearchQuery()
       menu = findMenu(rows.value, code)
     }
     if (menu) {
@@ -183,18 +250,11 @@ async function openLinkedMenu() {
   }
 }
 
-async function loadTree() {
-  loading.value = true
-  try {
-    const res = await apiMenu.tree({
-      keyword: searchKeyword.value || undefined,
-    })
-    rows.value = res.data
-    syncSelectedMenu()
-  }
-  finally {
-    loading.value = false
-  }
+/** 直达深链时列表已整体重取，搜索表单同步回到未筛选状态 */
+function clearSearchQuery() {
+  searchQuery.keyword = undefined
+  searchQuery.type = undefined
+  searchQuery.status = undefined
 }
 
 function syncSelectedMenu() {
@@ -204,11 +264,6 @@ function syncSelectedMenu() {
   }
   const first = flattenMenus(rows.value).find(item => item.type !== 'BUTTON')
   selectedKeys.value = first ? [first.code] : []
-}
-
-function resetSearch() {
-  searchKeyword.value = ''
-  loadTree()
 }
 
 function openCreate(parent?: MenuManageItem) {
@@ -271,7 +326,7 @@ async function saveForm() {
   }
   toast.success(currentEditing ? '编辑成功' : '新增成功')
   formVisible.value = false
-  await loadTree()
+  await load()
   await refreshDynamicRoutes(router)
   if (!currentEditing && payload.code) {
     selectedKeys.value = [payload.code]
@@ -290,7 +345,7 @@ function confirmDisable(row?: MenuManageItem) {
     onConfirm: async () => {
       await apiMenu.disable(target.code)
       toast.success('停用成功')
-      await loadTree()
+      await load()
       await refreshDynamicRoutes(router)
     },
   })
@@ -311,7 +366,7 @@ function confirmDelete(row?: MenuManageItem) {
       if (selectedKeys.value[0] === target.code) {
         selectedKeys.value = []
       }
-      await loadTree()
+      await load()
       await refreshDynamicRoutes(router)
     },
   })
@@ -329,7 +384,7 @@ function confirmEnable(row?: MenuManageItem) {
     onConfirm: async () => {
       await apiMenu.enable(target.code)
       toast.success('启用成功')
-      await loadTree()
+      await load()
       await refreshDynamicRoutes(router)
     },
   })
@@ -417,6 +472,17 @@ function displayValue(value?: string | number | boolean | null) {
   return value ?? '-'
 }
 
+/** 长权限标识中间截断，完整值靠 title 悬浮查看 */
+function truncateMiddle(value?: string | null, head = 8, tail = 4) {
+  if (!value) {
+    return ''
+  }
+  if (value.length <= head + tail + 1) {
+    return value
+  }
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
 function menuForTreeNode(node?: YdTreeNode) {
   return node ? findMenu(rows.value, node.key) : undefined
 }
@@ -468,7 +534,7 @@ function findMenu(items: MenuManageItem[], code?: string): MenuManageItem | unde
 }
 
 async function exportMenus() {
-  const res = await apiExcel.exportMenus({ keyword: searchKeyword.value || undefined })
+  const res = await apiExcel.exportMenus({ keyword: searchQuery.keyword || undefined })
   saveExcelResponse(res, '菜单管理.xlsx')
 }
 
@@ -481,297 +547,227 @@ function importMenus() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importMenus(excelForm(file))
     toast.success(importResultMessage(res.data))
-    await loadTree()
+    await load()
   })
 }
 </script>
 
 <template>
-  <div class="menu-page">
-    <div class="menu-workbench">
-      <aside class="menu-sidebar">
-        <div class="menu-sidebar__header">
-          <h2>菜单列表</h2>
-          <div class="menu-toolbar">
-            <YdButton v-auth="'system:menu:export'" variant="ghost" size="sm" title="导出菜单" @click="exportMenus">
-              <YdIcon name="morph:file-spreadsheet" />
-            </YdButton>
-            <YdButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="下载模板" @click="downloadMenuTemplate">
-              <YdIcon name="morph:download" />
-            </YdButton>
-            <YdButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="导入菜单" @click="importMenus">
-              <YdIcon name="morph:upload" />
-            </YdButton>
-            <YdButton v-auth="'system:menu:create'" variant="ghost" size="sm" title="新增菜单" @click="openCreate()">
-              <YdIcon name="morph:plus" />
-            </YdButton>
-            <YdButton
-              v-if="selectedMenu?.status === 'DISABLED'"
-              v-auth="'system:menu:edit'"
-              variant="ghost"
-              size="sm"
-              title="启用菜单"
-              @click="confirmEnable()"
-            >
-              <YdIcon name="morph:circle-play" />
-            </YdButton>
-            <YdButton
-              v-if="selectedMenu?.status === 'ACTIVE'"
-              v-auth="'system:menu:edit'"
-              variant="ghost"
-              size="sm"
-              title="停用菜单"
-              @click="confirmDisable()"
-            >
-              <YdIcon name="morph:circle-pause" />
-            </YdButton>
-            <YdButton
-              v-if="selectedMenu"
-              v-auth="'system:menu:delete'"
-              variant="ghost"
-              size="sm"
-              title="删除菜单"
-              @click="confirmDelete()"
-            >
-              <YdIcon name="morph:trash-2" />
-            </YdButton>
-          </div>
-        </div>
-
-        <YdInput
-          v-model="searchKeyword"
-          clearable
-          placeholder="请输入菜单名称"
-          class="w-full"
-          @keydown.enter="loadTree"
-          @clear="resetSearch"
+  <div>
+    <YdTablePageLayout
+      title="菜单管理"
+      :actions="pageActions"
+      :actions-threshold="4"
+    >
+      <template #search="{ fold }">
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :fold="fold"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
         />
+      </template>
 
-        <div class="menu-tree">
-          <YdTree
-            v-model:selected-keys="selectedKeys"
-            :data="treeData"
-            :default-expand-all="true"
-          >
-            <template #default="{ node }">
-              <div class="menu-tree-node">
-                <span class="menu-tree-node__main">
-                  <span class="menu-tree-node__icon">
-                    <YdIcon :name="menuIcon(menuForTreeNode(node))" />
-                  </span>
-                  <span>{{ node?.label ?? '' }}</span>
-                  <span
-                    v-if="menuForTreeNode(node)?.source === 'PLUGIN'"
-                    class="plugin-source-marker"
-                    title="插件菜单"
-                    aria-label="插件菜单"
-                  />
-                </span>
-                <YdButton
-                  v-if="menuForTreeNode(node) && menuForTreeNode(node)?.type !== 'LINK'"
-                  v-auth="'system:menu:create'"
-                  variant="ghost"
-                  size="sm"
-                  title="新增子菜单"
-                  @click.stop="openCreate(menuForTreeNode(node))"
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <div class="menu-workbench">
+            <aside class="menu-sidebar">
+              <div class="menu-sidebar__header">
+                <h2>菜单列表</h2>
+              </div>
+
+              <div class="menu-tree">
+                <YdTree
+                  v-model:selected-keys="selectedKeys"
+                  :data="treeData"
+                  :default-expand-all="true"
                 >
-                  <YdIcon name="morph:plus" />
-                </YdButton>
+                  <template #default="{ node }">
+                    <div class="menu-tree-node">
+                      <span class="menu-tree-node__main">
+                        <span class="menu-tree-node__icon">
+                          <YdIcon :name="menuIcon(menuForTreeNode(node))" />
+                        </span>
+                        <span>{{ node?.label ?? '' }}</span>
+                        <span
+                          v-if="menuForTreeNode(node)?.source === 'PLUGIN'"
+                          class="plugin-source-marker"
+                          title="插件菜单"
+                          aria-label="插件菜单"
+                        />
+                      </span>
+                      <YdButton
+                        v-if="menuForTreeNode(node) && menuForTreeNode(node)?.type !== 'LINK'"
+                        v-auth="'system:menu:create'"
+                        variant="ghost"
+                        size="sm"
+                        title="新增子菜单"
+                        @click.stop="openCreate(menuForTreeNode(node))"
+                      >
+                        <YdIcon name="morph:plus" />
+                      </YdButton>
+                    </div>
+                  </template>
+                </YdTree>
               </div>
-            </template>
-          </YdTree>
-        </div>
-      </aside>
+            </aside>
 
-      <main class="menu-content">
-        <section class="menu-section">
-          <div class="menu-section__header">
-            <h2>菜单详情</h2>
-            <div class="menu-actions">
-              <YdButton v-auth="'system:menu:create'" variant="outline" size="sm" :disabled="!canCreateChild" @click="openCreateFromSelected">
-                <YdIcon name="morph:plus" />
-                新增子菜单
-              </YdButton>
-              <YdButton v-auth="'system:menu:edit'" variant="outline" size="sm" :disabled="!selectedMenu" @click="openEdit()">
-                <YdIcon name="morph:pencil" />
-                编辑
-              </YdButton>
-              <YdButton
-                v-if="selectedMenu?.status === 'DISABLED'"
-                v-auth="'system:menu:edit'"
-                variant="outline"
-                size="sm"
-                @click="confirmEnable()"
-              >
-                <YdIcon name="morph:circle-play" />
-                启用
-              </YdButton>
-              <YdButton
-                v-if="selectedMenu?.status === 'ACTIVE'"
-                v-auth="'system:menu:edit'"
-                variant="outline"
-                size="sm"
-                @click="confirmDisable()"
-              >
-                <YdIcon name="morph:circle-pause" />
-                停用
-              </YdButton>
-              <YdButton
-                v-if="selectedMenu"
-                v-auth="'system:menu:delete'"
-                variant="destructive"
-                size="sm"
-                @click="confirmDelete()"
-              >
-                <YdIcon name="morph:trash-2" />
-                删除
-              </YdButton>
-            </div>
+            <main class="menu-content">
+              <section class="menu-section">
+                <div class="menu-section__header">
+                  <h2>菜单详情</h2>
+                </div>
+
+                <div v-if="selectedMenu" class="detail-grid">
+                  <div class="detail-cell detail-cell--label">
+                    菜单类型
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="typeVariant(selectedMenu.type)">
+                      {{ typeText(selectedMenu.type) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    菜单状态
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="statusVariant(selectedMenu.status)">
+                      {{ statusText(selectedMenu.status) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    来源
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="sourceVariant(selectedMenu.source)">
+                      {{ sourceText(selectedMenu.source) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    运行状态
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="runtimeVariant(selectedMenu)">
+                      {{ runtimeText(selectedMenu) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    菜单名称
+                  </div>
+                  <div class="detail-cell detail-cell__name">
+                    <YdIcon :name="menuIcon(selectedMenu)" />
+                    <span>{{ selectedMenu.name }}</span>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    路由地址
+                  </div>
+                  <div class="detail-cell">
+                    {{ displayValue(selectedMenu.path) }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    菜单编码
+                  </div>
+                  <div class="detail-cell">
+                    {{ selectedMenu.code }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    权限标识
+                  </div>
+                  <div class="detail-cell">
+                    {{ displayValue(selectedMenu.permission) }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    展示父级
+                  </div>
+                  <div class="detail-cell">
+                    {{ selectedDisplayParentLabel }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    配置父级
+                  </div>
+                  <div class="detail-cell">
+                    {{ selectedActualParentLabel }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    组件路径
+                  </div>
+                  <div class="detail-cell">
+                    {{ displayValue(selectedMenu.component) }}
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    菜单显示
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="visibleVariant(selectedMenu)">
+                      {{ visibleText(selectedMenu) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    是否外链
+                  </div>
+                  <div class="detail-cell">
+                    <YdTag :variant="isExternal(selectedMenu) ? 'outline' : 'secondary'">
+                      {{ displayValue(isExternal(selectedMenu)) }}
+                    </YdTag>
+                  </div>
+                  <div class="detail-cell detail-cell--label">
+                    外链地址
+                  </div>
+                  <div class="detail-cell detail-cell--wide">
+                    {{ displayValue(selectedMenu.link) }}
+                  </div>
+                  <template v-if="selectedMenu.source === 'PLUGIN'">
+                    <div class="detail-cell detail-cell--label">
+                      插件编码
+                    </div>
+                    <div class="detail-cell">
+                      {{ displayValue(selectedMenu.pluginCode) }}
+                    </div>
+                    <div class="detail-cell detail-cell--label">
+                      插件模块
+                    </div>
+                    <div class="detail-cell">
+                      {{ displayValue(selectedMenu.pluginModuleName) }}
+                    </div>
+                  </template>
+                </div>
+                <div v-else class="empty-state">
+                  请选择左侧菜单
+                </div>
+              </section>
+
+              <section class="menu-section">
+                <div class="menu-section__header">
+                  <h2>按钮权限列表</h2>
+                </div>
+
+                <YdResponsiveEnhancedTable
+
+                  row-key="code"
+                  table-root-class="rounded-lg overflow-hidden"
+                  table-class="min-w-[720px]"
+                  :user-column="buttonUserColumn"
+                  :status-column="buttonStatusColumn"
+                  :actions="buttonActions"
+                  :columns="buttonColumns"
+                  :data="buttonRows"
+                >
+                  <template #cell-index="{ row }">
+                    {{ row.index + 1 }}
+                  </template>
+                  <template #cell-permission="{ row }">
+                    <span v-if="row.original.permission" :title="row.original.permission">{{ truncateMiddle(row.original.permission, 18, 10) }}</span>
+                    <span v-else class="text-muted-foreground/40">-</span>
+                  </template>
+                </YdResponsiveEnhancedTable>
+              </section>
+            </main>
           </div>
-
-          <div v-if="selectedMenu" class="detail-grid">
-            <div class="detail-cell detail-cell--label">
-              菜单类型
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="typeVariant(selectedMenu.type)">
-                {{ typeText(selectedMenu.type) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              菜单状态
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="statusVariant(selectedMenu.status)">
-                {{ statusText(selectedMenu.status) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              来源
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="sourceVariant(selectedMenu.source)">
-                {{ sourceText(selectedMenu.source) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              运行状态
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="runtimeVariant(selectedMenu)">
-                {{ runtimeText(selectedMenu) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              菜单名称
-            </div>
-            <div class="detail-cell detail-cell__name">
-              <YdIcon :name="menuIcon(selectedMenu)" />
-              <span>{{ selectedMenu.name }}</span>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              路由地址
-            </div>
-            <div class="detail-cell">
-              {{ displayValue(selectedMenu.path) }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              菜单编码
-            </div>
-            <div class="detail-cell">
-              {{ selectedMenu.code }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              权限标识
-            </div>
-            <div class="detail-cell">
-              {{ displayValue(selectedMenu.permission) }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              展示父级
-            </div>
-            <div class="detail-cell">
-              {{ selectedDisplayParentLabel }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              配置父级
-            </div>
-            <div class="detail-cell">
-              {{ selectedActualParentLabel }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              组件路径
-            </div>
-            <div class="detail-cell">
-              {{ displayValue(selectedMenu.component) }}
-            </div>
-            <div class="detail-cell detail-cell--label">
-              菜单显示
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="visibleVariant(selectedMenu)">
-                {{ visibleText(selectedMenu) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              是否外链
-            </div>
-            <div class="detail-cell">
-              <YdTag :variant="isExternal(selectedMenu) ? 'outline' : 'secondary'">
-                {{ displayValue(isExternal(selectedMenu)) }}
-              </YdTag>
-            </div>
-            <div class="detail-cell detail-cell--label">
-              外链地址
-            </div>
-            <div class="detail-cell detail-cell--wide">
-              {{ displayValue(selectedMenu.link) }}
-            </div>
-            <template v-if="selectedMenu.source === 'PLUGIN'">
-              <div class="detail-cell detail-cell--label">
-                插件编码
-              </div>
-              <div class="detail-cell">
-                {{ displayValue(selectedMenu.pluginCode) }}
-              </div>
-              <div class="detail-cell detail-cell--label">
-                插件模块
-              </div>
-              <div class="detail-cell">
-                {{ displayValue(selectedMenu.pluginModuleName) }}
-              </div>
-            </template>
-          </div>
-          <div v-else class="empty-state">
-            请选择左侧菜单
-          </div>
-        </section>
-
-        <section class="menu-section">
-          <div class="menu-section__header">
-            <h2>按钮权限列表</h2>
-          </div>
-
-          <YdLoadingOverlay :loading="loading">
-            <YdResponsiveEnhancedTable
-
-              row-key="code"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[720px]"
-              :user-column="buttonUserColumn"
-              :status-column="buttonStatusColumn"
-              :actions="buttonActions"
-              :columns="buttonColumns"
-              :data="buttonRows"
-            >
-              <template #cell-index="{ row }">
-                {{ row.index + 1 }}
-              </template>
-            </YdResponsiveEnhancedTable>
-          </YdLoadingOverlay>
-        </section>
-      </main>
-    </div>
+        </YdLoadingOverlay>
+      </template>
+    </YdTablePageLayout>
 
     <YdModal v-model="formVisible" :title="editing ? '编辑菜单' : '新增菜单'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <YdForm :model="form" layout="vertical">
@@ -878,16 +874,17 @@ function importMenus() {
 </template>
 
 <style scoped>
+/*
+  工作台铺满表格卡片：单行两列、行高定义为剩余高度，左树与右侧详情各自内滚，
+  避免出现两个滚动盒叠加（页面整体滚动已由 YdTablePageLayout 接管）。
+*/
 .menu-workbench {
   display: grid;
   grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
-}
-
-.menu-page {
-  min-height: calc(100vh - 104px);
-  padding: 16px;
-  background: var(--color-fill-1);
+  height: 100%;
+  min-height: 0;
 }
 
 .menu-sidebar,
@@ -903,13 +900,11 @@ function importMenus() {
   gap: 12px;
   padding: 14px;
   min-height: 0;
-  max-height: calc(100vh - 136px);
+  overflow: hidden;
 }
 
 .menu-sidebar__header,
 .menu-section__header,
-.menu-actions,
-.menu-toolbar,
 .menu-tree-node,
 .menu-tree-node__main {
   display: flex;
@@ -928,13 +923,6 @@ function importMenus() {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-}
-
-.menu-toolbar,
-.menu-actions {
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .menu-tree {
@@ -985,6 +973,8 @@ function importMenus() {
   align-content: start;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .menu-section {
@@ -1064,25 +1054,18 @@ function importMenus() {
 }
 
 @media (max-width: 1280px) {
-  .menu-page {
-    padding: 12px;
-  }
-
+  /* 窄屏改为上下两段：树限高内滚，详情与按钮表占据剩余高度并内滚 */
   .menu-workbench {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 360px) minmax(0, 1fr);
   }
 
   .menu-sidebar {
-    min-height: 360px;
-    max-height: 460px;
+    max-height: 360px;
   }
 }
 
 @media (max-width: 768px) {
-  .menu-actions {
-    justify-content: flex-start;
-  }
-
   .detail-grid {
     grid-template-columns: 120px minmax(0, 1fr);
     min-width: 0;

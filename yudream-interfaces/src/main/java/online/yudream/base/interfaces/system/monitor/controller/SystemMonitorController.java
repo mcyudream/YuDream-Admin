@@ -1,6 +1,9 @@
 package online.yudream.base.interfaces.system.monitor.controller;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.monitor.query.ApiLogPageQuery;
+import online.yudream.base.application.system.monitor.query.LoginLogPageQuery;
+import online.yudream.base.application.system.monitor.query.OnlineUserQuery;
 import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
@@ -13,7 +16,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,9 +29,9 @@ public class SystemMonitorController {
 
     @GetMapping("/online-users")
     @PermissionRegister(code = "system:monitor:online:view", name = "查看在线用户", module = "系统管理", desc = "查看在线用户会话")
-    public Result<List<OnlineUserRes>> onlineUsers(@RequestParam(value = "keyword", required = false) String keyword,
-                                                   @RequestParam(value = "limit", defaultValue = "100") int limit) {
-        return Result.ok(MonitorWebAssembler.toOnlineUserResList(systemMonitorAppService.onlineUsers(keyword, limit)));
+    public Result<List<OnlineUserRes>> onlineUsers(OnlineUserQuery query) {
+        return Result.ok(MonitorWebAssembler.toOnlineUserResList(
+                systemMonitorAppService.onlineUsers(query.getKeyword(), query.getLimit())));
     }
 
     @DeleteMapping("/online-users/{token}")
@@ -41,11 +43,9 @@ public class SystemMonitorController {
 
     @GetMapping("/api-logs")
     @PermissionRegister(code = "system:monitor:api-log:view", name = "查看接口日志", module = "系统管理", desc = "查看系统接口日志")
-    public Result<PageResult<ApiLogRes>> apiLogs(@RequestParam(value = "keyword", required = false) String keyword,
-                                                 @RequestParam(value = "success", required = false) Boolean success,
-                                                 @RequestParam(value = "page", defaultValue = "1") int page,
-                                                 @RequestParam(value = "size", defaultValue = "10") int size) {
-        return Result.ok(MonitorWebAssembler.toApiLogPage(systemMonitorAppService.pageApiLogs(keyword, success, page, size)));
+    public Result<PageResult<ApiLogRes>> apiLogs(ApiLogPageQuery query) {
+        return Result.ok(MonitorWebAssembler.toApiLogPage(systemMonitorAppService.pageApiLogs(
+                query.getKeyword(), query.getSuccess(), query.getPage(), query.getSize())));
     }
 
     @DeleteMapping("/api-logs")
@@ -56,11 +56,9 @@ public class SystemMonitorController {
 
     @GetMapping("/login-logs")
     @PermissionRegister(code = "system:monitor:login-log:view", name = "查看登录日志", module = "系统管理", desc = "查看系统登录日志")
-    public Result<PageResult<LoginLogRes>> loginLogs(@RequestParam(value = "keyword", required = false) String keyword,
-                                                     @RequestParam(value = "success", required = false) Boolean success,
-                                                     @RequestParam(value = "page", defaultValue = "1") int page,
-                                                     @RequestParam(value = "size", defaultValue = "10") int size) {
-        return Result.ok(MonitorWebAssembler.toLoginLogPage(systemMonitorAppService.pageLoginLogs(keyword, success, page, size)));
+    public Result<PageResult<LoginLogRes>> loginLogs(LoginLogPageQuery query) {
+        return Result.ok(MonitorWebAssembler.toLoginLogPage(systemMonitorAppService.pageLoginLogs(
+                query.getKeyword(), query.getSuccess(), query.getPage(), query.getSize())));
     }
 
     @DeleteMapping("/login-logs")
