@@ -44,7 +44,8 @@ public class SystemLogAppService {
     }
 
     public SystemLogStats stats() {
-        return new SystemLogStats(systemLogRepo.size(), systemLogRepo.droppedCount(), systemLogRepo.maxEntries());
+        return new SystemLogStats(systemLogRepo.size(), systemLogRepo.droppedCount(), systemLogRepo.maxEntries(),
+                systemLogRepo.levelCounts());
     }
 
     public AutoCloseable subscribe(String level, Set<String> modules, String keyword, Consumer<SystemLogEntry> consumer) {

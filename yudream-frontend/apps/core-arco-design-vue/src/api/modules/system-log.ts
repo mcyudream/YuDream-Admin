@@ -1,11 +1,14 @@
 import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
+/** 日志级别词表：与后端 SystemLogLevel 枚举一一对应 */
+export type SystemLogLevel = 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+
 export interface SystemLogItem {
   sequence: number
   timestamp: number
   time: string
-  level: 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+  level: SystemLogLevel
   module: string
   thread: string
   traceId?: string
@@ -18,6 +21,8 @@ export interface SystemLogStats {
   size: number
   droppedCount: number
   maxEntries: number
+  /** 缓存内各级别条数（键为级别名）；后端 Long 走全局序列化，读到的是字符串，算术前须 Number() */
+  levelCounts: Record<string, number | string>
 }
 
 export interface DockerLogSettings {
@@ -57,8 +62,8 @@ export default {
   clear: () => {
     return systemClient.delete<unknown, ApiResponse<number>>('api/system/logs')
   },
-  download: (params?: { level?: string; modules?: string; keyword?: string }) => {
-    return systemClient.get<unknown, { data: Blob; headers: Record<string, string> }>('api/system/logs/download', {
+  download: (params?: { level?: string, modules?: string, keyword?: string }) => {
+    return systemClient.get<unknown, { data: Blob, headers: Record<string, string> }>('api/system/logs/download', {
       params,
       responseType: 'blob',
     })

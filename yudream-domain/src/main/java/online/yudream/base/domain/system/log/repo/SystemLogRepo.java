@@ -5,6 +5,7 @@ import online.yudream.base.domain.system.log.model.SystemLogModuleGroup;
 import online.yudream.base.domain.system.log.model.SystemLogQuery;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -13,6 +14,9 @@ import java.util.function.Consumer;
 public interface SystemLogRepo {
 
     List<SystemLogEntry> recent(SystemLogQuery query);
+
+    /** 缓存内各级别条数（键为级别名，含计数为 0 的级别），供页面按级别筛选与分布展示。 */
+    Map<String, Long> levelCounts();
 
     List<String> modules();
 

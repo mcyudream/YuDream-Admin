@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -49,6 +50,11 @@ public class SystemLogRepoImpl implements SystemLogRepo {
             groups.add(new SystemLogModuleGroup("其他", extra));
         }
         return groups;
+    }
+
+    @Override
+    public Map<String, Long> levelCounts() {
+        return SystemLogBuffer.instance().levelCounts();
     }
 
     @Override

@@ -7,7 +7,9 @@ import online.yudream.base.domain.system.log.model.SystemLogQuery;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,6 +73,23 @@ public final class SystemLogBuffer {
     public List<String> observedModules() {
         synchronized (monitor) {
             return entries.stream().map(SystemLogEntry::module).filter(Objects::nonNull).distinct().sorted().toList();
+        }
+    }
+
+    /** 按级别统计缓存条数；顺序固定为级别枚举顺序，便于前端稳定渲染计数胶囊。 */
+    public Map<String, Long> levelCounts() {
+        synchronized (monitor) {
+            Map<String, Long> counts = new LinkedHashMap<>();
+            for (SystemLogLevel level : SystemLogLevel.values()) {
+                counts.put(level.name(), 0L);
+            }
+            for (SystemLogEntry entry : entries) {
+                SystemLogLevel level = entry.level();
+                if (level != null) {
+                    counts.merge(level.name(), 1L, Long::sum);
+                }
+            }
+            return counts;
         }
     }
 

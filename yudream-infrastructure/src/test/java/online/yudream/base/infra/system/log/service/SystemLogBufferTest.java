@@ -6,6 +6,7 @@ import online.yudream.base.domain.system.log.model.SystemLogQuery;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -46,6 +47,26 @@ class SystemLogBufferTest {
             buffer.append(2L, SystemLogLevel.ERROR, "b", "系统", "t", null, "err", null);
         }
         assertEquals(1, count.get());
+    }
+
+    @Test
+    void countsEntriesByLevelForEveryLevel() {
+        SystemLogBuffer buffer = SystemLogBuffer.instance();
+        buffer.clear();
+        buffer.append(1L, SystemLogLevel.INFO, "a", "系统", "t", null, "one", null);
+        buffer.append(2L, SystemLogLevel.INFO, "a", "系统", "t", null, "two", null);
+        buffer.append(3L, SystemLogLevel.WARN, "a", "系统", "t", null, "three", null);
+        buffer.append(4L, SystemLogLevel.ERROR, "a", "系统", "t", null, "four", null);
+
+        Map<String, Long> counts = buffer.levelCounts();
+        // 五个级别都出现在结果里，缺计数为 0，前端胶囊才能稳定渲染
+        assertEquals(SystemLogLevel.values().length, counts.size());
+        assertEquals(2L, counts.get("INFO"));
+        assertEquals(1L, counts.get("WARN"));
+        assertEquals(1L, counts.get("ERROR"));
+        assertEquals(0L, counts.get("TRACE"));
+        assertEquals(0L, counts.get("DEBUG"));
+        buffer.clear();
     }
 
     @Test
