@@ -12,8 +12,10 @@ public class UserStatsWebAssembler {
 
     public static UserStatsRes toRes(UserStatsDTO dto) {
         return new UserStatsRes(dto.total(), dto.verifiedCount(), dto.activeCount(), dto.disabledCount(),
-                dto.newToday(), dto.newThisWeek(), dto.trendDays(), toTrendResList(dto.registeredTrend()),
-                toNamedCountResList(dto.roleDistribution()), toNamedCountResList(dto.completeness()));
+                dto.newToday(), dto.newThisWeek(), dto.trendDays(), dto.trendMonths(),
+                toTrendResList(dto.registeredTrend()), toTrendResList(dto.monthlyTrend()),
+                toNamedCountResList(dto.roleDistribution()), toNamedCountResList(dto.deptDistribution()),
+                toNamedCountResList(dto.completeness()));
     }
 
     public static List<UserStatsRes.TrendRes> toTrendResList(List<UserStatsDTO.TrendDTO> items) {

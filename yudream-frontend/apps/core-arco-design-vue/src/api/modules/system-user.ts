@@ -97,8 +97,12 @@ export interface UserStats {
   newToday: string | number
   newThisWeek: string | number
   trendDays: number
+  trendMonths: number
   registeredTrend: UserStatsDailyCount[]
+  /** 月度趋势：date 为 yyyy-MM */
+  monthlyTrend: UserStatsDailyCount[]
   roleDistribution: UserStatsNamedCount[]
+  deptDistribution: UserStatsNamedCount[]
   completeness: UserStatsNamedCount[]
 }
 

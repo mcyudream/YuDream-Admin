@@ -12,5 +12,5 @@ public interface UserStatsRepo {
      *
      * @param trendFrom 趋势起始日期（含），按服务器本地时区解释
      */
-    UserStatistics statistics(LocalDate trendFrom);
+    UserStatistics statistics(LocalDate trendFrom, String monthlyFrom);
 }

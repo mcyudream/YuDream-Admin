@@ -69,6 +69,17 @@ const trendDataset = computed<ChartDataset>(() => {
   }
 })
 
+/** 近 12 个月注册趋势 */
+const monthlyDataset = computed<ChartDataset>(() => {
+  const rows = props.stats?.monthlyTrend ?? []
+  return {
+    chartType: 'bar',
+    dimensions: ['月份', '新增'],
+    source: rows.map(row => [row.date.slice(2), toCount(row.count)]),
+    label: `近 ${props.stats?.trendMonths ?? 12} 个月新增注册`,
+  }
+})
+
 /** 角色分布：取前 6 + 其余合并，避免环形图图例溢出 */
 const roleDataset = computed<ChartDataset>(() => {
   const rows = (props.stats?.roleDistribution ?? []).map(row => ({ name: row.name, count: toCount(row.count) }))
@@ -99,6 +110,17 @@ const statusDataset = computed<ChartDataset>(() => ({
   label: '状态构成',
 }))
 
+/** 部门用户分布：后端已按人数降序并合并尾部队列 */
+const deptDataset = computed<ChartDataset>(() => {
+  const rows = (props.stats?.deptDistribution ?? []).map(row => ({ name: row.name, count: toCount(row.count) }))
+  return {
+    chartType: 'bar',
+    dimensions: ['部门', '人数'],
+    source: rows.map(row => [row.name, row.count]),
+    label: '部门用户分布',
+  }
+})
+
 /** 资料完善：各维度已填写人数 */
 const completenessDataset = computed<ChartDataset>(() => ({
   chartType: 'bar',
@@ -126,7 +148,13 @@ const completenessDataset = computed<ChartDataset>(() => ({
         <LineChart :dataset="trendDataset" :theme="chartTheme" :height="190" />
       </section>
       <section class="user-stats__chart">
+        <BarChart :dataset="monthlyDataset" :theme="chartTheme" :height="190" />
+      </section>
+      <section class="user-stats__chart">
         <PieChart :dataset="roleDataset" :theme="chartTheme" :height="190" />
+      </section>
+      <section class="user-stats__chart">
+        <BarChart :dataset="deptDataset" :theme="chartTheme" :height="190" />
       </section>
       <section class="user-stats__chart">
         <BarChart :dataset="statusDataset" :theme="chartTheme" :height="190" />
@@ -150,7 +178,7 @@ const completenessDataset = computed<ChartDataset>(() => ({
 /* auto-fit + minmax 自适应：宽屏一行四张，窄屏自动折行，不需要媒体查询 */
 .user-stats__charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
   min-width: 0;
 }

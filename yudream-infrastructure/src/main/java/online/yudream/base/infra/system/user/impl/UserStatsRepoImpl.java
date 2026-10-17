@@ -33,7 +33,7 @@ public class UserStatsRepoImpl implements UserStatsRepo {
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public UserStatistics statistics(LocalDate trendFrom) {
+    public UserStatistics statistics(LocalDate trendFrom, String monthlyFrom) {
         ZoneId zone = ZoneId.systemDefault();
         String timezone = mongoTimezone(zone);
         LocalDate today = LocalDate.now(zone);
@@ -74,9 +74,26 @@ public class UserStatsRepoImpl implements UserStatsRepo {
                 new Document("$unwind", "$roleIds"),
                 new Document("$group", new Document("_id", "$roleIds").append("count", new Document("$sum", 1))));
 
+        // 月度趋势：与日趋势同一时区折算，月份串（yyyy-MM）字典序等于时间序，可直接做边界比较
+        List<Document> monthly = List.of(
+                new Document("$group", new Document("_id", localMonth("$createTime", timezone))
+                        .append("count", new Document("$sum", 1))),
+                new Document("$match", new Document("_id", new Document("$gte", monthlyFrom))),
+                new Document("$sort", new Document("_id", 1)));
+
+        // 部门分布：先把用户-部门映射成 deptId 集合去重，再 unwind 统计，同一用户同一部门只计一次
+        List<Document> deptCounts = List.of(
+                new Document("$project", new Document("deptIds", new Document("$setUnion", List.of(
+                        new Document("$map", new Document("input", new Document("$ifNull", List.of("$depts", List.of())))
+                                .append("as", "dept").append("in", "$$dept.deptId")), List.of())))),
+                new Document("$unwind", "$deptIds"),
+                new Document("$group", new Document("_id", "$deptIds").append("count", new Document("$sum", 1))));
+
         Document facet = new Document("$facet", new Document("basic", List.of(basic))
                 .append("trend", trend)
                 .append("roleCounts", roleCounts)
+                .append("monthly", monthly)
+                .append("deptCounts", deptCounts)
                 .append("completeness", List.of(completeness)));
 
         Document result = mongoTemplate.aggregate(Aggregation.newAggregation(context -> facet), COLLECTION, Document.class)
@@ -98,6 +115,18 @@ public class UserStatsRepoImpl implements UserStatsRepo {
                 roleCountsById.merge(roleId.longValue(), number(row, "count"), Long::sum);
             }
         }
+        List<UserStatistics.MonthlyNew> monthlyNews = new ArrayList<>();
+        for (Document row : result.getList("monthly", Document.class, List.of())) {
+            if (row.get("_id") instanceof String month) {
+                monthlyNews.add(new UserStatistics.MonthlyNew(month, number(row, "count")));
+            }
+        }
+        Map<Long, Long> deptCountsById = new LinkedHashMap<>();
+        for (Document row : result.getList("deptCounts", Document.class, List.of())) {
+            if (row.get("_id") instanceof Number deptId) {
+                deptCountsById.merge(deptId.longValue(), number(row, "count"), Long::sum);
+            }
+        }
         Map<Long, Long> sortedRoleCounts = roleCountsById.entrySet().stream()
                 .sorted(Map.Entry.<Long, Long>comparingByValue(Comparator.reverseOrder())
                         .thenComparing(Map.Entry.comparingByKey()))
@@ -108,12 +137,18 @@ public class UserStatsRepoImpl implements UserStatsRepo {
                 number(count, "newThisWeek"), number(completenessCount, "deptFilledCount"),
                 number(completenessCount, "roleFilledCount"), number(completenessCount, "emailFilledCount"),
                 number(completenessCount, "phoneFilledCount"), number(completenessCount, "qqFilledCount"),
-                dailyNews, sortedRoleCounts);
+                dailyNews, sortedRoleCounts, monthlyNews, deptCountsById);
     }
 
     /** 按服务器本地时区把日期字段折算成 yyyy-MM-dd 字符串。 */
     private static Document localDay(String field, String timezone) {
         return new Document("$dateToString", new Document("format", "%Y-%m-%d")
+                .append("date", field).append("timezone", timezone));
+    }
+
+    /** 按服务器本地时区把日期字段折算成 yyyy-MM 字符串。 */
+    private static Document localMonth(String field, String timezone) {
+        return new Document("$dateToString", new Document("format", "%Y-%m")
                 .append("date", field).append("timezone", timezone));
     }
 
@@ -156,6 +191,6 @@ public class UserStatsRepoImpl implements UserStatsRepo {
     }
 
     private static UserStatistics empty() {
-        return new UserStatistics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, List.of(), Map.of());
+        return new UserStatistics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, List.of(), Map.of(), List.of(), Map.of());
     }
 }

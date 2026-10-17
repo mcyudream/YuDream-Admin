@@ -22,13 +22,22 @@ import java.util.Map;
  *                         消费方需自行补齐缺失日期
  * @param roleCounts       按 roleId 聚合的用户数；同一用户重复的 roleId 只计一次，
  *                         实现按 count 降序、同 count 按 roleId 升序返回（顺序仅便于消费，不做契约）
+ * @param monthlyNews      按月新增，month 为服务器本地时区的 yyyy-MM，仅包含有点数的月份，
+ *                         消费方需自行补齐缺失月份
+ * @param deptCounts       按 deptId 聚合的用户数；同一用户重复的 deptId 只计一次；
+ *                         未分配部门的用户数由 total 减去本表合计得出
  */
 public record UserStatistics(long total, long verifiedCount, long activeCount, long disabledCount,
                              long newToday, long newThisWeek, long deptFilledCount, long roleFilledCount,
                              long emailFilledCount, long phoneFilledCount, long qqFilledCount,
-                             List<DailyNew> dailyNews, Map<Long, Long> roleCounts) {
+                             List<DailyNew> dailyNews, Map<Long, Long> roleCounts,
+                             List<MonthlyNew> monthlyNews, Map<Long, Long> deptCounts) {
 
     /** 单日新增用户数，date 为服务器本地时区日期。 */
     public record DailyNew(LocalDate date, long count) {
+    }
+
+    /** 单月新增用户数，month 为服务器本地时区的 yyyy-MM。 */
+    public record MonthlyNew(String month, long count) {
     }
 }
