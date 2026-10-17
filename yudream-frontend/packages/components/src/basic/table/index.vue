@@ -566,7 +566,8 @@ function showAllColumns() {
 function showCommonColumns() {
   const next: VisibilityState = {}
   for (const column of columnVisibilityColumns.value) {
-    next[column.id] = !defaultHiddenState.value[column.id]
+    // 默认隐藏列的状态是「显式 false」，其余未记录的列都算可见
+    next[column.id] = defaultHiddenState.value[column.id] !== false
   }
   columnVisibilityState.value = next
 }

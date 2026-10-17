@@ -267,6 +267,8 @@ const oauthClientScopeInitialLabels = computed<Record<string, string>>(() => {
 const apiKeyColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
   { id: 'permissions', header: '权限', width: 220 },
   { accessorKey: 'maskedValue', header: '密钥标识', width: 180 },
+  { accessorKey: 'createTime', header: '创建时间', width: 180, defaultHidden: true },
+  { accessorKey: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
   { accessorKey: 'expireTime', header: '过期时间', width: 180 },
 ])
@@ -330,6 +332,7 @@ const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
   { accessorKey: 'deviceName', header: '设备名称', width: 180, fixed: 'left' },
   { id: 'userId', header: '账号', width: 180 },
   { accessorKey: 'credentialId', header: '凭据 ID', width: 260, defaultHidden: true },
+  { accessorKey: 'createTime', header: '创建时间', width: 180, defaultHidden: true },
   { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right', defaultHidden: true },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
 ])

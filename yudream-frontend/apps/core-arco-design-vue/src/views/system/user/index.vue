@@ -219,6 +219,11 @@ const userActions: ActionMenuItem<UserManageItem>[] = [
   { label: '停用', icon: 'morph:ban', danger: true, visible: row => row.status !== 'DISABLED' && auth('system:user:delete'), onClick: confirmDisable },
 ]
 
+/** 时间列统一去掉 ISO 的 T 并截到秒 */
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : ''
+}
+
 const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   // 用户列自绘为关联实体入口：点开就地查看/编辑（替代只读 userColumn，能力只增不减）
   { id: 'user', header: '用户', width: 240, fixed: 'left' },
@@ -229,6 +234,8 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   { id: 'deptNames', header: '部门', width: 220 },
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },
+  { id: 'createTime', header: '创建时间', width: 180, defaultHidden: true },
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ])
 
 onMounted(async () => {
@@ -718,6 +725,14 @@ function importUsers() {
             :columns="tableColumns"
             :data="rows"
           >
+            <template #cell-createTime="{ row }">
+              <span v-if="row.original.createTime">{{ dateText(row.original.createTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-updateTime="{ row }">
+              <span v-if="row.original.updateTime">{{ dateText(row.original.updateTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
             <template #cell-user="{ row }">
               <RelatedEntity
                 entity-type="user"
@@ -729,14 +744,14 @@ function importUsers() {
               />
             </template>
             <template #cell-identities="{ row }">
-              <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1">
-                <div v-if="row.original.qq" class="flex gap-2">
+              <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="text-sm flex flex-col gap-1 whitespace-normal">
+                <div v-if="row.original.qq" class="flex gap-2 min-w-0">
                   <span class="text-secondary-foreground/60 shrink-0">QQ 号</span>
                   <span class="break-all">{{ row.original.qq }}</span>
                 </div>
-                <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+                <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2 min-w-0">
                   <span class="text-secondary-foreground/60 shrink-0">{{ protocolLabel(item.protocol) }}</span>
-                  <span class="break-all">
+                  <span class="min-w-0 break-all">
                     {{ identityTypeLabel(item.identityType) }}
                     <span :title="item.identity">{{ truncateMiddle(item.identity) }}</span>{{ item.groupOpenid ? ` / 群 ${truncateMiddle(item.groupOpenid)}` : '' }}
                   </span>
@@ -745,10 +760,10 @@ function importUsers() {
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-fields="{ row }">
-              <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1">
-                <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
+              <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1 whitespace-normal">
+                <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2 min-w-0">
                   <span class="text-secondary-foreground/60 shrink-0">{{ field.label }}</span>
-                  <span class="break-all">{{ field.value }}</span>
+                  <span class="min-w-0 break-all">{{ field.value }}</span>
                 </div>
               </div>
               <span v-else class="text-muted-foreground/40">-</span>

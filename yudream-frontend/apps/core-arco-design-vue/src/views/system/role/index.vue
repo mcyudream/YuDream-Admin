@@ -173,6 +173,11 @@ useLinkedFocus<RoleManageItem>({
   },
 })
 
+/** 时间列统一去掉 ISO 的 T 并截到秒 */
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : ''
+}
+
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   // 角色名/部门都是关联实体入口：点开就地查看编辑、可跳完整管理
   { id: 'name', header: '角色名称', width: 220, fixed: 'left' },
@@ -182,6 +187,8 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'level', header: '等级', width: 120 },
   { accessorKey: 'permissionCount', header: '权限数', width: 100, align: 'center' },
   { id: 'systemRole', header: '类型', width: 110, align: 'center' },
+  { id: 'createTime', header: '创建时间', width: 180, defaultHidden: true },
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ])
 
 onMounted(async () => {
@@ -521,6 +528,14 @@ function importRoles() {
               :columns="tableColumns"
               :data="rows"
             >
+              <template #cell-createTime="{ row }">
+                <span v-if="row.original.createTime">{{ dateText(row.original.createTime) }}</span>
+                <span v-else class="text-muted-foreground/40">-</span>
+              </template>
+              <template #cell-updateTime="{ row }">
+                <span v-if="row.original.updateTime">{{ dateText(row.original.updateTime) }}</span>
+                <span v-else class="text-muted-foreground/40">-</span>
+              </template>
               <template #cell-name="{ row }">
                 <RelatedEntity
                   entity-type="role"

@@ -184,6 +184,11 @@ const pageActions = computed<YdTablePageAction[]>(() => [
     : []),
 ])
 
+/** 时间列统一去掉 ISO 的 T 并截到秒 */
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : ''
+}
+
 const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { id: 'name', header: '部门名称', width: 220, fixed: 'left' },
   { id: 'leaderName', header: '负责人', width: 160 },
@@ -191,6 +196,8 @@ const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center', defaultHidden: true },
   { id: 'systemDept', header: '类型', width: 110, align: 'center' },
   { accessorKey: 'description', header: '描述', minWidth: 220, defaultHidden: true },
+  { id: 'createTime', header: '创建时间', width: 180, defaultHidden: true },
+  { id: 'updateTime', header: '更新时间', width: 180, defaultHidden: true },
 ])
 
 /** 后端返回 /api/files/... 相对地址，列表落地前统一补后端基址 */
@@ -356,6 +363,14 @@ function importDepts() {
             :columns="tableColumns"
             :data="rows"
           >
+            <template #cell-createTime="{ row }">
+              <span v-if="row.original.createTime">{{ dateText(row.original.createTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
+            <template #cell-updateTime="{ row }">
+              <span v-if="row.original.updateTime">{{ dateText(row.original.updateTime) }}</span>
+              <span v-else class="text-muted-foreground/40">-</span>
+            </template>
             <template #cell-name="{ row }">
               <RelatedEntity
                 entity-type="dept"
