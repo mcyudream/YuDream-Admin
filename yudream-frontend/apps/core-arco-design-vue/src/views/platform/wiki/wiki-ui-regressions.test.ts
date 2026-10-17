@@ -325,4 +325,15 @@ test('public comments are switchable from space settings; hints never claim the 
   assert.match(author, /设置 → 评论区/)
   assert.doesNotMatch(author, /评论接口不可用/)
   assert.match(comments, /store\.openManage\('settings'\)/)
+
+  // 评论读写的失败原因必须来自后端 message（例如引用无法定位），不能只显示 axios 的英文状态码文案
+  const publicController = wikiFile('../../../views/wiki/use-wiki-public-comments.ts')
+  const authorComments = wikiFile('components/WikiAuthorComments.vue')
+  const thread = wikiFile('../../../views/wiki/WikiCommentThread.vue')
+  assert.match(publicController, /resolveApiErrorMessage\(exception\)/)
+  assert.doesNotMatch(publicController, /exception\?\.message/)
+  assert.match(authorComments, /resolveApiErrorMessage\(exception\)/)
+  assert.doesNotMatch(authorComments, /exception\?\.message/)
+  // 引用评论提交成功后父级会收起草稿（内联提示随之消失）：必须有 toast 兜底确认
+  assert.match(thread, /toast\.success\('引用评论已提交/)
 })

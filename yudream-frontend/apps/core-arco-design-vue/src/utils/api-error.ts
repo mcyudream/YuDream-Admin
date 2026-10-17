@@ -15,6 +15,7 @@ interface BackendResultLike {
 const ERROR_HINTS: Array<{ pattern: RegExp, hint: string }> = [
   { pattern: /能力未启用/, hint: '请到「平台 → 能力管理」启用对应能力后重试' },
   { pattern: /系统已初始化/, hint: '请直接使用管理员账号登录' },
+  { pattern: /无法在当前已发布版本中唯一定位/, hint: '请重新选择一段连续正文（避免跨段落、跨标题，或选区里含加粗、链接、行内代码等排版）' },
 ]
 
 export function hintForMessage(message: string) {

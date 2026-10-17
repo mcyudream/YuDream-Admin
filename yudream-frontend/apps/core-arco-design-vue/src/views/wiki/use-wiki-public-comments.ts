@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { WikiCommentAnchorPayload, WikiPublicComment } from './wiki-public-api'
 import { computed, ref, watch } from 'vue'
+import { resolveApiErrorMessage } from '@/utils/api-error'
 import dayjs from '@/utils/dayjs'
 import { createPublicWikiComment, fetchPublicWikiComments, fetchPublicWikiProfile } from './wiki-public-api'
 
@@ -136,7 +137,8 @@ export function useWikiPublicComments(scope: () => WikiPublicCommentsScope): Wik
         comments.value = []
         total.value = 0
       }
-      loadError.value = exception?.message || '评论加载失败，请稍后重试'
+      // 服务端拒绝原因（例如引用无法定位）要原样带给读者，axios 默认英文文案没有可操作性
+      loadError.value = await resolveApiErrorMessage(exception)
     }
     finally {
       if (requestId === listRequestId) {
@@ -175,7 +177,7 @@ export function useWikiPublicComments(scope: () => WikiPublicCommentsScope): Wik
       return { ok: true }
     }
     catch (exception: any) {
-      return { ok: false, error: exception?.message || '评论提交失败，请稍后重试' }
+      return { ok: false, error: await resolveApiErrorMessage(exception) }
     }
   }
 

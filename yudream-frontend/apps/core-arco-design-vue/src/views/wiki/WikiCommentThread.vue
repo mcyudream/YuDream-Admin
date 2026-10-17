@@ -43,6 +43,7 @@ const emit = defineEmits<{
 const { commentEnabled, comments, total, loading, loadError, isLogin, hasMore, page, loginHref } = props.controller
 
 const root = ref<HTMLElement | null>(null)
+const toast = useYdToast()
 const quoteDraft = ref('')
 const quoteSubmitting = ref(false)
 const quoteError = ref('')
@@ -139,6 +140,8 @@ async function submitQuoteComment() {
     // 服务端落为待审核：不加入已发布列表、不高亮，只提示审核中
     quoteNotice.value = '引用评论已提交，审核通过后会展示在本面板。'
     replyTarget.value = null
+    // 提交成功后父级会收起草稿（面板与内联提示一起消失），用 toast 保证读者拿到确认
+    toast.success('引用评论已提交，审核通过后展示')
     emit('posted')
   }
   else {
@@ -228,10 +231,14 @@ async function submitReply() {
       <div v-if="activeComment" class="wiki-thread__active" :data-wiki-thread-comment="activeComment.id">
         <div class="wiki-thread__meta">
           <strong class="wiki-thread__author">{{ activeComment.authorName || '读者' }}</strong>
-          <YdTag v-if="stateLabelOf(activeComment)" :variant="stateToneOf(activeComment)">{{ stateLabelOf(activeComment) }}</YdTag>
+          <YdTag v-if="stateLabelOf(activeComment)" :variant="stateToneOf(activeComment)">
+            {{ stateLabelOf(activeComment) }}
+          </YdTag>
           <time v-if="formatWikiCommentTime(activeComment.createTime)">{{ formatWikiCommentTime(activeComment.createTime) }}</time>
         </div>
-        <p class="wiki-thread__content">{{ activeComment.content }}</p>
+        <p class="wiki-thread__content">
+          {{ activeComment.content }}
+        </p>
         <p v-if="activeComment.anchor" class="wiki-thread__quote">
           <YdIcon name="morph:quote" /> {{ activeComment.anchor.exact }}
         </p>
@@ -256,12 +263,16 @@ async function submitReply() {
               <strong class="wiki-thread__author">{{ reply.authorName || '读者' }}</strong>
               <time v-if="formatWikiCommentTime(reply.createTime)">{{ formatWikiCommentTime(reply.createTime) }}</time>
             </div>
-            <p class="wiki-thread__content">{{ reply.content }}</p>
+            <p class="wiki-thread__content">
+              {{ reply.content }}
+            </p>
           </li>
         </ul>
 
         <div v-if="isLogin && replyTarget?.id === activeComment.id" class="wiki-thread__composer">
-          <p class="wiki-thread__hint">回复 {{ replyTarget.authorName || '读者' }}（回复继承根评论的引用）</p>
+          <p class="wiki-thread__hint">
+            回复 {{ replyTarget.authorName || '读者' }}（回复继承根评论的引用）
+          </p>
           <YdTextarea
             v-model="replyDraft"
             :autosize="{ minRows: 2, maxRows: 6 }"
@@ -286,7 +297,9 @@ async function submitReply() {
       </div>
 
       <div v-if="anchoredComments.length" class="wiki-thread__list">
-        <p class="wiki-thread__section">文中引用评论（{{ anchoredComments.length }}）</p>
+        <p class="wiki-thread__section">
+          文中引用评论（{{ anchoredComments.length }}）
+        </p>
         <YdButton
           v-for="comment in anchoredComments"
           :key="comment.id"
@@ -324,7 +337,9 @@ async function submitReply() {
           登录
         </RouterLink> 后可发表引用评论；匿名评论未开放。
       </p>
-      <p v-else class="wiki-thread__total">共 {{ total }} 条评论</p>
+      <p v-else class="wiki-thread__total">
+        共 {{ total }} 条评论
+      </p>
     </template>
   </section>
 </template>
@@ -332,8 +347,8 @@ async function submitReply() {
 <style scoped>
 .wiki-thread {
   display: grid;
-  align-content: start;
   gap: 14px;
+  align-content: start;
 }
 
 .wiki-thread__head {
@@ -397,13 +412,13 @@ async function submitReply() {
   display: flex;
   gap: 6px;
   align-items: flex-start;
-  margin: 0;
   padding: 6px 10px;
-  border-left: 2px solid var(--yb-site-primary, var(--color-border-2));
-  color: var(--yb-site-text-2, var(--color-text-2));
+  margin: 0;
   font-size: 13px;
   line-height: 1.6;
+  color: var(--yb-site-text-2, var(--color-text-2));
   overflow-wrap: anywhere;
+  border-left: 2px solid var(--yb-site-primary, var(--color-border-2));
 }
 
 .wiki-thread__quote :deep(svg) {
@@ -434,9 +449,9 @@ async function submitReply() {
 
 .wiki-thread__section {
   margin: 0 0 8px;
-  color: var(--yb-site-muted, var(--color-text-3));
   font-size: 12px;
   font-weight: 700;
+  color: var(--yb-site-muted, var(--color-text-3));
   letter-spacing: 0.04em;
 }
 
@@ -446,12 +461,12 @@ async function submitReply() {
 
 .wiki-thread__card {
   display: grid;
+  gap: 6px;
+  justify-items: start;
   width: 100%;
   height: auto;
-  justify-items: start;
-  gap: 6px;
-  margin-bottom: 8px;
   padding: 10px 12px;
+  margin-bottom: 8px;
   text-align: left;
   white-space: normal;
   background: var(--yb-site-surface, var(--color-bg-2));
@@ -466,9 +481,9 @@ async function submitReply() {
   display: flex;
   gap: 6px;
   align-items: flex-start;
-  color: var(--yb-site-text, var(--color-text-1));
   font-size: 13px;
   line-height: 1.6;
+  color: var(--yb-site-text, var(--color-text-1));
   overflow-wrap: anywhere;
 }
 
@@ -478,16 +493,16 @@ async function submitReply() {
 }
 
 .wiki-thread__card-meta {
-  color: var(--yb-site-muted, var(--color-text-3));
   font-size: 12px;
+  color: var(--yb-site-muted, var(--color-text-3));
 }
 
 .wiki-thread__hint,
 .wiki-thread__login,
 .wiki-thread__total {
   margin: 0;
-  color: var(--yb-site-muted, var(--color-text-3));
   font-size: 12px;
+  color: var(--yb-site-muted, var(--color-text-3));
 }
 
 .wiki-thread__login a {
@@ -496,13 +511,13 @@ async function submitReply() {
 
 .wiki-thread__error {
   margin: 0;
-  color: var(--color-danger-6, #f53f3f);
   font-size: 13px;
+  color: var(--color-danger-6, #f53f3f);
 }
 
 .wiki-thread__notice {
   margin: 0;
-  color: var(--yb-site-text-2, var(--color-text-2));
   font-size: 13px;
+  color: var(--yb-site-text-2, var(--color-text-2));
 }
 </style>

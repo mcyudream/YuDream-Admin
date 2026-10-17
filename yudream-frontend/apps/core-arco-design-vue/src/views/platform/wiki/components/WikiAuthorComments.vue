@@ -2,6 +2,7 @@
 import type { WikiAuthorComment, WikiAuthorCommentAnchor } from './wiki-author-comments-api'
 import type { WikiAnchorBlock, WikiQuoteAnchor, WikiQuoteAnchorMatch } from '@/views/wiki/wiki-quote-anchor'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { resolveApiErrorMessage } from '@/utils/api-error'
 import dayjs from '@/utils/dayjs'
 import { classifyWikiQuoteAnchor } from '@/views/wiki/wiki-quote-anchor'
 import { createWikiAuthorComment, fetchWikiAuthorComments, wikiAnchorFromAuthorComment, wikiAnchorStateFromAuthorComment } from './wiki-author-comments-api'
@@ -106,7 +107,7 @@ async function loadPage(next: number) {
       comments.value = []
       total.value = 0
     }
-    loadError.value = exception?.message || '评论加载失败，请稍后重试'
+    loadError.value = await resolveApiErrorMessage(exception)
   }
   finally {
     if (requestId === listRequestId) {
@@ -154,7 +155,7 @@ async function submitComment() {
     submitNotice.value = '评论已提交，审核通过后会在本页展示。'
   }
   catch (exception: any) {
-    submitError.value = exception?.message || '评论提交失败，请稍后重试'
+    submitError.value = await resolveApiErrorMessage(exception)
   }
   finally {
     submitting.value = false
