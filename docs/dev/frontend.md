@@ -54,7 +54,15 @@
 - 本地兄弟组件**必须**显式 import（全局只注册 Fa*/Yd*）；漏导入时 Vue 静默降级为原生元素，页面缺结构但内容还在——先查模板里每个非 Fa/Yd 大写标签的 import。
 - Mock 用 `vite-plugin-fake-server`，文件放对应 api 模块旁；Node 版本以根 `package.json` 为准。
 
-## 6. AI 前端边界
+## 6. 表格页版式与分页归宿
+
+- 宿主列表页统一用 `YdTablePageLayout`（页头 + 折叠搜索 + 表格卡 + `#footer` 分页 + 可选 `#stats`），但**套模板的前提是「标题 + 搜索 + 单表 + 分页」形态**；多表、多 Tab、看板自绘的复杂页保留自绘布局，只复用版式令牌（页头、卡片、16px 间距、表格视觉），每个表格各自决定分页方式。
+- **分页归宿由数据源决定，不由版式决定**：持久化集合（Mongo/关系库）必须服务端 `page/size`；内存或有界枚举（如 Sa-Token 会话、系统指标快照）由网关全量枚举后在服务端切片并给出真实 `total`，**禁止**把全量丢给前端再本地分页；游标源（Redis `SCAN`）用游标分页并在 UI 标注采样，不做 `page/size` 假分页；有界小集合且接口未分页的可客户端分页，但页面要说明数据是快照。
+- 表格统计（`#stats`）**必须**由仓储在全量数据上聚合，不得依据当前分页；分页参数经 `useTablePage` 的 `query.page/query.size` 传递，后端 Long 计数字段在 composable 内已归一为 Number。
+- 搜索条件来自后端查询类的 `@Searchable` 注解，前端用 `YdDynamicSearchForm` 渲染；下拉控件所需选项经 `options-sources` 登记，控件值为字符串时在页面内还原为目标类型（如布尔）。
+- 页头只放标题与只读情报，操作按钮一律走 `actions`：`autoFold` 收进「更多」，`danger` 自动 destructive 变体。
+
+## 7. AI 前端边界
 
 - 所有 AI 前端用公开 YD Agent/chat 组件；推理面板只渲染真实推理（OpenAI 兼容 `reasoningContent`/`reasoning_content`），自然语言增量、工具与生命周期进度分开；禁止业务页直接引 TDesign Chat。
 - `YdAgentWorkbench`/`YdAgentAnswer` 是受控 UI 投影：运行、权限、上下文压缩与持久化由宿主 Harness 管理；version 1 渲染协议含 markdown/reference/tool 块；入口先校验协议并局部清理 Markdown HTML，引用外链仅 HTTP(S)，文件引用与工具重试交宿主事件；Skills/MCP/工作区/审批无适配器时不得伪造连接，演示明确标识本地状态。详见 `docs/yd-agent-workbench.md`。
