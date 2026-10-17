@@ -137,7 +137,7 @@ public class AiRunAppService {
             online.yudream.base.domain.platform.ai.valobj.HarnessRunResult result;
             if (tools == null) result = harness.resume(request, reference.turnId(), output::content, output::reasoning, output::tool,
                     progress -> output.progress(progress.action(), progress));
-            else try (var scope = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools)) {
+            else try (var scope = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools, run.getUserId())) {
                 result = harness.resume(request, reference.turnId(), output::content, output::reasoning, output::tool,
                         progress -> output.progress(progress.action(), progress));
             }
@@ -269,7 +269,7 @@ public class AiRunAppService {
                         "toolName", logicalName, "status", Boolean.FALSE.equals(output.get("ok")) ? "error" : "complete", "payload", output)));
             }
             {
-                var result = respondNative(request, requestId, approved, output, responseEmitter, tools);
+                var result = respondNative(run, request, requestId, approved, output, responseEmitter, tools);
                 return continueBusiness(run, responseEmitter, result, currentPermissions);
             }
             }
@@ -309,12 +309,13 @@ public class AiRunAppService {
     }
 
     private online.yudream.base.domain.platform.ai.valobj.HarnessRunResult respondNative(
+            AiRun run,
             online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest request, String requestId, Boolean approved,
             Map<String, Object> output, RunEmitter emitter, List<online.yudream.base.domain.platform.ai.service.AiAgentTool> tools) {
         var answers = List.of(new online.yudream.base.domain.platform.ai.valobj.HarnessInteractionAnswer(requestId, approved, output));
         if (tools == null) return harness.respond(request, answers, emitter::content, emitter::reasoning, emitter::tool,
                 progress -> emitter.progress(progress.action(), progress));
-        try (var scope = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools)) {
+        try (var scope = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools, run.getUserId())) {
             return harness.respond(request, answers, emitter::content, emitter::reasoning, emitter::tool,
                     progress -> emitter.progress(progress.action(), progress));
         }

@@ -22,8 +22,14 @@ import java.util.List;
  */
 public final class WikiAccessCoverage {
 
-    /** 受限 ACL 是否已具备暴露条件；跨 Wiki AI/chat 调用链尚未完成实例级授权，当前保持关闭。 */
-    public static final boolean RESTRICTED_EXPOSURE_READY = false;
+    /**
+     * 受限 ACL 是否已具备暴露条件。
+     * <p>
+     * 平台侧端点已全部经应用层双闸门或 {@code @WikiSpaceAccess} 覆盖（{@code WikiSpaceAclCoverageTest} 反射断言）；
+     * 跨 Wiki 的 AI/chat 调用链也已补齐：工具执行作用域携带运行发起人，{@code wiki.search} 按 slug 取库后
+     * 用发起人做空间实例 ACL（{@code requireSpaceAclForUser}），未登录主体一律拒绝。
+     */
+    public static final boolean RESTRICTED_EXPOSURE_READY = true;
 
     /** 经确认不构成受限空间旁路的例外（保持全局权限码控制，不做实例 ACL）。 */
     public static final List<String> DOCUMENTED_EXCEPTIONS = List.of(

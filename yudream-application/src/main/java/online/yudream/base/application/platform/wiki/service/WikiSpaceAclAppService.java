@@ -118,6 +118,24 @@ public class WikiSpaceAclAppService {
         return space;
     }
 
+    /**
+     * 以「发起人用户 ID」做实例 ACL 判定：供没有请求级安全上下文的执行线程使用
+     * （AI 运行线程里的 wiki 工具）。主体按该用户持久化的部门/角色上下文解析，
+     * 用户不存在、未启用或没有有效角色一律按未认证处理并 fail closed。
+     */
+    @Transactional(readOnly = true)
+    public WikiSpace requireSpaceAclForUser(Long actorUserId, Long spaceId, WikiSpaceAclAction action) {
+        WikiSpace space = requireSpaceEntity(spaceId);
+        WikiActor actor = actorGateway.actorFor(actorUserId);
+        if (permits(space, actor, action)) {
+            return space;
+        }
+        if (actor == null || !actor.authenticated()) {
+            throw new BizException("无法确认运行发起人的身份，已拒绝访问受限知识库");
+        }
+        throw new BizException("运行发起人没有该知识库的访问权限");
+    }
+
     /** 加载空间（不含 ACL 判定）；不存在一律拒绝。 */
     @Transactional(readOnly = true)
     public WikiSpace requireSpaceEntity(Long spaceId) {

@@ -37,7 +37,15 @@ public class SaTokenWikiActorGateway implements WikiActorGateway {
 
     @Override
     public WikiActor currentActor() {
-        Long userId = currentUserId();
+        return actorFor(currentUserId());
+    }
+
+    /**
+     * 指定用户的主体快照：与 {@link #currentActor()} 同一解析口径，只是身份来自调用方给出的用户 ID。
+     * AI 运行线程没有 Sa-Token 请求上下文，工具侧只能这样取主体；角色/部门仍按该用户持久化的当前上下文解析。
+     */
+    @Override
+    public WikiActor actorFor(Long userId) {
         if (userId == null) {
             return null;
         }

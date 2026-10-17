@@ -134,7 +134,7 @@ public class AiAppService {
                 );
         online.yudream.base.domain.platform.ai.valobj.HarnessRunResult result;
         try (online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope ignored =
-                     online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools);
+                     online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools, cmd.getUserId());
              var usageScope = online.yudream.base.domain.platform.ai.service.AiUsageExecutionScope.open(cmd.getUserId())) {
             result = harnessAgents.run(request, onDelta, onReasoningDelta, onTool, onProgress);
         }

@@ -5,9 +5,13 @@ import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
+import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
+import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -18,6 +22,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 原生 Agent 工具：wiki.search —— 混合检索（关键词 + 向量），支持“只读原文”模式。
+ * <p>
+ * 工具按 slug 取库，必须自己做空间实例 ACL：运行线程没有请求级安全上下文，
+ * 主体取本次运行的发起人；LEGACY 空间沿用既有全局权限行为，RESTRICTED 空间非成员一律拒绝。
  */
 @Component
 @RequiredArgsConstructor
@@ -27,6 +34,8 @@ public class WikiSearchAiTool implements AiAgentTool {
     public static final String PERMISSION_CODE = "platform:wiki:tool:search";
 
     private final WikiSearchAppService search;
+    private final WikiSpaceRepo spaceRepo;
+    private final WikiSpaceAclAppService access;
 
     @Override
     public AiAgentToolDescriptor descriptor() {
@@ -64,6 +73,9 @@ public class WikiSearchAiTool implements AiAgentTool {
         if (!StringUtils.hasText(query)) {
             throw new BizException("wiki.search 缺少 query 参数");
         }
+        // 受限空间的实例 ACL：主体是本次运行的发起人（运行线程里没有请求级安全上下文）
+        WikiSpace space = spaceRepo.findBySlug(slug).orElseThrow(() -> new BizException("知识库不存在：" + slug));
+        access.requireSpaceAclForUser(AiAgentToolExecutionScope.currentUserId(), space.getId(), WikiSpaceAclAction.READ);
         int topK = intValue(args.get("topK"), 8);
         String pathPrefix = text(args.get("pathPrefix"));
         boolean graph = bool(args.get("graphExpansion"));

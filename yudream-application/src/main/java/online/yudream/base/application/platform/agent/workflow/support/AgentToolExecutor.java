@@ -163,7 +163,7 @@ public final class AgentToolExecutor {
         PermissionSnapshot permissionSnapshot = capturePermissionSnapshot(command);
         AiAgentTool tool = resolve(toolCode, application, permissionSnapshot);
         Map<String, Object> safeArguments = arguments == null ? Map.of() : new LinkedHashMap<>(arguments);
-        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(tool))) {
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(tool), command.getUserId())) {
             ensurePermission(tool.descriptor().permissionCode(), tool.descriptor().title(), permissionSnapshot);
             return tool.execute(new AiAgentToolCall(tool.descriptor().name(), safeArguments));
         }

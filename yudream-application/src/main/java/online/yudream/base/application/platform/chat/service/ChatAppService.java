@@ -231,7 +231,7 @@ public class ChatAppService {
 
     private ChatDispatchResult dispatch(ChatSendCmd cmd, ChatScopeType scopeType, ChatDispatchContext context) {
         if (cmd.getScopedTools() == null) return dispatcher(scopeType).dispatch(context);
-        try (var ignored = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(cmd.getScopedTools())) {
+        try (var ignored = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(cmd.getScopedTools(), context.userId())) {
             return dispatcher(scopeType).dispatch(context);
         }
     }

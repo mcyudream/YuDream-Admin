@@ -101,7 +101,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         boolean nativeTools = ("llm".equals(kind) || "vision".equals(kind)) && !tools.isEmpty();
         if (useWorkspace || statefulChat || nativeTools) {
             HarnessRunResult result;
-            try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools);
+            try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools, state.command().getUserId());
                  HarnessExecutionScope invocation = HarnessExecutionScope.child(state.nextModelInvocation(node.id()))) {
                 result = harnessRun(node, system, userPrompt, providerCode, modelCode, toolMode, tools,
                         callbackResults, useWorkspace, images);
@@ -129,7 +129,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 structuredOutput(node)
         );
 
-        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools)) {
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools, state.command().getUserId())) {
             generated = gateway.generateStream(request, "understand".equals(kind) ? null : state::emitDelta,
                     state::emitReasoningDelta, result -> {
                         callbackResults.add(result);

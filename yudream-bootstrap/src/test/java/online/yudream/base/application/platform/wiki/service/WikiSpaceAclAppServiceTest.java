@@ -136,7 +136,7 @@ class WikiSpaceAclAppServiceTest {
     }
 
     @Test
-    void newSpaceGetsCreatorManageAndOnlyBecomesRestrictedWhenExposureIsReady() {
+    void newSpaceGetsCreatorManageAndIsRestrictedNowThatExposureIsReady() {
         WikiSpaceSaveCmd command = new WikiSpaceSaveCmd();
         command.setName("新库");
         command.setSlug("new-lib");
@@ -152,7 +152,8 @@ class WikiSpaceAclAppServiceTest {
 
         WikiSpaceDTO saved = service.saveSpace(command);
 
-        assertThat(saved.getAclMode()).isEqualTo(WikiSpaceAclMode.LEGACY.name());
+        // 覆盖清单就绪后新建空间直接是 RESTRICTED：先授权创建者 MANAGE，再收紧可见性
+        assertThat(saved.getAclMode()).isEqualTo(WikiSpaceAclMode.RESTRICTED.name());
         ArgumentCaptor<WikiSpaceMember> captor = ArgumentCaptor.forClass(WikiSpaceMember.class);
         verify(members).save(captor.capture());
         assertThat(captor.getValue().getSubjectType()).isEqualTo(WikiSpaceMemberSubjectType.USER);
@@ -175,11 +176,12 @@ class WikiSpaceAclAppServiceTest {
     }
 
     @Test
-    void enablingRestrictedAclFailsClosedUntilCoverageIsReady() {
+    void enablingRestrictedAclGrantsActorManageSoNoSpaceCanLockItselfOut() {
         WikiSpace space = WikiSpace.create("旧库", "legacy");
         space.setId(10L);
         when(spaces.findById(10L)).thenReturn(Optional.of(space));
-        when(members.findBySpaceId(10L)).thenReturn(List.of(member(1L, WikiSpaceMemberSubjectType.USER, 100L,
+        // 没有可管理成员：启用受限前必须先把 MANAGE 授给操作者
+        when(members.findBySpaceId(10L)).thenReturn(List.of(member(1L, WikiSpaceMemberSubjectType.USER, 200L,
                 WikiSpaceAclAction.READ)));
         when(members.findBySubject(10L, WikiSpaceMemberSubjectType.USER, 100L)).thenReturn(Optional.empty());
         when(members.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -187,11 +189,13 @@ class WikiSpaceAclAppServiceTest {
         when(actors.currentActor()).thenReturn(CREATOR);
         when(actors.hasPermission("platform:wiki:member:manage")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.enableRestrictedAcl(10L))
-                .isInstanceOf(BizException.class)
-                .hasMessageContaining("受限访问尚未开放");
-        assertThat(space.effectiveAclMode()).isEqualTo(WikiSpaceAclMode.LEGACY);
-        org.mockito.Mockito.verifyNoInteractions(spaces, members);
+        WikiSpaceDTO enabled = service.enableRestrictedAcl(10L);
+
+        assertThat(enabled.getAclMode()).isEqualTo(WikiSpaceAclMode.RESTRICTED.name());
+        ArgumentCaptor<WikiSpaceMember> captor = ArgumentCaptor.forClass(WikiSpaceMember.class);
+        verify(members).save(captor.capture());
+        assertThat(captor.getValue().getSubjectId()).isEqualTo(100L);
+        assertThat(captor.getValue().getActions()).containsExactly(WikiSpaceAclAction.MANAGE);
     }
 
     private static WikiSpace restricted(Long id) {
