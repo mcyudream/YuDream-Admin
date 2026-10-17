@@ -53,7 +53,7 @@ class PluginWsMappingConnectivityTest {
         context.registerBean("dispatchController", PluginDispatchController.class,
                 () -> new PluginDispatchController(null, null, null));
         context.registerBean("pluginController", PluginController.class,
-                () -> new PluginController(null, null, null));
+                () -> new PluginController(null, null, null, null));
         context.registerBean("ticketController", PluginWsTicketController.class,
                 () -> new PluginWsTicketController(null, null));
         context.refresh();

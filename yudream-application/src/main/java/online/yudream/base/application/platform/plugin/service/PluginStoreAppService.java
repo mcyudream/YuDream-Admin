@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchUpdateCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginDependencyStatusDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceBatchUpdateResultDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceInstallPlanDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
@@ -311,6 +313,46 @@ public class PluginStoreAppService {
         // 更新会同时替换 JAR、写回备份元数据并刷新插件注册表，同一进程内必须串行。
         synchronized (this) {
             return updateSerial(code, targetVersion, sourceCode);
+        }
+    }
+
+    /**
+     * 批量更新：在同一把串行锁内逐项更新，单项业务失败（更新受阻、市场无候选、下载失败等）
+     * 只记录原因并继续后面的插件。已完成的更新不回滚——JAR 已被替换，需要时走回滚入口。
+     */
+    @Transactional
+    public PluginMarketplaceBatchUpdateResultDTO updateBatch(PluginMarketplaceBatchUpdateCmd cmd) {
+        if (cmd == null || cmd.getItems() == null || cmd.getItems().isEmpty()) {
+            throw new BizException("更新清单不能为空");
+        }
+        boolean malformed = cmd.getItems().stream().anyMatch(item -> item == null
+                || !StringUtils.hasText(item.getCode()) || !StringUtils.hasText(item.getReleaseVersion()));
+        if (malformed) {
+            throw new BizException("更新清单包含缺少编码或版本的条目");
+        }
+        synchronized (this) {
+            List<String> updatedCodes = new ArrayList<>();
+            List<PluginMarketplaceBatchUpdateResultDTO.FailureDTO> failures = new ArrayList<>();
+            for (PluginMarketplaceBatchUpdateCmd.Item item : cmd.getItems()) {
+                try {
+                    updateSerial(item.getCode(), item.getReleaseVersion(), item.getSourceCode());
+                    updatedCodes.add(item.getCode());
+                } catch (BizException exception) {
+                    log.warn("批量更新插件 {}@{} 失败：{}", item.getCode(), item.getReleaseVersion(),
+                            exception.getMessage());
+                    failures.add(PluginMarketplaceBatchUpdateResultDTO.FailureDTO.builder()
+                            .code(item.getCode())
+                            .reason(StringUtils.hasText(exception.getMessage())
+                                    ? exception.getMessage()
+                                    : "更新失败：" + item.getCode())
+                            .build());
+                }
+            }
+            return PluginMarketplaceBatchUpdateResultDTO.builder()
+                    .updatedCodes(updatedCodes)
+                    .failures(failures)
+                    .requiresRestart(!updatedCodes.isEmpty())
+                    .build();
         }
     }
 

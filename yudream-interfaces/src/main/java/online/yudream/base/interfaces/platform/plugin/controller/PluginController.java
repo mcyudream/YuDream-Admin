@@ -4,9 +4,12 @@ import cn.dev33.satoken.stp.StpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
+import online.yudream.base.application.platform.plugin.query.PluginModulePageQuery;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.application.platform.plugin.service.PluginDirectoryAppService;
 import online.yudream.base.application.platform.plugin.service.PluginStoreAppService;
 import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
@@ -15,6 +18,7 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatus
 import online.yudream.base.interfaces.platform.plugin.res.PluginDependentsRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginModuleSummaryRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeRes;
 import org.springframework.http.CacheControl;
@@ -43,11 +47,28 @@ public class PluginController {
     private final PluginAppService pluginAppService;
     private final PluginThemeAppService pluginThemeAppService;
     private final PluginStoreAppService pluginStoreAppService;
+    private final PluginDirectoryAppService pluginDirectoryAppService;
 
     @GetMapping
     @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件列表与运行状态")
     public Result<List<PluginModuleRes>> list() {
         return Result.ok(PluginWebAssembler.toResList(pluginAppService.list()));
+    }
+
+    /**
+     * 插件目录分页：关键词、运行状态、更新状态与排序全部在服务端完成。
+     * 与 {@link #list()} 并存——仪表盘、关系图等需要全量清单的调用方不受影响。
+     */
+    @GetMapping("/page")
+    @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "分页查询插件目录与运行状态")
+    public Result<PageResult<PluginModuleRes>> page(PluginModulePageQuery query) {
+        return Result.ok(PluginWebAssembler.toPage(pluginDirectoryAppService.page(query)));
+    }
+
+    @GetMapping("/summary")
+    @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件总数与运行状态分布")
+    public Result<PluginModuleSummaryRes> summary() {
+        return Result.ok(PluginWebAssembler.toSummaryRes(pluginDirectoryAppService.summary()));
     }
 
     @PostMapping("/refresh")

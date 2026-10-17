@@ -7,8 +7,10 @@ import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchInstallRequest;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchUpdateRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceInstallRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceUpdateRequest;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceBatchUpdateResultRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdatePlanRes;
@@ -76,6 +78,13 @@ public class PluginMarketplaceController {
     public Result<PluginMarketplaceUpdateResultRes> rollback(@PathVariable String code,
                                                              @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "false") boolean cascade) {
         return Result.ok(PluginWebAssembler.toUpdateResultRes(pluginStoreAppService.rollback(code, null, cascade)));
+    }
+
+    @PostMapping("/update-batch")
+    @PermissionRegister(code = "platform:plugin:manage", name = "批量更新插件", module = "平台插件市场", desc = "一键更新多个插件到更新计划中的目标版本；单项失败不影响其余，全部完成后需重启")
+    public Result<PluginMarketplaceBatchUpdateResultRes> updateBatch(@Valid @RequestBody PluginMarketplaceBatchUpdateRequest request) {
+        return Result.ok(PluginWebAssembler.toBatchUpdateResultRes(pluginStoreAppService.updateBatch(
+                PluginWebAssembler.toBatchUpdateCmd(request))));
     }
 
     @PostMapping("/{code}/install")

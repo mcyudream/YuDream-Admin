@@ -6,6 +6,7 @@ import jakarta.servlet.http.Part;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpStreamingDispatchCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchUpdateCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
@@ -13,6 +14,8 @@ import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO
 import online.yudream.base.application.platform.plugin.dto.PluginGuideDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginGuideStepDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginModuleSummaryDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceBatchUpdateResultDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateResultDTO;
@@ -36,6 +39,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginDeptCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginRoleCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginUserCatalogDTO;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchInstallRequest;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchUpdateRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginPluginActionRequest;
 import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatusItemRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatusRes;
@@ -48,6 +52,8 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginGlobalWidgetRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginGuideRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginGuideStepRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginModuleSummaryRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceBatchUpdateResultRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanEntryRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
@@ -65,6 +71,7 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginVersi
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeRes;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingConnectionRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingGroupRes;
@@ -93,6 +100,21 @@ public class PluginWebAssembler {
 
     public static List<PluginModuleRes> toResList(List<PluginModuleDTO> items) {
         return items == null ? List.of() : items.stream().map(PluginWebAssembler::toRes).toList();
+    }
+
+    /** 插件目录分页结果：记录逐条转 res，总数与页码原样透传。 */
+    public static PageResult<PluginModuleRes> toPage(PageResult<PluginModuleDTO> page) {
+        if (page == null) {
+            return PageResult.empty(1, 0);
+        }
+        return new PageResult<>(toResList(page.getRecords()), page.getTotal(), page.getPage(), page.getSize());
+    }
+
+    public static PluginModuleSummaryRes toSummaryRes(PluginModuleSummaryDTO dto) {
+        return PluginModuleSummaryRes.builder()
+                .total(dto.getTotal())
+                .statusCounts(dto.getStatusCounts())
+                .build();
     }
 
     /** 启用请求携带的软依赖集合；空请求返回空集。 */
@@ -175,6 +197,37 @@ public class PluginWebAssembler {
     public static PluginMarketplaceUpdateResultRes toUpdateResultRes(PluginMarketplaceUpdateResultDTO dto) {
         return PluginMarketplaceUpdateResultRes.builder()
                 .modules(toResList(dto.getModules()))
+                .requiresRestart(dto.isRequiresRestart())
+                .build();
+    }
+
+    public static PluginMarketplaceBatchUpdateCmd toBatchUpdateCmd(PluginMarketplaceBatchUpdateRequest request) {
+        PluginMarketplaceBatchUpdateCmd cmd = new PluginMarketplaceBatchUpdateCmd();
+        if (request == null || request.getItems() == null) {
+            cmd.setItems(List.of());
+            return cmd;
+        }
+        cmd.setItems(request.getItems().stream()
+                .map(item -> {
+                    PluginMarketplaceBatchUpdateCmd.Item entry = new PluginMarketplaceBatchUpdateCmd.Item();
+                    entry.setCode(item.getCode());
+                    entry.setReleaseVersion(item.getReleaseVersion());
+                    entry.setSourceCode(item.getSourceCode());
+                    return entry;
+                })
+                .toList());
+        return cmd;
+    }
+
+    public static PluginMarketplaceBatchUpdateResultRes toBatchUpdateResultRes(PluginMarketplaceBatchUpdateResultDTO dto) {
+        return PluginMarketplaceBatchUpdateResultRes.builder()
+                .updatedCodes(dto.getUpdatedCodes())
+                .failures(dto.getFailures().stream()
+                        .map(failure -> PluginMarketplaceBatchUpdateResultRes.FailureRes.builder()
+                                .code(failure.getCode())
+                                .reason(failure.getReason())
+                                .build())
+                        .toList())
                 .requiresRestart(dto.isRequiresRestart())
                 .build();
     }
