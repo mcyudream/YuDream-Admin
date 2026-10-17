@@ -82,6 +82,7 @@ public class WikiAppService {
         space.applyKnowledgeConfig(command.getPurpose(), command.getSchemaContent(), command.getLanguage());
         space.applyModelRouting(command.getChatProviderCode(), command.getChatModelCode(), command.getIngestProviderCode(),
                 command.getIngestModelCode(), command.getVisionProviderCode(), command.getVisionModelCode());
+        space.applyRerankRouting(command.getRerankProviderCode(), command.getRerankModelCode());
         // API Key 不回显：提交为空白时保留既有值，与前端「留空则不修改」语义一致。
         String webSearchApiKey = StringUtils.hasText(command.getWebSearchApiKey())
                 ? command.getWebSearchApiKey() : space.getWebSearchApiKey();

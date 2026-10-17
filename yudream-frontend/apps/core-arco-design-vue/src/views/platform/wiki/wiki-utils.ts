@@ -50,6 +50,8 @@ export interface StatusMeta {
 export const ingestStatusMeta: Record<string, StatusMeta> = {
   QUEUED: { label: '排队中', color: 'var(--color-text-3)' },
   RUNNING: { label: '运行中', color: 'var(--color-text-2)' },
+  // 后端枚举是 SUCCEEDED / FAILED / CANCELLED；旧值一并保留，避免历史数据回落成原始英文
+  SUCCEEDED: { label: '已完成', color: 'rgb(var(--success-6))' },
   COMPLETED: { label: '已完成', color: 'rgb(var(--success-6))' },
   FAILED: { label: '失败', color: 'rgb(var(--danger-6))' },
   CANCELLED: { label: '已取消', color: 'var(--color-text-2)' },

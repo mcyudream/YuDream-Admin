@@ -23,6 +23,8 @@ public class WikiSpaceSaveCmd implements Serializable {
     private int topK = 8;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    private String rerankProviderCode;
+    private String rerankModelCode;
     private Integer hitImageLimit;
 
     private String purpose;

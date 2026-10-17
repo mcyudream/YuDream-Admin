@@ -23,6 +23,9 @@ public class WikiSpaceSaveRequest {
     private int topK = 8;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    /** 重排序端点：留空表示回落到向量供应商的首个重排模型。 */
+    private String rerankProviderCode;
+    private String rerankModelCode;
     private Integer hitImageLimit;
 
     private String purpose;

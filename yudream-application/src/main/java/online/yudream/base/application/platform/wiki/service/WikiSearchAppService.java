@@ -24,6 +24,7 @@ import online.yudream.base.domain.platform.wiki.valobj.WikiSearchHit;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -314,7 +315,9 @@ public class WikiSearchAppService {
     private List<WikiSearchHit> rerank(WikiSpace space, String query, List<WikiSearchHit> candidates) {
         if (space.isRerankEnabled() && !candidates.isEmpty()) {
             try {
-                return reranks.rerank(space.getEmbeddingProviderCode(), query, candidates);
+                String providerCode = StringUtils.hasText(space.getRerankProviderCode())
+                        ? space.getRerankProviderCode() : space.getEmbeddingProviderCode();
+                return reranks.rerank(providerCode, space.getRerankModelCode(), query, candidates);
             }
             catch (Exception exception) {
                 log.warn("Rerank 失败，已使用原始排序：{}", exception.getMessage());

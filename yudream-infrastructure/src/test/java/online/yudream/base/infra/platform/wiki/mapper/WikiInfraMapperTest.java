@@ -84,6 +84,32 @@ class WikiInfraMapperTest {
     }
 
     @Test
+    void rerankRoutingRoundTripsThroughDataObj() {
+        WikiSpace space = WikiSpace.create("重排库", "rerank-space");
+        space.setId(3L);
+        space.applyRerankRouting("jina", "jina-reranker-v2");
+
+        WikiSpace loaded = WikiInfraMapper.toDomain(WikiInfraMapper.space(space));
+
+        assertEquals("jina", loaded.getRerankProviderCode());
+        assertEquals("jina-reranker-v2", loaded.getRerankModelCode());
+    }
+
+    @Test
+    void legacySpaceWithoutRerankRoutingKeepsNullProviderAndModel() {
+        WikiSpaceDO stored = new WikiSpaceDO();
+        stored.setId(4L);
+        stored.setName("旧检索库");
+        stored.setSlug("legacy-rerank");
+        stored.setRerankEnabled(true);
+
+        WikiSpace loaded = WikiInfraMapper.toDomain(stored);
+
+        assertNull(loaded.getRerankProviderCode());
+        assertNull(loaded.getRerankModelCode());
+    }
+
+    @Test
     void memberAndCommentRoundTripThroughDataObj() {
         WikiSpaceMember member = WikiSpaceMember.create(1L, WikiSpaceMemberSubjectType.ROLE, 7L,
                 List.of(WikiSpaceAclAction.READ, WikiSpaceAclAction.COMMENT), 5L);

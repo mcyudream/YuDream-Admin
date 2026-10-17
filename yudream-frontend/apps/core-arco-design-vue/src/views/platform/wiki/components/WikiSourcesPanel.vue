@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { YdFilePickerInstance } from '@yudream/components'
+import type { ActionMenuItem, TableColumn, YdFilePickerInstance } from '@yudream/components'
 import type { WikiSource } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
@@ -34,9 +34,40 @@ const urlsText = ref('')
 const importing = ref(false)
 const uploading = ref(false)
 const fileInput = ref<YdFilePickerInstance | null>(null)
-const expandedSource = ref('')
 
 const sortedSources = computed(() => [...sources.value].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)))
+
+// 表格列：资料（标题 + 目录）｜类型｜处理状态（抽取/摄入 + 失败原因）｜图片；细节动作收在行尾菜单
+const columns: TableColumn<WikiSource>[] = [
+  { accessorKey: 'title', header: '资料', minWidth: 260 },
+  { id: 'format', header: '类型', width: 110 },
+  { id: 'status', header: '处理状态', width: 210 },
+  { id: 'images', header: '图片', width: 150 },
+]
+
+const actions: ActionMenuItem<WikiSource>[] = [
+  { label: '摄入', icon: 'morph:play', onClick: source => ingest(source) },
+  { label: '编辑内容', icon: 'morph:pencil', visible: source => source.kind === 'TEXT', onClick: source => openTextEditor(source) },
+  { label: '补 caption', icon: 'morph:sparkles', visible: source => Boolean((source.images || []).length), onClick: source => caption(source) },
+  { label: '删除', icon: 'morph:trash-2', danger: true, onClick: source => removeSource(source) },
+]
+
+function sourceKindIcon(source: WikiSource): string {
+  if (source.kind === 'URL') {
+    return 'morph:globe'
+  }
+  return source.kind === 'TEXT' ? 'morph:feather' : 'morph:file'
+}
+
+/** 处理状态：抽取与摄入并列展示，失败原因仍跟在状态后面 */
+function sourceStatuses(source: WikiSource) {
+  const extraction = extractionStatusLabel(source.extractionStatus)
+  const ingest = ingestStatusLabel(source.ingestStatus)
+  return [
+    { prefix: '抽取', label: extraction.label, color: extraction.color },
+    { prefix: '摄入', label: ingest.label, color: ingest.color },
+  ]
+}
 
 // 客户端分页（资料可能很多，避免一次性长列表）
 const page = ref(1)
@@ -66,10 +97,6 @@ async function load() {
   finally {
     loading.value = false
   }
-}
-
-function pickFile() {
-  fileInput.value?.open()
 }
 
 async function onFileChange(files: File[]) {
@@ -211,45 +238,42 @@ watch(() => store.spaceId.value, load)
   <div class="src-panel">
     <YdScrollArea class="src-scroll">
       <div class="src-inner">
-        <!-- 导入工具栏 -->
-        <YdCard class="src-import">
-          <div class="src-import__grid">
-            <label class="src-field">
+        <!-- 导入区：第一行定位置与上传/新建，第二行批量 URL（输入与动作对齐，按钮不再挤成一条） -->
+        <section class="src-import" aria-label="导入资料">
+          <div class="src-import__row">
+            <label class="src-field src-field--folder">
               <span><YdIcon name="morph:folder" /> 目标目录</span>
-              <YdInput v-model="folderPath" placeholder="/" />
+              <YdInput v-model="folderPath" placeholder="/" aria-label="目标目录" />
             </label>
             <div class="src-field">
               <span><YdIcon name="morph:cloud-upload" /> 上传文件</span>
-              <div>
-                <YdButton variant="outline" :loading="uploading" @click="pickFile">
-                  <YdIcon name="morph:upload" /> 选择文件上传
-                </YdButton>
-                <YdFilePicker ref="fileInput" label="选择资料文件" @select="onFileChange">
-                  <template #default />
-                </YdFilePicker>
-              </div>
+              <YdFilePicker ref="fileInput" label="选择资料文件" @select="onFileChange">
+                <template #default="{ open }">
+                  <YdButton variant="outline" :loading="uploading" @click="open">
+                    <YdIcon name="morph:upload" /> 选择文件上传
+                  </YdButton>
+                </template>
+              </YdFilePicker>
             </div>
             <div class="src-field">
-              <span><YdIcon name="i-ri:markdown-line" /> 在线文档</span>
-              <div>
-                <YdButton variant="outline" @click="openTextEditor()">
-                  <YdIcon name="morph:feather" /> 新建 Markdown 文档
-                </YdButton>
-              </div>
-            </div>
-            <label class="src-field src-field--urls">
-              <span><YdIcon name="morph:link" /> 批量 URL 导入（每行一个）</span>
-              <YdTextarea v-model="urlsText" :rows="3" placeholder="https://example.com/docs/a&#10;https://example.com/docs/b" />
-            </label>
-            <div class="src-field src-field--action">
-              <YdButton :loading="importing" @click="importUrls">
-                <YdIcon name="morph:cloud-download" /> 导入 URL
+              <span><YdIcon name="morph:feather" /> 在线文档</span>
+              <YdButton variant="outline" @click="openTextEditor()">
+                <YdIcon name="morph:feather" /> 新建 Markdown 文档
               </YdButton>
             </div>
           </div>
-        </YdCard>
+          <div class="src-import__row src-import__row--urls">
+            <label class="src-field src-field--urls">
+              <span><YdIcon name="morph:link" /> 批量 URL 导入（每行一个）</span>
+              <YdTextarea v-model="urlsText" :rows="3" placeholder="https://example.com/docs/a&#10;https://example.com/docs/b" aria-label="批量导入 URL" />
+            </label>
+            <YdButton :loading="importing" @click="importUrls">
+              <YdIcon name="morph:cloud-download" /> 导入 URL
+            </YdButton>
+          </div>
+        </section>
 
-        <!-- 资料列表 -->
+        <!-- 资料表：自适应表格，状态与图片直接进列，行尾菜单收细节动作 -->
         <div v-if="loadError" class="src-error">
           <YdAlert variant="destructive" title="资料加载失败" :description="loadError" />
           <YdButton variant="outline" size="sm" :loading="loading" @click="load">
@@ -265,82 +289,75 @@ watch(() => store.spaceId.value, load)
           title="暂无资料"
           description="上传文件或导入 URL，系统会自动抽取文本与图片"
         />
-        <div v-else-if="sortedSources.length" class="src-list">
-          <YdCard v-for="source in pagedSources" :key="source.id" class="src-card">
-            <div class="src-card__head">
-              <div class="src-card__title">
-                <YdIcon :name="source.kind === 'URL' ? 'morph:globe' : source.kind === 'TEXT' ? 'i-ri:markdown-line' : 'morph:file'" class="src-card__kind-icon" />
-                <strong>{{ source.title }}</strong>
-                <span class="src-card__path">{{ source.folderPath }} · {{ source.format || source.mimeType }}</span>
-              </div>
-              <div class="src-card__badges">
-                <span class="src-badge" :style="{ color: extractionStatusLabel(source.extractionStatus).color, background: `${extractionStatusLabel(source.extractionStatus).color}1a` }">
-                  抽取 · {{ extractionStatusLabel(source.extractionStatus).label }}
+        <template v-else-if="sortedSources.length">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            stripe
+            border
+            column-visibility
+            table-class="min-w-[860px]"
+            :columns="columns"
+            :actions="actions"
+            :data="pagedSources"
+          >
+            <template #cell-title="{ row }">
+              <div class="src-cell">
+                <div class="src-cell__title">
+                  <YdIcon :name="sourceKindIcon(row.original)" class="src-cell__icon" />
+                  <strong>{{ row.original.title }}</strong>
+                </div>
+                <span class="src-cell__path" :title="`${row.original.folderPath} · ${row.original.kind}`">
+                  {{ row.original.folderPath }} · {{ row.original.kind }}
                 </span>
-                <span class="src-badge" :style="{ color: ingestStatusLabel(source.ingestStatus).color, background: `${ingestStatusLabel(source.ingestStatus).color}1a` }">
-                  摄入 · {{ ingestStatusLabel(source.ingestStatus).label }}
+              </div>
+            </template>
+            <template #cell-format="{ row }">
+              <span class="src-cell__meta">{{ row.original.format || row.original.mimeType || '-' }}</span>
+            </template>
+            <template #cell-status="{ row }">
+              <div class="src-cell__status">
+                <span v-for="item in sourceStatuses(row.original)" :key="item.prefix" class="src-status">
+                  <span class="src-status__dot" :style="{ background: item.color }" />
+                  {{ item.prefix }} · {{ item.label }}
+                </span>
+                <span
+                  v-if="row.original.extractionError || row.original.ingestError"
+                  class="src-status__error"
+                  :title="row.original.extractionError || row.original.ingestError"
+                >
+                  <YdIcon name="morph:triangle-alert" />
+                  {{ row.original.extractionError || row.original.ingestError }}
                 </span>
               </div>
-            </div>
-
-            <p v-if="source.extractionError || source.ingestError" class="src-card__error">
-              <YdIcon name="morph:triangle-alert" /> {{ source.extractionError || source.ingestError }}
-            </p>
-
-            <div v-if="(source.images || []).length" class="src-card__images">
-              <YdButton
-                v-for="(img, index) in source.images.slice(0, expandedSource === source.id ? source.images.length : 6)"
-                :key="img.fileObjectId"
-                variant="ghost"
-                type="button"
-                class="src-thumb"
-                :title="img.caption || `第 ${img.pageNumber} 页图片`"
-                :aria-label="img.caption || `预览第 ${img.pageNumber} 页图片`"
-                @click="previewImage(source, index)"
-              >
-                <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
-                <span v-else class="src-thumb__placeholder"><YdIcon name="morph:image" /></span>
-                <span v-if="img.caption" class="src-thumb__caption">{{ img.caption }}</span>
-              </YdButton>
-              <YdButton
-                v-if="source.images.length > 6"
-                variant="ghost"
-                type="button"
-                class="src-thumb src-thumb--more"
-                :aria-expanded="expandedSource === source.id"
-                @click="expandedSource = expandedSource === source.id ? '' : source.id"
-              >
-                {{ expandedSource === source.id ? '收起' : `+${source.images.length - 6}` }}
-              </YdButton>
-            </div>
-
-            <div class="src-card__footer">
-              <span class="src-card__count"><YdIcon name="morph:image" /> {{ (source.images || []).length }} 张图片</span>
-              <span v-if="source.url" class="src-card__url">{{ source.url }}</span>
-              <div class="src-card__actions">
-                <YdButton v-if="source.kind === 'TEXT'" size="sm" variant="outline" @click="openTextEditor(source)">
-                  <YdIcon name="morph:pencil" /> 编辑
+            </template>
+            <template #cell-images="{ row }">
+              <div v-if="(row.original.images || []).length" class="src-thumbs">
+                <YdButton
+                  v-for="(img, index) in row.original.images.slice(0, 3)"
+                  :key="img.fileObjectId"
+                  variant="ghost"
+                  type="button"
+                  class="src-thumb"
+                  :title="img.caption || `第 ${img.pageNumber} 页图片`"
+                  :aria-label="img.caption || `预览第 ${img.pageNumber} 页图片`"
+                  @click="previewImage(row.original, index)"
+                >
+                  <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
+                  <span v-else class="src-thumb__placeholder"><YdIcon name="morph:image" /></span>
                 </YdButton>
-                <YdButton size="sm" @click="ingest(source)">
-                  <YdIcon name="morph:play" /> 摄入
-                </YdButton>
-                <YdButton size="sm" variant="outline" :disabled="!(source.images || []).length" @click="caption(source)">
-                  <YdIcon name="morph:sparkles" /> 补 caption
-                </YdButton>
-                <YdButton size="sm" variant="ghost" class="src-danger" @click="removeSource(source)">
-                  <YdIcon name="morph:trash-2" /> 删除
-                </YdButton>
+                <span v-if="row.original.images.length > 3" class="src-thumbs__more">+{{ row.original.images.length - 3 }}</span>
               </div>
-            </div>
-          </YdCard>
-        </div>
-        <YdPagination
-          v-if="sortedSources.length > pageSize"
-          v-model:page="page"
-          v-model:size="pageSize"
-          :total="sortedSources.length"
-          class="src-pagination"
-        />
+              <span v-else class="src-cell__meta">无</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+          <YdPagination
+            v-if="sortedSources.length > pageSize"
+            v-model:page="page"
+            v-model:size="pageSize"
+            :total="sortedSources.length"
+            class="src-pagination"
+          />
+        </template>
       </div>
     </YdScrollArea>
 
@@ -385,11 +402,21 @@ watch(() => store.spaceId.value, load)
   padding: 16px;
 }
 
-.src-import__grid {
+.src-import {
   display: grid;
-  grid-template-columns: 160px auto auto minmax(280px, 1fr) auto;
-  gap: 14px;
-  align-items: end;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+/* 导入区两行：位置 + 上传/新建一行，批量 URL 一行；按钮与输入底部对齐 */
+.src-import__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
 }
 
 .src-field {
@@ -400,14 +427,19 @@ watch(() => store.spaceId.value, load)
 
 .src-field > span {
   display: inline-flex;
-  align-items: center;
   gap: 5px;
-  color: var(--color-text-3);
+  align-items: center;
   font-size: 12px;
+  color: var(--color-text-3);
 }
 
-.src-field--action {
-  align-self: end;
+.src-field--folder {
+  width: 180px;
+}
+
+.src-field--urls {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 /* YdAlert 没有默认插槽：重试动作必须与告警相邻，不能作为子节点传入 */
@@ -422,84 +454,92 @@ watch(() => store.spaceId.value, load)
   padding: 56px 0;
 }
 
-.src-list {
+/* —— 资料表单元格 —— */
+.src-cell {
   display: grid;
-  gap: 12px;
-}
-
-.src-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.src-card__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 2px;
   min-width: 0;
-  flex-wrap: wrap;
 }
 
-.src-card__kind-icon {
-  color: var(--color-text-3);
-  font-size: 17px;
-}
-
-.src-card__title strong {
-  font-size: 14px;
-}
-
-.src-card__path {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.src-card__badges {
+.src-cell__title {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
+  align-items: center;
+  min-width: 0;
 }
 
-.src-badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
+.src-cell__title strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.src-card__error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #ef444412;
-  color: #dc2626;
-  font-size: 12px;
+.src-cell__icon {
+  flex-shrink: 0;
+  font-size: 15px;
+  color: var(--color-text-3);
 }
 
-.src-card__images {
+.src-cell__path,
+.src-cell__meta {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--color-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-cell__status {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.src-status {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-2);
+  white-space: nowrap;
+}
+
+.src-status__dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.src-status__error {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 11px;
+  color: rgb(var(--danger-6));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-thumbs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  align-items: center;
 }
 
 .src-thumb {
   position: relative;
-  width: 96px;
-  height: 72px;
+  width: 40px;
+  height: 32px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-fill-2);
   cursor: zoom-in;
+  background: var(--color-fill-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
 }
 
 .src-thumb img {
@@ -512,64 +552,14 @@ watch(() => store.spaceId.value, load)
   display: grid;
   height: 100%;
   place-items: center;
-  color: var(--color-text-3);
-}
-
-.src-thumb__caption {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  overflow: hidden;
-  padding: 2px 5px;
-  background: rgb(0 0 0 / 55%);
-  color: #fff;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.src-thumb--more {
-  display: grid;
-  place-items: center;
-  color: var(--color-text-3);
-  cursor: pointer;
   font-size: 12px;
-}
-
-.src-card__footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.src-card__count {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   color: var(--color-text-3);
-  font-size: 12px;
 }
 
-.src-card__url {
-  overflow: hidden;
-  max-width: 360px;
+.src-thumbs__more {
+  font-size: 12px;
   color: var(--color-text-3);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.src-card__actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.src-danger {
-  color: #dc2626;
+  font-variant-numeric: tabular-nums;
 }
 
 .src-pagination {
@@ -585,38 +575,26 @@ watch(() => store.spaceId.value, load)
   min-height: 0;
 }
 
-/* 在线文档编辑器高度由 WikiMarkdownEditor 的 height 属性控制（YdMarkdownEditor 不透传 class，类选择器无效） */
-
 .src-text-hint {
   margin: 0;
   color: var(--color-text-3);
   font-size: 12px;
 }
 
-@media (max-width: 1100px) {
-  .src-import__grid {
-    grid-template-columns: 1fr 1fr;
+@media (max-width: 900px) {
+  .src-import__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .src-field--folder {
+    width: 100%;
   }
 }
 
-/* 窄屏：导入区真单列，卡片操作换行到独立一行，长文编辑区让位给视口 */
 @media (max-width: 768px) {
   .src-inner {
     padding: 12px;
-  }
-
-  .src-import__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .src-card__actions {
-    width: 100%;
-    margin-left: 0;
-    flex-wrap: wrap;
-  }
-
-  .src-card__url {
-    max-width: 100%;
   }
 }
 </style>

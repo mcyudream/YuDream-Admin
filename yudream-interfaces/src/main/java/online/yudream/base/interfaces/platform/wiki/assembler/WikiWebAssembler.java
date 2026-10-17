@@ -36,6 +36,8 @@ public final class WikiWebAssembler {
         c.setTopK(r.getTopK());
         c.setQueryExpansionEnabled(r.isQueryExpansionEnabled());
         c.setRerankEnabled(r.isRerankEnabled());
+        c.setRerankProviderCode(r.getRerankProviderCode());
+        c.setRerankModelCode(r.getRerankModelCode());
         c.setHitImageLimit(r.getHitImageLimit());
         c.setPurpose(r.getPurpose());
         c.setSchemaContent(r.getSchemaContent());

@@ -41,6 +41,9 @@ public class WikiSpace extends BaseDomain {
     private int topK;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    /** 重排序端点：为空时检索沿用向量模型的供应商与首个重排模型（兼容旧数据）。 */
+    private String rerankProviderCode;
+    private String rerankModelCode;
     /** 每条检索命中最多随带的相关图片数；null 表示默认 4，0 表示不带图片 */
     private Integer hitImageLimit;
 
@@ -144,6 +147,12 @@ public class WikiSpace extends BaseDomain {
         this.ingestModelCode = text(ingestModelCode);
         this.visionProviderCode = text(visionProviderCode);
         this.visionModelCode = text(visionModelCode);
+    }
+
+    /** 重排序端点与其余模型分开维护：它只在检索重排时使用，未配置时回落到向量供应商。 */
+    public void applyRerankRouting(String providerCode, String modelCode) {
+        this.rerankProviderCode = text(providerCode);
+        this.rerankModelCode = text(modelCode);
     }
 
     public void applyWebSearch(String providerCode, String apiKey, String instanceUrl, String engine) {

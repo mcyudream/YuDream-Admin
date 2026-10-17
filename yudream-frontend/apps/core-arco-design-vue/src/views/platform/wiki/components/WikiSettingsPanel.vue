@@ -88,14 +88,16 @@ function modelOptions(providerCode: string | undefined, filter: (model: AgentMod
 const chatFilter = (model: AgentModelOption) => model.kind === 'chat'
 const visionFilter = (model: AgentModelOption) => model.vision
 const embeddingFilter = (model: AgentModelOption) => model.kind === 'embedding'
+const rerankFilter = (model: AgentModelOption) => model.kind === 'rerank'
 
 const chatModelOptions = computed(() => modelOptions(form.value.chatProviderCode, chatFilter))
 const ingestModelOptions = computed(() => modelOptions(form.value.ingestProviderCode, chatFilter))
 const visionModelOptions = computed(() => modelOptions(form.value.visionProviderCode, visionFilter))
 const embeddingModelOptions = computed(() => modelOptions(form.value.embeddingProviderCode, embeddingFilter))
+const rerankModelOptions = computed(() => modelOptions(form.value.rerankProviderCode, rerankFilter))
 const graphModelOptions = computed(() => modelOptions(form.value.graphProviderCode, chatFilter))
 
-function onProviderChange(field: 'chat' | 'ingest' | 'vision' | 'embedding' | 'graph', value: unknown) {
+function onProviderChange(field: 'chat' | 'ingest' | 'vision' | 'embedding' | 'rerank' | 'graph', value: unknown) {
   const providerCode = typeof value === 'string' ? value : ''
   ;(form.value as Record<string, unknown>)[`${field}ProviderCode`] = providerCode || undefined
   ;(form.value as Record<string, unknown>)[`${field}ModelCode`] = undefined
@@ -103,7 +105,7 @@ function onProviderChange(field: 'chat' | 'ingest' | 'vision' | 'embedding' | 'g
     return
   }
   // 自动选中该供应商下的默认/首个可用模型，避免只选供应商导致模型为空（后端要求成对配置）
-  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, graph: chatFilter }
+  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, rerank: rerankFilter, graph: chatFilter }
   const candidates = models.value.filter(model => model.providerCode === providerCode && filterMap[field](model))
   const preferred = candidates.find(model => model.defaultModel) || candidates[0]
   if (preferred) {
@@ -145,7 +147,7 @@ async function save() {
     return
   }
   // 保存兜底：供应商已选但模型为空时，用目录中的默认/首个模型补齐（后端要求 provider+model 成对）
-  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, graph: chatFilter }
+  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, rerank: rerankFilter, graph: chatFilter }
   for (const field of Object.keys(filterMap) as (keyof typeof filterMap)[]) {
     const record = form.value as Record<string, unknown>
     const providerCode = record[`${field}ProviderCode`]
@@ -249,7 +251,7 @@ onMounted(loadGraphTables)
 
         <template #models>
           <YdSettingsSection title="AI 模型" description="供应商与模型均从平台模型目录中选择，需要成对配置">
-            <div class="set-grid">
+            <div class="set-grid set-grid--models">
               <div class="set-model">
                 <span class="set-model__label"><YdIcon name="morph:message-circle" /> 问答模型（chat）</span>
                 <YdSelect
@@ -299,6 +301,22 @@ onMounted(loadGraphTables)
                   @change="(value: unknown) => onProviderChange('graph', value)"
                 />
                 <YdSelect v-model="form.graphModelCode" :options="graphModelOptions" placeholder="选择模型" />
+              </div>
+              <div class="set-model">
+                <span class="set-model__label"><YdIcon name="morph:arrow-down-up" /> 重排序模型（rerank）</span>
+                <YdSelect
+                  :model-value="form.rerankProviderCode"
+                  :options="providerOptions"
+                  placeholder="留空沿用向量供应商"
+                  @change="(value: unknown) => onProviderChange('rerank', value)"
+                />
+                <YdSelect v-model="form.rerankModelCode" :options="rerankModelOptions" placeholder="选择重排模型" />
+                <p v-if="!form.rerankEnabled" class="set-model__note">
+                  检索里的「重排序」开关当前关闭，选好模型后到「检索与切分」开启才会生效。
+                </p>
+                <p v-else-if="form.rerankProviderCode && !rerankModelOptions.length" class="set-model__note">
+                  该供应商没有可用的重排序模型：请先在「平台能力 → AI 助手」的供应商配置里补充 rerank 模型，再回来选择。
+                </p>
               </div>
               <p v-if="catalogLoading" class="set-hint">
                 <YdIcon name="morph:loader-circle" /> 正在加载模型目录…
@@ -506,23 +524,48 @@ onMounted(loadGraphTables)
   color: var(--color-text-3);
 }
 
+/* 模型一行一个：左侧模型名，右侧供应商与模型两个下拉；窄屏折行成两段 */
+.set-grid--models {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
 .set-model {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(150px, 190px) minmax(140px, 220px) minmax(0, 1fr);
   gap: 10px;
-  align-content: start;
-  padding: 16px;
+  align-items: center;
+  padding: 10px 14px;
   border: 1px solid var(--color-border-2);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .set-model__label {
   display: inline-flex;
-  grid-column: 1 / -1;
   gap: 6px;
   align-items: center;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.set-model__note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-3);
+}
+
+@media (width <= 1280px) {
+  .set-model {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .set-model__label,
+  .set-model__note {
+    grid-column: 1 / -1;
+  }
 }
 
 .set-model__label :deep(svg) {

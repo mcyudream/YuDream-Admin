@@ -25,6 +25,9 @@ public class WikiSpaceDTO {
     private int topK;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    /** 重排序端点（未配置时检索回落到向量供应商的首个重排模型）。 */
+    private String rerankProviderCode;
+    private String rerankModelCode;
     private Integer hitImageLimit;
 
     private String purpose;

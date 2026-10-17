@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ActionMenuItem, TableColumn } from '@yudream/components'
 import type { WikiIngestTask } from '@/api/modules/platform-wiki'
 import { computed, inject, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
@@ -19,11 +20,15 @@ const account = useAppAccountStore()
 const runProgressOpen = ref(false)
 const selectedRunId = ref('')
 
+function canViewAiRun(task: WikiIngestTask): boolean {
+  return Boolean(task.aiRunId) && account.isLogin && String(task.requestedByUserId || '') === String(account.userId)
+}
+
 function viewAiRun(task: WikiIngestTask) {
-  if (!task.aiRunId || !account.isLogin || String(task.requestedByUserId || '') !== String(account.userId)) {
+  if (!canViewAiRun(task)) {
     return
   }
-  selectedRunId.value = task.aiRunId
+  selectedRunId.value = task.aiRunId!
   runProgressOpen.value = true
 }
 
@@ -35,6 +40,31 @@ let abortController: AbortController | null = null
 
 const sortedTasks = computed(() => [...tasks.value].sort((a, b) => (b.sortOrder ?? 0) - (a.sortOrder ?? 0)))
 const runningCount = computed(() => tasks.value.filter(task => ['QUEUED', 'RUNNING'].includes(task.status)).length)
+
+// 队列表格：任务｜状态（含失败原因）｜进度｜开始时间；取消/重试/删除收在行尾菜单
+const taskColumns: TableColumn<WikiIngestTask>[] = [
+  { accessorKey: 'taskType', header: '任务', minWidth: 180 },
+  { id: 'status', header: '状态', width: 230 },
+  { id: 'progress', header: '进度', width: 220 },
+  { id: 'startedAt', header: '开始时间', width: 170 },
+]
+
+const taskActions: ActionMenuItem<WikiIngestTask>[] = [
+  { label: 'AI 实际进度', icon: 'morph:bot', visible: task => canViewAiRun(task), onClick: task => viewAiRun(task) },
+  { label: '取消', icon: 'morph:circle-stop', visible: task => ['QUEUED', 'RUNNING'].includes(task.status), danger: true, onClick: task => cancelTask(task) },
+  { label: '重试', icon: 'morph:rotate-cw', visible: task => ['FAILED', 'CANCELLED'].includes(task.status), onClick: task => retryTask(task) },
+  { label: '删除', icon: 'morph:trash-2', visible: task => task.status !== 'QUEUED', danger: true, onClick: task => deleteTask(task) },
+]
+
+function formatTaskTime(value?: string): string {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? '-'
+    : date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+}
 
 // 客户端分页（任务可能很多）
 const page = ref(1)
@@ -249,70 +279,57 @@ watch(() => store.spaceId.value, () => {
           title="暂无摄入任务"
           description="在「资料源」面板对资料点击「摄入」，或在「深度研究」启动研究"
         />
-        <div v-else-if="sortedTasks.length" class="ing-list">
-          <YdCard v-for="task in pagedTasks" :key="task.id" class="ing-card">
-            <div class="ing-card__row">
-              <span
-                class="ing-card__status"
-                :style="{ color: ingestStatusLabel(task.status).color, background: `${ingestStatusLabel(task.status).color}1a` }"
-              >
-                {{ ingestStatusLabel(task.status).label }}
-              </span>
-              <strong class="ing-card__type">{{ taskTypeLabel(task.taskType) }}</strong>
-              <span class="ing-card__phase">{{ task.phase }}</span>
-              <div class="ing-card__actions">
-                <YdButton v-if="task.aiRunId && String(task.requestedByUserId || '') === String(account.userId)" size="sm" variant="outline" @click="viewAiRun(task)">
-                  <YdIcon name="morph:bot" /> AI 实际进度
-                </YdButton>
-                <YdButton
-                  v-if="['QUEUED', 'RUNNING'].includes(task.status)"
-                  size="sm"
-                  variant="ghost"
-                  class="ing-danger"
-                  @click="cancelTask(task)"
-                >
-                  <YdIcon name="morph:circle-stop" /> 取消
-                </YdButton>
-                <YdButton
-                  v-if="['FAILED', 'CANCELLED'].includes(task.status)"
-                  size="sm"
-                  variant="outline"
-                  @click="retryTask(task)"
-                >
-                  <YdIcon name="morph:rotate-cw" /> 重试
-                </YdButton>
-                <YdButton
-                  v-if="!['QUEUED'].includes(task.status)"
-                  size="sm"
-                  variant="ghost"
-                  class="ing-danger"
-                  @click="deleteTask(task)"
-                >
-                  <YdIcon name="morph:trash-2" /> 删除
-                </YdButton>
+        <template v-else-if="sortedTasks.length">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            stripe
+            border
+            column-visibility
+            table-class="min-w-[900px]"
+            :columns="taskColumns"
+            :actions="taskActions"
+            :data="pagedTasks"
+          >
+            <template #cell-taskType="{ row }">
+              <div class="ing-cell">
+                <strong class="ing-cell__title">{{ taskTypeLabel(row.original.taskType) }}</strong>
+                <span class="ing-cell__meta">{{ row.original.phase || '-' }}</span>
               </div>
-            </div>
-            <div class="ing-card__progress">
-              <YdProgress
-                :model-value="task.percent"
-                class="ing-progress"
-                :class="{ 'ing-progress--failed': task.status === 'FAILED' }"
-              />
-              <span class="ing-card__percent">{{ task.percent }}%</span>
-              <span class="ing-card__attempts">尝试 {{ task.attempts }}/{{ task.maxAttempts }}</span>
-            </div>
-            <p v-if="task.errorMessage" class="ing-card__error">
-              <YdIcon name="morph:triangle-alert" /> {{ task.errorMessage }}
-            </p>
-          </YdCard>
-        </div>
-        <YdPagination
-          v-if="sortedTasks.length > pageSize"
-          v-model:page="page"
-          v-model:size="pageSize"
-          :total="sortedTasks.length"
-          class="ing-pagination"
-        />
+            </template>
+            <template #cell-status="{ row }">
+              <div class="ing-cell">
+                <span class="ing-status">
+                  <span class="ing-status__dot" :style="{ background: ingestStatusLabel(row.original.status).color }" />
+                  {{ ingestStatusLabel(row.original.status).label }}
+                </span>
+                <span class="ing-cell__meta">尝试 {{ row.original.attempts }}/{{ row.original.maxAttempts }}</span>
+                <span v-if="row.original.errorMessage" class="ing-cell__error" :title="row.original.errorMessage">
+                  <YdIcon name="morph:triangle-alert" /> {{ row.original.errorMessage }}
+                </span>
+              </div>
+            </template>
+            <template #cell-progress="{ row }">
+              <div class="ing-progress-cell">
+                <YdProgress
+                  :model-value="row.original.percent"
+                  class="ing-progress"
+                  :class="{ 'ing-progress--failed': row.original.status === 'FAILED' }"
+                />
+                <span class="ing-cell__percent">{{ row.original.percent }}%</span>
+              </div>
+            </template>
+            <template #cell-startedAt="{ row }">
+              <span class="ing-cell__meta">{{ formatTaskTime(row.original.startedAt) }}</span>
+            </template>
+          </YdResponsiveEnhancedTable>
+          <YdPagination
+            v-if="sortedTasks.length > pageSize"
+            v-model:page="page"
+            v-model:size="pageSize"
+            :total="sortedTasks.length"
+            class="ing-pagination"
+          />
+        </template>
       </div>
     </YdScrollArea>
     <YdDrawer v-model="runProgressOpen" title="摄入任务的 AI 运行" :footer="false" content-class="w-[760px] max-w-full">
@@ -382,59 +399,74 @@ watch(() => store.spaceId.value, () => {
   padding: 56px 0;
 }
 
-.ing-list {
-  display: grid;
-  gap: 10px;
-}
-
 .ing-pagination {
   display: flex;
   justify-content: flex-end;
 }
 
-.ing-card__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+/* —— 队列表单元格 —— */
+.ing-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
-.ing-card__status {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
+.ing-cell__title {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ing-card__type {
-  font-size: 14px;
-}
-
-.ing-card__phase {
-  color: var(--color-text-3);
+.ing-cell__meta {
+  overflow: hidden;
   font-size: 12px;
+  color: var(--color-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ing-card__actions {
+.ing-cell__error {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 11px;
+  color: rgb(var(--danger-6));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ing-status {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-2);
+  white-space: nowrap;
+}
+
+.ing-status__dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.ing-progress-cell {
   display: flex;
-  gap: 8px;
-  margin-left: auto;
-  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .ing-danger {
-  color: #dc2626;
-}
-
-.ing-card__progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
+  color: rgb(var(--danger-6));
 }
 
 .ing-progress {
   flex: 1;
+  min-width: 80px;
 }
 
 .ing-progress :deep(.progress),
@@ -442,62 +474,23 @@ watch(() => store.spaceId.value, () => {
   width: 100%;
 }
 
-.ing-card__percent {
+.ing-cell__percent {
   width: 44px;
+  font-size: 12px;
   color: var(--color-text-1);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.ing-card__attempts {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.ing-card__error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #ef444412;
-  color: #dc2626;
-  font-size: 12px;
-}
-
-/* 窄屏：任务行与操作按钮换行堆叠，不横向挤压 */
 @media (max-width: 768px) {
   .ing-inner {
     padding: 12px;
   }
 
   .ing-head {
-    align-items: flex-start;
     flex-wrap: wrap;
     gap: 8px;
-  }
-
-  .ing-card__row {
     align-items: flex-start;
-  }
-
-  .ing-card__phase {
-    width: 100%;
-  }
-
-  .ing-card__actions {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .ing-card__progress {
-    flex-wrap: wrap;
-  }
-
-  .ing-progress {
-    flex-basis: 100%;
   }
 }
 </style>

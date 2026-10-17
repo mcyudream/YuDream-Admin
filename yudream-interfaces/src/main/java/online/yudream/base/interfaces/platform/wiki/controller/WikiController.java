@@ -41,6 +41,12 @@ public class WikiController {
         return Result.ok(access.spaces());
     }
 
+    @GetMapping("/spaces/{id}")
+    @PermissionRegister(code = "platform:wiki:view", name = "查看 Wiki 知识库详情", module = "平台能力", desc = "查看单个知识库详情（含卡片聚合事实）")
+    public Result<WikiSpaceDTO> spaceDetail(@PathVariable Long id) {
+        return Result.ok(access.spaceDetail(id));
+    }
+
     @PostMapping("/spaces")
     @PermissionRegister(code = "platform:wiki:manage", name = "创建 Wiki 知识库", module = "平台能力", desc = "创建知识库")
     public Result<WikiSpaceDTO> create(@Valid @RequestBody WikiSpaceSaveRequest r) {

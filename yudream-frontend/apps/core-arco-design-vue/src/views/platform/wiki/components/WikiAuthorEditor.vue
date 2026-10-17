@@ -316,7 +316,7 @@ const wikiToolbars: YdMarkdownToolbar[] = [
   'catalog',
 ]
 
-// 页面正文标题层级（活动栏「大纲」视图，只读展示，点击不改变编辑器滚动位置，避免与编辑器自带目录打架）
+// 页面正文标题层级（活动栏「大纲」视图：点击跳转到对应标题，当前项高亮）
 const outline = computed(() => {
   if (!isPage.value) {
     return []
@@ -335,6 +335,11 @@ const outline = computed(() => {
   }
   return items.slice(0, 60)
 })
+
+/** 大纲当前项：只在点击后标记，避免与编辑器自带目录的滚动高亮互相打架 */
+const outlineActive = ref(-1)
+/** 编辑面容器：编辑态滚动定位在 CodeMirror 行上找（预览态用 previewHostRef） */
+const editorHostRef = ref<HTMLElement | null>(null)
 
 function openLinkPicker() {
   linkedPageId.value = ''
@@ -631,6 +636,34 @@ const previewHostRef = ref<HTMLElement | null>(null)
 const previewRevision = ref(0)
 const previewQuote = ref<{ anchor: WikiAuthorCommentAnchor, top: number, left: number } | null>(null)
 const previewQuoteHint = ref<{ text: string, top: number, left: number } | null>(null)
+
+function escapeHeadingText(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 在编辑面或预览面定位同名标题元素：编辑态匹配 Markdown 源行，预览态匹配渲染后的标题 */
+function locateHeading(text: string): HTMLElement | null {
+  const lines = editorHostRef.value?.querySelectorAll<HTMLElement>('.cm-line')
+  if (lines?.length) {
+    const pattern = new RegExp(`^#{1,4}\\s+${escapeHeadingText(text)}\\s*$`)
+    const hit = [...lines].find(line => pattern.test((line.textContent || '').trim()))
+    if (hit) {
+      return hit
+    }
+  }
+  const previewHeadings = previewHostRef.value?.querySelectorAll<HTMLElement>('h1, h2, h3, h4')
+  return [...(previewHeadings || [])].find(node => (node.textContent || '').trim() === text) || null
+}
+
+async function jumpToHeading(index: number) {
+  const item = outline.value[index]
+  if (!item) {
+    return
+  }
+  outlineActive.value = index
+  await nextTick()
+  locateHeading(item.text)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
 
 const accountStore = useAppAccountStore()
 const isLogin = computed(() => accountStore.isLogin)
@@ -1061,17 +1094,19 @@ onBeforeUnmount(() => {
           >
             <template #default="{ node: treeNode, expanded }">
               <span class="author-node">
-                <YdIcon
-                  class="author-node__icon"
-                  :class="{ 'author-node__icon--dir': treeNodeView(treeNode)?.isDirectory }"
-                  :name="treeNodeIcon(treeNode, expanded)"
-                />
-                <span class="author-node__title" :title="treeNode?.label">{{ treeNode?.label }}</span>
-                <span v-if="treeNodeView(treeNode)?.typeLabel" class="author-node__type">
-                  <span class="author-node__type-dot" :style="{ background: treeNodeView(treeNode)?.typeDot }" />
-                  {{ treeNodeView(treeNode)?.typeLabel }}
+                <span class="author-node__main">
+                  <YdIcon
+                    class="author-node__icon"
+                    :class="{ 'author-node__icon--dir': treeNodeView(treeNode)?.isDirectory }"
+                    :name="treeNodeIcon(treeNode, expanded)"
+                  />
+                  <span class="author-node__title" :title="treeNode?.label">{{ treeNode?.label }}</span>
+                  <span v-if="treeNodeView(treeNode)?.typeLabel" class="author-node__type" :title="treeNodeView(treeNode)?.typeLabel">
+                    <span class="author-node__type-dot" :style="{ background: treeNodeView(treeNode)?.typeDot }" />
+                    {{ treeNodeView(treeNode)?.typeLabel }}
+                  </span>
+                  <span v-if="treeNodeView(treeNode)?.published" class="author-node__dot" title="已发布" aria-label="已发布" />
                 </span>
-                <span v-if="treeNodeView(treeNode)?.published" class="author-node__dot" title="已发布" aria-label="已发布" />
                 <YdButton
                   class="author-node__delete"
                   :class="{ 'author-node__delete--busy': deletingNodeId === treeNode?.key }"
@@ -1095,24 +1130,28 @@ onBeforeUnmount(() => {
         </YdScrollArea>
       </div>
 
-      <!-- 大纲：当前页面正文标题（活动栏第二项） -->
+      <!-- 大纲：当前页面正文标题（活动栏第二项），点击跳转到对应标题 -->
       <div v-else class="author-outline-view">
         <div class="author-outline-view__head">
           <span class="author-outline-view__title">正文标题</span>
           <span class="author-outline-view__count">{{ outline.length }}</span>
         </div>
         <YdScrollArea class="author-outline-view__list">
-          <ul v-if="outline.length" class="author-outline">
-            <li
+          <div v-if="outline.length" class="author-outline">
+            <YdButton
               v-for="(item, index) in outline"
               :key="`${index}-${item.text}`"
+              variant="ghost"
+              size="sm"
               class="author-outline__item"
-              :style="{ paddingLeft: `${(item.level - 1) * 12}px` }"
+              :class="{ 'author-outline__item--active': outlineActive === index }"
+              :style="{ paddingLeft: `${8 + (item.level - 1) * 10}px` }"
               :title="item.text"
+              @click="jumpToHeading(index)"
             >
               {{ item.text }}
-            </li>
-          </ul>
+            </YdButton>
+          </div>
           <p v-else class="author-outline-view__empty">
             {{ node ? '当前正文还没有标题' : '打开页面后可查看标题大纲' }}
           </p>
@@ -1148,24 +1187,27 @@ onBeforeUnmount(() => {
             </YdButton>
           </div>
           <div v-if="isPage && viewMode === 'edit'" class="author-body__editor">
-            <div class="author-insert">
-              <YdButton variant="outline" size="sm" :disabled="!pageOptions.length" @click="openLinkPicker">
-                <YdIcon name="morph:link" /> 插入知识库页面
-              </YdButton>
-              <span v-if="node.path" class="author-insert__path">{{ node.path }}</span>
-            </div>
-            <div class="author-body__md">
-              <WikiMarkdownEditor
-                ref="editorRef"
-                :key="node.id"
-                v-model="editorFields.body"
-                height="100%"
-                show-toolbar-name
-                :catalog-max-depth="4"
-                :toolbars="wikiToolbars"
-                @save="saveNode"
-              />
-            </div>
+            <!-- 编辑面也是「白卡」：卡片头部放路径与插入动作，正文编辑区留白交给编辑器自己 -->
+            <section class="author-editor-card" aria-label="页面正文">
+              <header class="author-editor-card__head">
+                <span class="author-editor-card__path" :title="node.path || node.slug">{{ node.path || node.slug }}</span>
+                <YdButton variant="ghost" size="sm" :disabled="!pageOptions.length" @click="openLinkPicker">
+                  <YdIcon name="morph:link" /> 插入知识库页面
+                </YdButton>
+              </header>
+              <div ref="editorHostRef" class="author-body__md">
+                <WikiMarkdownEditor
+                  ref="editorRef"
+                  :key="node.id"
+                  v-model="editorFields.body"
+                  height="100%"
+                  show-toolbar-name
+                  :catalog-max-depth="4"
+                  :toolbars="wikiToolbars"
+                  @save="saveNode"
+                />
+              </div>
+            </section>
           </div>
           <YdScrollArea
             v-else-if="isPage"
@@ -1485,31 +1527,46 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--color-border-2);
 }
 
-.author-insert {
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 16px 0;
-  font-size: 12px;
-  color: var(--color-text-3);
-}
-
-.author-insert__path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 正文容器不滚动：滚动权交给 MdEditor / YdScrollArea，避免双重滚动条与头部被裁 */
 .author-body__editor {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: 12px 20px 16px;
+  padding: 12px 16px 16px;
   overflow: hidden;
+  background: var(--color-fill-1);
+}
+
+/* 编辑面与预览面同为「白卡」：卡片头放路径与插入动作，正文区由编辑器自己滚动 */
+.author-editor-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+.author-editor-card__head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px 5px 14px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.author-editor-card__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
 }
 
 .author-body__md {
@@ -1652,34 +1709,42 @@ onBeforeUnmount(() => {
   padding: 4px 8px 10px;
 }
 
-/* 树节点整行可点区域：圆角 + 灰底 hover / 品牌色浅底选中，在灰底侧栏上保持可辨 */
+/* 树行沿用系统「菜单管理」树的规范：只把标题槽拉满、hover 用最浅填充，
+   选中态交给组件库默认样式，不自绘内边距/圆角/主色底（自绘会与系统其余树不一致） */
 .author-tree__list :deep(.arco-tree-node-title) {
-  padding: 5px 8px;
-  border-radius: 6px;
+  width: 100%;
 }
 
 .author-tree__list :deep(.arco-tree-node-title:hover) {
-  background-color: var(--color-fill-2);
-}
-
-.author-tree__list :deep(.arco-tree-node-selected .arco-tree-node-title),
-.author-tree__list :deep(.arco-tree-node-selected .arco-tree-node-title:hover) {
-  background-color: var(--color-primary-light-1);
+  background: var(--color-fill-1);
 }
 
 .author-node {
   display: flex;
-  flex: 1;
-  gap: 7px;
+  gap: 8px;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
   min-width: 0;
+  min-height: 32px;
   font-size: 13px;
   line-height: 1.45;
   text-align: left;
 }
 
+/* 图标 + 标题 + 元信息同组：整组可收缩，标题省略号，徽标不参与压缩，行内不溢出 */
+.author-node__main {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
 .author-node__icon {
-  flex-shrink: 0;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
   font-size: 15px;
   color: var(--color-text-3);
 }
@@ -1699,7 +1764,7 @@ onBeforeUnmount(() => {
 /* 类型徽标：淡色小圆点 + 灰字标签，替代整块灰底文字，目录树不再杂乱 */
 .author-node__type {
   display: inline-flex;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   gap: 5px;
   align-items: center;
   font-size: 11px;
@@ -1715,15 +1780,15 @@ onBeforeUnmount(() => {
 }
 
 .author-node__dot {
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  background: var(--color-text-3);
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  background: var(--color-text-4);
   border-radius: 50%;
 }
 
 .author-node__delete {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   color: var(--color-text-3);
   opacity: 0;
   transition: opacity var(--yd-motion-duration-fast) var(--yd-motion-ease);
@@ -1779,13 +1844,51 @@ onBeforeUnmount(() => {
 .author-outline-view__list {
   flex: 1;
   min-height: 0;
-  padding: 4px 12px 12px;
+  padding: 2px 8px 12px;
 }
 
 .author-outline-view__empty {
   margin: 0;
+  padding: 0 4px;
   font-size: 12px;
   color: var(--color-text-3);
+}
+
+/* 大纲条目：按层级缩进的可点行，当前项用最浅填充 + 左侧墨色指示条 */
+.author-outline {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+}
+
+.author-outline__item.author-outline__item {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text-2);
+  text-align: left;
+  text-overflow: ellipsis;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.author-outline__item.author-outline__item:hover {
+  color: var(--color-text-1);
+  background: var(--color-fill-1);
+}
+
+.author-outline__item.author-outline__item--active {
+  font-weight: 600;
+  color: var(--color-text-1);
+  background: var(--color-fill-1);
+  box-shadow: inset 2px 0 0 0 var(--color-text-1);
 }
 
 /* —— 属性栏 —— */
@@ -1872,23 +1975,6 @@ onBeforeUnmount(() => {
   width: 22px;
   height: 22px;
   padding: 0;
-}
-
-.author-outline {
-  display: grid;
-  gap: 2px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.author-outline__item {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-2);
-  white-space: nowrap;
 }
 
 .author-savebar {

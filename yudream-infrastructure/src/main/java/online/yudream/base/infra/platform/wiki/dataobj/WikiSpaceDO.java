@@ -29,6 +29,8 @@ public class WikiSpaceDO extends BaseDO {
     private int topK;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    private String rerankProviderCode;
+    private String rerankModelCode;
     private Integer hitImageLimit;
 
     private String purpose;

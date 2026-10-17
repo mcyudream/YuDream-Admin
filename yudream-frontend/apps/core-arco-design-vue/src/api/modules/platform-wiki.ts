@@ -20,6 +20,9 @@ export interface WikiSpace {
   topK: number
   queryExpansionEnabled: boolean
   rerankEnabled: boolean
+  /** 重排序端点：未配置时检索回落到向量供应商的首个重排模型 */
+  rerankProviderCode?: string
+  rerankModelCode?: string
   hitImageLimit?: number
   purpose?: string
   schemaContent?: string
