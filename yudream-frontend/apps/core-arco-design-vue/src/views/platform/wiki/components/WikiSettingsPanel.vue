@@ -455,10 +455,12 @@ onMounted(loadGraphTables)
 </template>
 
 <style scoped>
+/* 设置分区是一整幅白底设置页：面板与内部 YdSettingsLayout 同为白底，
+   铺满舞台由 WikiManageView 的 .manage__content--sheet 打开高度链（flex:1 + min-height:0） */
 .set-panel {
   height: 100%;
   min-height: 0;
-  background: var(--color-fill-1);
+  background: var(--color-bg-1);
 }
 
 /* YdSettingsLayout 的 scroll 模式要求有界外壳：分区导航与页头固定，只有内容区滚动 */
@@ -480,6 +482,7 @@ onMounted(loadGraphTables)
   gap: 12px;
   align-items: center;
   justify-content: space-between;
+
   /* 与正文同一列：页头不铺满全宽，标题左边缘、保存按钮右边缘都和正文对齐 */
   width: 100%;
   max-width: 1280px;
@@ -509,6 +512,7 @@ onMounted(loadGraphTables)
 
 .set-grid {
   display: grid;
+
   /* 短字段随可用宽度自动铺满一行的 2–3 列（auto-fill 保留空轨道，落单的字段不会被拉满整行） */
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 18px 16px;

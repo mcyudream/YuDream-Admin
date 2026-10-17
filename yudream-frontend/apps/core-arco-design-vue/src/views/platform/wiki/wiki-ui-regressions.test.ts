@@ -189,6 +189,22 @@ test('settings uses YdSettingsLayout with header save, no fixed bottom bar', () 
   assert.match(settings, /\.settings-page-shell \{[\s\S]*?height: 100%;/)
 })
 
+test('settings tab is one full-bleed white page instead of a white card framed by the gray stage', () => {
+  const manage = wikiFile('components/WikiManageView.vue')
+  const settings = wikiFile('components/WikiSettingsPanel.vue')
+  // 舞台底色随活动分区切换：只有设置分区换成白底，其余分区仍是灰底治理舞台
+  assert.match(manage, /const stageClass = computed\(\(\) => activeArea\.value\.key === 'settings'/)
+  assert.match(manage, /'manage__content manage__content--sheet'/)
+  assert.match(manage, /\.manage__content--sheet\) \{\s*background: var\(--color-bg-1\);/)
+  // 白底要铺到舞台四边：区域与面板拉满舞台，面板高度不再由内容决定（否则白卡下方露出灰条）
+  assert.match(manage, /\.manage__content--sheet\) \.manage__area,\s*\.manage__tabs :deep\(\.manage__content--sheet\) \.set-panel \{[\s\S]{0,80}?flex: 1;[\s\S]{0,40}?min-height: 0;/)
+  // 设置面板自身也铺白底，白底与白卡之间不再夹一层灰
+  assert.match(settings, /\.set-panel \{[\s\S]{0,120}?background: var\(--color-bg-1\);/)
+  assert.doesNotMatch(settings, /\.set-panel \{[\s\S]{0,120}?background: var\(--color-fill-1\);/)
+  // 非设置分区的灰底舞台规则必须留着（白底只属于设置）
+  assert.match(manage, /\.manage__tabs :deep\(\.manage__content\) \{[\s\S]{0,220}?background: var\(--color-fill-1\);/)
+})
+
 test('manage surface is one top tab bar: area tabs, full-width dynamic content', () => {
   const manage = wikiFile('components/WikiManageView.vue')
   assert.equal(wikiManageAreas.length, 6)
@@ -209,7 +225,7 @@ test('manage surface is one top tab bar: area tabs, full-width dynamic content',
   // 区域导航放顶部横向 Tab（治理面板以表格与统计为主，不再把内容挤进居中窄列）；不引入左侧设置版式与自绘 <nav>
   assert.match(manage, /<YdTabs/)
   assert.match(manage, /:list="areaList"/)
-  assert.match(manage, /content-class="manage__content"/)
+  assert.match(manage, /:content-class="stageClass"/)
   assert.doesNotMatch(manage, /<YdSettingsLayout/)
   assert.doesNotMatch(manage, /<nav class="manage__nav"/)
   assert.doesNotMatch(manage, /manage__mobile-nav/)

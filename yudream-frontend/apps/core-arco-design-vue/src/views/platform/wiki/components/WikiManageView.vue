@@ -28,6 +28,14 @@ const areaList = computed(() => wikiManageAreas.map(area => ({
 
 const activeArea = computed(() => wikiManageAreas.find(area => area.panels.includes(store.activePanel.value)) || wikiManageAreas[0])
 
+/**
+ * 设置分区是一整幅白底设置页：舞台底色跟着变白，配合下方打开的高度链让白底铺满舞台四边，
+ * 不再出现「白卡外面套一圈灰框」。其余分区保持灰底舞台 + 白卡片的治理版式。
+ */
+const stageClass = computed(() => activeArea.value.key === 'settings'
+  ? 'manage__content manage__content--sheet'
+  : 'manage__content')
+
 /** 当前挂载的区域内容：切换区域前用它的设置脏状态确认，避免静默丢改动 */
 const areaInstances = new Map<string, InstanceType<typeof WikiManageArea>>()
 
@@ -144,7 +152,7 @@ function openAuthor() {
       :list="areaList"
       class="manage__tabs"
       aria-label="知识库治理分区"
-      content-class="manage__content"
+      :content-class="stageClass"
     >
       <template #overview>
         <WikiManageArea :ref="(instance) => registerArea('overview', instance)" area-key="overview" />
@@ -240,13 +248,15 @@ function openAuthor() {
  * 顶部区域 Tab：压掉组件库的分段胶囊外观，改为页面级横向标签——透明底、
  * 左对齐、活动项用品牌色下划线标记。用 :deep 触达 Tabs 内部元素，
  * 重叠一层 .manage__tabs 以外层类垫高优先级，压过未分层工具类。
+ * 只认「直接子级」的标签行：设置面板内嵌的 YdSettingsLayout 分区导航是另一套
+ * 版式（宽屏竖向胶囊、窄屏收进下拉），被这里的规则压掉会变成第二排横向标签。
  */
 .manage__tabs.manage__tabs {
   flex: 1;
   min-height: 0;
 }
 
-.manage__tabs :deep([data-slot="tabs-list"]) {
+.manage__tabs :deep(> [data-slot="tabs-list"]) {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
@@ -259,7 +269,7 @@ function openAuthor() {
   border-radius: 0;
 }
 
-.manage__tabs :deep([data-slot="tabs-trigger"]) {
+.manage__tabs :deep(> [data-slot="tabs-list"]) [data-slot="tabs-trigger"] {
   flex: 0 0 auto;
   width: auto;
   height: 36px;
@@ -273,11 +283,11 @@ function openAuthor() {
   transition: color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.manage__tabs :deep([data-slot="tabs-trigger"]:hover) {
+.manage__tabs :deep(> [data-slot="tabs-list"]) [data-slot="tabs-trigger"]:hover {
   color: var(--color-text-1);
 }
 
-.manage__tabs :deep([data-slot="tabs-trigger"][data-state="active"]) {
+.manage__tabs :deep(> [data-slot="tabs-list"]) [data-slot="tabs-trigger"][data-state="active"] {
   font-weight: 600;
   color: var(--color-text-1);
   background: transparent;
@@ -293,6 +303,21 @@ function openAuthor() {
   padding: 14px 16px 16px;
   overflow: hidden;
   background: var(--color-fill-1);
+}
+
+/*
+ * 设置分区：整幅白底设置页。舞台底色改成白，内边距落在白底里不会显出色差；
+ * 同时把区域与面板拉满舞台（设置页需要一处有界外壳，内容区才能独立滚动），
+ * 白底因此一直铺到舞台下沿，不再有「白块四周一圈灰」。
+ */
+.manage__tabs :deep(.manage__content--sheet) {
+  background: var(--color-bg-1);
+}
+
+.manage__tabs :deep(.manage__content--sheet) .manage__area,
+.manage__tabs :deep(.manage__content--sheet) .set-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (width <= 768px) {
