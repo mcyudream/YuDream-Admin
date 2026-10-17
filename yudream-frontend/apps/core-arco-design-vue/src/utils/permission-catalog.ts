@@ -13,7 +13,7 @@ export const permissionCategoryMeta: readonly PermissionCategoryMeta[] = [
   { key: 'view', label: '查看', actions: ['view', 'export', 'download'], variant: 'secondary' },
   { key: 'operate', label: '操作', actions: ['create', 'edit', 'import', 'upload', 'use', 'generate', 'publish', 'connect', 'send', 'test', 'run', 'invoke', 'execute', 'enable', 'disable', 'assign-*', 'dataset', 'report', 'accept'], variant: 'outline' },
   { key: 'manage', label: '管理', actions: ['manage', 'config'], variant: 'default' },
-  { key: 'danger', label: '危险', actions: ['delete', 'kickout', 'revoke', 'impersonate'], variant: 'destructive' },
+  { key: 'danger', label: '危险', actions: ['delete', 'purge', 'kickout', 'revoke', 'impersonate'], variant: 'destructive' },
   { key: 'other', label: '其他', actions: [], variant: 'outline' },
 ]
 

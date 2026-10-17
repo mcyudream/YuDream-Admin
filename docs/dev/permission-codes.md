@@ -18,9 +18,10 @@
 | 查看 | `view`、`export`、`download` |
 | 操作 | `create`、`edit`、`import`、`upload`、`use`、`generate`、`publish`、`connect`、`send`、`test`、`run`、`invoke`、`execute`、`enable`、`disable`、`assign-*`、`dataset`、`report`、`accept` |
 | 管理 | `manage`、`config` |
-| 危险 | `delete`、`kickout`、`revoke`、`impersonate` |
+| 危险 | `delete`、`purge`、`kickout`、`revoke`、`impersonate` |
 
 - 词表外动作归入「其他」分组。
+- `purge` 专指**永久删除且不可恢复**（连账号级联数据一起回收）。`delete` 在历史用法里同时承载「真实删除」（菜单）与「停用」（用户/部门/角色的 `:delete` 实为停用）两种口径，语义不明的资源新增删除能力时用 `purge` 把不可恢复语义写死。
 - 确需新动作词时，**在同一提交**同步三处：本文件本节、集中词表 `yudream-frontend/apps/core-arco-design-vue/src/utils/permission-catalog.ts` 的 `permissionCategoryMeta`、插件仓对应规范。
 
 ## 3. 展示与目录规范

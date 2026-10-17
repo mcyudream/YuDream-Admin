@@ -21,7 +21,7 @@
 | 查看 | view、export、download | 读取、导出、下载 |
 | 操作 | create、edit、import、upload、use、generate、publish、connect、send、test、run、invoke、execute、enable、disable、assign-*、dataset、report、accept | 写入与执行业务动作 |
 | 管理 | manage、config | 资源管理与配置 |
-| 危险 | delete、kickout、revoke、impersonate | 删除、踢出、撤销、身份代入 |
+| 危险 | delete、purge、kickout、revoke、impersonate | 删除、永久删除（不可恢复）、踢出、撤销、身份代入 |
 | 其他 | 历史或未规范动作 | 显式兼容，不能伪装成规范权限 |
 
 `assign-*` 匹配非空的规范动作后缀，例如 assign-role、assign-dept、assign-team；不能只硬编码已有的两个动作。列表、权限树、矩阵、星图共用 `permissionCategoryMeta`、`permissionCategoryOf` 和 `permissionResourceOf`。

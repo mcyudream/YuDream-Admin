@@ -35,6 +35,8 @@
 
 ## 4. 待同步
 
+- 权限动作词表新增 `purge`（危险组，永久删除不可恢复；`docs/dev/permission-codes.md` §2、`docs/system/permission-management.md` 动作分类、`permission-catalog.ts` 三处已同步）：插件仓 `docs/dev/conventions.md` 按引用跟随主仓词表，本仓暂无插件注册 `purge`，待插件仓 WIP 落定后随下一次规范同步一并核对。
+- `docs/dev/backend-architecture.md` 新增「账号级联删除（purge）」条目（级联回收范围、守卫与保留项）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
 - SPI 2.36.0 新手引导契约（`docs/plugin-system/spi-2.36.0-guides.md` + SPI/SDK 消费）：主仓已完成本地提交，未获发布授权；待 Nexus 发布验签后同步插件仓依赖与文档。
 - `docs/yd-ui-guidelines.md` 设置页布局与响应式增强表格条目（YdSettingsLayout 居中/窄屏分区选择器、YdResponsiveEnhancedTable 卡片按 cell 渲染）：插件仓同名副本存在未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待插件仓 WIP 落定后重跑同步。
 - `docs/yd-ui-guidelines.md` 设置页保存按钮页头规范与 `YdSettingsLayout surface` 铺满白底（宿主设置页新约定），以及 YdMarkdownEditor 可控工具栏、内链插入和预览能力：插件仓同名副本存在未提交改动，先保留其 WIP，待落定后再一并 `pnpm sync:ui-docs`。
