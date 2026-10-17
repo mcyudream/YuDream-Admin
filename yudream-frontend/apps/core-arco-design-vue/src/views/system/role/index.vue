@@ -177,7 +177,7 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   // 角色名/部门都是关联实体入口：点开就地查看编辑、可跳完整管理
   { id: 'name', header: '角色名称', width: 220, fixed: 'left' },
   { id: 'visual', header: '标识', width: 88, align: 'center' },
-  { accessorKey: 'code', header: '编码', width: 180 },
+  { accessorKey: 'code', header: '编码', width: 180, defaultHidden: true },
   { id: 'deptName', header: '部门', width: 180 },
   { accessorKey: 'level', header: '等级', width: 120 },
   { accessorKey: 'permissionCount', header: '权限数', width: 100, align: 'center' },

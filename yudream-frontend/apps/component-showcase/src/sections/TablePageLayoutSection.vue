@@ -296,6 +296,7 @@ const entityPeekCode = `<YdEntityPeek
       <li>操作按钮超过 <code>actionsThreshold</code> 时，标记 <code>autoFold</code> 的项收进「更多」下拉；<code>danger</code> 项红色标识且默认可二次确认。</li>
       <li>表格默认铺满可用宽度；移动端（≤768px）自动切换卡片视图。</li>
       <li>给布局一个确定高度（示例为 <code>h-[560px]</code>）后，纵向滚动发生在表格卡内部：表头固定、固定列钉住，分页始终留在卡片底部。</li>
+      <li>列定义标 <code>defaultHidden: true</code> 的列默认不展示，列显隐菜单顶部提供「显示全部字段 / 只看常用字段」。</li>
     </ul>
   </DemoCard>
 

@@ -21,12 +21,12 @@ const sessionActions: ActionMenuItem<OnlineUser>[] = [
 const tableColumns = computed<TableColumn<OnlineUser>[]>(() => [
   // 用户列自带头像与就地预览/编辑（替代只读的 userColumn，能力只增不减）
   { id: 'sessionUser', header: '用户', width: 220, fixed: 'left' },
-  { accessorKey: 'username', header: '用户名', width: 140 },
+  { accessorKey: 'username', header: '用户名', width: 140, defaultHidden: true },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
-  { accessorKey: 'email', header: '邮箱', width: 220 },
+  { accessorKey: 'email', header: '邮箱', width: 220, defaultHidden: true },
   { accessorKey: 'device', header: '设备', width: 120 },
   { id: 'timeout', header: '会话剩余时间', width: 150 },
-  { id: 'token', header: '会话标识', width: 260 },
+  { id: 'token', header: '会话标识', width: 260, defaultHidden: true },
   { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
 

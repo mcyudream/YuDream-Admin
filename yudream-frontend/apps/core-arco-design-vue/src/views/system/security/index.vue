@@ -329,8 +329,8 @@ const oauthProviderActions = computed<ActionMenuItem<OAuthProvider>[]>(() => [
 const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
   { accessorKey: 'deviceName', header: '设备名称', width: 180, fixed: 'left' },
   { id: 'userId', header: '账号', width: 180 },
-  { accessorKey: 'credentialId', header: '凭据 ID', width: 260 },
-  { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right' },
+  { accessorKey: 'credentialId', header: '凭据 ID', width: 260, defaultHidden: true },
+  { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right', defaultHidden: true },
   { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
 ])
 

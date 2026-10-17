@@ -196,13 +196,13 @@ const traceActions: ActionMenuItem<AgentTraceSummary>[] = [
 
 /** 追踪 ID 是行标识，固定左侧；其余列沿用原列表字段 */
 const tableColumns = computed<TableColumn<AgentTraceSummary>[]>(() => [
-  { id: 'traceId', header: '追踪 ID', width: 190, fixed: 'left' },
+  { id: 'traceId', header: '追踪 ID', width: 190, fixed: 'left', defaultHidden: true },
   { id: 'source', header: '来源', width: 90 },
   { id: 'agent', header: 'Agent', width: 220 },
   { accessorKey: 'ownerPluginCode', header: '插件', width: 140 },
   { accessorKey: 'stepCount', header: '步数', width: 80, align: 'right' },
   { id: 'durationMs', header: '耗时', width: 100, align: 'right' },
-  { id: 'input', header: '输入摘要', width: 280 },
+  { id: 'input', header: '输入摘要', width: 280, defaultHidden: true },
   { id: 'startTime', header: '开始时间', width: 180 },
   { id: 'error', header: '错误', width: 220 },
 ])

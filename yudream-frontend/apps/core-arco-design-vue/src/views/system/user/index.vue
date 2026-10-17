@@ -223,9 +223,9 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   // 用户列自绘为关联实体入口：点开就地查看/编辑（替代只读 userColumn，能力只增不减）
   { id: 'user', header: '用户', width: 240, fixed: 'left' },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
-  { id: 'identities', header: '消息身份', width: 280 },
-  { id: 'fields', header: '扩展资料', width: 240 },
-  { id: 'tags', header: '标签', width: 220 },
+  { id: 'identities', header: '消息身份', width: 280, defaultHidden: true },
+  { id: 'fields', header: '扩展资料', width: 240, defaultHidden: true },
+  { id: 'tags', header: '标签', width: 220, defaultHidden: true },
   { id: 'deptNames', header: '部门', width: 220 },
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },

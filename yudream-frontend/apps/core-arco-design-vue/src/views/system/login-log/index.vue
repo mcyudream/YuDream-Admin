@@ -71,11 +71,11 @@ const pageActions = computed<YdTablePageAction[]>(() => [
 const tableColumns = computed<TableColumn<LoginLog>[]>(() => [
   { id: 'username', header: '用户名', width: 180, fixed: 'left' },
   { id: 'success', header: '状态', width: 90, align: 'center' },
-  { accessorKey: 'userId', header: '用户ID', width: 160 },
+  { accessorKey: 'userId', header: '用户ID', width: 160, defaultHidden: true },
   { accessorKey: 'ip', header: 'IP', width: 150 },
   { id: 'message', header: '结果', width: 260 },
   { id: 'createTime', header: '登录时间', width: 180 },
-  { id: 'userAgent', header: '客户端', width: 360 },
+  { id: 'userAgent', header: '客户端', width: 360, defaultHidden: true },
 ])
 
 /** 搜索表单的成功/失败是字符串值，仅这两种取值转成接口需要的布尔 */

@@ -75,6 +75,8 @@ export type TableExpandedState = ExpandedState
 
 interface TableColumnOptions<TData extends RowData = RowData, TValue = unknown> {
   align?: TableAlign
+  /** 默认隐藏的非常用列（技术字段、长文本、重复信息）；列显隐菜单里可打开，或一键显示全部字段 */
+  defaultHidden?: boolean
   cellClass?: ColumnClass<CellContext<TData, TValue>>
   class?: HTMLAttributes['class']
   fixed?: boolean | TableColumnFixed
@@ -530,22 +532,69 @@ const singleSelectedRowId = computed(() => Object.keys(rowSelection.value).find(
 const tableRootComponent = computed(() => isSingleSelectionMode.value ? RadioGroup : 'div')
 const tableRootModelValue = computed(() => isSingleSelectionMode.value ? singleSelectedRowId.value : undefined)
 const stripeInteractionClass = computed(() => props.stripe ? '[&:hover:not([data-state=selected])>td]:bg-muted/50' : undefined)
+/** 列定义里的 defaultHidden 决定初始可见性；用户勾选后不再被列定义覆盖 */
+const defaultHiddenState = computed<VisibilityState>(() => {
+  const state: VisibilityState = {}
+  for (const column of resolvedColumns.value as TableColumn<TData, any>[]) {
+    const id = column.id ?? (column as { accessorKey?: string }).accessorKey
+    if (column.defaultHidden && typeof id === 'string' && id) {
+      state[id] = false
+    }
+  }
+  return state
+})
+
+const hasDefaultHiddenColumns = computed(() => Object.keys(defaultHiddenState.value).length > 0)
+
+let visibilityInitialized = false
+watch(defaultHiddenState, (state) => {
+  if (visibilityInitialized) {
+    return
+  }
+  visibilityInitialized = true
+  columnVisibilityState.value = { ...state }
+}, { immediate: true })
+
+function showAllColumns() {
+  const next: VisibilityState = {}
+  for (const column of columnVisibilityColumns.value) {
+    next[column.id] = true
+  }
+  columnVisibilityState.value = next
+}
+
+function showCommonColumns() {
+  const next: VisibilityState = {}
+  for (const column of columnVisibilityColumns.value) {
+    next[column.id] = !defaultHiddenState.value[column.id]
+  }
+  columnVisibilityState.value = next
+}
+
 const columnVisibilityColumns = computed(() => {
   void resolvedColumns.value
   void columnVisibilityState.value
 
   return table.getAllLeafColumns().filter(column => column.getCanHide())
 })
-const columnVisibilityMenuItems = computed(() => [
-  columnVisibilityColumns.value.length
+const columnVisibilityMenuItems = computed(() => {
+  const groups: Array<Array<{ type?: 'checkbox', label: string, checked?: boolean, handle?: (checked?: boolean) => void }>> = []
+  if (hasDefaultHiddenColumns.value) {
+    groups.push([
+      { label: '显示全部字段', handle: () => showAllColumns() },
+      { label: '只看常用字段', handle: () => showCommonColumns() },
+    ])
+  }
+  groups.push(columnVisibilityColumns.value.length
     ? columnVisibilityColumns.value.map(column => ({
         type: 'checkbox' as const,
         label: getColumnVisibilityLabel(column),
         checked: column.getIsVisible(),
         handle: (checked?: boolean) => column.toggleVisibility(checked),
       }))
-    : [],
-])
+    : [])
+  return groups
+})
 
 watch(
   () => props.multiple,

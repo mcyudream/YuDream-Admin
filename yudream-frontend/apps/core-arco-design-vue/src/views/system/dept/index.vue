@@ -188,9 +188,9 @@ const tableColumns = computed<TableColumn<DeptManageItem>[]>(() => [
   { id: 'name', header: '部门名称', width: 220, fixed: 'left' },
   { id: 'leaderName', header: '负责人', width: 160 },
   { accessorKey: 'phone', header: '电话', width: 140 },
-  { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center' },
+  { accessorKey: 'sortOrder', header: '排序', width: 90, align: 'center', defaultHidden: true },
   { id: 'systemDept', header: '类型', width: 110, align: 'center' },
-  { accessorKey: 'description', header: '描述', minWidth: 220 },
+  { accessorKey: 'description', header: '描述', minWidth: 220, defaultHidden: true },
 ])
 
 /** 后端返回 /api/files/... 相对地址，列表落地前统一补后端基址 */
