@@ -64,6 +64,43 @@ export interface SystemAgentTool extends AgentToolCandidate {
   inputSchema?: Record<string, unknown>
 }
 
+export interface AiToolModuleTool {
+  code: string
+  name: string
+  description?: string
+  permissionCode?: string
+  risk?: 'READ' | 'WRITE'
+  source?: string
+  requiresConfirmation?: boolean
+  enabled?: boolean
+}
+
+export interface AiToolModule {
+  code: string
+  name: string
+  description?: string
+  icon?: string
+  source?: string
+  /** 常驻模块：工具无需 load_tools 加载即进入模型视野 */
+  alwaysOn?: boolean
+  enabled?: boolean
+  canDisable?: boolean
+  /** 按需加载：需要模型先调用 load_tools 加载该模块 */
+  lazy?: boolean
+  toolCount?: number
+  tools?: AiToolModuleTool[]
+}
+
+export interface AiToolModuleCatalog {
+  /** 系统工具总开关（配置项与持久开关同时开启才为 true） */
+  systemEnabled: boolean
+  /** 配置项闸门：部署侧 yudream.platform.agent.system-tools-enabled */
+  configEnabled?: boolean
+  /** 是否按需加载模式（eager 模式下所有模块常驻） */
+  onDemand?: boolean
+  modules: AiToolModule[]
+}
+
 export interface AgentRunResult {
   content: string
   toolResults: Array<{ toolName: string, action: string, message: string, payload?: Record<string, unknown> }>
@@ -152,6 +189,9 @@ export default {
   catalog: () => systemClient.get<unknown, ApiResponse<AgentCatalog>>('api/platform/agents/catalog'),
   models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
+  toolModules: () => systemClient.get<unknown, ApiResponse<AiToolModuleCatalog>>('api/platform/agents/tools/modules'),
+  updateSystemToolsEnabled: (enabled: boolean) => systemClient.put<unknown, ApiResponse<AiToolModuleCatalog>>(`api/platform/agents/tools/system/enabled/${enabled}`),
+  updateToolModuleEnabled: (code: string, enabled: boolean) => systemClient.put<unknown, ApiResponse<AiToolModuleCatalog>>(`api/platform/agents/tools/modules/${encodeURIComponent(code)}/enabled/${enabled}`),
   createTool: (data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.post<unknown, ApiResponse<AgentTool>>('api/platform/agents/tools', data),
   updateTool: (id: string, data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.put<unknown, ApiResponse<AgentTool>>(`api/platform/agents/tools/${id}`, data),
   deleteTool: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/agents/tools/${id}`),

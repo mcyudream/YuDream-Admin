@@ -1,15 +1,44 @@
 <script setup lang="ts">
-import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { AgentFlowNode, AgentNodeData } from './types'
-import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { agentModelKind, extractOutputSchemaDefault, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
 import AgentJsonCodeEditor from './AgentJsonCodeEditor.vue'
+
+/** 工具选择项：由编排页按工具模块目录（toolModules）生成，组件只负责渲染与选择状态。 */
+interface AgentToolPickerTool {
+  code: string
+  name: string
+  description?: string
+  permissionCode?: string
+  risk?: 'READ' | 'WRITE'
+  requiresConfirmation?: boolean
+  /** 当前能否授权：系统工具总开关开启、模块开放且工具启用 */
+  selectable: boolean
+  /** 不可授权的原因，selectable 为 false 时展示 */
+  reason?: string
+}
+
+/** 工具模块分组：模块编码、开关状态与工具清单的唯一来源是后端模块目录。 */
+interface AgentToolPickerGroup {
+  code: string
+  name: string
+  description?: string
+  source?: string
+  /** 按需加载模块：模型需要先调用 load_tools 加载后才能看到其中的工具 */
+  lazy: boolean
+  /** 模块当前已关闭（总开关或模块开关），其中的工具不能授权 */
+  closed: boolean
+  closedReason?: string
+  /** 常驻 / 按需加载 / 已关闭 */
+  stateText: string
+  tools: AgentToolPickerTool[]
+}
 
 const props = defineProps<{
   node: AgentFlowNode
   systemTools: SystemAgentTool[]
   customTools: AgentTool[]
-  toolFetcher: (query: YdTablePickerQuery) => Promise<YdTablePickerResult<AgentToolCandidate>>
+  toolGroups: AgentToolPickerGroup[]
   models: AgentModelOption[]
   knowledgeSpaces: AgentKnowledgeSpaceOption[]
 }>()
@@ -20,19 +49,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const toolColumns: TableColumn<AgentToolCandidate>[] = [
-  { accessorKey: 'name', header: '工具名称', minWidth: 180 },
-  { accessorKey: 'code', header: '编码', minWidth: 180 },
-  { accessorKey: 'source', header: '来源', width: 100 },
-]
+const sourceLabels: Record<string, string> = { system: '系统', plugin: '插件', mcp: 'MCP', python: 'Python' }
 
-const toolInitialLabels = computed<Record<string, string>>(() => {
-  const labels: Record<string, string> = {}
-  for (const tool of [...props.systemTools, ...props.customTools]) {
-    labels[tool.code] = `${tool.name} (${tool.code})`
-  }
-  return labels
-})
 const toolModeOptions = [
   { label: '禁用工具', value: 'NONE' },
   { label: '模型自主调用', value: 'AUTO' },
@@ -47,6 +65,131 @@ const modelToolOptions = computed(() => {
     ...(custom.length ? [{ label: '自定义 Python 工具', options: custom }] : []),
   ]
 })
+
+/* ------------------------------------------------------------ 按模块选择工具 */
+
+const toolKeyword = ref('')
+const openedModules = ref<Record<string, boolean>>({})
+
+const selectedToolCodes = computed(() => props.node.data.toolCodes || [])
+const selectedToolCodeSet = computed(() => new Set(selectedToolCodes.value))
+const pickerDisabled = computed(() => props.node.data.toolMode === 'NONE')
+
+const toolIndex = computed(() => {
+  const index = new Map<string, AgentToolPickerTool>()
+  for (const group of props.toolGroups) {
+    for (const tool of group.tools) {
+      index.set(tool.code, tool)
+    }
+  }
+  return index
+})
+
+/** 已选但不在任何模块清单里的工具：历史授权或已下线的工具编码。 */
+const unknownSelectedTools = computed(() => selectedToolCodes.value
+  .filter(code => !toolIndex.value.has(code))
+  .map(code => ({
+    code,
+    name: props.systemTools.find(tool => tool.code === code)?.name
+      || props.customTools.find(tool => tool.code === code)?.name
+      || code,
+  })))
+
+const filteredGroups = computed(() => {
+  const query = toolKeyword.value.trim().toLocaleLowerCase()
+  if (!query) {
+    return props.toolGroups
+  }
+  return props.toolGroups.flatMap((group) => {
+    if ([group.name, group.code, group.description].some(value => value?.toLocaleLowerCase().includes(query))) {
+      return [group]
+    }
+    const tools = group.tools.filter(tool => [tool.name, tool.code, tool.description, tool.permissionCode]
+      .some(value => value?.toLocaleLowerCase().includes(query)))
+    return tools.length ? [{ ...group, tools }] : []
+  })
+})
+
+watch(filteredGroups, (groups) => {
+  if (!toolKeyword.value.trim()) {
+    return
+  }
+  for (const group of groups) {
+    openedModules.value[group.code] = true
+  }
+})
+
+function isModuleOpen(group: AgentToolPickerGroup) {
+  const state = openedModules.value[group.code]
+  return state === undefined
+    ? group.tools.some(tool => selectedToolCodeSet.value.has(tool.code))
+    : state
+}
+
+function toggleModuleOpen(group: AgentToolPickerGroup) {
+  openedModules.value[group.code] = !isModuleOpen(group)
+}
+
+/** 模块级勾选态：可授权的工具全部选中为 true，部分选中为 indeterminate。 */
+function moduleCheckState(group: AgentToolPickerGroup) {
+  const codes = group.tools.map(tool => tool.code)
+  if (!codes.length) {
+    return false
+  }
+  const target = group.closed ? codes : group.tools.filter(tool => tool.selectable).map(tool => tool.code)
+  const expected = target.length ? target : codes
+  if (expected.every(code => selectedToolCodeSet.value.has(code))) {
+    return true
+  }
+  return codes.some(code => selectedToolCodeSet.value.has(code)) ? 'indeterminate' as const : false
+}
+
+/** 模块内没有任何可授权工具时，模块级勾选不可用（例如整个 MCP 服务的工具都已停用）。 */
+function moduleSelectable(group: AgentToolPickerGroup) {
+  return group.tools.some(tool => tool.selectable)
+}
+
+function hasSelectedTool(group: AgentToolPickerGroup) {
+  return group.tools.some(tool => selectedToolCodeSet.value.has(tool.code))
+}
+
+function toggleModule(group: AgentToolPickerGroup, value: unknown) {
+  const next = new Set(selectedToolCodes.value)
+  if (value === true) {
+    for (const tool of group.tools) {
+      if (tool.selectable) {
+        next.add(tool.code)
+      }
+    }
+  }
+  else {
+    for (const tool of group.tools) {
+      next.delete(tool.code)
+    }
+  }
+  changeToolCodes([...next])
+}
+
+function toggleTool(code: string, value: unknown) {
+  const next = new Set(selectedToolCodes.value)
+  if (value === true) {
+    next.add(code)
+  }
+  else {
+    next.delete(code)
+  }
+  changeToolCodes([...next])
+}
+
+function moduleSourceText(group: AgentToolPickerGroup) {
+  return group.source ? sourceLabels[group.source] ?? group.source : '系统'
+}
+
+/** 已选工具的标签语义：不可授权或已失效的授权用危险色提示。 */
+function selectedToolVariant(code: string) {
+  const entry = toolIndex.value.get(code)
+  return !entry || !entry.selectable ? 'destructive' as const : 'secondary' as const
+}
 
 const knowledgeSpaceOptions = computed(() => props.knowledgeSpaces.map(space => ({
   label: `${space.name} (${space.slug})`,
@@ -211,24 +354,150 @@ function changeClasses(value: unknown) {
           <YdSelect :model-value="node.data.toolMode" class="w-full" :options="toolModeOptions" placeholder="选择模型调用工具的策略" @update:model-value="changeToolMode" />
           <small>自主调用由模型按任务判断；必须调用要求模型至少完成一次工具调用。</small>
         </label>
-        <label class="form-field" :class="{ disabled: node.data.toolMode === 'NONE' }">
-          <span>可用工具</span>
-          <YdTablePicker
-            :model-value="node.data.toolCodes"
-            class="w-full"
-            :disabled="node.data.toolMode === 'NONE'"
-            :columns="toolColumns"
-            :fetcher="toolFetcher"
-            row-key="code"
-            label-key="name"
-            :initial-labels="toolInitialLabels"
-            title="选择可用工具"
-            placeholder="按名称或编码选择工具"
-            @update:model-value="changeToolCodes"
-          />
-          <small v-if="node.data.toolMode === 'NONE'">当前模型不会调用工具。</small>
-          <small v-else>应用授权会从所有模型节点的选择自动汇总。</small>
-        </label>
+        <div class="form-field" :class="{ disabled: pickerDisabled }">
+          <span class="field-title">
+            可用工具
+            <em v-if="selectedToolCodes.length">{{ selectedToolCodes.length }} 项已选</em>
+          </span>
+          <div v-if="selectedToolCodes.length" class="selected-tools">
+            <YdTag
+              v-for="code in selectedToolCodes"
+              :key="code"
+              :variant="selectedToolVariant(code)"
+              closable
+              @close="toggleTool(code, false)"
+            >
+              {{ toolIndex.get(code)?.name || code }}
+            </YdTag>
+          </div>
+          <p class="picker-note">
+            <YdIcon name="morph:layers" class="picker-note__icon" />
+            <span>按模块授权：常驻模块的工具直接进入模型视野；标记「按需加载」的模块需要模型先调用 <code>load_tools</code> 加载后才会看到其中的工具。</span>
+          </p>
+
+          <div class="tool-picker">
+            <YdInput
+              v-model="toolKeyword"
+              clearable
+              class="w-full"
+              :disabled="pickerDisabled"
+              placeholder="搜索模块或工具"
+              aria-label="搜索工具模块或工具"
+            />
+
+            <div v-if="toolGroups.length && filteredGroups.length" class="module-list">
+              <div
+                v-for="group in filteredGroups"
+                :key="group.code"
+                class="tool-module"
+                :class="{ 'is-closed': group.closed }"
+              >
+                <div class="tool-module__head">
+                  <YdCheckbox
+                    :model-value="moduleCheckState(group)"
+                    :disabled="pickerDisabled || group.closed || !moduleSelectable(group)"
+                    :aria-label="`选择${group.name}模块全部工具`"
+                    @update:model-value="toggleModule(group, $event)"
+                  >
+                    <span class="tool-module__title">
+                      <strong>{{ group.name }}</strong>
+                      <YdTag :variant="group.closed ? 'destructive' : group.lazy ? 'outline' : 'secondary'">
+                        {{ group.stateText }}
+                      </YdTag>
+                      <YdTag variant="outline">{{ moduleSourceText(group) }}</YdTag>
+                      <code>{{ group.code }}</code>
+                    </span>
+                    <small class="tool-module__desc">{{ group.description || '暂无模块说明' }}</small>
+                  </YdCheckbox>
+                  <YdButton
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="tool-module__toggle"
+                    :aria-expanded="isModuleOpen(group)"
+                    :aria-label="`${isModuleOpen(group) ? '收起' : '展开'}${group.name}模块工具`"
+                    @click="toggleModuleOpen(group)"
+                  >
+                    <YdIcon name="morph:chevron-down" :class="{ 'is-open': isModuleOpen(group) }" />
+                  </YdButton>
+                </div>
+                <p v-if="group.closed" class="tool-module__reason">
+                  <YdIcon name="morph:lock" />
+                  <span>{{ group.closedReason || '模块已关闭' }}，其中的工具当前不能授权；请先在 Agent 工具页开启该模块。</span>
+                  <YdButton
+                    v-if="hasSelectedTool(group)"
+                    size="sm"
+                    variant="outline"
+                    class="tool-module__remove"
+                    :disabled="pickerDisabled"
+                    @click="toggleModule(group, false)"
+                  >
+                    移除已选
+                  </YdButton>
+                </p>
+                <div v-if="isModuleOpen(group)" class="tool-rows">
+                  <div v-for="tool in group.tools" :key="tool.code" class="tool-row">
+                    <YdCheckbox
+                      :model-value="selectedToolCodeSet.has(tool.code)"
+                      :disabled="pickerDisabled || !tool.selectable"
+                      @update:model-value="toggleTool(tool.code, $event)"
+                    >
+                      <span class="tool-row__body">
+                        <span class="tool-row__head">
+                          <b>{{ tool.name }}</b>
+                          <YdTag v-if="tool.risk === 'READ'" variant="secondary">只读</YdTag>
+                          <YdTag v-else-if="tool.risk === 'WRITE'" :variant="tool.requiresConfirmation ? 'destructive' : 'outline'">
+                            {{ tool.requiresConfirmation ? '写入 · 需确认' : '写入' }}
+                          </YdTag>
+                        </span>
+                        <small class="tool-row__code">{{ tool.code }}</small>
+                        <small v-if="tool.description" class="tool-row__desc">{{ tool.description }}</small>
+                        <small v-if="!tool.selectable" class="tool-row__reason">{{ tool.reason }}</small>
+                      </span>
+                    </YdCheckbox>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <YdEmpty
+              v-else-if="toolGroups.length"
+              title="没有匹配的模块或工具"
+              description="换一个关键词，或清除搜索查看全部模块。"
+            />
+            <YdEmpty
+              v-else
+              title="暂无工具模块"
+              description="工具模块目录为空或加载失败；可稍后重试，或先在 Agent 工具页确认系统工具状态。"
+            />
+
+            <div v-if="unknownSelectedTools.length" class="tool-module is-closed">
+              <div class="tool-module__head">
+                <span class="tool-module__title">
+                  <strong>未识别的已选工具</strong>
+                  <YdTag variant="destructive">不可用</YdTag>
+                </span>
+              </div>
+              <p class="tool-module__reason">
+                <YdIcon name="morph:triangle-alert" />
+                <span>这些工具已不在候选列表中，运行时无法解析；请移除后重新选择。</span>
+              </p>
+              <div class="tool-rows">
+                <div v-for="tool in unknownSelectedTools" :key="tool.code" class="tool-row tool-row--static">
+                  <span class="tool-row__body">
+                    <span class="tool-row__head"><b>{{ tool.name }}</b></span>
+                    <small class="tool-row__code">{{ tool.code }}</small>
+                  </span>
+                  <YdButton size="sm" variant="outline" :disabled="pickerDisabled" @click="toggleTool(tool.code, false)">
+                    移除
+                  </YdButton>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <small v-if="pickerDisabled">当前模型不会调用工具。</small>
+          <small v-else>应用授权会从所有模型节点的选择自动汇总；模块开关随「Agent 工具」页的配置实时生效。</small>
+        </div>
         <YdCheckbox v-if="node.data.kind === 'llm'" :model-value="Boolean(node.data.workspace)" class="check-line" @update:model-value="emit('update', { workspace: $event === true })">
           <span><b>启用文件工作区</b><small>节点经 Harness 会话运行，模型可读写工作区文件（按运行用户隔离、跨运行复用）；不勾选则保持无状态生成。</small></span>
         </YdCheckbox>
@@ -409,6 +678,35 @@ function changeClasses(value: unknown) {
 .check-line small { color: var(--color-text-3); font-size: 9px; line-height: 1.55; }
 .form-field .field-error { color: rgb(var(--danger-6)); }
 .form-field.disabled { opacity: 0.65; }
+.field-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field-title em { color: var(--color-text-3); font-size: 9px; font-style: normal; }
+.selected-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker-note { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--color-text-3); font-size: 9px; line-height: 1.55; }
+.picker-note__icon { flex: none; margin-top: 2px; }
+.picker-note code { padding: 0 3px; border-radius: 3px; color: var(--color-text-2); background: var(--color-fill-2); font-size: 9px; }
+.tool-picker { display: grid; gap: 8px; }
+.module-list { display: grid; max-height: 330px; gap: 8px; padding-right: 2px; overflow: auto; }
+.tool-module { border: 1px solid var(--color-border-2); border-radius: 7px; background: var(--color-bg-1); }
+.tool-module.is-closed { background: color-mix(in oklab, var(--color-fill-1) 55%, var(--color-bg-1)); }
+.tool-module__head { display: grid; align-items: center; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 3px 6px 3px 2px; }
+.tool-module__title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tool-module__title strong { color: var(--color-text-1); font-size: 11px; font-weight: 600; }
+.tool-module__title code { color: var(--color-text-3); font-size: 9px; }
+.tool-module__desc { display: block; color: var(--color-text-3); font-size: 9px; line-height: 1.5; }
+.tool-module__toggle { color: var(--color-text-3); }
+.tool-module__toggle :deep(.is-open) { transform: rotate(180deg); }
+.tool-module__reason { display: flex; align-items: flex-start; gap: 5px; margin: 0; padding: 0 10px 8px; color: rgb(var(--warning-6)); font-size: 9px; line-height: 1.5; }
+.tool-module__reason > span { flex: 1; }
+.tool-module__remove { flex: none; }
+.tool-rows { border-top: 1px solid var(--color-border-2); }
+.tool-row + .tool-row { border-top: 1px solid var(--color-border-2); }
+.tool-row--static { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; }
+.tool-row__body { display: grid; min-width: 0; gap: 3px; }
+.tool-row__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tool-row__head b { color: var(--color-text-1); font-size: 10px; font-weight: 500; }
+.tool-row__code { color: var(--color-text-3); font-size: 9px; word-break: break-all; }
+.tool-row__desc { color: var(--color-text-3); font-size: 9px; line-height: 1.5; }
+.tool-row__reason { color: rgb(var(--warning-6)); font-size: 9px; line-height: 1.5; }
 .form-grid { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
 .toggle-option { display: grid; min-height: 54px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 12px; padding: 9px 10px; border: 1px solid var(--color-border-2); border-radius: 6px; }
 .toggle-option > span { display: grid; gap: 3px; }

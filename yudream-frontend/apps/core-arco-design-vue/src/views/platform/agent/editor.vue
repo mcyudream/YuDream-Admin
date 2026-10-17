@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { YdTablePickerQuery, YdTablePickerResult, YdWorkflowCanvasInstance, YdWorkflowConnection, YdWorkflowEdge, YdWorkflowNode } from '@yudream/components'
+import type { YdWorkflowCanvasInstance, YdWorkflowConnection, YdWorkflowEdge, YdWorkflowNode } from '@yudream/components'
 import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
-import type { AgentApplicationPayload, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentApplicationPayload, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, AiToolModuleCatalog, SystemAgentTool } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
 import { useAiRunTask } from '@/composables/use-ai-run-task'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
@@ -34,6 +34,8 @@ const selectedEdgeId = ref('')
 const defaultConnectionStyle = ref<AgentConnectionStyle>('arrow')
 const customTools = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
+const toolModuleCatalog = ref<AiToolModuleCatalog>()
+const toolCandidates = ref<AgentToolCandidate[]>([])
 const agentModels = ref<AgentModelOption[]>([])
 const knowledgeSpaces = ref<AgentKnowledgeSpaceOption[]>([])
 const aiRuntime = useAiAssistantStore()
@@ -96,15 +98,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
 })
 
-async function fetchToolCandidates(query: YdTablePickerQuery): Promise<YdTablePickerResult<AgentToolCandidate>> {
-  const page = (await apiAgent.pageToolCandidates(query)).data
-  return { list: page.records, total: page.total }
-}
 async function loadTools() {
   try {
-    const [result, system] = await Promise.all([apiAgent.pageTools({ page: 1, size: 200 }), apiAgent.systemTools()])
+    const [result, system, modules, candidates] = await Promise.all([
+      apiAgent.pageTools({ page: 1, size: 200 }),
+      apiAgent.systemTools(),
+      apiAgent.toolModules(),
+      apiAgent.pageToolCandidates({ page: 1, size: 200 }),
+    ])
     customTools.value = result.data.records.filter(item => item.enabled)
     systemTools.value = system.data
+    toolModuleCatalog.value = modules.data
+    toolCandidates.value = candidates.data.records
   }
   catch {
     toast.error('加载 Agent 工具失败')
@@ -288,12 +293,14 @@ function selectNode(nodeId: string) {
   rightMode.value = 'config'
   selectedNodeId.value = nodeId
   selectedEdgeId.value = ''
+  revealInspector()
 }
 
 function selectEdge(edgeId: string) {
   rightMode.value = 'config'
   selectedEdgeId.value = edgeId
   selectedNodeId.value = ''
+  revealInspector()
 }
 
 function clearSelection() {
@@ -331,7 +338,9 @@ function changeEdgeLabel(label: string) {
 }
 
 function deleteNode(nodeId: string) {
-  if (runtimeReadonly.value) return
+  if (runtimeReadonly.value) {
+    return
+  }
   nodes.value = nodes.value.filter(node => node.id !== nodeId)
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
   edges.value = edgeRecords.filter(edge => edge.source !== nodeId && edge.target !== nodeId) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
@@ -339,14 +348,18 @@ function deleteNode(nodeId: string) {
 }
 
 function deleteEdge(edgeId: string) {
-  if (runtimeReadonly.value) return
+  if (runtimeReadonly.value) {
+    return
+  }
   const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
   edges.value = edgeRecords.filter(edge => edge.id !== edgeId) as unknown as YdWorkflowEdge<Record<string, unknown>>[]
   clearSelection()
 }
 
 function deleteSelection() {
-  if (runtimeReadonly.value) return
+  if (runtimeReadonly.value) {
+    return
+  }
   if (selectedNodeId.value) {
     deleteNode(selectedNodeId.value)
   }
@@ -356,7 +369,9 @@ function deleteSelection() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (runtimeReadonly.value) return
+  if (runtimeReadonly.value) {
+    return
+  }
   if (event.key !== 'Delete' && event.key !== 'Backspace') {
     return
   }
@@ -570,25 +585,280 @@ function clearDebug() {
   void debugTask.reconnect()
 }
 
+/* ------------------------------------------------------------ 工具模块分组与校验反馈 */
+
+/** 工具选择项：模块目录（toolModules）是模块归属、开关状态与工具清单的唯一来源。 */
+interface AgentToolPickerTool {
+  code: string
+  name: string
+  description?: string
+  permissionCode?: string
+  risk?: 'READ' | 'WRITE'
+  requiresConfirmation?: boolean
+  /** 当前能否授权：系统工具总开关开启、模块开放且工具启用 */
+  selectable: boolean
+  reason?: string
+}
+
+interface AgentToolPickerGroup {
+  code: string
+  name: string
+  description?: string
+  source?: string
+  /** 按需加载模块：模型需要先调用 load_tools 加载后才能看到其中的工具 */
+  lazy: boolean
+  closed: boolean
+  closedReason?: string
+  /** 常驻 / 按需加载 / 已关闭 */
+  stateText: string
+  tools: AgentToolPickerTool[]
+}
+
+interface AgentEditorIssue {
+  key: string
+  tone: 'error' | 'warning'
+  message: string
+  nodeId?: string
+}
+
+/**
+ * MCP 模块在管理端目录里下发的工具编码是 mcp:<server>.<tool> 的展示形式，
+ * 运行期可解析的工具名是 mcp.<server>.<tool>（后端 AiToolModules.mcpToolName）。
+ * 授权必须保存运行期编码，否则运行时会解析不到工具。
+ */
+function runtimeToolCode(moduleCode: string, toolCode: string) {
+  return moduleCode.startsWith('mcp:') ? toolCode.replace(/^mcp:/, 'mcp.') : toolCode
+}
+
+const toolPickerGroups = computed<AgentToolPickerGroup[]>(() => {
+  const catalog = toolModuleCatalog.value
+  const systemEnabled = catalog?.systemEnabled !== false
+  const groups: AgentToolPickerGroup[] = []
+  const indexed = new Set<string>()
+  for (const module of catalog?.modules || []) {
+    // 系统工具总开关只作用于系统 / 插件 / MCP 工具；Python 自定义工具由应用显式授权，不受总开关影响。
+    const globalClosed = !systemEnabled && module.source !== 'python'
+    const moduleClosed = globalClosed || module.enabled === false
+    const tools = (module.tools || []).map((tool) => {
+      const code = runtimeToolCode(module.code, tool.code)
+      indexed.add(code)
+      const reason = module.enabled === false
+        ? '所属模块已关闭，暂不能授权'
+        : globalClosed
+          ? '系统工具总开关已关闭，暂不能授权'
+          : tool.enabled === false
+            ? '工具当前已停用，暂不能授权'
+            : undefined
+      return {
+        code,
+        name: tool.name || code,
+        description: tool.description,
+        permissionCode: tool.permissionCode,
+        risk: tool.risk,
+        requiresConfirmation: tool.requiresConfirmation,
+        selectable: !reason,
+        reason,
+      }
+    })
+    if (!tools.length) {
+      continue
+    }
+    groups.push({
+      code: module.code,
+      name: module.name || module.code,
+      description: module.description,
+      source: module.source,
+      lazy: module.lazy === true,
+      closed: moduleClosed,
+      closedReason: moduleClosed ? (module.enabled === false ? '模块已关闭' : '系统工具总开关已关闭') : undefined,
+      stateText: moduleClosed ? '已关闭' : module.lazy ? '按需加载' : '常驻',
+      tools,
+    })
+  }
+  // 兜底：候选列表里存在、但未出现在模块目录中的工具，仍允许授权（目录与候选来源不一致时）。
+  const extra = toolCandidates.value.filter(candidate => candidate.code && !indexed.has(candidate.code))
+  if (extra.length) {
+    for (const candidate of extra) {
+      indexed.add(candidate.code)
+    }
+    groups.push({
+      code: 'unclassified',
+      name: '其他可用工具',
+      description: '未归入工具模块的候选工具，可直接授权调用。',
+      lazy: false,
+      closed: false,
+      stateText: '常驻',
+      tools: extra.map(candidate => ({
+        code: candidate.code,
+        name: candidate.name || candidate.code,
+        description: candidate.description,
+        permissionCode: candidate.permissionCode,
+        selectable: true,
+      })),
+    })
+  }
+  return groups
+})
+
+const toolPickerIndex = computed(() => {
+  const index = new Map<string, { group: AgentToolPickerGroup, tool: AgentToolPickerTool }>()
+  for (const group of toolPickerGroups.value) {
+    for (const tool of group.tools) {
+      index.set(tool.code, { group, tool })
+    }
+  }
+  return index
+})
+
+const knownToolCodes = computed(() => new Set([
+  ...toolPickerIndex.value.keys(),
+  ...customTools.value.map(tool => tool.code),
+  ...systemTools.value.map(tool => tool.code),
+]))
+
+const workflowValidation = computed(() => validateAgentWorkflow(nodes.value, edges.value, {
+  models: agentModels.value,
+  knowledgeSpaceSlugs: new Set(knowledgeSpaces.value.map(space => space.slug)),
+  toolCodes: knownToolCodes.value,
+}))
+
+/** 是否已经尝试过保存 / 发布校验：问题面板只在用户触发校验后展示阻断项。 */
+const validationAttempted = ref(false)
+
+const applicationIssues = computed<AgentEditorIssue[]>(() => {
+  const issues: AgentEditorIssue[] = []
+  if (!form.name.trim()) {
+    issues.push({ key: 'app-name', tone: 'error', message: '应用名称不能为空，请在右侧「应用设置」中填写应用名称。' })
+  }
+  if (!form.code.trim()) {
+    issues.push({ key: 'app-code', tone: 'error', message: '应用编码不能为空，请在右侧「应用设置」中填写应用编码。' })
+  }
+  else if (!/^[a-z][a-z0-9-]*$/i.test(form.code.trim())) {
+    issues.push({ key: 'app-code-format', tone: 'error', message: '应用编码只能包含英文字母、数字和连字符，并以字母开头。' })
+  }
+  return issues
+})
+
+/** 工具授权提醒：模块关闭或工具已下线时不阻断保存，但必须显式提示运行时风险。 */
+const toolWarnings = computed<AgentEditorIssue[]>(() => {
+  const warnings: AgentEditorIssue[] = []
+  if (!toolPickerGroups.value.length) {
+    // 模块目录未加载时不臆测工具状态，避免把正常授权误报为失效。
+    return warnings
+  }
+  const legacyCodes = new Set([...customTools.value.map(tool => tool.code), ...systemTools.value.map(tool => tool.code)])
+  for (const node of nodes.value) {
+    const codes = node.data.kind === 'tool'
+      ? (node.data.toolCode ? [node.data.toolCode] : [])
+      : (node.data.toolCodes || [])
+    const nodeTitle = node.data.title || node.id
+    for (const code of codes) {
+      const entry = toolPickerIndex.value.get(code)
+      if (!entry) {
+        if (legacyCodes.has(code)) {
+          continue
+        }
+        warnings.push({
+          key: `${node.id}:${code}`,
+          tone: 'warning',
+          nodeId: node.id,
+          message: `节点“${nodeTitle}”授权的工具“${code}”已不在候选列表中，运行时无法解析，请重新选择。`,
+        })
+        continue
+      }
+      if (!entry.tool.selectable) {
+        warnings.push({
+          key: `${node.id}:${code}`,
+          tone: 'warning',
+          nodeId: node.id,
+          message: `节点“${nodeTitle}”授权的工具“${entry.tool.name}”当前不可用：${entry.tool.reason}。`,
+        })
+      }
+    }
+  }
+  return warnings
+})
+
+const panelIssues = computed<AgentEditorIssue[]>(() => [
+  ...(validationAttempted.value
+    ? [
+        ...applicationIssues.value,
+        ...workflowValidation.value.issues.map((issue, index) => ({
+          key: `workflow-${issue.nodeId || 'graph'}-${index}`,
+          tone: 'error' as const,
+          nodeId: issue.nodeId,
+          message: issue.message,
+        })),
+      ]
+    : []),
+  ...toolWarnings.value,
+])
+
+const blockingIssueCount = computed(() => panelIssues.value.filter(issue => issue.tone === 'error').length)
+
+const inspectorPane = ref<HTMLElement | null>(null)
+const issuePanel = ref<HTMLElement | null>(null)
+/** 三栏在窄屏会退化为堆叠布局，此时选中节点需要把检查器带回可视区。 */
+const stackedLayout = useIsMobile('(max-width: 1180px)')
+
+function revealInspector() {
+  if (!stackedLayout.value) {
+    return
+  }
+  void nextTick(() => inspectorPane.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
+
+function focusNode(nodeId: string) {
+  selectNode(nodeId)
+  focusDebugNode(nodeId)
+}
+
+function focusIssue(issue: AgentEditorIssue) {
+  if (issue.nodeId) {
+    focusNode(issue.nodeId)
+  }
+}
+
+function scrollToIssues() {
+  void nextTick(() => issuePanel.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
+
+function dismissIssues() {
+  validationAttempted.value = false
+}
+
+function openDebugPanel() {
+  rightMode.value = 'debug'
+  revealInspector()
+}
+
 async function save(publish = false, notify = true): Promise<string> {
   if (!form.name.trim() || !form.code.trim()) {
+    validationAttempted.value = true
     toast.error('请在右侧应用设置中填写应用名称和编码')
     clearSelection()
+    scrollToIssues()
     return ''
   }
   if (!/^[a-z][a-z0-9-]*$/i.test(form.code.trim())) {
+    validationAttempted.value = true
     toast.error('应用编码只能包含英文字母、数字和连字符，并以字母开头')
     clearSelection()
+    scrollToIssues()
     return ''
   }
   if (!nodes.value.some(node => node.data.kind === 'start') || !nodes.value.some(node => node.data.kind === 'end')) {
+    validationAttempted.value = true
     toast.error('工作流至少需要一个开始节点和一个结束节点')
+    scrollToIssues()
     return ''
   }
   const emptyToolNode = nodes.value.find(node => node.data.kind === 'tool' && !node.data.toolCode)
   if (emptyToolNode) {
-    selectNode(emptyToolNode.id)
+    validationAttempted.value = true
+    focusNode(emptyToolNode.id)
     toast.error('请为工具调用节点选择具体工具')
+    scrollToIssues()
     return ''
   }
   if (publish && !validateCurrentWorkflow()) {
@@ -626,19 +896,17 @@ async function save(publish = false, notify = true): Promise<string> {
 }
 
 function validateCurrentWorkflow() {
-  const validation = validateAgentWorkflow(nodes.value, edges.value, {
-    models: agentModels.value,
-    knowledgeSpaceSlugs: new Set(knowledgeSpaces.value.map(space => space.slug)),
-    toolCodes: new Set([...customTools.value.map(tool => tool.code), ...systemTools.value.map(tool => tool.code)]),
-  })
-  if (validation.valid) {
+  if (workflowValidation.value.valid) {
+    validationAttempted.value = false
     return true
   }
-  const issue = validation.issues[0]!
+  validationAttempted.value = true
+  const issue = workflowValidation.value.issues[0]!
   if (issue.nodeId) {
-    selectNode(issue.nodeId)
+    focusNode(issue.nodeId)
   }
   toast.error(issue.message)
+  scrollToIssues()
   return false
 }
 </script>
@@ -657,7 +925,7 @@ function validateCurrentWorkflow() {
           <YdButton v-if="runtimeReadonly" :loading="saving" @click="importRuntimeApplication">
             <YdIcon name="morph:cloud-download" /> 导入并编辑
           </YdButton>
-          <YdButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
+          <YdButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="openDebugPanel">
             <YdIcon name="morph:bug" /> 调试
           </YdButton>
           <YdButton v-if="!runtimeReadonly" variant="outline" :loading="saving" @click="save(false)">
@@ -668,6 +936,41 @@ function validateCurrentWorkflow() {
           </YdButton>
         </div>
       </YdPageHeader>
+
+      <section
+        v-if="panelIssues.length"
+        ref="issuePanel"
+        class="issue-panel"
+        :class="{ 'is-warning-only': !blockingIssueCount }"
+        aria-live="polite"
+      >
+        <header class="issue-panel__head">
+          <span class="issue-panel__icon">
+            <YdIcon :name="blockingIssueCount ? 'morph:circle-alert' : 'morph:triangle-alert'" />
+          </span>
+          <div class="issue-panel__copy">
+            <strong>{{ blockingIssueCount ? `保存前需处理 ${blockingIssueCount} 项问题` : '工具授权提醒' }}</strong>
+            <small v-if="blockingIssueCount && toolWarnings.length">
+              另有 {{ toolWarnings.length }} 项工具授权提醒；提醒不阻断保存，但相关工具在运行时可能不可用。
+            </small>
+            <small v-else-if="!blockingIssueCount">下列工具授权在运行时可能不可用，请确认后再发布。</small>
+          </div>
+          <YdButton variant="ghost" size="sm" @click="dismissIssues">
+            关闭
+          </YdButton>
+        </header>
+        <ul class="issue-panel__list">
+          <li v-for="issue in panelIssues" :key="issue.key">
+            <YdTag :variant="issue.tone === 'error' ? 'destructive' : 'outline'">
+              {{ issue.tone === 'error' ? '问题' : '提醒' }}
+            </YdTag>
+            <span class="issue-panel__message">{{ issue.message }}</span>
+            <YdButton v-if="issue.nodeId" variant="outline" size="sm" @click="focusIssue(issue)">
+              定位节点
+            </YdButton>
+          </li>
+        </ul>
+      </section>
 
       <section class="agent-editor" :class="{ 'is-runtime-readonly': runtimeReadonly }">
         <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="agentNodePaletteGroups" @add="addNode" />
@@ -740,56 +1043,55 @@ function validateCurrentWorkflow() {
           </div>
         </main>
 
-        <AgentDebugPanel
-          v-if="rightMode === 'debug'"
-          class="inspector-panel"
-          :messages="debugMessages"
-          :harness="debugHarness"
-          :run-id="debugTask.run.value?.id"
-          :failure="debugTask.failure.value"
-          :running="debugRunning"
-          :allow-image="debugAllowsImage"
-          :allow-files="debugAllowsTextFiles"
-          :model-label="debugModelLabel"
-          @send="startDebug"
-          @stop="stopDebug"
-          @clear="clearDebug"
-          @close="rightMode = 'config'"
-        />
-        <AgentNodeInspector
-          v-else-if="selectedNode"
-          class="inspector-panel"
-          :node="selectedNode"
-          :system-tools="systemTools"
-          :custom-tools="customTools"
-          :tool-fetcher="fetchToolCandidates"
-          :models="agentModels"
-          :knowledge-spaces="knowledgeSpaces"
-          @update="updateSelectedNode"
-          @delete="deleteNode(selectedNode.id)"
-          @close="clearSelection"
-        />
-        <AgentEdgeInspector
-          v-else-if="selectedEdge"
-          class="inspector-panel"
-          :edge="selectedEdge"
-          :source-name="selectedSourceName"
-          :target-name="selectedTargetName"
-          @change-style="changeEdgeStyle"
-          @change-label="changeEdgeLabel"
-          @delete="deleteEdge(selectedEdge.id)"
-          @close="clearSelection"
-        />
-        <AgentApplicationInspector
-          v-else
-          class="inspector-panel"
-          :form="form"
-          :tool-codes="applicationToolCodes"
-          :system-tools="systemTools"
-          :custom-tools="customTools"
-          :code-disabled="Boolean(id)"
-          @update-field="updateApplicationField"
-        />
+        <div ref="inspectorPane" class="inspector-panel">
+          <AgentDebugPanel
+            v-if="rightMode === 'debug'"
+            :messages="debugMessages"
+            :harness="debugHarness"
+            :run-id="debugTask.run.value?.id"
+            :failure="debugTask.failure.value"
+            :running="debugRunning"
+            :allow-image="debugAllowsImage"
+            :allow-files="debugAllowsTextFiles"
+            :model-label="debugModelLabel"
+            @send="startDebug"
+            @stop="stopDebug"
+            @clear="clearDebug"
+            @close="rightMode = 'config'"
+          />
+          <AgentNodeInspector
+            v-else-if="selectedNode"
+            :node="selectedNode"
+            :system-tools="systemTools"
+            :custom-tools="customTools"
+            :tool-groups="toolPickerGroups"
+            :models="agentModels"
+            :knowledge-spaces="knowledgeSpaces"
+            @update="updateSelectedNode"
+            @delete="deleteNode(selectedNode.id)"
+            @close="clearSelection"
+          />
+          <AgentEdgeInspector
+            v-else-if="selectedEdge"
+            :edge="selectedEdge"
+            :source-name="selectedSourceName"
+            :target-name="selectedTargetName"
+            @change-style="changeEdgeStyle"
+            @change-label="changeEdgeLabel"
+            @delete="deleteEdge(selectedEdge.id)"
+            @close="clearSelection"
+          />
+          <AgentApplicationInspector
+            v-else
+            :form="form"
+            :tool-codes="applicationToolCodes"
+            :system-tools="systemTools"
+            :custom-tools="customTools"
+            :tool-groups="toolPickerGroups"
+            :code-disabled="Boolean(id)"
+            @update-field="updateApplicationField"
+          />
+        </div>
       </section>
     </div>
   </YdLoadingOverlay>
@@ -797,9 +1099,21 @@ function validateCurrentWorkflow() {
 
 <style scoped>
 .agent-editor-page { min-width: 0; }
-.header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.header-actions { display: flex; min-width: 0; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.issue-panel { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--color-border-2); border-left: 3px solid rgb(var(--danger-6)); border-radius: 7px; background: var(--color-bg-1); }
+.issue-panel.is-warning-only { border-left-color: rgb(var(--warning-6)); }
+.issue-panel__head { display: flex; align-items: flex-start; gap: 9px; }
+.issue-panel__icon { flex: none; margin-top: 1px; color: rgb(var(--danger-6)); font-size: 16px; }
+.issue-panel.is-warning-only .issue-panel__icon { color: rgb(var(--warning-6)); }
+.issue-panel__copy { display: grid; min-width: 0; gap: 3px; flex: 1; }
+.issue-panel__copy strong { color: var(--color-text-1); font-size: 12px; }
+.issue-panel__copy small { color: var(--color-text-3); font-size: 10px; line-height: 1.55; }
+.issue-panel__list { display: grid; max-height: 220px; gap: 6px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.issue-panel__list li { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 8px; }
+.issue-panel__message { color: var(--color-text-2); font-size: 11px; line-height: 1.55; word-break: break-word; }
 .agent-editor { display: grid; height: calc(100vh - 174px); min-height: 650px; overflow: hidden; grid-template-columns: 242px minmax(0, 1fr) 360px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr) 360px; }
+.inspector-panel { display: flex; min-width: 0; min-height: 0; overflow: hidden; }
 .agent-editor.is-runtime-readonly .inspector-panel { opacity: 0.86; pointer-events: none; }
 .flow-canvas { position: relative; min-width: 0; overflow: hidden; background: var(--color-bg-2); }
 .agent-flow { width: 100%; height: 100%; }
@@ -832,18 +1146,27 @@ function validateCurrentWorkflow() {
 .agent-flow :deep(.vue-flow__minimap-mask) { fill: color-mix(in srgb, var(--color-fill-3), transparent 18%); }
 @keyframes edge-flow { to { stroke-dashoffset: -13; } }
 @media (max-width: 1180px) {
-  .agent-editor { height: auto; min-height: 0; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 640px 480px; }
-  .inspector-panel { grid-column: 1 / -1; border-top: 1px solid var(--color-border-2); border-left: 0 !important; }
+  /* 窄屏退化为两段堆叠：画布在上、检查器在下，两段各自内部滚动，检查器始终可达。 */
+  .agent-editor { height: auto; min-height: 0; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: minmax(420px, 58vh) minmax(300px, 52vh); }
+  .agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(320px, 58vh) auto; }
+  .inspector-panel { grid-column: 1 / -1; border-top: 1px solid var(--color-border-2); }
+  .inspector-panel :deep(.inspector), .inspector-panel :deep(.debug-panel) { border-left: 0; }
+  /* 只读编排面板不接收交互，改为按内容展开、由页面滚动承载，保证内容可完整阅读。 */
+  .agent-editor.is-runtime-readonly .inspector-panel { overflow: visible; }
+  .agent-editor.is-runtime-readonly .inspector-panel :deep(.inspector) { height: auto; }
+  .agent-editor.is-runtime-readonly .inspector-panel :deep(.inspector-body) { overflow: visible; }
+  .issue-panel__list li { grid-template-columns: max-content minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
   .header-actions { justify-content: flex-start; }
-  .agent-editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 350px 620px 520px; }
-  .agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr); grid-template-rows: 620px 520px; }
+  .agent-editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 38vh) minmax(320px, 58vh) minmax(320px, 62vh); }
+  .agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(320px, 58vh) auto; }
   .palette-panel, .flow-canvas, .inspector-panel { grid-column: 1; }
   .palette-panel { border-right: 0 !important; border-bottom: 1px solid var(--color-border-2); }
   .canvas-toolbar { left: 10px; max-width: calc(100% - 20px); transform: none; }
   .canvas-toolbar > span { display: none; }
   .canvas-status span:last-child { display: none; }
   .agent-flow :deep(.vue-flow__minimap) { width: 130px; height: 90px; }
+  .issue-panel__list li { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

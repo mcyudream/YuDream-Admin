@@ -1,28 +1,73 @@
 <script setup lang="ts">
 import type { AgentApplicationPayload, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 
-const emit = defineEmits<{
-  updateField: [key: keyof AgentApplicationPayload, value: unknown]
-}>()
+/** 与编排页工具模块分组保持同一形状（editor 依据 toolModules 生成）。 */
+interface AgentToolPickerTool {
+  code: string
+  name: string
+  description?: string
+  permissionCode?: string
+  risk?: 'READ' | 'WRITE'
+  requiresConfirmation?: boolean
+  selectable: boolean
+  reason?: string
+}
+
+interface AgentToolPickerGroup {
+  code: string
+  name: string
+  description?: string
+  source?: string
+  lazy: boolean
+  closed: boolean
+  closedReason?: string
+  stateText: string
+  tools: AgentToolPickerTool[]
+}
 
 const props = defineProps<{
   form: AgentApplicationPayload
   toolCodes: string[]
   systemTools: SystemAgentTool[]
   customTools: AgentTool[]
+  toolGroups: AgentToolPickerGroup[]
   codeDisabled?: boolean
 }>()
 
-const authorizedTools = computed(() => props.toolCodes.map((code) => {
-  const systemTool = props.systemTools.find(tool => tool.code === code)
-  if (systemTool) {
-    return { ...systemTool, type: '系统工具' }
-  }
-  const customTool = props.customTools.find(tool => tool.code === code)
-  return customTool
-    ? { ...customTool, type: 'Python 工具' }
-    : { code, name: code, description: '该工具当前不可用或已被删除', type: '不可用工具' }
-}))
+const emit = defineEmits<{
+  updateField: [key: keyof AgentApplicationPayload, value: unknown]
+}>()
+
+const sourceLabels: Record<string, string> = { system: '系统', plugin: '插件', mcp: 'MCP', python: 'Python' }
+
+/** 应用授权摘要按工具模块汇总：模块名 + 数量 + 常驻/按需/关闭状态。 */
+const authorizedModules = computed(() => {
+  const selected = new Set(props.toolCodes)
+  const groups = props.toolGroups
+    .map(group => ({ ...group, tools: group.tools.filter(tool => selected.has(tool.code)) }))
+    .filter(group => group.tools.length)
+  const covered = new Set(groups.flatMap(group => group.tools.map(tool => tool.code)))
+  const missing = props.toolCodes
+    .filter(code => !covered.has(code))
+    .map(code => ({
+      code,
+      name: props.systemTools.find(tool => tool.code === code)?.name
+        || props.customTools.find(tool => tool.code === code)?.name
+        || code,
+    }))
+  return { groups, missing }
+})
+
+const authorizedCount = computed(() => props.toolCodes.length)
+const moduleCount = computed(() => authorizedModules.value.groups.length)
+/** 当前不可用的授权：模块关闭、工具停用或已不在候选列表中。 */
+const unavailableCount = computed(() => authorizedModules.value.groups
+  .reduce((total, group) => total + group.tools.filter(tool => !tool.selectable).length, 0)
+  + authorizedModules.value.missing.length)
+
+function groupSourceText(group: AgentToolPickerGroup) {
+  return group.source ? sourceLabels[group.source] ?? group.source : '系统'
+}
 </script>
 
 <template>
@@ -66,18 +111,72 @@ const authorizedTools = computed(() => props.toolCodes.map((code) => {
       <section class="form-section">
         <div class="section-title">
           <h3>应用授权摘要</h3>
-          <span>{{ toolCodes.length }} 项派生授权</span>
+          <span>{{ authorizedCount }} 项派生授权 · {{ moduleCount }} 个模块</span>
         </div>
         <p class="summary-copy">
           授权范围由画布中各模型节点选择的工具自动汇总，不能在应用级单独编辑；尚未定义节点工具的历史应用会暂时保留原授权。
         </p>
-        <div v-if="authorizedTools.length" class="tool-summary" aria-label="模型节点派生的工具授权">
-          <div v-for="tool in authorizedTools" :key="tool.code" class="tool-summary-row">
-            <span class="tool-type">{{ tool.type }}</span>
-            <span><b>{{ tool.name }}</b><small>{{ tool.description || tool.code }}</small></span>
+        <p v-if="unavailableCount" class="summary-warning">
+          <YdIcon name="morph:triangle-alert" />
+          <span>{{ unavailableCount }} 项授权当前不可用（模块关闭、工具停用或已下线），发布后运行时可能无法调用。</span>
+        </p>
+
+        <div v-if="authorizedModules.groups.length" class="module-summary" aria-label="模型节点派生的工具授权">
+          <div
+            v-for="group in authorizedModules.groups"
+            :key="group.code"
+            class="module-summary__group"
+            :class="{ 'is-closed': group.closed }"
+          >
+            <div class="module-summary__head">
+              <strong>{{ group.name }}</strong>
+              <YdTag :variant="group.closed ? 'destructive' : group.lazy ? 'outline' : 'secondary'">
+                {{ group.stateText }}
+              </YdTag>
+              <YdTag variant="outline">
+                {{ groupSourceText(group) }}
+              </YdTag>
+              <span class="module-summary__count">{{ group.tools.length }} 项</span>
+            </div>
+            <p v-if="group.closed" class="module-summary__reason">
+              {{ group.closedReason || '模块已关闭' }}，其中的工具在运行时不可用。
+            </p>
+            <ul class="module-summary__tools">
+              <li v-for="tool in group.tools" :key="tool.code">
+                <span class="tool-line">
+                  <b>{{ tool.name }}</b>
+                  <YdTag v-if="tool.risk === 'READ'" variant="secondary">只读</YdTag>
+                  <YdTag v-else-if="tool.risk === 'WRITE'" :variant="tool.requiresConfirmation ? 'destructive' : 'outline'">
+                    {{ tool.requiresConfirmation ? '写入 · 需确认' : '写入' }}
+                  </YdTag>
+                </span>
+                <small>{{ tool.code }}</small>
+                <small v-if="!tool.selectable" class="tool-line__reason">{{ tool.reason }}</small>
+              </li>
+            </ul>
           </div>
         </div>
-        <p v-else class="empty-copy">
+
+        <div v-if="authorizedModules.missing.length" class="module-summary__group is-closed">
+          <div class="module-summary__head">
+            <strong>未识别的授权</strong>
+            <YdTag variant="destructive">
+              不可用
+            </YdTag>
+            <span class="module-summary__count">{{ authorizedModules.missing.length }} 项</span>
+          </div>
+          <p class="module-summary__reason">
+            这些工具已不在候选列表中，运行时无法解析；请在对应模型节点重新选择。
+          </p>
+          <ul class="module-summary__tools">
+            <li v-for="tool in authorizedModules.missing" :key="tool.code">
+              <span class="tool-line"><b>{{ tool.name }}</b></span>
+              <small>{{ tool.code }}</small>
+            </li>
+          </ul>
+        </div>
+
+        <p v-if="!authorizedCount" class="empty-copy">
           尚未有模型节点授权工具；在文本生成、结构化提取、意图分类或视觉理解节点中配置。
         </p>
       </section>
@@ -103,12 +202,21 @@ const authorizedTools = computed(() => props.toolCodes.map((code) => {
 .section-title h3 { margin-bottom: 0; }
 .section-title span { color: var(--color-text-2); font-size: 10px; }
 .summary-copy { margin: 0; color: var(--color-text-3); font-size: 10px; line-height: 1.6; }
-.tool-summary { display: grid; gap: 8px; margin-top: 12px; }
-.tool-summary-row { display: grid; min-width: 0; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 7px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border-2); }
-.tool-summary-row:last-child { padding-bottom: 0; border-bottom: 0; }
-.tool-summary-row > span:last-child { display: grid; min-width: 0; gap: 2px; }
-.tool-summary-row b { overflow: hidden; color: var(--color-text-1); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.tool-summary-row small { overflow: hidden; color: var(--color-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.tool-type { padding: 2px 4px; border-radius: 3px; color: var(--color-text-2); background: var(--color-fill-2); font-size: 9px; line-height: 1.3; white-space: nowrap; }
+.summary-warning { display: flex; align-items: flex-start; gap: 5px; margin: 8px 0 0; color: rgb(var(--warning-6)); font-size: 10px; line-height: 1.55; }
+.summary-warning > :first-child { flex: none; margin-top: 2px; }
+.module-summary { display: grid; gap: 8px; margin-top: 12px; }
+.module-summary__group { display: grid; gap: 7px; padding: 9px 10px; border: 1px solid var(--color-border-2); border-radius: 6px; }
+.module-summary__group.is-closed { background: color-mix(in oklab, var(--color-fill-1) 55%, var(--color-bg-1)); }
+.module-summary__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.module-summary__head strong { color: var(--color-text-1); font-size: 11px; font-weight: 600; }
+.module-summary__count { margin-left: auto; color: var(--color-text-3); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.module-summary__reason { margin: 0; color: rgb(var(--warning-6)); font-size: 9px; line-height: 1.5; }
+.module-summary__tools { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.module-summary__tools li { display: grid; min-width: 0; gap: 2px; }
+.module-summary__tools li + li { padding-top: 7px; border-top: 1px solid var(--color-border-2); }
+.tool-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tool-line b { overflow: hidden; color: var(--color-text-1); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.module-summary__tools small { overflow: hidden; color: var(--color-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.module-summary__tools small.tool-line__reason { color: rgb(var(--warning-6)); white-space: normal; }
 .empty-copy { margin: 0; color: var(--color-text-3); font-size: 10px; line-height: 1.5; }
 </style>
