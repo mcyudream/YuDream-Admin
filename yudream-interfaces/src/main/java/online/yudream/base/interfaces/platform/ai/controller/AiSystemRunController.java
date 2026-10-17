@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.ai.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.ai.query.AiSystemRunsQuery;
 import online.yudream.base.application.platform.ai.service.AiSystemRunAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -26,9 +27,9 @@ public class AiSystemRunController {
 
     @GetMapping
     @PermissionRegister(code = "platform:ai:system:view", name = "查看系统 AI 运行", module = "平台能力", desc = "查看系统预算后台运行，不混入个人助手")
-    public Result<List<AiRunRes>> list(@RequestParam(defaultValue = "false") boolean activeOnly) {
+    public Result<List<AiRunRes>> list(AiSystemRunsQuery query) {
         var principal = SecurityPrincipalSupport.current();
-        return Result.ok(AiRunWebAssembler.runs(systemRuns.list(principal.userId(), principal.permissions(), activeOnly)));
+        return Result.ok(AiRunWebAssembler.runs(systemRuns.list(principal.userId(), principal.permissions(), query)));
     }
     @GetMapping("/{id}")
     @PermissionRegister(code = "platform:ai:system:view", name = "查看系统 AI 运行", module = "平台能力", desc = "查看系统预算后台运行详情")

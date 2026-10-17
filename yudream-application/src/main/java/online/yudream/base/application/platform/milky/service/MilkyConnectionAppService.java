@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.milky.assembler.MilkyConnectionA
 import online.yudream.base.application.platform.milky.cmd.MilkyConnectionCreateCmd;
 import online.yudream.base.application.platform.milky.cmd.MilkyConnectionUpdateCmd;
 import online.yudream.base.application.platform.milky.dto.MilkyConnectionDTO;
+import online.yudream.base.application.platform.milky.query.MilkyConnectionPageQuery;
 import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
@@ -95,9 +96,9 @@ public class MilkyConnectionAppService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<MilkyConnectionDTO> page(String keyword, int page, int size) {
+    public PageResult<MilkyConnectionDTO> page(MilkyConnectionPageQuery query) {
         ready();
-        return MilkyConnectionAssembler.toDTO(connectionRepo.page(keyword, page, size));
+        return MilkyConnectionAssembler.toDTO(connectionRepo.page(query.getKeyword(), query.getPage(), query.getSize()));
     }
 
     @Transactional

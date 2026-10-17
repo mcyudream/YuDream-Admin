@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.milky.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.milky.query.MilkyConnectionPageQuery;
 import online.yudream.base.application.platform.milky.service.MilkyConnectionAppService;
 import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
 import online.yudream.base.domain.common.PageResult;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,10 +28,8 @@ public class MilkyConnectionController {
 
     @GetMapping
     @PermissionRegister(code = "platform:milky:view", name = "查看 QQ 消息连接", module = "QQ 消息平台", desc = "查看连接")
-    public Result<PageResult<MilkyConnectionRes>> page(@RequestParam(required = false) String keyword,
-                                                        @RequestParam(defaultValue = "1") int page,
-                                                        @RequestParam(defaultValue = "20") int size) {
-        return Result.ok(MilkyConnectionWebAssembler.toRes(appService.page(keyword, page, size)));
+    public Result<PageResult<MilkyConnectionRes>> page(MilkyConnectionPageQuery query) {
+        return Result.ok(MilkyConnectionWebAssembler.toRes(appService.page(query)));
     }
 
     @PostMapping

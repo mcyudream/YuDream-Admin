@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.ai.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.ai.dto.AiRunDTO;
+import online.yudream.base.application.platform.ai.query.AiSystemRunsQuery;
 import online.yudream.base.domain.common.exception.BizException;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -14,9 +15,10 @@ import java.util.Map;
 public class AiSystemRunAppService {
     private final AiRunAppService runs;
 
-    public List<AiRunDTO> list(Long actorId, List<String> permissions, boolean activeOnly) {
+    public List<AiRunDTO> list(Long actorId, List<String> permissions, AiSystemRunsQuery query) {
         authorize(actorId, permissions, "view");
-        return runs.list(0L, null, activeOnly);
+        // 未传 activeOnly 时沿用原先的 @RequestParam(defaultValue = "false") 语义：枚举全部任务
+        return runs.list(0L, null, query != null && Boolean.TRUE.equals(query.getActiveOnly()));
     }
     public AiRunDTO get(Long actorId, List<String> permissions, String id) {
         authorize(actorId, permissions, "view");

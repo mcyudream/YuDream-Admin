@@ -32,8 +32,19 @@ public class MilkyConnectionRepoImpl implements MilkyConnectionRepo {
     @Override public Optional<MilkyConnection> findById(Long id) { return Optional.ofNullable(MilkyInfraMapper.toDomain(mongoTemplate.findById(id, MilkyConnectionDO.class), cipher)); }
     @Override public List<MilkyConnection> findEnabled() { return mongoTemplate.find(Query.query(Criteria.where("enabled").is(true)), MilkyConnectionDO.class).stream().map(item -> MilkyInfraMapper.toDomain(item, cipher)).toList(); }
     @Override public PageResult<MilkyConnection> page(String keyword, int page, int size) {
-        Query query = new Query(); int current = Math.max(1, page); int limit = Math.max(1, size); long total = mongoTemplate.count(query, MilkyConnectionDO.class);
+        Query query = keywordQuery(keyword); int current = Math.max(1, page); int limit = Math.max(1, size); long total = mongoTemplate.count(query, MilkyConnectionDO.class);
         query.with(Sort.by(Sort.Direction.DESC, "createTime")).skip((long) (current - 1) * limit).limit(limit);
         return new PageResult<>(mongoTemplate.find(query, MilkyConnectionDO.class).stream().map(item -> MilkyInfraMapper.toDomain(item, cipher)).toList(), total, current, limit);
+    }
+
+    /** 关键词按名称与地址模糊匹配；空关键词不产生条件，保持原「全量分页」语义 */
+    private Query keywordQuery(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return new Query();
+        }
+        String pattern = java.util.regex.Pattern.quote(keyword.trim());
+        return Query.query(new Criteria().orOperator(
+                Criteria.where("name").regex(pattern, "i"),
+                Criteria.where("baseUrl").regex(pattern, "i")));
     }
 }
