@@ -405,6 +405,10 @@ const filters = ref({ keyword: '', status: 'enabled' })
 
 宿主把「实体类型 → 预览卡」注册在 `src/components/RelatedEntity/registry.ts`，页面用 `<RelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件侧沿用同一个入口注册自己的实体类型（SDK 导出同名注册函数后生效），宿主不硬编码插件实体。
 
+触发器的默认形态是「头像/图标 + 名称（+ 次行标识）」，悬停给底色；需要沿用本页色彩体系时（部门色标签、角色色标签等）把自定义元素写进 `YdEntityPeek` 的默认插槽（`RelatedEntity` 亦然），并给该元素加 `yd-entity-trigger` 类获得同样的指针与悬停语义。
+
+配套的两个 DOM 约定（跨页定位用）：表格行渲染 `data-row-key="<行主键>"`，定位高亮给目标行打 `data-yd-highlight` 属性（属性不参与行上的 `:class` 绑定，重渲染不会丢），样式由 `adapters.css` 的定位行令牌提供。
+
 ```vue
 <script setup lang="ts">
 import type { EntityPeekFact } from '@yudream/components'

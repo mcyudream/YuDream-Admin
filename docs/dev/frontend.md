@@ -61,6 +61,12 @@
 - 表格统计（`#stats`）**必须**由仓储在全量数据上聚合，不得依据当前分页；分页参数经 `useTablePage` 的 `query.page/query.size` 传递，后端 Long 计数字段在 composable 内已归一为 Number。
 - 搜索条件来自后端查询类的 `@Searchable` 注解，前端用 `YdDynamicSearchForm` 渲染；下拉控件所需选项经 `options-sources` 登记，控件值为字符串时在页面内还原为目标类型（如布尔）。
 - 页头只放标题与只读情报，操作按钮一律走 `actions`：`autoFold` 收进「更多」，`danger` 自动 destructive 变体。
+- **关联实体交互（默认做法，不是可选项）**：列表里的关联数据——用户、部门、角色等已登记实体——**必须**做成可点开的实体入口，不得只渲染纯文本，也不得用整页跳转代替查看。
+  - 呈现：用户用头像 + 名称（可带次行标识），其余实体用图标/头像 + 名称；保持本页色彩体系时（如部门色标签、角色色标签）用自定义触发器，但触发器元素**必须**带 `yd-entity-trigger` 类补交互语义。
+  - 用法：`<RelatedEntity entity-type="user|dept|role" :entity-id="..." :label="..." :avatar="..." @changed="load">`（自定义触发器写默认插槽 + `yd-entity-trigger`）。实体类型必须在 `src/components/RelatedEntity/register.ts` 登记，未登记类型降级为纯文本。
+  - 卡片能力：查看（事实清单/芯片组/状态）+ 就地编辑（保存走该实体的 update 接口）+ 按权限显隐的操作 + 「完整管理」跳转；详情按 id 缓存 30 秒、请求 10 秒超时兜底并给重试。
+  - **跨页定位**：点「完整管理」时先 `requestEntityFocus({ id, keyword })`（内存移交，应用内跳转不受动态路由守卫影响），再带 `keyword` 与 `focusXxx` 查询参数跳目标页；目标页在 setup 里调用 `useLinkedFocus({ rows, idOf, queryKey, applyKeyword, flatten? })`——检索词写进搜索模型（首次加载即过滤），命中行打 `data-yd-highlight` 标记并滚入可视区，约 5 秒后自动移除。**定位标记只用 data-\*，不要用 class**（行上有 `:class` 绑定，重渲染会覆盖手工类名）；**不要**用 `router.replace` 清理这些查询参数（会触发动态路由重建并重挂载页面）。
+  - 数据来源允许妥协：目标实体没有单条详情端点时（如部门取树后按 id 定位、角色按关键词取列表后定位），在卡片内注明检索范围，不要为卡片新增未评审的端点。
 
 ## 7. AI 前端边界
 

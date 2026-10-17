@@ -42,3 +42,4 @@
 - `docs/yd-ui-guidelines.md` 的 `YdSortableTree` 拖拽落点提示与 `YdMarkdownEditor` 只读区域/错误呈现条目（本次宿主组件视觉细化）：插件仓同名副本仍有未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待其 WIP 落定后一并重跑同步。
 - `docs/yd-ui-guidelines.md` §7 目录新增 `YdTablePageLayout`、`YdDynamicSearchForm`、`YdNumberRange` 与表格页版式约定（宿主表格页规范落地），SDK `host-components.ts` 已同步导出：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
 - `docs/dev/backend-architecture.md` 第 5.8 节内置基础设施（SSE/WebSocket/数据可视化直接内置为底层能力、取消双闸门与 sse 依赖声明）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
+- `docs/yd-ui-guidelines.md` §5 新增「关联实体触发器/跨页定位行」视觉约定（头像/图标 + 名称、`yd-entity-trigger` 自定义触发器交互语义、命中行主色呼吸提亮）：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。

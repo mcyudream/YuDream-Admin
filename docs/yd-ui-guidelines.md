@@ -193,6 +193,8 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 
 `YdResponsiveTable` / `YdResponsiveEnhancedTable` 通过 `v-model:row-selection` 控制选择键集合，桌面与卡片共享同一表格状态和禁用判定。`#card` 使用 `selected`、`selectDisabled`、`toggleSelected`，不另外维护移动端选中数组；切换断点不销毁表格状态。函数式旧导入入口使用 `useYdFilePicker().open()`，必须在用户动作中调用；取消、再次打开和作用域销毁释放临时输入，目录选择保留 File 的相对路径。
 
+- 关联实体触发器统一为「头像/图标 + 名称」，悬停给 `color-mix` 底色、指针为手型；沿用页面色彩体系的自定义标签也要带同样的交互语义（`yd-entity-trigger`）。跨页定位命中行用主色呼吸提亮并滚入可视区，`prefers-reduced-motion` 下静态呈现。
+
 ## 6. AI 与 Agent 界面
 
 Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPanel`，回答复用 `YdAgentAnswer`。知识库问答与简单聊天可组合 `YdChatWindow`、`YdChatMessageList`、`YdChatSender` 等元件，不为全部场景强塞工作区侧栏。
@@ -208,6 +210,8 @@ Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPa
 工具卡片区分 `queued`、`running`、`awaiting-approval`、`success`、`error`、`cancelled` 六种状态。保持稳定调用 ID，并由宿主权威事件更新；一个工具成功不意味着整项任务完成。只在宿主允许且失败可重试时提供重试，批准入口只提交决策，宿主重新校验权限并恢复对应调用。
 
 Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状态投影，不是前端自行实现 AI 底层。普通聊天不因 UI 出现“编码”模式自动获得文件或 shell 权限。本地演示必须显式标记，断开连接不能渲染成已连接。完整契约见 [YD Agent 工作台](yd-agent-workbench.md)。
+
+
 
 ## 7. 已公开的组件目录
 

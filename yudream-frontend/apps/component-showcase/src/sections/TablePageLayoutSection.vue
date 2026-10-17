@@ -429,6 +429,8 @@ const entityPeekCode = `<YdEntityPeek
       <li>外壳只管卡片外观与「查看 ↔ 编辑」状态机；细节加载、权限、保存动作由使用方通过 <code>facts</code> / <code>actions</code> / <code>#editor</code> 提供。</li>
       <li><code>actions[].danger</code> 自动渲染为红色，排在低位；<code>detailLabel</code> 给「完整管理」这类逃生入口。</li>
       <li>宿主用 <code>&lt;RelatedEntity entity-type="user" /&gt;</code> 按实体类型解析预览卡，未注册类型降级为纯文本，插件可注册自己的实体类型。</li>
+      <li>沿用本页色彩体系时把自定义标签写进默认插槽并加 <code>yd-entity-trigger</code>（部门/角色色标签即此用法）。</li>
+      <li>跨页定位：跳转前 <code>requestEntityFocus</code> 移交意图，目标页 <code>useLinkedFocus</code> 写入检索词并给命中行打 <code>data-yd-highlight</code>（约 5 秒呼吸提亮后自动移除）。</li>
     </ul>
   </DemoCard>
 </template>
