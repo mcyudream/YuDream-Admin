@@ -37,6 +37,15 @@ public class WikiCommentDTO {
     private boolean pinned;
     private String reviewedByUserId;
     private LocalDateTime reviewedAt;
+    /** 本条评论实际走的审核方式（MANUAL / AI）；仅治理视图返回。 */
+    private String reviewMode;
+    /** AI 判定（approved / rejected / unavailable）；仅治理视图返回，未走过 AI 审核为 null。 */
+    private String aiVerdict;
+    /** AI 判定理由摘要；仅治理视图返回。 */
+    private String aiNote;
+    /** 参与判定的模型（provider/model）；仅治理视图返回。 */
+    private String aiModel;
+    private LocalDateTime aiReviewedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     /** 同页浅线程：根评论的已发布回复（回复不再嵌套）。 */

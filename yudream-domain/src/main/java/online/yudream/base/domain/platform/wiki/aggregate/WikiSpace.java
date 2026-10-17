@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceCoverType;
 import online.yudream.base.domain.platform.wiki.valobj.WikiCover;
@@ -77,6 +78,9 @@ public class WikiSpace extends BaseDomain {
     /** 是否允许登录用户在公开页面发表评论；默认关闭。 */
     private boolean commentEnabled;
 
+    /** 评论审核方式：人工审核（默认）或 AI 审核；旧数据为空按人工审核处理。 */
+    private WikiCommentReviewMode commentReviewMode;
+
     /** 实例 ACL 模式；旧数据为空按 LEGACY 处理。 */
     private WikiSpaceAclMode aclMode;
 
@@ -105,6 +109,7 @@ public class WikiSpace extends BaseDomain {
         space.coverSeed = "";
         space.coverAlt = "";
         space.commentEnabled = false;
+        space.commentReviewMode = WikiCommentReviewMode.MANUAL;
         space.aclMode = WikiSpaceAclMode.LEGACY;
         return space;
     }
@@ -202,6 +207,21 @@ public class WikiSpace extends BaseDomain {
     /** 评论开关（默认关闭；匿名策略不在本用例内）。 */
     public void applyCommentEnabled(boolean enabled) {
         this.commentEnabled = enabled;
+    }
+
+    /** 评论审核方式（人工/AI）；空值回落人工审核，机器审核必须是管理员显式选择。 */
+    public void applyCommentReviewMode(WikiCommentReviewMode mode) {
+        this.commentReviewMode = WikiCommentReviewMode.of(mode);
+    }
+
+    /** 当前评论审核方式（旧数据回落人工审核）。 */
+    public WikiCommentReviewMode effectiveCommentReviewMode() {
+        return WikiCommentReviewMode.of(commentReviewMode);
+    }
+
+    /** 是否启用 AI 审核：同时要求评论开关已开，否则 AI 审核没有意义。 */
+    public boolean aiCommentReviewEnabled() {
+        return commentEnabled && effectiveCommentReviewMode() == WikiCommentReviewMode.AI;
     }
 
     /** 当前 ACL 模式（旧数据回落 LEGACY）。 */

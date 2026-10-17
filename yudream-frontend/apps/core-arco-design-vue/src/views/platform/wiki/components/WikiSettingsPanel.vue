@@ -96,6 +96,21 @@ function goPublicRead() {
   activeSection.value = 'retrieval'
 }
 
+// ---- 评论审核方式：默认人工审核，AI 审核必须由管理员显式选择 ----
+const reviewModeOptions = [
+  { label: '人工审核', value: 'MANUAL' },
+  { label: 'AI 审核', value: 'AI' },
+]
+
+const reviewModeValue = computed<string>({
+  get: () => (form.value.commentReviewMode === 'AI' ? 'AI' : 'MANUAL'),
+  set: (value) => { form.value.commentReviewMode = value === 'AI' ? 'AI' : 'MANUAL' },
+})
+
+/** AI 审核用空间的问答模型：没配模型时选了 AI 也只是把所有评论转人工，必须提前说清楚 */
+const aiReviewNeedsModel = computed(() => form.value.commentReviewMode === 'AI'
+  && (!form.value.chatProviderCode || !form.value.chatModelCode))
+
 /** 表单是否偏离当前知识库配置：治理区离开设置分区前的确认依据 */
 const dirty = computed(() => {
   const space = store.space.value
@@ -453,6 +468,16 @@ onMounted(loadGraphTables)
                 <YdSwitch v-model="form.commentEnabled" :disabled="!form.publicReadEnabled" />
                 <span>公开评论<small>读者可在公开页面与引用线程发表评论，提交后进入待审核</small></span>
               </label>
+              <div class="set-field set-field--full">
+                <span>审核方式</span>
+                <YdSegmented v-model="reviewModeValue" :options="reviewModeOptions" size="sm" aria-label="评论审核方式" />
+                <small class="set-hint">
+                  AI 审核用本知识库「AI 模型 → 问答模型」判定：判定通过立即公开，判定不通过或调用失败仍进待审核交人工。
+                </small>
+                <small v-if="aiReviewNeedsModel" class="set-hint">
+                  <YdIcon name="morph:triangle-alert" /> 当前未配置问答模型：选 AI 审核后所有评论都会转人工，请先到「AI 模型」配置。
+                </small>
+              </div>
               <div v-if="!form.publicReadEnabled" class="set-depend">
                 <p class="set-hint">
                   <YdIcon name="morph:info" /> 评论读写的都是公开接口，需要先开启「公开访问」

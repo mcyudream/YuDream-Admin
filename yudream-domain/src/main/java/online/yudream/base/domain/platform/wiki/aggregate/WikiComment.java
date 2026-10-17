@@ -7,8 +7,10 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAiVerdict;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAuthorType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentRagStatus;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentStatus;
 import online.yudream.base.domain.platform.wiki.valobj.WikiTextAnchor;
 
@@ -34,6 +36,10 @@ public class WikiComment extends BaseDomain {
 
     /** 评论正文长度上限（纯文本字符数）。 */
     public static final int MAX_CONTENT_LENGTH = 2000;
+    /** AI 判定理由摘要长度上限。 */
+    public static final int MAX_AI_NOTE_LENGTH = 200;
+    /** AI 模型标识长度上限（provider/model）。 */
+    public static final int MAX_AI_MODEL_LENGTH = 160;
     private static final int MAX_AUTHOR_NAME_LENGTH = 64;
     private static final String ANONYMOUS_AUTHOR_NAME = "匿名访客";
 
@@ -53,6 +59,15 @@ public class WikiComment extends BaseDomain {
     private Long reviewedByUserId;
     private LocalDateTime reviewedAt;
     private WikiCommentRagStatus ragStatus;
+    /** 本条评论实际走的审核方式（提交时的空间配置）；旧数据为空按人工审核理解。 */
+    private WikiCommentReviewMode reviewMode;
+    /** AI 审核判定；人工审核或未走过 AI 时为 null。 */
+    private WikiCommentAiVerdict aiVerdict;
+    /** AI 判定理由摘要（审计用，限长）；未审或人工审核时为 null。 */
+    private String aiNote;
+    /** 参与判定的模型（provider/model）；审计用。 */
+    private String aiModel;
+    private LocalDateTime aiReviewedAt;
 
     public static WikiComment create(Long spaceId, Long nodeId, Long parentId, Long authorUserId, String authorName,
                                      String content) {
@@ -115,6 +130,7 @@ public class WikiComment extends BaseDomain {
                 .status(WikiCommentStatus.PENDING)
                 .pinned(false)
                 .ragStatus(WikiCommentRagStatus.DISABLED)
+                .reviewMode(WikiCommentReviewMode.MANUAL)
                 .build();
     }
 
@@ -167,6 +183,59 @@ public class WikiComment extends BaseDomain {
         this.status = WikiCommentStatus.PUBLISHED;
         this.ragStatus = WikiCommentRagStatus.PENDING;
         audit(reviewerUserId);
+    }
+
+    /**
+     * AI 审核通过：状态迁移与人工发布完全一致（进入公开端与检索候选），
+     * 另外记下机器判定、理由与模型——机器结论不能只留在日志里，人工复核要能看到。
+     */
+    public void publishByAi(String note, String model) {
+        publish(null);
+        this.reviewMode = WikiCommentReviewMode.AI;
+        auditAi(WikiCommentAiVerdict.APPROVED, note, model);
+    }
+
+    /**
+     * AI 判定不适合直接公开：留在待审核由人工复核，不自动隐藏（避免机器一句话就把读者评论下架）。
+     */
+    public void rejectByAi(String note, String model) {
+        if (status != WikiCommentStatus.PENDING) {
+            throw new BizException("只有待审核评论可以记录 AI 判定");
+        }
+        this.reviewMode = WikiCommentReviewMode.AI;
+        auditAi(WikiCommentAiVerdict.REJECTED, note, model);
+    }
+
+    /** AI 审核没审成（能力未启用/模型未配置/调用失败）：留在待审核，并记下原因供人工接手。 */
+    public void aiUnavailable(String note) {
+        if (status != WikiCommentStatus.PENDING) {
+            throw new BizException("只有待审核评论可以记录 AI 判定");
+        }
+        this.reviewMode = WikiCommentReviewMode.AI;
+        auditAi(WikiCommentAiVerdict.UNAVAILABLE, note, null);
+    }
+
+    /** AI 判定审计：与人工审核共用 reviewedAt 语义之外，另存机器判定的时间与理由。 */
+    private void auditAi(WikiCommentAiVerdict verdict, String note, String model) {
+        this.aiVerdict = verdict;
+        this.aiNote = normalizeAiNote(note);
+        this.aiModel = normalizeAiModel(model);
+        this.aiReviewedAt = LocalDateTime.now();
+        setUpdateTime(LocalDateTime.now());
+    }
+
+    private static String normalizeAiNote(String note) {
+        String normalized = note == null ? "" : note.replaceAll("\\s+", " ").trim();
+        return normalized.length() > MAX_AI_NOTE_LENGTH ? normalized.substring(0, MAX_AI_NOTE_LENGTH) : normalized;
+    }
+
+    /** 没有模型参与判定（审核不可用）时保持 null，不落空串：审计字段要能区分「没审」与「谁审的」。 */
+    private static String normalizeAiModel(String model) {
+        String normalized = model == null ? "" : model.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > MAX_AI_MODEL_LENGTH ? normalized.substring(0, MAX_AI_MODEL_LENGTH) : normalized;
     }
 
     public void pin(Long operatorUserId) {

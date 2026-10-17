@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.wiki.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 
 import java.time.LocalDateTime;
 
@@ -59,6 +60,8 @@ public class WikiSpaceDTO {
 
     /** 是否允许登录用户在公开页面发表评论。 */
     private boolean commentEnabled;
+    /** 评论审核方式（人工/AI）。 */
+    private WikiCommentReviewMode commentReviewMode;
     /** LEGACY / RESTRICTED 实例 ACL 模式。 */
     private String aclMode;
 

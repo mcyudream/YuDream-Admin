@@ -4,7 +4,7 @@ import type { WikiCommentReviewAction, WikiManagedComment } from '@/api/modules/
 import { YdAlert, YdButton, YdEmpty, YdIcon, YdLoading, YdPagination, YdScrollArea, YdSegmented, YdTag } from '@yudream/components'
 import { computed, inject, onMounted, ref } from 'vue'
 import { fetchWikiManagedComments, reviewWikiComment } from '@/api/modules/platform-wiki'
-import { wikiCommentStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
+import { wikiAiVerdictLabel, wikiCommentStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 /**
  * 评论审核：新评论先落待审核，通过后才在公开页出现；隐藏与删除都是软状态、可恢复。
@@ -52,7 +52,7 @@ const commentColumns: TableColumn<WikiManagedComment>[] = [
   { id: 'content', header: '评论', minWidth: 300 },
   { id: 'page', header: '页面', minWidth: 180 },
   { id: 'author', header: '作者', width: 150 },
-  { id: 'status', header: '状态', width: 140 },
+  { id: 'status', header: '状态', width: 190 },
   { id: 'createTime', header: '时间', width: 160 },
 ]
 
@@ -251,6 +251,9 @@ defineExpose({ reload: refresh })
                 <span v-if="row.original.parentId" class="cmt-content__meta">
                   <YdTag variant="secondary">回复</YdTag>
                 </span>
+                <span v-if="row.original.aiVerdict" class="cmt-content__ai">
+                  {{ wikiAiVerdictLabel(row.original.aiVerdict).label }}<template v-if="row.original.aiNote">：{{ row.original.aiNote }}</template>
+                </span>
               </div>
             </template>
             <template #cell-page="{ row }">
@@ -270,6 +273,13 @@ defineExpose({ reload: refresh })
                 </span>
                 <YdTag v-if="row.original.pinned" variant="default">
                   置顶
+                </YdTag>
+                <YdTag
+                  v-if="row.original.aiVerdict"
+                  :variant="wikiAiVerdictLabel(row.original.aiVerdict).tone"
+                  :title="row.original.aiNote || undefined"
+                >
+                  {{ wikiAiVerdictLabel(row.original.aiVerdict).label }}
                 </YdTag>
               </div>
             </template>
@@ -385,6 +395,15 @@ defineExpose({ reload: refresh })
 }
 
 .cmt-content__text {
+  .cmt-content__ai {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--color-text-3);
+    white-space: nowrap;
+  }
+
   /* 长评论必须在列内折行截断：不设限会横穿到相邻列 */
   display: -webkit-box;
   overflow: hidden;

@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.wiki.assembler;
 
 import online.yudream.base.application.platform.wiki.cmd.WikiNodeSaveCmd;
 import online.yudream.base.application.platform.wiki.cmd.WikiSpaceSaveCmd;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.application.platform.wiki.dto.WikiChatResultDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
@@ -57,6 +58,7 @@ public final class WikiWebAssembler {
         c.setWatchEnabled(r.isWatchEnabled());
         c.setWatchFolderPath(r.getWatchFolderPath());
         c.setCommentEnabled(r.isCommentEnabled());
+        c.setCommentReviewMode(WikiCommentReviewMode.of(r.getCommentReviewMode()));
         return c;
     }
 

@@ -50,6 +50,8 @@ export interface WikiSpace {
   aclMode?: string
   /** 是否允许登录用户在公开页面发表评论；未开启时读者无法发新评论 */
   commentEnabled?: boolean
+  /** 评论审核方式：MANUAL（默认，先审后发）/ AI（判定通过即公开，判定不了回落人工） */
+  commentReviewMode?: 'MANUAL' | 'AI'
   /** 列表卡片聚合事实（由后端按空间补算）；旧响应或非列表端点可能缺字段 */
   pageCount?: number
   directoryCount?: number
@@ -309,6 +311,15 @@ export interface WikiManagedComment {
   contentHash?: string
   status?: string
   pinned?: boolean
+  /** 本条评论实际走的审核方式（仅治理端返回） */
+  reviewMode?: 'MANUAL' | 'AI'
+  /** AI 判定（仅治理端返回）：approved / rejected / unavailable */
+  aiVerdict?: string
+  /** AI 判定理由摘要（仅治理端返回） */
+  aiNote?: string
+  /** 参与判定的模型（仅治理端返回） */
+  aiModel?: string
+  aiReviewedAt?: string
   createTime?: string
   updateTime?: string
 }

@@ -2,8 +2,10 @@ package online.yudream.base.infra.platform.wiki.dataobj;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAiVerdict;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAuthorType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentRagStatus;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentStatus;
 import online.yudream.base.infra.common.baseobj.BaseDO;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -39,4 +41,13 @@ public class WikiCommentDO extends BaseDO {
     private Long reviewedByUserId;
     private LocalDateTime reviewedAt;
     private WikiCommentRagStatus ragStatus;
+    /** 本条评论实际走的审核方式（提交时的空间配置）；旧数据为空按人工审核理解。 */
+    private WikiCommentReviewMode reviewMode;
+    /** AI 审核判定（approved/rejected/unavailable）；未走过 AI 审核为 null。 */
+    private WikiCommentAiVerdict aiVerdict;
+    /** AI 判定理由摘要（审计用）；未审或人工审核为 null。 */
+    private String aiNote;
+    /** 参与判定的模型标识（provider/model）；审计用。 */
+    private String aiModel;
+    private LocalDateTime aiReviewedAt;
 }

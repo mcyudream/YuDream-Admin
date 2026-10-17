@@ -267,7 +267,9 @@ test('collaboration area is real workbenches: space ACL members and comment revi
   // 协作区两个分区是真实面板；「能力待接入」占位模式已随契约落地退役
   assert.match(utils, /key: 'members', label: '成员与权限'/)
   assert.match(utils, /key: 'comments', label: '评论'/)
-  assert.doesNotMatch(utils, /unavailable/)
+  // 退役的是「能力待接入」占位模型本身（WikiUnavailableCapability + 面板的 unavailable 字段）；
+  // 不再对 unavailable 这个词做全局禁止——评论 AI 判定的三态里它是合法的线协议值
+  assert.doesNotMatch(utils, /WikiUnavailableCapability/)
 
   const area = wikiFile('components/WikiManageArea.vue')
   assert.match(area, /members: WikiMembersPanel/)
@@ -336,4 +338,30 @@ test('public comments are switchable from space settings; hints never claim the 
   assert.doesNotMatch(authorComments, /exception\?\.message/)
   // 引用评论提交成功后父级会收起草稿（内联提示随之消失）：必须有 toast 兜底确认
   assert.match(thread, /toast\.success\('引用评论已提交/)
+})
+
+test('comment review mode is a per-space setting: manual by default, AI opt-in with human fallback', () => {
+  const settings = wikiFile('components/WikiSettingsPanel.vue')
+  const comments = wikiFile('components/WikiCommentsPanel.vue')
+  const utils = wikiFile('wiki-utils.ts')
+  const api = wikiFile('../../../api/modules/platform-wiki.ts')
+
+  // 设置里能选审核方式：人工（默认）/ AI，绑定空间字段并随保存提交
+  assert.match(settings, /const reviewModeOptions = \[/)
+  assert.match(settings, /label: '人工审核', value: 'MANUAL'/)
+  assert.match(settings, /label: 'AI 审核', value: 'AI'/)
+  assert.match(settings, /<YdSegmented v-model="reviewModeValue" :options="reviewModeOptions"/)
+  assert.match(settings, /form\.value\.commentReviewMode = value === 'AI' \? 'AI' : 'MANUAL'/)
+  // AI 审核依赖问答模型：没配模型必须提前说清楚会全部转人工
+  assert.match(settings, /const aiReviewNeedsModel = computed/)
+  assert.match(settings, /当前未配置问答模型/)
+  assert.match(api, /commentReviewMode\?: 'MANUAL' \| 'AI'/)
+
+  // 治理端能看到 AI 判定与理由（approved/rejected/unavailable 三态分开），并有标签元数据
+  assert.match(utils, /approved: \{ label: 'AI 通过'/)
+  assert.match(utils, /rejected: \{ label: 'AI 拒绝'/)
+  assert.match(utils, /unavailable: \{ label: 'AI 未判定'/)
+  assert.match(comments, /row\.original\.aiVerdict/)
+  assert.match(comments, /wikiAiVerdictLabel\(row\.original\.aiVerdict\)/)
+  assert.match(comments, /aiNote/)
 })

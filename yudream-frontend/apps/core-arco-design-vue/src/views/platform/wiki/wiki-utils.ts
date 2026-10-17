@@ -93,6 +93,17 @@ export const wikiCommentStatusMeta: Record<string, StatusMeta> = {
   DELETED: { label: '已删除', color: 'rgb(var(--danger-6))' },
 }
 
+/** AI 审核判定展示：未判定（不可用）与拒绝要能分开，人工复核才知道是机器不同意还是机器没审成。 */
+export const wikiAiVerdictMeta: Record<string, { label: string, tone: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+  approved: { label: 'AI 通过', tone: 'secondary' },
+  rejected: { label: 'AI 拒绝', tone: 'outline' },
+  unavailable: { label: 'AI 未判定', tone: 'outline' },
+}
+
+export function wikiAiVerdictLabel(verdict?: string) {
+  return wikiAiVerdictMeta[verdict || ''] || { label: 'AI 判定', tone: 'outline' as const }
+}
+
 export function wikiCommentStatusLabel(status?: string): StatusMeta {
   return (status && wikiCommentStatusMeta[status]) || { label: status || '-', color: 'var(--color-text-3)' }
 }

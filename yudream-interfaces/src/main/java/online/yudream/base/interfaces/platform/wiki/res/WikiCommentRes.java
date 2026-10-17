@@ -40,6 +40,15 @@ public class WikiCommentRes implements Serializable {
     private boolean pinned;
     private String reviewedByUserId;
     private LocalDateTime reviewedAt;
+    /** 本条评论实际走的审核方式（MANUAL / AI）；仅治理端返回。 */
+    private String reviewMode;
+    /** AI 判定（approved / rejected / unavailable）；仅治理端返回。 */
+    private String aiVerdict;
+    /** AI 判定理由摘要；仅治理端返回。 */
+    private String aiNote;
+    /** 参与判定的模型（provider/model）；仅治理端返回。 */
+    private String aiModel;
+    private LocalDateTime aiReviewedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<WikiCommentRes> replies;

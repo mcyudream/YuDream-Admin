@@ -1,6 +1,8 @@
 package online.yudream.base.domain.platform.wiki.aggregate;
 
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAiVerdict;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentRagStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentStatus;
 import online.yudream.base.domain.platform.wiki.valobj.WikiTextAnchor;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,6 +97,51 @@ class WikiCommentTest {
 
         comment.hide(REVIEWER);
         assertFalse(comment.isPinned());
+    }
+
+    @Test
+    void aiApprovalPublishesWithAuditableVerdict() {
+        WikiComment comment = WikiComment.create(1L, 2L, null, AUTHOR, "小明", "写得清楚");
+        comment.publishByAi("与页面主题相关", "openai/gpt-4o-mini");
+
+        assertEquals(WikiCommentStatus.PUBLISHED, comment.getStatus());
+        assertEquals(WikiCommentRagStatus.PENDING, comment.getRagStatus());
+        assertEquals(WikiCommentReviewMode.AI, comment.getReviewMode());
+        assertEquals(WikiCommentAiVerdict.APPROVED, comment.getAiVerdict());
+        assertEquals("与页面主题相关", comment.getAiNote());
+        assertEquals("openai/gpt-4o-mini", comment.getAiModel());
+        assertNotNull(comment.getAiReviewedAt());
+        // 机器判定不能伪装成人工审核：这里没有人工审核人
+        assertNull(comment.getReviewedByUserId());
+        assertTrue(comment.visibleToPublic());
+    }
+
+    @Test
+    void aiRejectionAndUnavailabilityKeepTheCommentPendingForHumans() {
+        WikiComment rejected = WikiComment.create(1L, 2L, null, AUTHOR, "小明", "加微信领资料");
+        rejected.rejectByAi("广告引流", "openai/gpt-4o-mini");
+        assertEquals(WikiCommentStatus.PENDING, rejected.getStatus());
+        assertEquals(WikiCommentAiVerdict.REJECTED, rejected.getAiVerdict());
+        assertFalse(rejected.visibleToPublic());
+
+        WikiComment skipped = WikiComment.create(1L, 2L, null, AUTHOR, "小明", "正常发言");
+        skipped.aiUnavailable("AI 审核失败：模型未配置，已转人工审核");
+        assertEquals(WikiCommentStatus.PENDING, skipped.getStatus());
+        assertEquals(WikiCommentAiVerdict.UNAVAILABLE, skipped.getAiVerdict());
+        assertNull(skipped.getAiModel());
+        assertNotNull(skipped.getAiReviewedAt());
+
+        // 判定理由与模型标识都限长：审计字段不能把文档撑爆
+        WikiComment longNote = WikiComment.create(1L, 2L, null, AUTHOR, "小明", "内容");
+        longNote.rejectByAi("x".repeat(500), "m".repeat(400));
+        assertEquals(WikiComment.MAX_AI_NOTE_LENGTH, longNote.getAiNote().length());
+        assertEquals(WikiComment.MAX_AI_MODEL_LENGTH, longNote.getAiModel().length());
+
+        // 已发布的评论不能再被记成「AI 判定待审核」：状态机不被绕过
+        WikiComment published = WikiComment.create(1L, 2L, null, AUTHOR, "小明", "已发布");
+        published.publish(REVIEWER);
+        assertThrows(BizException.class, () -> published.rejectByAi("重复驳回", null));
+        assertThrows(BizException.class, () -> published.aiUnavailable("重复判定"));
     }
 
     @Test

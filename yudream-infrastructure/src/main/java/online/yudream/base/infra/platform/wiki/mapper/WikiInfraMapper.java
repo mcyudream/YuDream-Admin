@@ -5,6 +5,7 @@ import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpaceMember;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceCoverType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiTextBlockType;
@@ -72,6 +73,7 @@ public final class WikiInfraMapper {
                 .coverFileObjectId(dataObj.getCoverFileObjectId())
                 .coverAlt(dataObj.getCoverAlt() == null ? "" : dataObj.getCoverAlt())
                 .commentEnabled(dataObj.isCommentEnabled())
+                .commentReviewMode(WikiCommentReviewMode.of(dataObj.getCommentReviewMode()))
                 .aclMode(WikiSpaceAclMode.of(dataObj.getAclMode()))
                 .build();
     }
@@ -121,6 +123,7 @@ public final class WikiInfraMapper {
         dataObj.setCoverFileObjectId(domain.getCoverFileObjectId());
         dataObj.setCoverAlt(domain.getCoverAlt() == null ? "" : domain.getCoverAlt());
         dataObj.setCommentEnabled(domain.isCommentEnabled());
+        dataObj.setCommentReviewMode(domain.effectiveCommentReviewMode());
         dataObj.setAclMode(WikiSpaceAclMode.of(domain.getAclMode()));
         return dataObj;
     }
@@ -273,6 +276,11 @@ public final class WikiInfraMapper {
                 .reviewedByUserId(dataObj.getReviewedByUserId())
                 .reviewedAt(dataObj.getReviewedAt())
                 .ragStatus(dataObj.getRagStatus())
+                .reviewMode(dataObj.getReviewMode())
+                .aiVerdict(dataObj.getAiVerdict())
+                .aiNote(dataObj.getAiNote())
+                .aiModel(dataObj.getAiModel())
+                .aiReviewedAt(dataObj.getAiReviewedAt())
                 .build();
     }
 
@@ -293,6 +301,11 @@ public final class WikiInfraMapper {
         dataObj.setReviewedByUserId(domain.getReviewedByUserId());
         dataObj.setReviewedAt(domain.getReviewedAt());
         dataObj.setRagStatus(domain.getRagStatus());
+        dataObj.setReviewMode(domain.getReviewMode());
+        dataObj.setAiVerdict(domain.getAiVerdict());
+        dataObj.setAiNote(domain.getAiNote());
+        dataObj.setAiModel(domain.getAiModel());
+        dataObj.setAiReviewedAt(domain.getAiReviewedAt());
         return dataObj;
     }
 

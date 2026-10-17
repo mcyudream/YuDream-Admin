@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.wiki.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 
 @Data
 public class WikiSpaceSaveRequest {
@@ -47,4 +48,6 @@ public class WikiSpaceSaveRequest {
     private String watchFolderPath;
     /** 是否允许登录用户在公开页面发表评论；默认关闭。 */
     private boolean commentEnabled;
+    /** 评论审核方式：MANUAL（默认）/ AI。 */
+    private WikiCommentReviewMode commentReviewMode;
 }

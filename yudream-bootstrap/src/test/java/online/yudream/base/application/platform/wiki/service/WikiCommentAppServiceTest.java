@@ -11,6 +11,8 @@ import online.yudream.base.domain.platform.wiki.aggregate.WikiComment;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentAiVerdict;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiTextAnchorState;
@@ -18,7 +20,9 @@ import online.yudream.base.domain.platform.wiki.repo.WikiCommentRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.domain.platform.wiki.service.WikiCommentModerationGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiActorGateway;
+import online.yudream.base.domain.platform.wiki.valobj.WikiCommentModerationVerdict;
 import online.yudream.base.domain.platform.wiki.valobj.WikiActor;
 import online.yudream.base.domain.platform.wiki.valobj.WikiTextAnchor;
 import org.junit.jupiter.api.Test;
@@ -32,6 +36,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,8 +65,9 @@ class WikiCommentAppServiceTest {
     private final WikiCommentRepo comments = mock(WikiCommentRepo.class);
     private final WikiActorGateway actors = mock(WikiActorGateway.class);
     private final WikiSpaceAclAppService access = mock(WikiSpaceAclAppService.class);
+    private final WikiCommentModerationGateway moderation = mock(WikiCommentModerationGateway.class);
     private final WikiCommentAppService service = new WikiCommentAppService(spaces, nodes, versions, comments,
-            actors, access);
+            actors, access, moderation);
 
     @Test
     void createFailsClosedWhenCommentDisabledOrSpaceMissing() {
@@ -379,6 +386,110 @@ class WikiCommentAppServiceTest {
         assertThat(comment.getStatus()).isEqualTo(WikiCommentStatus.PUBLISHED);
         assertThat(comment.getContent()).isEqualTo("原始");
         verify(comments, never()).save(any());
+    }
+
+    @Test
+    void aiReviewPublishesApprovedCommentsAndKeepsTheRestPendingForHumans() {
+        WikiSpace space = aiReviewSpace(10L);
+        stubCommentableSpace(space);
+        ArgumentCaptor<WikiComment> captor = ArgumentCaptor.forClass(WikiComment.class);
+
+        // 判定通过：直接公开，并留下可追溯的机器判定（模型、理由、时间）
+        when(moderation.review(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WikiCommentModerationVerdict.approve("与页面主题相关"));
+        service.create(createCmd("demo", 20L, null, "写得清楚"));
+        WikiComment approved = lastSavedComment(captor);
+        assertThat(approved.getStatus()).isEqualTo(WikiCommentStatus.PUBLISHED);
+        assertThat(approved.visibleToPublic()).isTrue();
+        assertThat(approved.getReviewMode()).isEqualTo(WikiCommentReviewMode.AI);
+        assertThat(approved.getAiVerdict()).isEqualTo(WikiCommentAiVerdict.APPROVED);
+        assertThat(approved.getAiNote()).isEqualTo("与页面主题相关");
+        assertThat(approved.getAiModel()).isEqualTo("openai/gpt-4o-mini");
+        assertThat(approved.getAiReviewedAt()).isNotNull();
+        // 机器判定不等于人工审核：审核人字段保持为空
+        assertThat(approved.getReviewedByUserId()).isNull();
+
+        // 判定不通过：留在待审核，绝不自动隐藏或丢弃
+        when(moderation.review(any(), any(), any(), any(), any(), any()))
+                .thenReturn(WikiCommentModerationVerdict.reject("广告引流"));
+        service.create(createCmd("demo", 20L, null, "加微信领资料"));
+        WikiComment rejected = lastSavedComment(captor);
+        assertThat(rejected.getStatus()).isEqualTo(WikiCommentStatus.PENDING);
+        assertThat(rejected.getAiVerdict()).isEqualTo(WikiCommentAiVerdict.REJECTED);
+        assertThat(rejected.getAiNote()).isEqualTo("广告引流");
+
+        // 审核不可用（模型/能力问题）：内容照常落库，只把原因记进审计并转人工
+        when(moderation.review(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new BizException("AI 能力未启用"));
+        service.create(createCmd("demo", 20L, null, "正常发言"));
+        WikiComment skipped = lastSavedComment(captor);
+        assertThat(skipped.getStatus()).isEqualTo(WikiCommentStatus.PENDING);
+        assertThat(skipped.getAiVerdict()).isEqualTo(WikiCommentAiVerdict.UNAVAILABLE);
+        assertThat(skipped.getAiModel()).isNull();
+        assertThat(skipped.getAiNote()).contains("已转人工审核");
+    }
+
+    @Test
+    void manualReviewModeNeverCallsTheModeratorEvenWhenTheModelIsConfigured() {
+        // 人工审核是默认：即使配了模型也不能偷偷自动放行
+        WikiSpace space = commentableSpace(10L);
+        space.setChatProviderCode("openai");
+        space.setChatModelCode("gpt-4o-mini");
+        stubCommentableSpace(space);
+        ArgumentCaptor<WikiComment> captor = ArgumentCaptor.forClass(WikiComment.class);
+
+        service.create(createCmd("demo", 20L, null, "内容"));
+
+        WikiComment saved = lastSavedComment(captor);
+        assertThat(saved.getStatus()).isEqualTo(WikiCommentStatus.PENDING);
+        assertThat(saved.getAiVerdict()).isNull();
+        assertThat(saved.getReviewMode()).isEqualTo(WikiCommentReviewMode.MANUAL);
+        verify(moderation, never()).review(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aiReviewWithoutChatModelFallsBackToHumanReview() {
+        WikiSpace space = aiReviewSpace(10L);
+        space.setChatProviderCode("");
+        space.setChatModelCode("");
+        stubCommentableSpace(space);
+        ArgumentCaptor<WikiComment> captor = ArgumentCaptor.forClass(WikiComment.class);
+
+        service.create(createCmd("demo", 20L, null, "内容"));
+
+        WikiComment saved = lastSavedComment(captor);
+        assertThat(saved.getStatus()).isEqualTo(WikiCommentStatus.PENDING);
+        assertThat(saved.getAiVerdict()).isEqualTo(WikiCommentAiVerdict.UNAVAILABLE);
+        assertThat(saved.getAiNote()).contains("未配置问答模型");
+        verify(moderation, never()).review(any(), any(), any(), any(), any(), any());
+    }
+
+    /** 取最后一次落库的评论实体（AI 审核先落库、判定后再更新一次），并清空抓取记录供下一步使用。 */
+    private WikiComment lastSavedComment(ArgumentCaptor<WikiComment> captor) {
+        verify(comments, atLeastOnce()).save(captor.capture());
+        List<WikiComment> values = captor.getAllValues();
+        WikiComment last = values.get(values.size() - 1);
+        clearInvocations(comments);
+        captor.getAllValues().clear();
+        return last;
+    }
+
+    /** 可评论 + AI 审核 + 已配置问答模型的空间。 */
+    private static WikiSpace aiReviewSpace(Long id) {
+        WikiSpace space = commentableSpace(id);
+        space.applyCommentReviewMode(WikiCommentReviewMode.AI);
+        space.setChatProviderCode("openai");
+        space.setChatModelCode("gpt-4o-mini");
+        return space;
+    }
+
+    /** 已发布页面 + 认证作者 + 落库回显，供 AI 审核用例复用。 */
+    private void stubCommentableSpace(WikiSpace space) {
+        when(spaces.findBySlug("demo")).thenReturn(Optional.of(space));
+        when(nodes.findById(20L)).thenReturn(Optional.of(publishedNode(space.getId(), 20L)));
+        when(versions.findById(200L)).thenReturn(Optional.of(version(space.getId(), 20L, PUBLISHED_MARKDOWN, "hash-1")));
+        when(actors.currentActor()).thenReturn(AUTHOR);
+        when(comments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private static WikiCommentCreateCmd createCmd(String slug, Long nodeId, Long parentId, String content) {

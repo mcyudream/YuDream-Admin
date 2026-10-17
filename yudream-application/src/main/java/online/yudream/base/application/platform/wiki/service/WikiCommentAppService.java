@@ -19,7 +19,9 @@ import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiActorGateway;
+import online.yudream.base.domain.platform.wiki.service.WikiCommentModerationGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiActor;
+import online.yudream.base.domain.platform.wiki.valobj.WikiCommentModerationVerdict;
 import online.yudream.base.domain.platform.wiki.valobj.WikiFrontmatter;
 import online.yudream.base.domain.platform.wiki.valobj.WikiTextAnchor;
 import online.yudream.base.domain.platform.wiki.valobj.WikiTextBlockHint;
@@ -51,6 +53,7 @@ public class WikiCommentAppService {
     private final WikiCommentRepo commentRepo;
     private final WikiActorGateway actorGateway;
     private final WikiSpaceAclAppService accessAppService;
+    private final WikiCommentModerationGateway moderationGateway;
 
     /** 公开分页：根评论按置顶/时间排序，同页浅线程带回各自已发布回复，并按当前发布版本计算锚点状态。 */
     @Transactional(readOnly = true)
@@ -95,7 +98,51 @@ public class WikiCommentAppService {
             comment = WikiComment.create(space.getId(), page.node().getId(), null, actor.userId(),
                     actor.displayName(), cmd.getContent(), anchor);
         }
-        return WikiCommentAssembler.publicView(commentRepo.save(comment), List.of(), page.version());
+        WikiComment saved = commentRepo.save(comment);
+        if (space.aiCommentReviewEnabled()) {
+            saved = moderateByAi(space, page, saved);
+        }
+        return WikiCommentAssembler.publicView(saved, List.of(), page.version());
+    }
+
+    /**
+     * AI 审核：判定通过即自动公开，判定不通过或审核不可用一律留在待审核交人工处理。
+     * <p>
+     * 评论先落库再审：机器调用失败、超时都必须保住读者已提交的内容，只把原因记进审计字段，
+     * 绝不把异常抛回公开端（公开端只应看到「已提交、待审核」）。
+     */
+    private WikiComment moderateByAi(WikiSpace space, PublishedPage page, WikiComment comment) {
+        String providerCode = text(space.getChatProviderCode());
+        String modelCode = text(space.getChatModelCode());
+        if (providerCode.isEmpty() || modelCode.isEmpty()) {
+            comment.aiUnavailable("知识库未配置问答模型，AI 审核不可用，已转人工审核");
+            return commentRepo.save(comment);
+        }
+        String quoted = comment.getAnchor() == null ? "" : comment.getAnchor().exact();
+        try {
+            WikiCommentModerationVerdict verdict = moderationGateway.review(providerCode, modelCode,
+                    space.getName(), page.node().getTitle(), quoted, comment.getContent());
+            if (verdict.approved()) {
+                comment.publishByAi(verdict.reason(), providerCode + "/" + modelCode);
+            }
+            else {
+                comment.rejectByAi(verdict.reason(), providerCode + "/" + modelCode);
+            }
+        }
+        catch (RuntimeException error) {
+            comment.aiUnavailable("AI 审核失败：" + brief(error.getMessage()) + "，已转人工审核");
+        }
+        return commentRepo.save(comment);
+    }
+
+    private static String text(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    /** 审计字段只存摘要：异常信息可能很长，截断后再落库。 */
+    private static String brief(String message) {
+        String normalized = message == null ? "" : message.replaceAll("\s+", " ").trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120) : normalized;
     }
 
     /** 编辑本人评论：作者校验在领域内完成，服务端不接受请求传入的作者 ID；节点未发布一律拒绝。 */

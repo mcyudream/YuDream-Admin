@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.wiki.cmd;
 
 import lombok.Data;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 
 import java.io.Serializable;
 
@@ -46,4 +47,6 @@ public class WikiSpaceSaveCmd implements Serializable {
     private String watchFolderPath;
     /** 是否允许登录用户在公开页面发表评论；默认关闭。 */
     private boolean commentEnabled;
+    /** 评论审核方式：MANUAL（默认）/ AI；AI 审核通过即公开，判定不了回落人工。 */
+    private WikiCommentReviewMode commentReviewMode;
 }

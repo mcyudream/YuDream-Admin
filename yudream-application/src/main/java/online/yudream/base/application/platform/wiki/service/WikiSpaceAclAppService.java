@@ -206,9 +206,11 @@ public class WikiSpaceAclAppService {
         }
         WikiSpaceDTO saved = wikiAppService.saveSpace(command);
         Long spaceId = Long.valueOf(saved.getId());
-        // 评论开关由本用例维护：评论默认关闭，只有显式开启后公开端才允许发表。
+        // 评论开关与审核方式由本用例维护：评论默认关闭；审核方式默认人工，
+        // AI 审核必须由管理员显式选择（机器判定通过才直接公开，判定不了回落人工）。
         WikiSpace space = requireSpaceEntity(spaceId);
         space.applyCommentEnabled(command.isCommentEnabled());
+        space.applyCommentReviewMode(command.getCommentReviewMode());
         if (creating) {
             // 先授权、再启用 RESTRICTED：任一步失败都不会留下无人可管的受限空间。
             grantManage(spaceId, actor);

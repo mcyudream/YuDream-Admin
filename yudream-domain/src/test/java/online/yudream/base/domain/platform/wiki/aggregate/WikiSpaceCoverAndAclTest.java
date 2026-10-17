@@ -2,6 +2,7 @@ package online.yudream.base.domain.platform.wiki.aggregate;
 
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclAction;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiCommentReviewMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceAclMode;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceCoverType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSpaceMemberSubjectType;
@@ -89,6 +90,30 @@ class WikiSpaceCoverAndAclTest {
         assertTrue(space.isCommentEnabled());
         space.applyCommentEnabled(false);
         assertFalse(space.isCommentEnabled());
+    }
+
+    @Test
+    void commentReviewModeDefaultsToManualAndAiRequiresTheCommentSwitch() {
+        WikiSpace space = WikiSpace.create("演示库", "demo");
+        // 旧数据没有该字段：必须回落人工审核，不能被机器判定接管
+        assertEquals(WikiCommentReviewMode.MANUAL, space.effectiveCommentReviewMode());
+        assertEquals(WikiCommentReviewMode.MANUAL, space.getCommentReviewMode());
+        assertFalse(space.aiCommentReviewEnabled());
+        // 旧数据（字段缺失）同样必须回落人工审核
+        assertEquals(WikiCommentReviewMode.MANUAL, WikiCommentReviewMode.of(null));
+
+        space.applyCommentReviewMode(WikiCommentReviewMode.AI);
+        assertEquals(WikiCommentReviewMode.AI, space.effectiveCommentReviewMode());
+        // 评论开关没开时 AI 审核没有意义：不能因为选了 AI 就当作已启用
+        assertFalse(space.aiCommentReviewEnabled());
+
+        space.applyCommentEnabled(true);
+        assertTrue(space.aiCommentReviewEnabled());
+
+        // 显式空值回落人工审核，不清空为 null（避免出现第三种状态）
+        space.applyCommentReviewMode(null);
+        assertEquals(WikiCommentReviewMode.MANUAL, space.getCommentReviewMode());
+        assertFalse(space.aiCommentReviewEnabled());
     }
 
     @Test

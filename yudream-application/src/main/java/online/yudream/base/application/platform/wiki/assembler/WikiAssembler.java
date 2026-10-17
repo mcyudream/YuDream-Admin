@@ -61,6 +61,7 @@ public final class WikiAssembler {
                 .coverFileObjectId(id(s.cover().fileObjectId()))
                 .coverAlt(s.cover().alt())
                 .commentEnabled(s.isCommentEnabled())
+                .commentReviewMode(s.effectiveCommentReviewMode())
                 .aclMode(s.effectiveAclMode().name())
                 .build();
     }
