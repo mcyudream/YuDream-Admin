@@ -76,6 +76,46 @@ const actions: YdTablePageAction[] = [
   { label: '批量删除', icon: 'morph:trash-2', danger: true, autoFold: true, onClick: () => toast.error('危险操作需二次确认') },
 ]
 
+/** 统计区示例：KPI + 图表版式（真实页面图表用 @yudream/dataviz，这里用轻量 SVG/CSS 演示版式与交互） */
+const statsKpis = [
+  { title: '总用户', value: '365', desc: '含启用与停用' },
+  { title: '邮箱已验证', value: '363', desc: '占比 99.5%' },
+  { title: '已启用', value: '364', desc: '占比 99.7%' },
+  { title: '本周新增', value: '12', desc: '今日 +3' },
+]
+
+const statsTrend = [3, 5, 4, 8, 6, 9, 7, 11, 8, 12, 10, 14, 9, 13, 15, 12, 16, 14, 18, 15, 19, 17, 21, 18, 22, 20, 24, 21, 26, 23]
+const statsRoles = [
+  { label: '普通用户', value: 42, color: 'var(--yd-emphasis)' },
+  { label: '超级管理员', value: 18, color: 'var(--yd-status-success)' },
+  { label: '管理员', value: 12, color: 'var(--yd-status-warning)' },
+  { label: '访客', value: 8, color: 'var(--yd-status-info)' },
+]
+const statsCompleteness = [
+  { label: '已填部门', ratio: 0.72 },
+  { label: '已分配角色', ratio: 0.68 },
+  { label: '已填邮箱', ratio: 0.95 },
+  { label: '已绑定 QQ', ratio: 0.41 },
+]
+
+const statsTrendPath = computed(() => {
+  const max = Math.max(...statsTrend)
+  return statsTrend
+    .map((value, index) => `${index === 0 ? 'M' : 'L'}${(index / (statsTrend.length - 1) * 100).toFixed(2)},${(28 - value / max * 26).toFixed(2)}`)
+    .join(' ')
+})
+
+const statsDonut = computed(() => {
+  const total = statsRoles.reduce((sum, role) => sum + role.value, 0)
+  let acc = 0
+  return statsRoles.map((role) => {
+    const start = acc / total * 360
+    acc += role.value
+    const end = acc / total * 360
+    return `${role.color} ${start.toFixed(1)}deg ${end.toFixed(1)}deg`
+  }).join(', ')
+})
+
 const page = ref(1)
 const size = ref(10)
 const total = ref(rows.value.length)
@@ -105,6 +145,28 @@ const layoutCode = `<YdTablePageLayout
   <template #footer>
     <YdPagination v-model:page="page" v-model:size="size" :total="total" />
   </template>
+</YdTablePageLayout>`
+
+const statsCode = `<YdTablePageLayout
+  title="用户管理"
+  stats-storage-key="system-user"
+  :stats-default-expanded="true"
+>
+  <template #stats="{ narrow }">
+    <YdStats>
+      <YdStat title="总用户" :value="365" description="含启用与停用" />
+      <YdStat title="邮箱已验证" :value="363" description="占比 99.5%" />
+    </YdStats>
+
+    <!-- 真实页面图表用 @yudream/dataviz；窄屏不挂载 -->
+    <div v-if="!narrow" class="grid gap-3 charts">
+      <LineChart :dataset="trendDataset" :height="190" />
+      <PieChart :dataset="roleDataset" :height="190" />
+    </div>
+  </template>
+
+  <template #table>…</template>
+  <template #footer>…</template>
 </YdTablePageLayout>`
 
 const dynamicFormCode = `// 后端查询类（注解驱动，前端零硬编码）
@@ -182,6 +244,84 @@ const { searchConfig, searchQuery } = useTablePage({
   </DemoCard>
 
   <DemoCard
+    title="YdTablePageLayout · 统计情报区（#stats）"
+    description="表格页的「情报板」：KPI 条 + 图表自适应一行；默认折叠并记住状态，窄屏只留 KPI、图表不挂载（真实页面用 @yudream/dataviz 的 ECharts 封装，这里用轻量 SVG/CSS 演示版式）"
+    :code="statsCode"
+  >
+    <div class="h-[460px]">
+      <YdTablePageLayout
+        title="用户管理"
+        :actions="actions"
+        :actions-threshold="3"
+        :stats-default-expanded="true"
+        stats-storage-key="showcase-stats"
+      >
+        <template #stats="{ narrow }">
+          <div class="pt-1 flex flex-col gap-4">
+            <YdStats>
+              <YdStat v-for="kpi in statsKpis" :key="kpi.title" :title="kpi.title" :value="kpi.value" :description="kpi.desc" />
+            </YdStats>
+
+            <div v-if="!narrow" class="stats-demo__charts gap-3 grid">
+              <section class="stats-demo__card">
+                <p class="stats-demo__title">
+                  近 30 天新增注册
+                </p>
+                <svg class="stats-demo__spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+                  <path :d="statsTrendPath" fill="none" stroke="var(--yd-emphasis)" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                </svg>
+              </section>
+
+              <section class="stats-demo__card">
+                <p class="stats-demo__title">
+                  角色分布
+                </p>
+                <div class="stats-demo__donut-row">
+                  <span class="stats-demo__donut" :style="{ backgroundImage: `conic-gradient(${statsDonut})` }" aria-hidden="true" />
+                  <ul class="stats-demo__legend">
+                    <li v-for="role in statsRoles" :key="role.label">
+                      <span class="stats-demo__dot" :style="{ background: role.color }" />{{ role.label }}
+                    </li>
+                  </ul>
+                </div>
+              </section>
+
+              <section class="stats-demo__card">
+                <p class="stats-demo__title">
+                  资料完善
+                </p>
+                <ul class="stats-demo__bars">
+                  <li v-for="item in statsCompleteness" :key="item.label">
+                    <span>{{ item.label }}</span>
+                    <span class="stats-demo__bar"><i :style="{ width: `${item.ratio * 100}%` }" /></span>
+                    <b>{{ Math.round(item.ratio * 100) }}%</b>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </template>
+
+        <template #table>
+          <YdResponsiveEnhancedTable
+            :data="rows.slice(0, 8)"
+            :columns="columns"
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+          />
+        </template>
+      </YdTablePageLayout>
+    </div>
+
+    <ul class="text-xs text-muted-foreground mt-3 space-y-1">
+      <li>统计区默认折叠，点击「统计」整行展开；折叠状态按 <code>statsStorageKey</code>（默认当前路径）记入 localStorage。</li>
+      <li>插槽传出 <code>narrow</code>：窄屏只保留 KPI 条，图表由页面 <code>v-if</code> 不挂载，省掉图表初始化开销。</li>
+      <li>KPI 与图表容器用 <code>auto-fit + minmax</code> 网格自适应：宽屏一行四张，窄屏自动折行，无需媒体查询。</li>
+      <li>它只是「情报板」：表格仍是页面主战场，统计不占首屏。</li>
+    </ul>
+  </DemoCard>
+
+  <DemoCard
     title="YdDynamicSearchForm + useTablePage"
     description="注解驱动的动态筛选表单：后端 @Searchable 声明字段元数据，前端按 queryClass 拉取配置自动渲染，无需重复定义筛选控件"
     :code="dynamicFormCode"
@@ -200,3 +340,89 @@ const { searchConfig, searchQuery } = useTablePage({
     </ul>
   </DemoCard>
 </template>
+
+<style scoped>
+/* 统计区示例：轻量图形（真实页面用 @yudream/dataviz） */
+.stats-demo__charts {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.stats-demo__card {
+  min-width: 0;
+  padding: 12px 14px;
+  background: oklch(var(--card));
+  border: 1px solid oklch(var(--border));
+  border-radius: 8px;
+}
+
+.stats-demo__title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: oklch(var(--muted-foreground));
+}
+
+.stats-demo__spark {
+  width: 100%;
+  height: 120px;
+}
+
+.stats-demo__donut-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.stats-demo__donut {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  mask: radial-gradient(circle, transparent 54%, #000 55%);
+}
+
+.stats-demo__legend {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.stats-demo__legend li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: oklch(var(--muted-foreground));
+}
+
+.stats-demo__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.stats-demo__bars {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.stats-demo__bars li {
+  display: grid;
+  grid-template-columns: 76px 1fr 34px;
+  gap: 8px;
+  align-items: center;
+  color: oklch(var(--muted-foreground));
+}
+
+.stats-demo__bar {
+  height: 6px;
+  overflow: hidden;
+  background: oklch(var(--muted));
+  border-radius: 999px;
+}
+
+.stats-demo__bar i {
+  display: block;
+  height: 100%;
+  background: var(--yd-emphasis);
+}
+</style>

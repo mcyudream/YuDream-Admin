@@ -145,10 +145,12 @@ interface StatusColumn<TData> {
   statusKey: keyof TData
   /** 列标题 */
   header: string
-  /** 状态映射:值 -> {label, variant} */
-  statusMap: Record<string, { 
+  /** 状态映射:值 -> {label, variant, tone?} */
+  statusMap: Record<string, {
     label: string
-    variant: 'default' | 'success' | 'warning' | 'danger' 
+    variant: 'default' | 'destructive' | 'secondary'
+    /** 传则改用语义色胶囊（忽略 variant 底色），长列表里能一眼扫出异常行 */
+    tone?: 'info' | 'success' | 'warning' | 'danger' | 'neutral'
   }>
   /** 列宽度 */
   width?: number | string
@@ -258,6 +260,23 @@ import { YdResponsiveTable } from '@yudream/components'
 - **行悬停**: 浅色高亮 (`--color-fill-1`),过渡动画 0.15s
 - **单元格**: 垂直内边距 12px,水平 16px,最小高度 64px
 - **边框**: 统一使用 `--color-border-2`
+
+### 状态语义色
+
+状态列、卡片状态、页面自渲染的状态标记统一用 `.yd-status-tone` + `data-tone`（令牌 `--yd-status-info/success/warning/danger`，`neutral` 走弱化文字色），呈现淡底 + 同色描边 + 同色文字的胶囊：
+
+```vue
+<!-- 增强表格：statusMap 里给 tone 即可 -->
+statusMap: {
+  ACTIVE: { label: '启用', variant: 'default', tone: 'success' },
+  DISABLED: { label: '停用', variant: 'secondary', tone: 'neutral' },
+}
+
+<!-- 页面自定义单元格（如邮箱验证）直接复用同一套视觉 -->
+<span class="yd-status-tone" :data-tone="row.emailVerified ? 'success' : 'warning'">已验证</span>
+```
+
+不要再用全黑/全灰实心胶囊表示可区分状态；`tone` 缺省时仍走 `variant` 的原有外观（向后兼容）。
 
 ### 间距与尺寸
 

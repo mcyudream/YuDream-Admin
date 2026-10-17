@@ -4,6 +4,20 @@ import type { TableColumn, TableProps } from '../basic/table/index.vue'
 /** Badge 变体映射 */
 export type BadgeVariant = 'default' | 'destructive' | 'secondary'
 
+/**
+ * 状态语义色：按 --yd-status-* 令牌渲染淡底状态胶囊，便于在长列表里一眼扫出异常行。
+ * neutral 用弱化文字色，适合"已停用/未分配"这类中性状态。
+ */
+export type StatusTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral'
+
+/** 状态呈现配置 */
+export interface StatusPresentation {
+  label: string
+  variant: BadgeVariant
+  /** 传则改用语义色胶囊（忽略 variant 的底色），不传保持原 Badge 外观 */
+  tone?: StatusTone
+}
+
 /** 用户信息列配置 */
 export interface UserColumn<TData extends RowData = RowData> {
   /** 用户名字段 */
@@ -26,8 +40,8 @@ export interface StatusColumn<TData extends RowData = RowData> {
   statusKey: keyof TData
   /** 列标题 */
   header: string
-  /** 状态映射:值 -> {label, variant} */
-  statusMap: Record<string, { label: string, variant: BadgeVariant }>
+  /** 状态映射:值 -> {label, variant, tone?} */
+  statusMap: Record<string, StatusPresentation>
   /** 列宽度 */
   width?: number | string
 }

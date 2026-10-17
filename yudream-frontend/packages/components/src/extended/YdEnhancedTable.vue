@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
 import type { RowData, RowSelectionState, Table as TanStackTable } from '@tanstack/vue-table'
 import type { TableColumn } from '../basic/table/index.vue'
-import type { BadgeVariant, EnhancedTableProps } from './YdEnhancedTable.types'
+import type { EnhancedTableProps, StatusPresentation } from './YdEnhancedTable.types'
 import { computed, ref } from 'vue'
 import FaAvatar from '../basic/avatar/index.vue'
 import { Badge } from '../basic/badge/badge'
@@ -104,7 +104,7 @@ function getUserEmail(row: TData): string | undefined {
 }
 
 /** 获取状态配置 */
-function getStatusConfig(row: TData): { label: string, variant: BadgeVariant } | undefined {
+function getStatusConfig(row: TData): StatusPresentation | undefined {
   if (!props.statusColumn) {
     return undefined
   }
@@ -182,10 +182,17 @@ function hasActionItems(groups: DropdownMenuItem[][]) {
       </div>
     </template>
 
-    <!-- 状态单元格 -->
+    <!-- 状态单元格：配了 tone 用语义色胶囊，否则保持原 Badge 外观 -->
     <template v-if="statusColumn" #cell-status="{ row }">
+      <span
+        v-if="getStatusConfig(row.original)?.tone"
+        class="yd-status-tone"
+        :data-tone="getStatusConfig(row.original)!.tone"
+      >
+        {{ getStatusConfig(row.original)!.label }}
+      </span>
       <Badge
-        v-if="getStatusConfig(row.original)"
+        v-else-if="getStatusConfig(row.original)"
         :variant="getStatusConfig(row.original)!.variant"
         class="font-medium"
       >

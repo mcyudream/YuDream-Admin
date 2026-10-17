@@ -216,6 +216,10 @@ const tableColumns = [
 | `activeTab` | `string` | - | 当前激活的tab |
 | `actions` | `YdTablePageAction[]` | - | 操作按钮配置 |
 | `actionsThreshold` | `number` | `4` | 操作按钮显示阈值 |
+| `showStats` | `boolean` | 跟随 `#stats` 插槽 | 是否显示统计区 |
+| `statsTitle` | `string` | `统计` | 统计区标题 |
+| `statsDefaultExpanded` | `boolean` | `false` | 未记忆过时的展开状态（窄屏一律默认折叠） |
+| `statsStorageKey` | `string` | 当前路径 | 折叠状态的 localStorage 记忆键 |
 
 ### YdTablePageAction 类型
 
@@ -237,6 +241,7 @@ interface YdTablePageAction {
 | 插槽 | 参数 | 说明 |
 |-----|------|------|
 | `page-title` | - | 自定义页面标题区域 |
+| `stats` | `{ narrow: boolean, expanded: boolean }` | 统计情报区（KPI/图表）；窄屏时页面据此不挂载图表 |
 | `search` | `{ fold: boolean }` | 搜索筛选表单内容 |
 | `tabs` | - | 自定义tab栏 |
 | `actions` | - | 自定义操作按钮区域 |
@@ -248,6 +253,39 @@ interface YdTablePageAction {
 | 事件 | 参数 | 说明 |
 |-----|------|------|
 | `update:activeTab` | `(value: string)` | Tab切换时触发 |
+
+## 统计情报区（`#stats`）
+
+表格页顶部可以放一条「情报板」：KPI 卡 + 图表，用于回答"这批数据整体长什么样"。它默认折叠并记住状态，展开后也只占一段可滚高度，**表格始终是页面主战场**。
+
+```vue
+<YdTablePageLayout title="用户管理" stats-storage-key="system-user">
+  <template #stats="{ narrow }">
+    <YdStats>
+      <YdStat title="总用户" :value="stats.total" description="含启用与停用" />
+      <YdStat title="邮箱已验证" :value="stats.verifiedCount" :description="`占比 ${ratio}%`" />
+    </YdStats>
+
+    <!-- 图表只在宽屏挂载：窄屏不初始化图表实例，省掉开销 -->
+    <div v-if="!narrow" class="grid gap-3">
+      <LineChart :dataset="trendDataset" :height="190" />
+      <PieChart :dataset="roleDataset" :height="190" />
+    </div>
+  </template>
+  <template #search>…</template>
+  <template #table>…</template>
+  <template #footer>…</template>
+</YdTablePageLayout>
+```
+
+使用约定：
+
+- **KPI 用 `YdStats` + `YdStat`**（flex 自动换行，宽屏一行放得下 4–5 张），图表容器用 `grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))`——两者都不需要媒体查询。
+- **图表用 `@yudream/dataviz`**（ECharts 封装，`LineChart`/`PieChart`/`BarChart` 等，内部已带容器级 `ResizeObserver`，菜单折叠、统计区展开都会自适应重绘）；主题按 `document.documentElement.classList.contains('dark')` 传 `light`/`dark`。
+- **窄屏只留 KPI**：插槽传出的 `narrow` 为 true 时用 `v-if`（而不是 `display:none`）跳过图表挂载。
+- **折叠不预初始化**：统计区默认折叠时不应挂载图表（可参考宿主用户管理页的"首次展开才挂载"写法）。
+- **统计必须来自全量聚合**：数字要么由后端仓储聚合（推荐，见 `GET /api/system/users/stats` 的 `UserStatsDTO`/`UserStatsAssembler` 分层），要么在页面上对全量数据计算；**禁止拿当前分页结果推算统计**（`docs/dev/permission-codes.md` 有明文约定）。
+- **计数归一化**：后端 Long 计数经全局 ToStringSerializer 序列化为字符串，消费前必须 `Number()`。
 
 ## YdDynamicSearchForm
 

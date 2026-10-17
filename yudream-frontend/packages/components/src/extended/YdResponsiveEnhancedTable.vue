@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
 import type { Cell, Row, RowData, RowSelectionState, Table as TanStackTable } from '@tanstack/vue-table'
 import type { TableCellSlotProps, TableColumn, TableHeaderSlotProps } from '../basic/table/index.vue'
-import type { BadgeVariant, EnhancedTableProps } from './YdEnhancedTable.types'
+import type { EnhancedTableProps, StatusPresentation } from './YdEnhancedTable.types'
 import { FlexRender } from '@tanstack/vue-table'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onMounted, ref, shallowRef, useAttrs, watch } from 'vue'
@@ -214,7 +214,7 @@ function getUserEmail(row: TData): string | undefined {
 }
 
 /** 获取状态配置 */
-function getStatusConfig(row: TData): { label: string, variant: BadgeVariant } | undefined {
+function getStatusConfig(row: TData): StatusPresentation | undefined {
   if (!props.statusColumn) {
     return undefined
   }
@@ -485,10 +485,17 @@ function fieldSlotProps(field: CardField, index: number): TableCellSlotProps<TDa
               </div>
             </div>
 
-            <!-- 卡片底部：状态 + 操作 -->
+            <!-- 卡片底部：状态 + 操作（与桌面表格一致地支持语义色胶囊） -->
             <div v-if="item.status || (showActions && hasActionItems(item.actionItems))" class="card-footer">
+              <span
+                v-if="item.status?.tone"
+                class="yd-status-tone shrink-0"
+                :data-tone="item.status.tone"
+              >
+                {{ item.status.label }}
+              </span>
               <FaBadge
-                v-if="item.status"
+                v-else-if="item.status"
                 :variant="item.status.variant"
                 class="shrink-0"
                 :value="item.status.label"

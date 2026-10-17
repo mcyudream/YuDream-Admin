@@ -78,8 +78,34 @@ export interface UserUpdatePayload {
   emailVerified?: boolean
 }
 
+/** 后端 Long 计数经全局 ToStringSerializer 序列化为字符串，消费方需 Number() 归一化 */
+export interface UserStatsNamedCount {
+  name: string
+  count: string | number
+}
+
+export interface UserStatsDailyCount {
+  date: string
+  count: string | number
+}
+
+export interface UserStats {
+  total: string | number
+  verifiedCount: string | number
+  activeCount: string | number
+  disabledCount: string | number
+  newToday: string | number
+  newThisWeek: string | number
+  trendDays: number
+  registeredTrend: UserStatsDailyCount[]
+  roleDistribution: UserStatsNamedCount[]
+  completeness: UserStatsNamedCount[]
+}
+
 export default {
   page: (params: UserPageParams) => systemClient.get<unknown, ApiResponse<PageResult<UserManageItem>>>('api/system/users', { params }),
+  /** 统计是「情报板」：不可用时由页面收起，不弹全局错误提示 */
+  stats: () => systemClient.get<unknown, ApiResponse<UserStats>>('api/system/users/stats', { skipGlobalToast: true }),
   detail: (id: IdValue) => systemClient.get<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`),
   create: (data: UserCreatePayload) => systemClient.post<unknown, ApiResponse<UserManageItem>>('api/system/users', data),
   update: (id: IdValue, data: UserUpdatePayload) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`, data),

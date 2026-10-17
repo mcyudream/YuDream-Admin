@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { YdTablePageAction } from './table-page-layout-types'
-import { computed, provide, ref, useId } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
+import { computed, onMounted, provide, ref, useId } from 'vue'
 import YdButton from '../basic/button/index.vue'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenu as YdDropdownMenu } from '../basic/dropdown/dropdown-menu/index'
 import YdIcon from '../basic/icon/index.vue'
@@ -15,11 +16,25 @@ const props = withDefaults(defineProps<YdTablePageLayoutProps>(), {
   showSearch: true,
   searchFolded: undefined,
   searchDefaultFolded: true,
+  showStats: undefined,
+  statsTitle: '统计',
+  statsDefaultExpanded: false,
+  statsStorageKey: undefined,
   actionsThreshold: 4,
 })
 const emit = defineEmits<{
   'update:activeTab': [value: string]
   'update:searchFolded': [value: boolean]
+}>()
+const slots = defineSlots<{
+  'page-title'?: () => unknown
+  'search'?: (props: { fold: boolean }) => unknown
+  'tabs'?: () => unknown
+  'actions'?: () => unknown
+  'table'?: () => unknown
+  'footer'?: () => unknown
+  /** 统计情报区（KPI/图表）：放这里的内容会被包进可折叠、可记住状态的统计卡 */
+  'stats'?: (props: { narrow: boolean, expanded: boolean }) => unknown
 }>()
 /** 操作栏尾部容器：表格的「列显隐」控件经 Teleport 并入此处，与操作按钮同排且最后 */
 const actionsAppendId = `yd-table-actions-${useId()}`
@@ -34,6 +49,14 @@ export interface YdTablePageLayoutProps {
   searchFolded?: boolean
   /** 搜索区默认折叠状态(未用 v-model 时的初始值) */
   searchDefaultFolded?: boolean
+  /** 是否显示统计区；默认跟随是否提供 #stats 插槽 */
+  showStats?: boolean
+  /** 统计区标题 */
+  statsTitle?: string
+  /** 统计区默认展开状态(未记忆过时的初始值；窄屏一律默认折叠) */
+  statsDefaultExpanded?: boolean
+  /** 统计区折叠状态的 localStorage 记忆键；默认按当前路径记忆 */
+  statsStorageKey?: string
   /** Tab选项 */
   tabs?: Array<{ label: string, value: string }>
   /** 当前激活的tab */
@@ -59,6 +82,42 @@ const searchFolded = computed({
 provide(tablePageSearchFoldKey, (fold: boolean) => {
   searchFolded.value = fold
 })
+
+/** 窄屏判定：统计区在窄屏默认折叠，图表由页面按 narrow 决定是否挂载（不挂载即省掉图表初始化开销） */
+const narrow = useMediaQuery('(max-width: 768px)')
+const showStats = computed(() => props.showStats ?? Boolean(slots.stats))
+const statsStorageKey = computed(() => `yd-table-stats:${props.statsStorageKey || (typeof window === 'undefined' ? '' : window.location.pathname)}`)
+const statsExpanded = ref(false)
+
+function readStoredStatsExpanded(): boolean | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+  const stored = window.localStorage.getItem(statsStorageKey.value)
+  return stored === null ? undefined : stored === '1'
+}
+
+function writeStoredStatsExpanded(expanded: boolean) {
+  if (typeof window === 'undefined') {
+    return
+  }
+  try {
+    window.localStorage.setItem(statsStorageKey.value, expanded ? '1' : '0')
+  }
+  catch {
+    // 隐私模式等存储不可用时忽略：状态仍在本次会话内生效
+  }
+}
+
+// 记忆优先，其次取默认值；窄屏未记忆过时默认折叠（管理员在手机上主要是搜人/改状态，不是看图表）
+onMounted(() => {
+  statsExpanded.value = readStoredStatsExpanded() ?? (props.statsDefaultExpanded && !narrow.value)
+})
+
+function toggleStats() {
+  statsExpanded.value = !statsExpanded.value
+  writeStoredStatsExpanded(statsExpanded.value)
+}
 
 const activeTabLocal = computed({
   get: () => props.activeTab || '',
@@ -105,6 +164,32 @@ const foldedActions = computed(() => {
     </YdPageHeader>
 
     <div class="yd-table-page-layout__body">
+      <!-- 统计情报区：独立成卡置于最上，默认折叠并记忆状态；只是"情报板"，不抢表格首屏 -->
+      <div v-if="showStats" class="yd-table-page-layout__stats">
+        <button
+          type="button"
+          class="yd-table-page-layout__stats-toggle"
+          :aria-expanded="statsExpanded"
+          @click="toggleStats"
+        >
+          <YdIcon name="morph:chart-no-axes-column" class="yd-table-page-layout__stats-icon" />
+          <span>{{ statsTitle }}</span>
+          <YdIcon
+            name="morph:chevron-down"
+            class="yd-table-page-layout__stats-chevron"
+            :class="{ 'is-folded': !statsExpanded }"
+          />
+        </button>
+
+        <div class="yd-table-page-layout__stats-body" :class="{ 'is-open': statsExpanded }">
+          <div class="yd-table-page-layout__stats-inner">
+            <div class="yd-table-page-layout__stats-content">
+              <slot name="stats" :narrow="narrow" :expanded="statsExpanded" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 搜索卡片：独立成卡，固定于顶部；整行点击切换展开，箭头带旋转过渡 -->
       <div v-if="showSearch" class="yd-table-page-layout__search">
         <button
@@ -233,6 +318,73 @@ const foldedActions = computed(() => {
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
+}
+
+/* 统计情报区：与搜索卡同构（折叠行 + grid 轨道动画），默认收起 */
+.yd-table-page-layout__stats {
+  flex-shrink: 0;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+.yd-table-page-layout__stats-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-1);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.yd-table-page-layout__stats-toggle:hover {
+  background: var(--color-fill-1);
+}
+
+.yd-table-page-layout__stats-icon {
+  color: var(--yd-emphasis);
+}
+
+.yd-table-page-layout__stats-chevron {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.yd-table-page-layout__stats-chevron.is-folded {
+  transform: rotate(-90deg);
+}
+
+.yd-table-page-layout__stats-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.yd-table-page-layout__stats-body.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.yd-table-page-layout__stats-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 统计内容限高并内部滚动：图表再多也不把表格挤出首屏 */
+.yd-table-page-layout__stats-content {
+  max-height: min(52vh, 520px);
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .yd-table-page-layout__search-toggle {

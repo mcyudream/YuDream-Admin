@@ -3,7 +3,7 @@ import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, Us
 import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
-import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
+import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStats, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
 import { useTablePage } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
@@ -15,6 +15,7 @@ import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
 import { entityTagStyle, entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
+import UserStatsPanel from './components/UserStatsPanel.vue'
 
 const modal = useYdModal()
 const toast = useYdToast()
@@ -109,6 +110,33 @@ const {
   autoLoad: false,
 })
 
+/** 统计情报区数据：仓储全量聚合，不受当前筛选/分页影响 */
+const userStats = ref<UserStats>()
+const statsLoading = ref(false)
+
+async function loadStats() {
+  if (!auth('system:user:view')) {
+    return
+  }
+  statsLoading.value = true
+  try {
+    const res = await apiUser.stats()
+    userStats.value = res.data
+  }
+  catch {
+    // 统计是"情报板"，不可用时收起即可，不打断列表主流程
+    userStats.value = undefined
+  }
+  finally {
+    statsLoading.value = false
+  }
+}
+
+/** 列表与统计一起刷新：任何写操作后两处都要跟着变 */
+async function refreshAll() {
+  await Promise.all([load(), loadStats()])
+}
+
 /** 搜索选项数据源：部门/角色从接口拉取（角色按当前部门收敛），状态词表本地定义 */
 const optionsSources: SearchOptionsSource[] = [
   {
@@ -154,9 +182,10 @@ const userStatusColumn: StatusColumn<UserManageItem> = {
   statusKey: 'status',
   header: '状态',
   width: 90,
+  // 语义色胶囊：长列表里能一眼扫出停用/异常行（tone 见 YD 状态令牌说明）
   statusMap: {
-    ACTIVE: { label: '启用', variant: 'default' },
-    DISABLED: { label: '停用', variant: 'secondary' },
+    ACTIVE: { label: '启用', variant: 'default', tone: 'success' },
+    DISABLED: { label: '停用', variant: 'secondary', tone: 'neutral' },
   },
 }
 
@@ -200,6 +229,7 @@ onMounted(async () => {
   await loadOptions()
   void loadRoleColors()
   await load()
+  void loadStats()
   await openLinkedUser()
 })
 
@@ -396,7 +426,7 @@ async function saveForm() {
   }
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
-  await load()
+  await refreshAll()
 }
 
 function openAssign(row: UserManageItem, mode: 'roles' | 'depts') {
@@ -424,7 +454,7 @@ async function saveAssign() {
   }
   toast.success('分配成功')
   assignVisible.value = false
-  await load()
+  await refreshAll()
 }
 
 function canImpersonateRow(row: UserManageItem) {
@@ -453,7 +483,7 @@ function confirmDisable(row: UserManageItem) {
     onConfirm: async () => {
       await apiUser.disable(row.id)
       toast.success('停用成功')
-      await load()
+      await refreshAll()
     },
   })
 }
@@ -465,7 +495,7 @@ function confirmEnable(row: UserManageItem) {
     onConfirm: async () => {
       await apiUser.enable(row.id)
       toast.success('启用成功')
-      await load()
+      await refreshAll()
     },
   })
 }
@@ -549,6 +579,17 @@ function identityTypeLabel(type?: string) {
   return type || '身份'
 }
 
+/** 长标识（OpenID 等）中间截断，完整值靠 title 悬浮查看 */
+function truncateMiddle(value?: string | null, head = 8, tail = 4) {
+  if (!value) {
+    return ''
+  }
+  if (value.length <= head + tail + 1) {
+    return value
+  }
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
 function identityKey(item: MessagingIdentity, index: string | number) {
   return [item.protocol, item.identityType, item.identity, item.groupOpenid, item.appId, item.connectionId, String(index)].join(':')
 }
@@ -630,7 +671,7 @@ function importUsers() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importUsers(excelForm(file))
     toast.success(importResultMessage(res.data))
-    await load()
+    await refreshAll()
   })
 }
 </script>
@@ -642,6 +683,10 @@ function importUsers() {
       :actions="userPageActions"
       :actions-threshold="3"
     >
+      <template #stats="{ narrow, expanded }">
+        <UserStatsPanel :stats="userStats" :loading="statsLoading" :narrow="narrow" :expanded="expanded" />
+      </template>
+
       <template #search="{ fold }">
         <YdDynamicSearchForm
           v-model="searchQuery"
@@ -676,10 +721,13 @@ function importUsers() {
                 </div>
                 <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
                   <span class="text-secondary-foreground/60 shrink-0">{{ protocolLabel(item.protocol) }}</span>
-                  <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
+                  <span class="break-all">
+                    {{ identityTypeLabel(item.identityType) }}
+                    <span :title="item.identity">{{ truncateMiddle(item.identity) }}</span>{{ item.groupOpenid ? ` / 群 ${truncateMiddle(item.groupOpenid)}` : '' }}
+                  </span>
                 </div>
               </div>
-              <span v-else>-</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-fields="{ row }">
               <div v-if="personnelFields(row.original).length" class="text-sm flex flex-col gap-1">
@@ -688,7 +736,7 @@ function importUsers() {
                   <span class="break-all">{{ field.value }}</span>
                 </div>
               </div>
-              <span v-else>-</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-tags="{ row }">
               <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
@@ -696,7 +744,7 @@ function importUsers() {
                   {{ tag.label }}
                 </YdTag>
               </div>
-              <span v-else>-</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-deptNames="{ row }">
               <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
@@ -718,20 +766,29 @@ function importUsers() {
                   {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
                 </YdTag>
               </div>
-              <span v-else>-</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-roleNames="{ row }">
-              <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1">
-                <YdTag v-for="name in row.original.roleNames" :key="name" :style="roleTagStyle(name)">
-                  {{ name }}
+              <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1 items-center">
+                <YdTag :style="roleTagStyle(row.original.roleNames[0])">
+                  {{ row.original.roleNames[0] }}
                 </YdTag>
+                <!-- 多角色只显示第一个 + “+N”，悬浮展开完整清单，避免列被标签撑爆 -->
+                <YdTooltip
+                  v-if="row.original.roleNames.length > 1"
+                  :text="row.original.roleNames.slice(1).join('、')"
+                >
+                  <YdTag variant="secondary" class="cursor-default">
+                    +{{ row.original.roleNames.length - 1 }}
+                  </YdTag>
+                </YdTooltip>
               </div>
-              <span v-else>-</span>
+              <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-emailVerified="{ row }">
-              <YdTag :variant="row.original.emailVerified ? 'default' : 'secondary'">
+              <span class="yd-status-tone" :data-tone="row.original.emailVerified ? 'success' : 'warning'">
                 {{ row.original.emailVerified ? '已验证' : '未验证' }}
-              </YdTag>
+              </span>
             </template>
           </YdResponsiveEnhancedTable>
         </YdLoadingOverlay>
