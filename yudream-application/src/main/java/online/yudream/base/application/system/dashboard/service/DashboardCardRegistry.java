@@ -19,7 +19,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DashboardCardRegistry {
 
-    private static final String DATAVIZ_CAPABILITY_CODE = "dataviz";
     private static final String MOBILE_APP_CAPABILITY_CODE = "mobile-app";
 
     private final PluginRuntimeGateway pluginRuntimeGateway;
@@ -161,7 +160,7 @@ public class DashboardCardRegistry {
                     false
             ));
         }
-        if (datavizEnabled()) {
+        {
             cards.add(new DashboardCardDefinition(
                     "platform.dataviz.capability-stats",
                     "能力分类统计",
@@ -255,18 +254,6 @@ public class DashboardCardRegistry {
             return false;
         }
         return capabilityModuleRepo.findByCode(MOBILE_APP_CAPABILITY_CODE)
-                .map(CapabilityModule::enabled)
-                .orElse(false);
-    }
-
-    private boolean datavizEnabled() {
-        boolean providerAvailable = capabilityProviders.stream()
-                .map(CapabilityProvider::descriptor)
-                .anyMatch(descriptor -> DATAVIZ_CAPABILITY_CODE.equals(descriptor.code()));
-        if (!providerAvailable) {
-            return false;
-        }
-        return capabilityModuleRepo.findByCode(DATAVIZ_CAPABILITY_CODE)
                 .map(CapabilityModule::enabled)
                 .orElse(false);
     }

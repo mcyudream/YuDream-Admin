@@ -70,7 +70,8 @@ Assembler 归属：接口 assembler 负责 `request -> cmd`、`DTO -> res`、`Ex
 ### 5.1 system 与 platform 的归属
 
 - 安全与身份等基线能力（接口加密、双 token、API Key、Passkey、OAuth）属于 `system`。
-- SSE、WebSocket、MQ、Neo4j、Python Runtime、HTTP 集成、文档生成、CMS、AI/Agent 等可动态加载能力属于 `platform`，与 `system` 分离，**必须**支持动态启停，避免未启用项目被迫配置无用中间件。
+- MQ、Neo4j、Python Runtime、HTTP 集成、文档生成、CMS、AI/Agent 等可动态加载能力属于 `platform`，与 `system` 分离，**必须**支持动态启停，避免未启用项目被迫配置无用中间件。
+- SSE、WebSocket、数据可视化**不属于**平台能力：它们是宿主内置的底层能力（见 5.8），与 MongoDB、Redis 同级，直接内置、无开关、不进能力目录。
 - 接口加密**必须**在公钥端点之前暴露未认证未加密的状态端点（前端先判断是否加密），加密过滤器显式放行这两个引导端点；可解密 `text/event-stream` 端点的入站请求，但**不得**包装/加密 SSE 响应体。
 
 ### 5.2 双闸门
@@ -114,6 +115,16 @@ Assembler 归属：接口 assembler 负责 `request -> cmd`、`DTO -> res`、`Ex
 - 异地备份目标 FTP/FTPS（commons-net）/WebDAV（JDK HttpClient），密码主密钥加密（AAD `system-backup:target:{code}`）；任务队列单虚拟线程串行；计划 cron 为 Spring 6 位表达式，监听 `BackupPlansChangedEvent` 重排。
 - 插件经 SPI `system.backup` 扩展点 `PluginBackupProvider` 贡献范围（`scopeCode` 归属插件码），恢复缺失提供方时跳过并告警；插件主动触发走 `FrameworkServices.backups(pluginCode).startScopeBackup`（只能触发本插件 scope），`listScopeJobs(scopeCode, limit)` 回查任务摘要；前端异地目标选择走宿主目录端点 `GET /api/platform/plugins/backup/targets`（SDK 1.8.0 起 `sdk.backup.targets()`）。
 - 导入跨主机比对 `manifest.masterKeyFingerprint`。细则见 `docs/system/backup.md`。
+
+### 5.8 内置基础设施（SSE / WebSocket / 数据可视化）
+
+SSE 实时推送、WebSocket 双向通信、数据可视化属于**宿主内置的底层能力**，与 MongoDB、Redis 同级：直接内置在后端，不注册为平台能力、不进能力目录、不在能力管理页展示，也没有启停开关与配置项。
+
+- 端点与组件常开：`/api/platform/sse/connect`、`/api/platform/ws`、`@yudream/dataviz` 始终可用；**不得**为它们加 `@ConditionalOnProperty` 项目闸门、`ensureEnabled` 应用闸门、`CapabilityDescriptor.dependencies` 依赖声明或能力管理页卡片（AI 不再声明 `sse` 依赖）。
+- 代码就是普通后端组件：住在普通包（如 `interfaces/platform/realtime`），**不得**实现 `CapabilityProvider`，也不暴露 describe/health/enable/disable/test 这套能力契约。
+- 不作能力即不在目录：`CapabilityAppService.list()` 按"是否存在 provider"过滤，删掉 Provider 后自动从目录与菜单过滤中消失；数据库里遗留的旧能力行是惰性的（列表不展示、`restoreEnabledProviders()` 跳过无 provider 的行），无需数据迁移。
+- 基础设施自身的边界仍要守：连接必须登录（SSE 走带令牌的 fetch 流式读取、WS 握手校验令牌）、并发连接上限、关闭时清理会话。
+- 判断标准：需要按项目配置、需要连接外部中间件、关掉能省资源的（MQ、Neo4j、AI 等）才做平台能力；进程内的通用基础设施（实时推送、图表渲染一类）一律直接内置。
 
 ## 6. 通用后端规则
 

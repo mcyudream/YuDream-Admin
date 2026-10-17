@@ -129,3 +129,12 @@
 - **根因**：只用统一白名单/黑名单而未区分硬排除与可配置排除。
 - **规避**：硬排除系统内部表/视图/备份自身；日志遥测令牌类走可覆盖配置，生效清单写入 manifest；核心 `sys*` 业务表纳入；跨主机导入先核 fingerprint。
 - **来源**：`system-backup-capability`；`docs/system/backup.md`。
+
+## 5. 构建与产物
+
+### 删除或迁移 Java 类后重启报重复映射 / 旧能力复活
+
+- **现象**：删掉/挪走一个类后重启，出现 `Ambiguous mapping`（同一路径两个 handler）启动失败；或已删除的能力/端点在页面上依旧出现。
+- **根因**：Maven 增量编译与被 IDE/Maven 启动的 `target/classes` 都不会清理"源文件已删除"的旧 `.class`；打包时旧 class 一并进 JAR，Spring 组件扫描与请求映射照样注册它们。
+- **规避**：删除/迁移类（尤其 `@RestController`、`@Component`、`CapabilityProvider`）后必须 `mvn clean` 后重建（或删除对应 `target/classes` 残留）再启动；打包产物验收时用 `unzip -l`/zip 工具确认旧 class 不在 JAR 内。类名与包名保持不变的重构不受影响。
+- **来源**：SSE/WebSocket/数据可视化从平台能力拆到系统工具层（提交 `系统工具层` 系列）。

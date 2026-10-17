@@ -1,7 +1,6 @@
 package online.yudream.base.application.platform.dataviz.service;
 
 import lombok.RequiredArgsConstructor;
-import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.dataviz.assembler.ChartAssembler;
 import online.yudream.base.application.platform.dataviz.cmd.ChartDefinitionCreateCmd;
 import online.yudream.base.application.platform.dataviz.cmd.ChartDefinitionUpdateCmd;
@@ -25,17 +24,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChartAppService {
 
-    private static final String CAPABILITY_CODE = "dataviz";
-    private static final String CAPABILITY_NAME = "数据可视化";
-
-    private final CapabilityAppService capabilityAppService;
     private final ChartDomainService chartDomainService;
     private final ChartDefinitionRepo chartDefinitionRepo;
     private final ChartDatasetGateway chartDatasetGateway;
 
     @Transactional(readOnly = true)
     public PageResult<ChartDefinitionDTO> pageDefinitions(ChartDefinitionPageQuery query) {
-        ensureEnabled();
         PageResult<ChartDefinition> page = chartDefinitionRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(
                 ChartAssembler.toDTOs(page.getRecords()),
@@ -47,7 +41,6 @@ public class ChartAppService {
 
     @Transactional
     public ChartDefinitionDTO createDefinition(ChartDefinitionCreateCmd cmd) {
-        ensureEnabled();
         ensureCodeAvailable(cmd.getCode(), null);
         ChartDefinition chart = ChartDefinition.create(
                 cmd.getCode(),
@@ -62,7 +55,6 @@ public class ChartAppService {
 
     @Transactional
     public ChartDefinitionDTO updateDefinition(ChartDefinitionUpdateCmd cmd) {
-        ensureEnabled();
         ChartDefinition chart = getChart(cmd.getId());
         chart.update(
                 cmd.getName(),
@@ -76,7 +68,6 @@ public class ChartAppService {
 
     @Transactional
     public void disableDefinition(Long id) {
-        ensureEnabled();
         ChartDefinition chart = getChart(id);
         chart.disable();
         chartDefinitionRepo.save(chart);
@@ -84,7 +75,6 @@ public class ChartAppService {
 
     @Transactional
     public void enableDefinition(Long id) {
-        ensureEnabled();
         ChartDefinition chart = getChart(id);
         chart.activate();
         chartDefinitionRepo.save(chart);
@@ -92,7 +82,6 @@ public class ChartAppService {
 
     @Transactional(readOnly = true)
     public ChartDatasetDTO queryDataset(ChartDataQuery query) {
-        ensureEnabled();
         chartDomainService.validateDatasetQuery(query.getChartType(), query.getDatasetQuery());
         List<ChartDataSeries> series = chartDatasetGateway.query(query.getDatasetQuery());
         String title = null;
@@ -121,9 +110,5 @@ public class ChartAppService {
                 throw new BizException("图表编码已存在");
             }
         });
-    }
-
-    private void ensureEnabled() {
-        capabilityAppService.ensureEnabled(CAPABILITY_CODE, CAPABILITY_NAME);
     }
 }

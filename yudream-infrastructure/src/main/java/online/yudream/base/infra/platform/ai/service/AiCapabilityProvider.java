@@ -53,7 +53,7 @@ public class AiCapabilityProvider implements CapabilityProvider {
                 "i-ri:sparkling-2-line",
                 95,
                 defaultConfig,
-                List.of("sse")
+                List.of()
         );
     }
 

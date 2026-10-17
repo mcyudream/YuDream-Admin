@@ -41,3 +41,4 @@
 - SPI 2.37.0 飞书云文档（含 Wiki 知识空间节点列表）与站点目录文件端口（`docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`、`AGENTS.md` 基线条目、`docs/plugin-system/specification.md` 第 11 节与 `docs/dev/plugin-system.md` 的对应条目 → 插件仓 `AGENTS.md`/`docs/dev/plugin-development.md` 引用与消费）：主仓只完成源码升版，未获发布授权，不得推 Nexus 或让插件仓消费；插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），待发布验签且 WIP 落定后同工作项同步，先保留其 WIP 不动。
 - `docs/yd-ui-guidelines.md` 的 `YdSortableTree` 拖拽落点提示与 `YdMarkdownEditor` 只读区域/错误呈现条目（本次宿主组件视觉细化）：插件仓同名副本仍有未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待其 WIP 落定后一并重跑同步。
 - `docs/yd-ui-guidelines.md` §7 目录新增 `YdTablePageLayout`、`YdDynamicSearchForm`、`YdNumberRange` 与表格页版式约定（宿主表格页规范落地），SDK `host-components.ts` 已同步导出：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
+- `docs/dev/backend-architecture.md` 第 5.8 节内置基础设施（SSE/WebSocket/数据可视化直接内置为底层能力、取消双闸门与 sse 依赖声明）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
