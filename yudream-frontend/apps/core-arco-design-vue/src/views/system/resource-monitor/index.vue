@@ -13,18 +13,37 @@ import type {
 import apiMonitor from '@/api/modules/system-monitor'
 import ChartWidget from '@/components/chart/ChartWidget.vue'
 import {
-  RESOURCE_GLOSSARY,
   analyzeResource,
   describePool,
+  METRIC_THRESHOLDS,
+  metricTone,
+  RESOURCE_GLOSSARY,
   severityLabel,
   severityTag,
 } from './analysis'
+
+/** 自动刷新间隔（秒），0 表示只手动刷新 */
+const REFRESH_OPTIONS = [
+  { label: '每 5 秒', value: 5 },
+  { label: '每 10 秒', value: 10 },
+  { label: '每 30 秒', value: 30 },
+  { label: '仅手动刷新', value: 0 },
+]
+/** 网卡默认只列前几块：本机虚拟网卡很多，全量表格会把真正在跑流量的那几块淹掉 */
+const NETWORK_TOP = 5
+const ANALYSIS_STORAGE_KEY = 'yudream:resource-monitor:analysis-open'
 
 const toast = useYdToast()
 
 const loading = ref(false)
 const historyLoading = ref(false)
 const hours = ref(1)
+const refreshSeconds = ref(5)
+const lastUpdatedText = ref('')
+const snapshotError = ref('')
+const historyError = ref('')
+const analysisOpen = ref(true)
+const networkExpanded = ref(false)
 const snapshot = ref<HostResourceSnapshot | null>(null)
 const history = ref<ResourceMetricPoint[]>([])
 const isMobile = useIsMobile()
@@ -50,45 +69,83 @@ const stats = computed(() => {
   const rssHint = currentJvmProcess.value?.rssBytes
     ? `RSS ${formatBytes(currentJvmProcess.value.rssBytes)}`
     : ''
+  const swapUsed = data?.swapUsedBytes
+  const hostMemoryHint = [
+    `${formatBytes(data?.memoryUsedBytes)} / ${formatBytes(data?.memoryTotalBytes)}`,
+    swapUsed ? `交换 ${formatBytes(swapUsed)}` : '',
+  ].filter(Boolean).join(' · ')
   return [
     {
       label: 'CPU',
       value: percentText(data?.cpuUsagePercent),
       hint: loadText(data),
       icon: 'morph:cpu',
+      percent: numberOrNull(data?.cpuUsagePercent),
+      tone: metricTone(numberOrNull(data?.cpuUsagePercent), METRIC_THRESHOLDS.cpu),
     },
     {
       label: '主机内存',
       value: percentText(hostMemoryUsage.value),
-      hint: `${formatBytes(data?.memoryUsedBytes)} / ${formatBytes(data?.memoryTotalBytes)}`,
+      hint: hostMemoryHint,
       icon: 'morph:database',
+      percent: numberOrNull(hostMemoryUsage.value),
+      tone: metricTone(numberOrNull(hostMemoryUsage.value), METRIC_THRESHOLDS.hostMemory),
     },
     {
       label: '程序内存',
       value: percentText(programHeapUsage.value),
       hint: [heapHint(data), rssHint].filter(Boolean).join(' · '),
       icon: 'morph:layers',
+      percent: numberOrNull(programHeapUsage.value),
+      tone: metricTone(numberOrNull(programHeapUsage.value), METRIC_THRESHOLDS.heap),
     },
     {
       label: '磁盘',
       value: percentText(diskUsage.value),
       hint: `${formatBytes(data?.diskUsedBytes)} / ${formatBytes(data?.diskTotalBytes)}`,
       icon: 'morph:hard-drive',
+      percent: numberOrNull(diskUsage.value),
+      tone: metricTone(numberOrNull(diskUsage.value), METRIC_THRESHOLDS.disk),
     },
     {
       label: '网络',
       value: formatRate(data?.networkRecvBytesPerSec),
       hint: `发送 ${formatRate(data?.networkSentBytesPerSec)}`,
       icon: 'morph:wifi',
+      percent: null,
+      tone: 'neutral' as const,
     },
     {
       label: '线程',
       value: data?.jvmThreadCount ?? '-',
       hint: data?.jvmDaemonThreadCount != null ? `守护 ${data.jvmDaemonThreadCount}` : '',
       icon: 'morph:list-tree',
+      percent: null,
+      tone: 'neutral' as const,
     },
   ]
 })
+
+/** 趋势读数：当前 / 区间均 / 区间峰（无点返回空串，由调用方决定是否渲染） */
+type TrendKey = 'cpu' | 'memory' | 'disk' | 'network'
+const trendMetrics = computed<Record<TrendKey, string>>(() => {
+  const points = history.value
+  return {
+    cpu: percentTrend(points.map(point => numberOrNull(point.cpuUsagePercent))),
+    memory: percentTrend(points.map(point => numberOrNull(percentOf(point.memoryUsedBytes, point.memoryTotalBytes) ?? point.memoryUsagePercent))),
+    disk: percentTrend(points.map(point => numberOrNull(point.diskUsagePercent ?? percentOf(point.diskUsedBytes, point.diskTotalBytes)))),
+    network: rateTrend(points),
+  }
+})
+
+/** 网卡按实时速率排序，默认只看前几块；「全部」按钮展开完整的物理与虚拟网卡 */
+const networkRows = computed(() => {
+  const list = [...(snapshot.value?.networks || [])]
+    .sort((a, b) => networkWeight(b) - networkWeight(a))
+  return networkExpanded.value ? list : list.slice(0, NETWORK_TOP)
+})
+
+const networkHiddenCount = computed(() => Math.max(0, (snapshot.value?.networks?.length || 0) - networkRows.value.length))
 
 const hostMeta = computed(() => {
   const data = snapshot.value
@@ -122,8 +179,8 @@ const memoryDataset = computed<ChartDataset>(() => ({
   chartType: 'line',
   dimensions: ['time', '主机内存', '程序 Heap'],
   source: history.value.map(point => ({
-    time: formatTime(point.sampledAt),
-    主机内存: roundPercent(point.memoryUsagePercent ?? percentOf(point.memoryUsedBytes, point.memoryTotalBytes)),
+    'time': formatTime(point.sampledAt),
+    '主机内存': roundPercent(point.memoryUsagePercent ?? percentOf(point.memoryUsedBytes, point.memoryTotalBytes)),
     '程序 Heap': roundPercent(percentOf(point.jvmHeapUsedBytes, point.jvmHeapMaxBytes)),
   })),
 }))
@@ -150,6 +207,33 @@ const poolDataset = computed<ChartDataset>(() => ({
     usedBytes: pool.usedBytes || 0,
   })),
 }))
+
+const trendCharts = computed<Array<{ id: TrendKey, title: string, hint: string, dataset: ChartDataset }>>(() => [
+  {
+    id: 'cpu',
+    title: 'CPU 使用率',
+    hint: '整机处理器忙闲程度。曲线贴近 100% 表示机器已经在排队，不一定等于当前 Java 程序在忙。',
+    dataset: cpuDataset.value,
+  },
+  {
+    id: 'memory',
+    title: '内存使用率',
+    hint: '主机内存是整机物理占用；程序 Heap 才是当前 Java 对象占用。两条线接近，说明内存压力主要来自本程序。',
+    dataset: memoryDataset.value,
+  },
+  {
+    id: 'disk',
+    title: '磁盘使用率',
+    hint: '所有分区合计的容量占用。真正要清理时，请看下面的磁盘分区表，确认是哪个挂载点先满。',
+    dataset: diskDataset.value,
+  },
+  {
+    id: 'network',
+    title: '网络速率 KB/s',
+    hint: '当前每秒收发了多少数据，不是累计流量。突然升高通常对应下载、推送或大文件传输。',
+    dataset: networkDataset.value,
+  },
+])
 
 const diskColumns = computed<TableColumn<HostDisk>[]>(() => [
   { accessorKey: 'name', header: '卷', width: 180 },
@@ -189,45 +273,100 @@ const analysis = computed(() => analyzeResource(snapshot.value, history.value))
 const glossaryPreview = RESOURCE_GLOSSARY.slice(0, 6)
 
 onMounted(async () => {
+  loadAnalysisPref()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  restartTimer()
   await refreshAll()
-  timer = window.setInterval(() => {
-    void loadSnapshot()
-  }, 5000)
 })
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   if (timer != null) {
     window.clearInterval(timer)
+    timer = null
   }
 })
 
-async function refreshAll() {
-  await Promise.all([loadSnapshot(), loadHistory()])
+watch(refreshSeconds, restartTimer)
+watch(analysisOpen, (open) => {
+  try {
+    window.localStorage.setItem(ANALYSIS_STORAGE_KEY, open ? '1' : '0')
+  }
+  catch { /* 隐私模式等存储不可用时忽略，偏好仅在本次会话生效 */ }
+})
+
+function loadAnalysisPref() {
+  try {
+    const stored = window.localStorage.getItem(ANALYSIS_STORAGE_KEY)
+    if (stored !== null) {
+      analysisOpen.value = stored === '1'
+    }
+  }
+  catch { /* 损坏的本地偏好直接忽略 */ }
 }
 
-async function loadSnapshot() {
-  loading.value = true
+/** 自动刷新只在页面可见时轮询；隐藏期间不打扰后端，切回可见立即补一次快照 */
+function restartTimer() {
+  if (timer != null) {
+    window.clearInterval(timer)
+    timer = null
+  }
+  const seconds = Number(refreshSeconds.value) || 0
+  if (seconds <= 0) {
+    return
+  }
+  timer = window.setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      void loadSnapshot('auto')
+    }
+  }, seconds * 1000)
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    void loadSnapshot('auto')
+  }
+}
+
+async function refreshAll() {
+  await Promise.all([loadSnapshot('manual'), loadHistory('manual')])
+}
+
+async function loadSnapshot(mode: 'auto' | 'manual' = 'auto') {
+  if (mode === 'manual') {
+    loading.value = true
+  }
   try {
     const res = await apiMonitor.resource()
     snapshot.value = normalizeSnapshot(res.data)
+    snapshotError.value = ''
+    lastUpdatedText.value = formatClock(new Date())
   }
-  catch {
-    toast.error('资源监控', { description: '实时快照暂时不可用' })
+  catch (error) {
+    // 自动轮询失败不弹 toast（每 5 秒一条会刷屏），改为页面顶部的常驻错误条
+    snapshotError.value = error instanceof Error ? error.message : '实时快照暂时不可用'
+    if (mode === 'manual') {
+      toast.error('资源监控', { description: snapshotError.value })
+    }
   }
   finally {
     loading.value = false
   }
 }
 
-async function loadHistory() {
+async function loadHistory(mode: 'auto' | 'manual' = 'manual') {
   historyLoading.value = true
   try {
     const windowHours = Number(hours.value) || 1
     const res = await apiMonitor.resourceHistory({ hours: windowHours })
     history.value = res.data || []
+    historyError.value = ''
   }
-  catch {
-    toast.error('资源监控', { description: '历史趋势暂时不可用' })
+  catch (error) {
+    historyError.value = error instanceof Error ? error.message : '历史趋势暂时不可用'
+    if (mode === 'manual') {
+      toast.error('资源监控', { description: historyError.value })
+    }
   }
   finally {
     historyLoading.value = false
@@ -253,7 +392,7 @@ function percentLineDataset(
   return {
     chartType: 'line',
     dimensions: ['time', ...series.map(item => item.name)],
-    source: points.map(point => {
+    source: points.map((point) => {
       const row: Record<string, unknown> = { time: formatTime(point.sampledAt) }
       for (const item of series) {
         row[item.name] = roundPercent(Number(point[item.key] ?? 0))
@@ -283,6 +422,47 @@ function heapHint(data?: HostResourceSnapshot | null) {
     return ''
   }
   return `Heap ${formatBytes(data.jvmHeapUsedBytes)} / ${formatBytes(data.jvmHeapMaxBytes)}`
+}
+
+/** 数字型快照字段经 Jackson 序列化后可能是字符串，统一转成 number 或 null */
+function numberOrNull(value?: number | string | null) {
+  if (value == null) {
+    return null
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/** 趋势读数：当前 / 区间均 / 区间峰（无点返回空串，由调用方决定是否渲染） */
+function percentTrend(values: Array<number | null>) {
+  const list = values.filter((value): value is number => value != null)
+  if (!list.length) {
+    return ''
+  }
+  const avg = list.reduce((total, value) => total + value, 0) / list.length
+  return `当前 ${roundPercent(list[list.length - 1])}% · 均 ${roundPercent(avg)}% · 峰 ${roundPercent(Math.max(...list))}%`
+}
+
+function rateTrend(points: ResourceMetricPoint[]) {
+  const recv = points.map(point => numberOrNull(point.networkRecvBytesPerSec) ?? 0)
+  const sent = points.map(point => numberOrNull(point.networkSentBytesPerSec) ?? 0)
+  if (!recv.length) {
+    return ''
+  }
+  return `当前 ↓${formatRate(recv[recv.length - 1])} ↑${formatRate(sent[sent.length - 1])} · 峰 ↓${formatRate(Math.max(...recv))} ↑${formatRate(Math.max(...sent))}`
+}
+
+function networkWeight(item: HostNetwork) {
+  return (item.recvBytesPerSec || 0) + (item.sentBytesPerSec || 0)
+}
+
+/** 磁盘使用率胶囊：越满越醒目，和顶部 KPI 同一套阈值 */
+function diskTone(percent?: number) {
+  return metricTone(numberOrNull(percent), METRIC_THRESHOLDS.disk)
+}
+
+function formatClock(date: Date) {
+  return date.toLocaleTimeString('zh-CN', { hour12: false })
 }
 
 function loadText(data?: HostResourceSnapshot | null) {
@@ -356,11 +536,20 @@ function stackPreview(row: HostThreadHotspot) {
 
 <template>
   <div>
-    <YdPageHeader title="资源监控" class="mb-0 resource-header" main-class="min-w-0" default-class="w-full min-w-0 flex-wrap sm:w-auto">
+    <YdPageHeader title="资源监控" class="resource-header mb-0" main-class="min-w-0" default-class="w-full min-w-0 flex-wrap sm:w-auto">
       <template #description>
-        <p class="host-meta">{{ hostMeta }}</p>
+        <p class="host-meta">
+          {{ hostMeta }}
+        </p>
+        <p v-if="lastUpdatedText" class="update-meta">
+          更新于 {{ lastUpdatedText }}
+          <template v-if="!refreshSeconds">
+            · 自动刷新已关闭
+          </template>
+        </p>
       </template>
-      <YdSelect v-model="hours" :options="hourOptions" class="w-full min-w-0 sm:w-[140px]" @update:model-value="loadHistory" />
+      <YdSelect v-model="hours" :options="hourOptions" class="min-w-0 w-full sm:w-[140px]" @update:model-value="loadHistory()" />
+      <YdSelect v-model="refreshSeconds" :options="REFRESH_OPTIONS" class="min-w-0 w-full sm:w-[150px]" />
       <YdButton class="shrink-0" :loading="loading || historyLoading" @click="refreshAll">
         <YdIcon name="morph:refresh-cw" />
         刷新
@@ -368,112 +557,156 @@ function stackPreview(row: HostThreadHotspot) {
     </YdPageHeader>
 
     <YdPageMain class="resource-main" main-class="min-w-0 overflow-x-hidden">
-      <p v-if="snapshot?.notice" class="monitor-notice">{{ snapshot.notice }}</p>
+      <!-- 第一屏先给结论性数字：当前状态一眼可见，分析结论紧随其后 -->
+      <YdStats class="kpi-strip">
+        <YdStat
+          v-for="item in stats"
+          :key="item.label"
+          :title="item.label"
+          :description="item.hint"
+        >
+          <template #figure>
+            <span class="kpi-icon" :data-tone="item.tone"><YdIcon :name="item.icon" /></span>
+          </template>
+          <template #value>
+            <span class="kpi-value" :data-tone="item.tone">{{ item.value }}</span>
+          </template>
+          <template v-if="item.percent != null" #actions>
+            <div class="kpi-bar" :data-tone="item.tone">
+              <span :style="{ width: `${Math.min(100, Math.max(0, item.percent))}%` }" />
+            </div>
+          </template>
+        </YdStat>
+      </YdStats>
+      <p v-if="snapshot?.notice" class="kpi-note">
+        {{ snapshot.notice }}
+      </p>
 
-      <section class="monitor-panel analysis-panel">
-        <div class="panel-title">
-          <span>优化分析</span>
-          <YdTag :variant="severityTag(analysis.severity)">{{ severityLabel(analysis.severity) }}</YdTag>
-        </div>
-        <YdAlert
-          :icon="analysis.severity === 'warn' ? 'morph:triangle-alert' : 'morph:lightbulb'"
-          :title="analysis.headline"
-          :description="analysis.summary"
-          :variant="analysis.severity === 'warn' ? 'destructive' : 'default'"
-          class="analysis-alert"
-        />
-        <div v-if="analysis.findings.length" class="finding-list">
-          <article v-for="item in analysis.findings" :key="item.id" class="finding-card">
-            <div class="finding-head">
-              <strong>{{ item.title }}</strong>
-              <YdTag :variant="severityTag(item.severity)">{{ severityLabel(item.severity) }}</YdTag>
+      <YdAlert
+        v-if="snapshotError || historyError"
+        variant="destructive"
+        icon="morph:triangle-alert"
+        title="监控数据获取失败"
+        :description="`${[snapshotError, historyError].filter(Boolean).join('；')}（自动刷新仍在重试，也可点右上角刷新）`"
+        class="monitor-error"
+      />
+      <YdCard class="analysis-panel section-card">
+        <YdCollapsible v-model="analysisOpen">
+          <template #trigger="{ open }">
+            <div class="panel-head analysis-trigger">
+              <span class="panel-head-title">优化分析</span>
+              <YdTag :variant="severityTag(analysis.severity)">
+                {{ severityLabel(analysis.severity) }}
+              </YdTag>
+              <span class="panel-head-note">{{ analysis.findings.length ? `${analysis.findings.length} 条结论` : '暂无瓶颈' }}</span>
+              <span class="panel-head-toggle">{{ open ? '收起' : '展开' }}</span>
+              <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" />
             </div>
-            <p>{{ item.summary }}</p>
-            <p class="finding-action">{{ item.action }}</p>
-          </article>
-        </div>
-        <p v-else class="monitor-sub">当前没有需要处理的资源瓶颈，趋势图可用于确认是否刚刚抖动。</p>
-        <div class="spend-grid">
-          <div>
-            <div class="panel-title">
-              <span>内存花在哪</span>
+          </template>
+          <p class="analysis-headline">
+            {{ analysis.headline }}
+          </p>
+          <p class="monitor-sub">
+            {{ analysis.summary }}
+          </p>
+          <div v-if="analysis.findings.length" class="finding-list">
+            <article v-for="item in analysis.findings" :key="item.id" class="finding-card">
+              <div class="finding-head">
+                <strong>{{ item.title }}</strong>
+                <YdTag :variant="severityTag(item.severity)">
+                  {{ severityLabel(item.severity) }}
+                </YdTag>
+              </div>
+              <p>{{ item.summary }}</p>
+              <p class="finding-action">
+                {{ item.action }}
+              </p>
+            </article>
+          </div>
+          <p v-else class="monitor-sub">
+            当前没有需要处理的资源瓶颈，趋势图可用于确认是否刚刚抖动。
+          </p>
+          <div class="spend-grid">
+            <div>
+              <div class="panel-title">
+                <span>内存花在哪</span>
+              </div>
+              <p class="monitor-sub">
+                把本机进程 RSS 和当前 JVM 内存池放在一起看：先分清是别人占内存，还是自己的堆/堆外在涨。
+              </p>
+              <ol v-if="analysis.memorySpenders.length" class="spend-list">
+                <li v-for="item in analysis.memorySpenders" :key="`mem-${item.name}-${item.detail}`">
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <YdTag v-if="item.current" variant="secondary">
+                      当前程序
+                    </YdTag>
+                  </div>
+                  <span>{{ item.detail }}</span>
+                  <p>{{ item.hint }}</p>
+                </li>
+              </ol>
+              <p v-else class="monitor-sub">
+                暂无进程或内存池数据
+              </p>
             </div>
-            <p class="monitor-sub">把本机进程 RSS 和当前 JVM 内存池放在一起看：先分清是别人占内存，还是自己的堆/堆外在涨。</p>
-            <ol v-if="analysis.memorySpenders.length" class="spend-list">
-              <li v-for="item in analysis.memorySpenders" :key="`mem-${item.name}-${item.detail}`">
-                <div>
-                  <strong>{{ item.name }}</strong>
-                  <YdTag v-if="item.current" variant="secondary">当前程序</YdTag>
-                </div>
-                <span>{{ item.detail }}</span>
-                <p>{{ item.hint }}</p>
-              </li>
-            </ol>
-            <p v-else class="monitor-sub">暂无进程或内存池数据</p>
-          </div>
-          <div>
-            <div class="panel-title">
-              <span>CPU 花在哪</span>
+            <div>
+              <div class="panel-title">
+                <span>CPU 花在哪</span>
+              </div>
+              <p class="monitor-sub">
+                先看本机进程，再看当前 JVM 线程。线程累计 CPU 高，可能是热点，也可能只是活得久。
+              </p>
+              <ol v-if="analysis.cpuSpenders.length" class="spend-list">
+                <li v-for="item in analysis.cpuSpenders" :key="`cpu-${item.name}-${item.detail}`">
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <YdTag v-if="item.current" variant="secondary">
+                      当前程序
+                    </YdTag>
+                  </div>
+                  <span>{{ item.detail }}</span>
+                  <p>{{ item.hint }}</p>
+                </li>
+              </ol>
+              <p v-else class="monitor-sub">
+                暂无进程或线程热点
+              </p>
             </div>
-            <p class="monitor-sub">先看本机进程，再看当前 JVM 线程。线程累计 CPU 高，可能是热点，也可能只是活得久。</p>
-            <ol v-if="analysis.cpuSpenders.length" class="spend-list">
-              <li v-for="item in analysis.cpuSpenders" :key="`cpu-${item.name}-${item.detail}`">
-                <div>
-                  <strong>{{ item.name }}</strong>
-                  <YdTag v-if="item.current" variant="secondary">当前程序</YdTag>
-                </div>
-                <span>{{ item.detail }}</span>
-                <p>{{ item.hint }}</p>
-              </li>
-            </ol>
-            <p v-else class="monitor-sub">暂无进程或线程热点</p>
           </div>
-        </div>
-      </section>
-
-      <div class="monitor-summary">
-        <div v-for="item in stats" :key="item.label" class="summary-item">
-          <div class="summary-icon">
-            <YdIcon :name="item.icon" />
-          </div>
-          <div class="summary-body">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <em v-if="item.hint">{{ item.hint }}</em>
-          </div>
-        </div>
-      </div>
+        </YdCollapsible>
+      </YdCard>
 
       <div class="chart-grid">
-        <section class="monitor-panel">
-          <div class="panel-title">CPU 使用率</div>
-          <p class="monitor-sub">整机处理器忙闲程度。曲线贴近 100% 表示机器已经在排队，不一定等于当前 Java 程序在忙。</p>
-          <ChartWidget :dataset="cpuDataset" :height="chartHeight" />
-        </section>
-        <section class="monitor-panel">
-          <div class="panel-title">内存使用率</div>
-          <p class="monitor-sub">主机内存是整机物理占用；程序 Heap 才是当前 Java 对象占用。两条线接近，说明内存压力主要来自本程序。</p>
-          <ChartWidget :dataset="memoryDataset" :height="chartHeight" />
-        </section>
-        <section class="monitor-panel">
-          <div class="panel-title">磁盘使用率</div>
-          <p class="monitor-sub">所有分区合计的容量占用。真正要清理时，请看下面的磁盘分区表，确认是哪个挂载点先满。</p>
-          <ChartWidget :dataset="diskDataset" :height="chartHeight" />
-        </section>
-        <section class="monitor-panel">
-          <div class="panel-title">网络速率 KB/s</div>
-          <p class="monitor-sub">当前每秒收发了多少数据，不是累计流量。突然升高通常对应下载、推送或大文件传输。</p>
-          <ChartWidget :dataset="networkDataset" :height="chartHeight" />
-        </section>
+        <YdCard v-for="chart in trendCharts" :key="chart.id">
+          <template #header>
+            <div class="panel-head">
+              <div class="panel-head-main">
+                <span class="panel-head-title">{{ chart.title }}</span>
+                <p class="monitor-sub">
+                  {{ chart.hint }}
+                </p>
+              </div>
+              <span v-if="trendMetrics[chart.id]" class="panel-metric">{{ trendMetrics[chart.id] }}</span>
+            </div>
+          </template>
+          <ChartWidget :dataset="chart.dataset" :height="chartHeight" />
+        </YdCard>
       </div>
 
       <div class="monitor-grid">
-        <section class="monitor-panel">
-          <div class="panel-title">
-            <span>JVM 内存池</span>
-            <YdTag variant="secondary">{{ snapshot?.memoryPools.length || 0 }}</YdTag>
-          </div>
-          <p class="monitor-sub">饼图按已用字节看内存花在哪一块。Heap 高看 Eden/Old，RSS 明显高于 Heap 时再看 Metaspace、Code Cache 或 Direct。</p>
+        <YdCard>
+          <template #header>
+            <div class="panel-head">
+              <span class="panel-head-title">JVM 内存池</span>
+              <YdTag variant="secondary">
+                {{ snapshot?.memoryPools.length || 0 }}
+              </YdTag>
+            </div>
+            <p class="monitor-sub">
+              饼图按已用字节看内存花在哪一块。Heap 高看 Eden/Old，RSS 明显高于 Heap 时再看 Metaspace、Code Cache 或 Direct。
+            </p>
+          </template>
           <ChartWidget :dataset="poolDataset" :height="chartHeight" />
           <ul class="pool-legend">
             <li v-for="pool in snapshot?.memoryPools || []" :key="pool.name">
@@ -481,17 +714,23 @@ function stackPreview(row: HostThreadHotspot) {
               <span>{{ formatBytes(pool.usedBytes) }} · {{ describePool(pool).hint }}</span>
             </li>
           </ul>
-          <p class="monitor-sub">{{ gcText }}</p>
-        </section>
-        <section class="monitor-panel">
-          <div class="panel-title">磁盘分区</div>
-          <p class="monitor-sub">每个挂载点各自的容量。日志、上传和数据库文件通常不在同一个分区。</p>
+          <p class="monitor-sub monitor-sub--last">
+            {{ gcText }}
+          </p>
+        </YdCard>
+        <YdCard>
+          <template #header>
+            <span class="panel-head-title">磁盘分区</span>
+            <p class="monitor-sub">
+              每个挂载点各自的容量。日志、上传和数据库文件通常不在同一个分区。
+            </p>
+          </template>
           <YdResponsiveTable
             row-key="mount"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[640px]"
-            border
-            stripe
+
+            stripe border
             :columns="diskColumns"
             :data="snapshot?.disks || []"
           >
@@ -499,71 +738,111 @@ function stackPreview(row: HostThreadHotspot) {
               {{ formatBytes(row.original.usedBytes) }} / {{ formatBytes(row.original.totalBytes) }}
             </template>
             <template #cell-usagePercent="{ row }">
-              {{ percentText(row.original.usagePercent) }}
+              <span class="yd-status-tone" :data-tone="diskTone(row.original.usagePercent)">{{ percentText(row.original.usagePercent) }}</span>
             </template>
             <template #card="{ row }">
-              <YdCard class="w-full min-w-0">
+              <YdCard class="min-w-0 w-full">
                 <div class="card-row">
                   <strong>{{ row.name || row.mount }}</strong>
-                  <span>{{ percentText(row.usagePercent) }}</span>
+                  <span class="yd-status-tone" :data-tone="diskTone(row.usagePercent)">{{ percentText(row.usagePercent) }}</span>
                 </div>
-                <p class="monitor-sub">{{ row.mount }} · {{ row.type || '未知类型' }}</p>
-                <p class="monitor-sub">{{ formatBytes(row.usedBytes) }} / {{ formatBytes(row.totalBytes) }}</p>
+                <p class="monitor-sub">
+                  {{ row.mount }} · {{ row.type || '未知类型' }}
+                </p>
+                <p class="monitor-sub">
+                  {{ formatBytes(row.usedBytes) }} / {{ formatBytes(row.totalBytes) }}
+                </p>
               </YdCard>
             </template>
           </YdResponsiveTable>
-        </section>
+        </YdCard>
       </div>
 
-      <section class="monitor-panel monitor-panel--wide">
-        <div class="panel-title">网卡</div>
-        <p class="monitor-sub">看具体哪块网卡在跑流量。虚拟网卡速率高不一定代表对外带宽打满。</p>
+      <YdCard class="section-card">
+        <template #header>
+          <div class="panel-head">
+            <div class="panel-head-main">
+              <span class="panel-head-title">网卡</span>
+              <p class="monitor-sub">
+                看具体哪块网卡在跑流量。虚拟网卡速率高不一定代表对外带宽打满；默认按实时速率排前 {{ NETWORK_TOP }} 块。
+              </p>
+            </div>
+            <YdButton
+              v-if="(snapshot?.networks?.length || 0) > NETWORK_TOP"
+              variant="ghost"
+              size="sm"
+              @click="networkExpanded = !networkExpanded"
+            >
+              <YdIcon :name="networkExpanded ? 'morph:chevron-up' : 'morph:chevron-down'" />
+              {{ networkExpanded ? `只看前 ${NETWORK_TOP} 块` : `显示全部 ${snapshot?.networks?.length || 0} 块` }}
+            </YdButton>
+          </div>
+        </template>
         <YdResponsiveTable
           row-key="name"
           table-root-class="rounded-md overflow-hidden"
           table-class="min-w-[640px]"
-          border
-          stripe
+
+          stripe border
           :columns="networkColumns"
-          :data="snapshot?.networks || []"
+          :data="networkRows"
         >
+          <template #cell-name="{ row }">
+            <span>{{ row.original.name }}</span>
+            <YdTag v-if="row.original.ipv4" variant="secondary" class="ml-2">
+              {{ row.original.ipv4 }}
+            </YdTag>
+          </template>
           <template #cell-recv="{ row }">
             {{ formatRate(row.original.recvBytesPerSec) }}
           </template>
           <template #cell-sent="{ row }">
             {{ formatRate(row.original.sentBytesPerSec) }}
           </template>
-            <template #card="{ row }">
-            <YdCard class="w-full min-w-0">
+          <template #card="{ row }">
+            <YdCard class="min-w-0 w-full">
               <div class="card-row">
                 <strong>{{ row.name }}</strong>
                 <span>{{ row.ipv4 || '-' }}</span>
               </div>
-              <p class="monitor-sub">{{ formatRate(row.recvBytesPerSec) }} ↓ / {{ formatRate(row.sentBytesPerSec) }} ↑</p>
+              <p class="monitor-sub">
+                {{ formatRate(row.recvBytesPerSec) }} ↓ / {{ formatRate(row.sentBytesPerSec) }} ↑
+              </p>
             </YdCard>
           </template>
         </YdResponsiveTable>
-      </section>
+        <p v-if="networkHiddenCount" class="monitor-sub monitor-sub--last">
+          另有 {{ networkHiddenCount }} 块网卡未显示（多为虚拟网卡，速率较低）。
+        </p>
+      </YdCard>
 
       <div class="monitor-grid">
-        <section class="monitor-panel">
-          <div class="panel-title">
-            <span>进程 RSS Top</span>
-            <YdTag variant="secondary">{{ snapshot?.topProcesses.length || 0 }}</YdTag>
-          </div>
-          <p class="monitor-sub">本机物理内存占用最高的进程。带「当前 JVM」的才是这个管理端；如果第一名是别的程序，先别给 Java 加堆。</p>
+        <YdCard>
+          <template #header>
+            <div class="panel-head">
+              <span class="panel-head-title">进程 RSS Top</span>
+              <YdTag variant="secondary">
+                {{ snapshot?.topProcesses.length || 0 }}
+              </YdTag>
+            </div>
+            <p class="monitor-sub">
+              本机物理内存占用最高的进程。带「当前 JVM」的才是这个管理端；如果第一名是别的程序，先别给 Java 加堆。
+            </p>
+          </template>
           <YdResponsiveTable
             row-key="pid"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[860px]"
-            border
-            stripe
+
+            stripe border
             :columns="processColumns"
             :data="snapshot?.topProcesses || []"
           >
             <template #cell-name="{ row }">
               <span>{{ row.original.name }}</span>
-              <YdTag v-if="row.original.currentJvm" variant="secondary" class="ml-2">当前 JVM</YdTag>
+              <YdTag v-if="row.original.currentJvm" variant="secondary" class="ml-2">
+                当前 JVM
+              </YdTag>
             </template>
             <template #cell-rssBytes="{ row }">
               {{ formatBytes(row.original.rssBytes) }}
@@ -572,29 +851,39 @@ function stackPreview(row: HostThreadHotspot) {
               {{ percentText(row.original.cpuPercent) }}
             </template>
             <template #card="{ row }">
-              <YdCard class="w-full min-w-0">
+              <YdCard class="min-w-0 w-full">
                 <div class="card-row">
                   <strong>{{ row.name }} #{{ row.pid }}</strong>
-                  <YdTag v-if="row.currentJvm" variant="secondary">当前 JVM</YdTag>
+                  <YdTag v-if="row.currentJvm" variant="secondary">
+                    当前 JVM
+                  </YdTag>
                 </div>
-                <p class="monitor-sub">RSS {{ formatBytes(row.rssBytes) }} · CPU {{ percentText(row.cpuPercent) }}</p>
+                <p class="monitor-sub">
+                  RSS {{ formatBytes(row.rssBytes) }} · CPU {{ percentText(row.cpuPercent) }}
+                </p>
                 <code>{{ row.commandLine || '-' }}</code>
               </YdCard>
             </template>
           </YdResponsiveTable>
-        </section>
-        <section class="monitor-panel">
-          <div class="panel-title">
-            <span>线程 CPU Top</span>
-            <YdTag variant="secondary">{{ snapshot?.topThreads.length || 0 }}</YdTag>
-          </div>
-          <p class="monitor-sub">当前 JVM 里累计 CPU 最高的线程。RUNNABLE 更像计算热点；WAITING / BLOCKED 更像在等锁或 IO。</p>
+        </YdCard>
+        <YdCard>
+          <template #header>
+            <div class="panel-head">
+              <span class="panel-head-title">线程 CPU Top</span>
+              <YdTag variant="secondary">
+                {{ snapshot?.topThreads.length || 0 }}
+              </YdTag>
+            </div>
+            <p class="monitor-sub">
+              当前 JVM 里累计 CPU 最高的线程。RUNNABLE 更像计算热点；WAITING / BLOCKED 更像在等锁或 IO。
+            </p>
+          </template>
           <YdResponsiveTable
             row-key="threadId"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[860px]"
-            border
-            stripe
+
+            stripe border
             :columns="threadColumns"
             :data="snapshot?.topThreads || []"
           >
@@ -605,24 +894,26 @@ function stackPreview(row: HostThreadHotspot) {
               <code>{{ stackPreview(row.original) }}</code>
             </template>
             <template #card="{ row }">
-              <YdCard class="w-full min-w-0">
+              <YdCard class="min-w-0 w-full">
                 <div class="card-row">
                   <strong>{{ row.name }}</strong>
                   <span>{{ row.state || '-' }}</span>
                 </div>
-                <p class="monitor-sub">CPU {{ formatDuration(row.cpuTimeMs) }}</p>
+                <p class="monitor-sub">
+                  CPU {{ formatDuration(row.cpuTimeMs) }}
+                </p>
                 <code>{{ stackPreview(row) }}</code>
               </YdCard>
             </template>
           </YdResponsiveTable>
-        </section>
+        </YdCard>
       </div>
 
-      <section class="monitor-panel glossary-panel">
+      <YdCard class="glossary-panel section-card">
         <YdCollapsible v-model="glossaryOpen">
           <template #trigger="{ open }">
-            <div class="panel-title glossary-trigger">
-              <span>名词解释</span>
+            <div class="panel-head glossary-trigger">
+              <span class="panel-head-title">名词解释</span>
               <span class="glossary-toggle">{{ open ? '收起' : '展开全部' }}</span>
             </div>
           </template>
@@ -639,7 +930,7 @@ function stackPreview(row: HostThreadHotspot) {
             <dd>{{ item.meaning }}</dd>
           </div>
         </dl>
-      </section>
+      </YdCard>
     </YdPageMain>
   </div>
 </template>
@@ -664,7 +955,94 @@ function stackPreview(row: HostThreadHotspot) {
   word-break: break-word;
 }
 
-.monitor-notice,
+.update-meta {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* 指标卡片：默认 3 列，窄屏 2 列；卡片本体由 YdStat 提供统一表面 */
+.kpi-strip {
+  margin-bottom: 8px;
+}
+
+.kpi-strip > :deep(.yd-stat) {
+  flex: 1 1 30%;
+}
+
+.kpi-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: var(--color-text-3);
+  background: var(--color-fill-2);
+  border-radius: var(--yd-control-radius);
+  font-size: 16px;
+}
+
+.kpi-icon[data-tone='success'] {
+  color: var(--yd-status-success);
+  background: color-mix(in srgb, var(--yd-status-success) 12%, transparent);
+}
+
+.kpi-icon[data-tone='warning'] {
+  color: var(--yd-status-warning);
+  background: color-mix(in srgb, var(--yd-status-warning) 14%, transparent);
+}
+
+.kpi-icon[data-tone='danger'] {
+  color: var(--yd-status-danger);
+  background: color-mix(in srgb, var(--yd-status-danger) 12%, transparent);
+}
+
+.kpi-value[data-tone='warning'] {
+  color: var(--yd-status-warning);
+}
+
+.kpi-value[data-tone='danger'] {
+  color: var(--yd-status-danger);
+}
+
+.kpi-bar {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  background: var(--color-fill-2);
+  border-radius: 999px;
+}
+
+.kpi-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-text-3);
+  border-radius: inherit;
+  transition: width var(--yd-motion-duration-normal) var(--yd-motion-ease);
+}
+
+.kpi-bar[data-tone='success'] > span {
+  background: var(--yd-status-success);
+}
+
+.kpi-bar[data-tone='warning'] > span {
+  background: var(--yd-status-warning);
+}
+
+.kpi-bar[data-tone='danger'] > span {
+  background: var(--yd-status-danger);
+}
+
+.kpi-note {
+  margin: 0 0 16px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.monitor-error {
+  margin-bottom: 16px;
+}
+
 .monitor-sub {
   margin: 0 0 12px;
   color: var(--color-text-3);
@@ -673,67 +1051,71 @@ function stackPreview(row: HostThreadHotspot) {
   overflow-wrap: anywhere;
 }
 
-.monitor-notice {
-  padding: 8px 10px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-fill-1);
+.monitor-sub--last {
+  margin: 12px 0 0;
 }
 
-.monitor-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0 0 16px;
-}
-
-.summary-item {
+.panel-head {
   display: flex;
-  min-width: 0;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.summary-icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  place-items: center;
-  border-radius: 6px;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-  font-size: 18px;
-}
-
-.summary-body {
-  display: grid;
+  justify-content: space-between;
   min-width: 0;
-  gap: 2px;
 }
 
-.summary-body span {
+.panel-head-main {
+  min-width: 0;
+}
+
+.panel-head-main .monitor-sub {
+  margin: 4px 0 0;
+}
+
+.panel-head-title {
+  color: var(--color-text-1);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* 趋势卡片右上角的读数：当前 / 均 / 峰，避免只看曲线被抖动带偏 */
+.panel-metric {
+  flex: none;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.analysis-trigger {
+  align-items: center;
+  width: 100%;
+  cursor: pointer;
+  color: var(--color-text-1);
+}
+
+.panel-head-note,
+.panel-head-toggle {
+  margin-left: auto;
   color: var(--color-text-3);
   font-size: 12px;
+  font-weight: 400;
 }
 
-.summary-body strong {
-  overflow-wrap: anywhere;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
+.panel-head-toggle {
+  margin-left: 0;
 }
 
-.summary-body em {
-  color: var(--color-text-3);
-  font-size: 12px;
-  font-style: normal;
-  line-height: 1.4;
+.analysis-headline {
+  margin: 0 0 6px;
+  color: var(--color-text-1);
+  font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.section-card,
+.analysis-panel,
+.glossary-panel {
+  margin-bottom: 16px;
 }
 
 .chart-grid,
@@ -742,25 +1124,6 @@ function stackPreview(row: HostThreadHotspot) {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  margin-bottom: 16px;
-}
-
-.monitor-panel {
-  min-width: 0;
-  overflow: hidden;
-  padding: 16px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.monitor-panel--wide,
-.analysis-panel,
-.glossary-panel {
-  margin-bottom: 16px;
-}
-
-.analysis-alert {
   margin-bottom: 16px;
 }
 
@@ -886,13 +1249,16 @@ code {
 }
 
 @media (min-width: 640px) {
-  .monitor-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .glossary-preview,
   .glossary-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  /* 窄屏指标卡两列即可：一列会把六张卡拉成很长的一条 */
+  .kpi-strip > :deep(.yd-stat) {
+    flex: 1 1 45%;
   }
 }
 
@@ -903,10 +1269,6 @@ code {
 }
 
 @media (min-width: 1180px) {
-  .monitor-summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .chart-grid,
   .monitor-grid,
   .spend-grid {

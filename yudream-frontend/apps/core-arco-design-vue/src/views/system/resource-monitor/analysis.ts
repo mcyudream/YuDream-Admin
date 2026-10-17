@@ -126,6 +126,34 @@ export function severityTag(severity: AnalysisSeverity): 'destructive' | 'outlin
   return 'secondary'
 }
 
+/** 指标卡片的语义色调：直接对应 .yd-status-tone 的 data-tone，页面不再各自定色。 */
+export type MetricTone = 'success' | 'warning' | 'danger' | 'neutral'
+
+/** 各指标的注意线 / 危险线（百分比）。CPU 短时冲高属正常，故注意线高于内存与磁盘。 */
+export const METRIC_THRESHOLDS = {
+  cpu: { watch: 70, warn: 90 },
+  hostMemory: { watch: 80, warn: 92 },
+  heap: { watch: 75, warn: 90 },
+  disk: { watch: 80, warn: 90 },
+} as const
+
+/**
+ * 占用率分级：达到危险线给 danger、达到注意线给 warning，其余 success；无值给 neutral。
+ * 只做展示分级，不参与 analyzeResource 的结论判定。
+ */
+export function metricTone(percent: number | null | undefined, thresholds: { watch: number, warn: number }): MetricTone {
+  if (percent == null || !Number.isFinite(percent)) {
+    return 'neutral'
+  }
+  if (percent >= thresholds.warn) {
+    return 'danger'
+  }
+  if (percent >= thresholds.watch) {
+    return 'warning'
+  }
+  return 'success'
+}
+
 function cpuFinding(
   cpu: number | undefined,
   avgCpu: number | undefined,

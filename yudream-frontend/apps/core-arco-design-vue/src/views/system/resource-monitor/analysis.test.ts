@@ -1,7 +1,7 @@
+import type { HostResourceSnapshot } from '@/api/modules/system-monitor'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { HostResourceSnapshot } from '@/api/modules/system-monitor'
-import { analyzeResource } from './analysis'
+import { analyzeResource, metricTone } from './analysis'
 
 test('points at the other process when host memory is high but current JVM is not the top RSS', () => {
   const snapshot: HostResourceSnapshot = {
@@ -77,4 +77,14 @@ test('stays calm when host and program usage are moderate', () => {
   assert.equal(result.severity, 'ok')
   assert.equal(result.findings.length, 0)
   assert.match(result.headline, /平稳/)
+})
+
+test('grades metric tones at the watch and warn lines', () => {
+  const disk = { watch: 80, warn: 90 }
+  assert.equal(metricTone(12, disk), 'success')
+  assert.equal(metricTone(79.9, disk), 'success')
+  assert.equal(metricTone(80, disk), 'warning')
+  assert.equal(metricTone(90, disk), 'danger')
+  assert.equal(metricTone(undefined, disk), 'neutral')
+  assert.equal(metricTone(Number.NaN, disk), 'neutral')
 })
