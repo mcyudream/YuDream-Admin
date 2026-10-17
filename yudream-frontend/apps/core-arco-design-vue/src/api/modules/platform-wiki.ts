@@ -1,4 +1,4 @@
-import type { ApiResponse } from './system-client'
+import type { ApiResponse, PageResult } from './system-client'
 import type { AiRunSnapshot } from './platform-ai-runs'
 import systemClient from './system-client'
 
@@ -46,6 +46,10 @@ export interface WikiSpace {
   coverSeed?: string
   coverFileObjectId?: string
   coverAlt?: string
+  /** 访问模式：LEGACY 走全局权限码；RESTRICTED 只对空间成员授权开放（fail closed） */
+  aclMode?: string
+  /** 是否允许登录用户在公开页面发表评论；未开启时读者无法发新评论 */
+  commentEnabled?: boolean
   /** 列表卡片聚合事实（由后端按空间补算）；旧响应或非列表端点可能缺字段 */
   pageCount?: number
   directoryCount?: number
@@ -249,6 +253,70 @@ export const fetchWikiGraph = (spaceId: string) => systemClient.get<unknown, Api
 export const exportWikiArchive = (spaceId: string) => systemClient.get<unknown, ApiResponse<string>>(`api/platform/wiki/spaces/${spaceId}/export`)
 export const importWikiArchive = (content: string) => systemClient.post<unknown, ApiResponse<string>>('api/platform/wiki/import', { content })
 export const rebuildWikiIndex = (spaceId: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/spaces/${spaceId}/rebuild-index`)
+
+// ---- 空间成员（实例 ACL）：全局权限码 + 空间 MANAGE 双闸门在后端 ----
+
+export type WikiMemberSubjectType = 'USER' | 'ROLE'
+/** 动作语义包含：MANAGE > EDIT > COMMENT > READ（高阶覆盖低阶，不再逐条重复勾选） */
+export type WikiAclAction = 'READ' | 'COMMENT' | 'EDIT' | 'MANAGE'
+
+export interface WikiSpaceMember {
+  id: string
+  spaceId?: string
+  subjectType: WikiMemberSubjectType
+  subjectId: string
+  subjectName?: string
+  actions: WikiAclAction[]
+  createdByUserId?: string
+  /** 调整授权时必须回传的期望版本（CAS） */
+  version: number
+}
+
+export const fetchWikiSpaceMembers = (spaceId: string, params: { page?: number, size?: number }) => systemClient.get<unknown, ApiResponse<PageResult<WikiSpaceMember>>>(`api/platform/wiki/spaces/${spaceId}/members`, { params })
+export const createWikiSpaceMember = (spaceId: string, data: { subjectType: WikiMemberSubjectType, subjectId: string, actions: WikiAclAction[] }) => systemClient.post<unknown, ApiResponse<WikiSpaceMember>>(`api/platform/wiki/spaces/${spaceId}/members`, data)
+export const updateWikiSpaceMember = (spaceId: string, memberId: string, data: { actions: WikiAclAction[], expectedVersion: number }) => systemClient.put<unknown, ApiResponse<WikiSpaceMember>>(`api/platform/wiki/spaces/${spaceId}/members/${memberId}`, data)
+export const deleteWikiSpaceMember = (spaceId: string, memberId: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/wiki/spaces/${spaceId}/members/${memberId}`)
+/** 启用空间成员授权（RESTRICTED）：后端保留既有成员，并确保至少一名可管理成员 */
+export const enableWikiRestrictedAcl = (spaceId: string) => systemClient.post<unknown, ApiResponse<WikiSpace>>(`api/platform/wiki/spaces/${spaceId}/acl/restricted`)
+
+// ---- 治理端评论审核：状态机 PENDING → PUBLISHED ⇄ HIDDEN，软删除可恢复 ----
+
+export interface WikiCommentAnchor {
+  exact: string
+  prefix?: string
+  suffix?: string
+  blockOrdinal?: number
+  blockType?: string
+  tableRow?: number
+  tableCell?: number
+  startOffset?: number
+  endOffset?: number
+}
+
+export interface WikiManagedComment {
+  id: string
+  /** 空间归属（仅治理端返回） */
+  spaceId?: string
+  nodeId?: string
+  parentId?: string
+  authorType?: string
+  authorUserId?: string
+  authorName?: string
+  content: string
+  anchor?: WikiCommentAnchor | null
+  versionId?: string
+  revision?: string
+  contentHash?: string
+  status?: string
+  pinned?: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export const fetchWikiManagedComments = (spaceId: string, params: { page?: number, size?: number, status?: string }) => systemClient.get<unknown, ApiResponse<PageResult<WikiManagedComment>>>(`api/platform/wiki/spaces/${spaceId}/comments`, { params })
+export type WikiCommentReviewAction = 'publish' | 'hide' | 'restore' | 'delete' | 'pin' | 'unpin'
+export const reviewWikiComment = (commentId: string, action: WikiCommentReviewAction) => systemClient.post<unknown, ApiResponse<WikiManagedComment>>(`api/platform/wiki/comments/${commentId}/${action}`)
+
 
 // 智能问答（LLM 经 wiki.search 工具检索）
 export const chatWiki = (spaceId: string, data: { question: string; history?: WikiChatTurn[] }) => systemClient.post<unknown, ApiResponse<WikiChatResult>>(`api/platform/wiki/spaces/${spaceId}/chat`, data)

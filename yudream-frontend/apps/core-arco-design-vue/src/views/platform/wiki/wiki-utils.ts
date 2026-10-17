@@ -63,6 +63,40 @@ export function ingestStatusLabel(status?: string): StatusMeta {
   return (status && ingestStatusMeta[status]) || { label: status || '-', color: 'var(--color-text-3)' }
 }
 
+/** 空间访问模式：LEGACY 走全局权限码，RESTRICTED 只对空间成员授权开放；空值按 LEGACY 解释 */
+export interface AclModeMeta extends StatusMeta {
+  key: 'LEGACY' | 'RESTRICTED'
+  description: string
+}
+
+export function aclModeMeta(mode?: string): AclModeMeta {
+  return mode === 'RESTRICTED'
+    ? {
+        key: 'RESTRICTED',
+        label: '空间成员授权',
+        color: 'rgb(var(--success-6))',
+        description: '只有空间成员可以访问，未授权用户与全局权限码都不再放行',
+      }
+    : {
+        key: 'LEGACY',
+        label: '全局权限',
+        color: 'var(--color-text-2)',
+        description: '沿用平台全局权限码，未启用空间成员授权',
+      }
+}
+
+/** 治理端评论状态：PENDING 待审核 → PUBLISHED 已发布 ⇄ HIDDEN 已隐藏，软删除可恢复 */
+export const wikiCommentStatusMeta: Record<string, StatusMeta> = {
+  PENDING: { label: '待审核', color: 'rgb(var(--warning-6))' },
+  PUBLISHED: { label: '已发布', color: 'rgb(var(--success-6))' },
+  HIDDEN: { label: '已隐藏', color: 'var(--color-text-3)' },
+  DELETED: { label: '已删除', color: 'rgb(var(--danger-6))' },
+}
+
+export function wikiCommentStatusLabel(status?: string): StatusMeta {
+  return (status && wikiCommentStatusMeta[status]) || { label: status || '-', color: 'var(--color-text-3)' }
+}
+
 // 抽取状态
 export function extractionStatusLabel(status?: string): StatusMeta {
   const map: Record<string, StatusMeta> = {
@@ -177,17 +211,10 @@ export interface WikiWorkbenchStore {
 export const wikiWorkbenchKey: InjectionKey<WikiWorkbenchStore> = Symbol('wiki-workbench')
 
 // 治理区分区注册表：分组只描述导航结构，组件映射留在 WikiManageView，避免 utils 依赖具体面板
-/** 能力尚未接入时的诚实说明：原因 + 缺失的后端契约，界面只陈述，不伪造数据 */
-export interface WikiUnavailableCapability {
-  reason: string
-  contracts: string[]
-}
-
 export interface WikiManagePanelMeta {
   key: string
   label: string
   icon: string
-  unavailable?: WikiUnavailableCapability
 }
 
 /**
@@ -230,39 +257,15 @@ export const wikiManagePanels: WikiManagePanelMeta[] = [
   { key: 'research', label: '深度研究', icon: 'morph:flask-conical' },
   { key: 'search', label: '检索', icon: 'morph:zoom-in' },
   { key: 'graph', label: '图谱', icon: 'morph:waypoints' },
-  {
-    key: 'members',
-    label: '成员与权限',
-    icon: 'morph:users',
-    unavailable: {
-      reason: '空间成员 ACL 没有后端契约：成员列表、主体选择与空间级授权都无法在此维护，界面不提供假入口。',
-      contracts: [
-        'GET/POST/PUT/DELETE /api/platform/wiki/spaces/{spaceId}/members[/{memberId}]，列表分页、更新带 CAS token',
-        'SpaceACL（READ/COMMENT/EDIT/MANAGE）与 aclMode=LEGACY|RESTRICTED 语义，旧空间保持全局权限行为',
-        '管理用例需同时通过能力闸门、全局权限码与空间实例 ACL，缺失/过期关系 fail closed',
-      ],
-    },
-  },
-  {
-    key: 'comments',
-    label: '评论',
-    icon: 'morph:message-square',
-    unavailable: {
-      reason: '评论与审核接口没有后端契约：无法查看、置顶、隐藏或删除评论，界面不伪造评论数据。',
-      contracts: [
-        'GET /api/public/wiki/{spaceSlug}/nodes/{nodeId}/comments（分页、仅已发布节点上的公开评论）',
-        '管理端 /api/platform/wiki/comments 分页与审核动作，状态 PENDING/PUBLISHED/HIDDEN/DELETED',
-        '作者 ID 只从认证上下文推导，匿名策略默认关闭；管理员操作写审计',
-      ],
-    },
-  },
+  { key: 'members', label: '成员与权限', icon: 'morph:users' },
+  { key: 'comments', label: '评论', icon: 'morph:message-square' },
   { key: 'settings', label: '设置', icon: 'morph:settings' },
 ]
 export const wikiPendingCapabilities: { key: string, label: string, reason: string }[] = [
   {
     key: 'generated-source',
     label: '生成来源标记',
-    reason: '页面/版本缺少生成 run、model、prompt revision 与 source refs 字段：「生成内容」暂按页面类型分组呈现现有页面。',
+    reason: '「生成内容」已按页面 sources 推导资料数与产出它的 AI 运行；写入时固化的模型与 prompt revision 字段仍未提供，因此不显示「AI 生成」徽标。',
   },
 ]
 

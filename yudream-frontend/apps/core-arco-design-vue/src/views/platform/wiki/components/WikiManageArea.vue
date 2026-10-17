@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed, inject, ref } from 'vue'
-import { wikiManageAreaPanels, wikiManagePanelMeta, wikiManagePanels, wikiWorkbenchKey } from '../wiki-utils'
+import { wikiManageAreaPanels, wikiWorkbenchKey } from '../wiki-utils'
 import WikiGeneratedPanel from './WikiGeneratedPanel.vue'
 import WikiGraphPanel from './WikiGraphPanel.vue'
 import WikiIngestPanel from './WikiIngestPanel.vue'
 import WikiLintPanel from './WikiLintPanel.vue'
+import WikiMembersPanel from './WikiMembersPanel.vue'
+import WikiCommentsPanel from './WikiCommentsPanel.vue'
 import WikiOverviewPanel from './WikiOverviewPanel.vue'
 import WikiResearchPanel from './WikiResearchPanel.vue'
 import WikiReviewPanel from './WikiReviewPanel.vue'
 import WikiSearchPanel from './WikiSearchPanel.vue'
 import WikiSettingsPanel from './WikiSettingsPanel.vue'
 import WikiSourcesPanel from './WikiSourcesPanel.vue'
-import WikiUnavailablePanel from './WikiUnavailablePanel.vue'
 
 /**
  * 治理区单个区域的内容：区域内多分区时用横向子标签切换，右侧面板按选中分区动态加载。
@@ -34,8 +35,8 @@ const panelComponents: Record<string, Component> = {
   search: WikiSearchPanel,
   graph: WikiGraphPanel,
   settings: WikiSettingsPanel,
-  members: WikiUnavailablePanel,
-  comments: WikiUnavailablePanel,
+  members: WikiMembersPanel,
+  comments: WikiCommentsPanel,
 }
 
 const areaPanels = computed(() => wikiManageAreaPanels(props.areaKey))
@@ -47,7 +48,6 @@ const activePanelKey = computed({
   get: () => store.activePanel.value,
   set: (key: string) => store.openManage(key),
 })
-const activeMeta = computed(() => wikiManagePanelMeta(store.activePanel.value) || areaPanels.value[0] || wikiManagePanels[0])
 const activeComponent = computed(() => panelComponents[store.activePanel.value] || WikiOverviewPanel)
 
 /** 设置面板持有未保存表单：父级切换区域前用它确认，不能静默丢改动 */
@@ -67,15 +67,8 @@ defineExpose({
         aria-label="治理分区切换"
       />
     </div>
-    <WikiUnavailablePanel
-      v-if="activeMeta.unavailable"
-      :title="activeMeta.label"
-      :icon="activeMeta.icon"
-      :capability="activeMeta.unavailable"
-    />
     <component
       :is="activeComponent"
-      v-else
       ref="settingsRef"
     />
   </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import { rebuildWikiIndex } from '@/api/modules/platform-wiki'
-import { wikiManageAreaPanels, wikiManageAreas, wikiWorkbenchKey } from '../wiki-utils'
+import { wikiManageAreas, wikiWorkbenchKey } from '../wiki-utils'
 import WikiManageArea from './WikiManageArea.vue'
 
 /**
@@ -20,15 +20,9 @@ const modal = useYdModal()
 const rebuilding = ref(false)
 
 // 一级区域导航：每个区域可含多个分区，区域内的分区用横向子标签切换
-const navAreas = computed(() => wikiManageAreas.map(area => ({
-  ...area,
-  unavailable: wikiManageAreaPanels(area.key).every(panel => Boolean(panel.unavailable)),
-})))
-
-/** 顶部 Tab 列表：区域名即分区名；未接入区域在名称上直说，不用角标制造歧义 */
-const areaList = computed(() => navAreas.value.map(area => ({
+const areaList = computed(() => wikiManageAreas.map(area => ({
   icon: area.icon,
-  label: area.unavailable ? `${area.label}（待接入）` : area.label,
+  label: area.label,
   value: area.key,
 })))
 

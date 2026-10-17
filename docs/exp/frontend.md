@@ -40,6 +40,20 @@
 - **规避**：`markdown-render.ts` 里按值域放行这组 `data-*`（数字/枚举逐个校验，不放开任意属性）；同时在 `markdown-engine-config.ts` 用 `markdownItPlugins` 把 mermaid 插件的 `getCached` 置空，让图表只在运行期把 SVG 直接写进 DOM、永不经过字符串消毒——比放宽 SVG 白名单（要放 `foreignObject`/`style`）安全得多。验证看 `.md-editor-preview .md-editor-mermaid svg` 数量与 `<style>` 节点，别只看有没有 svg。
 - **来源**：`yd-mermaid-preview-sanitize`；验证脚本 `tmp/wiki-mermaid-verify.mjs`（`previewSvg>0`、无 CDN mermaid 脚本）。
 
+### 表格行尾操作菜单渲染不出来
+
+- **现象**：`YdResponsiveEnhancedTable` 传了 `actions` 却看不到行尾「操作」列的下拉按钮；单元格是空的，`visible` 谓词手工求值明明是 true。
+- **根因**：业务 `columns` 里自己声明了一列 `id: 'actions'`。`actions` 是表格内置操作列的保留 id（组件 push 时用它 + 用 `#cell-actions` 插槽渲染），撞名后业务列的插槽覆盖了内置下拉的渲染。
+- **规避**：业务列 id 避开 `actions`（如 `grants`/`status`），插槽名跟着改成 `#cell-grants`；验证看 `.yd-enhanced-table__actions-trigger` 数量而不是只看 `actions` 传了没传。
+- **来源**：`wiki-collaboration-panels`（成员与权限面板）。
+
+### YdTablePicker 的模型是行键数组，不是行对象
+
+- **现象**：选择器选完 `v-model` 里拿不到行对象字段（`selection[0].nickname` 为 undefined），提交后端报「主体 ID 不合法」。
+- **根因**：`YdTablePicker` 的 `modelValue` 是 `string[]`（行键），只负责选中与回显标签；行对象只存在于 `fetcher` 的返回里。
+- **规避**：模型声明成 `ref<string[]>([])`，行对象字段（昵称/名称）在 fetcher 里另存标签表供回显；提交时用键值。另：`YdCheckboxGroup` 的每个选项是 `div`（`role=group` 的子元素，点容器即切换，无内层 input/button），驱动验收脚本时要点选项容器本身。
+- **来源**：`wiki-collaboration-panels`（成员与权限面板）。
+
 ## 2. 布局与交互
 
 ### 表格表头 sticky 失效，跟着内容一起滚走

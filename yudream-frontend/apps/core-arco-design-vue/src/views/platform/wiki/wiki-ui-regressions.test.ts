@@ -245,3 +245,44 @@ test('overview leads with what needs attention and keeps statistics as the main 
   assert.match(overview, /grid-template-columns: minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/)
   assert.match(overview, /max-width: 1280px/)
 })
+
+test('collaboration area is real workbenches: space ACL members and comment review, no placeholder panels', () => {
+  const utils = wikiFile('wiki-utils.ts')
+  // 协作区两个分区是真实面板；「能力待接入」占位模式已随契约落地退役
+  assert.match(utils, /key: 'members', label: '成员与权限'/)
+  assert.match(utils, /key: 'comments', label: '评论'/)
+  assert.doesNotMatch(utils, /unavailable/)
+
+  const area = wikiFile('components/WikiManageArea.vue')
+  assert.match(area, /members: WikiMembersPanel/)
+  assert.match(area, /comments: WikiCommentsPanel/)
+  assert.doesNotMatch(area, /UnavailablePanel/)
+
+  const api = wikiFile('../../../api/modules/platform-wiki.ts')
+  // 端点与后端 WikiSpaceMemberController / WikiCommentManageController 一一对应
+  assert.match(api, /spaces\/\$\{spaceId\}\/members/)
+  assert.match(api, /members\/\$\{memberId\}/)
+  assert.match(api, /acl\/restricted/)
+  assert.match(api, /comments\/\$\{commentId\}\/\$\{action\}/)
+  assert.match(api, /expectedVersion/)
+
+  const members = wikiFile('components/WikiMembersPanel.vue')
+  // 调整授权必须回传 CAS 版本，权限动作语义包含关系要讲清楚
+  assert.match(members, /expectedVersion: member\.version/)
+  assert.match(members, /管理 &gt; 编辑 &gt; 评论 &gt; 读取/)
+  assert.match(members, /platform:wiki:member:manage/)
+  assert.match(members, /enableWikiRestrictedAcl/)
+  // LEGACY 下成员表不生效必须在界面上直说，不能让人以为勾了就生效
+  assert.match(members, /下表授权暂不生效/)
+
+  const comments = wikiFile('components/WikiCommentsPanel.vue')
+  assert.match(comments, /reviewWikiComment/)
+  assert.match(comments, /platform:wiki:comment:manage/)
+  // 删除是软状态：措辞要说明可恢复，不能只留一个危险按钮
+  assert.match(comments, /软状态/)
+  // 四个状态筛选与审核动作齐全
+  assert.match(comments, /'PENDING', 'PUBLISHED', 'HIDDEN', 'DELETED'/)
+  assert.match(comments, /comment\.status === 'PENDING'/)
+  assert.match(comments, /comment\.status === 'PUBLISHED' && !comment\.pinned/)
+  assert.match(comments, /'HIDDEN', 'DELETED'\]\.includes\(comment\.status/)
+})

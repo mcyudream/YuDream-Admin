@@ -1,17 +1,88 @@
 <script setup lang="ts">
 import type { WikiNode } from '@/api/modules/platform-wiki'
-import { computed, inject, ref } from 'vue'
-import { saveWikiNode } from '@/api/modules/platform-wiki'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { fetchWikiIngestTasks, fetchWikiSources, saveWikiNode } from '@/api/modules/platform-wiki'
+import AiRunProgress from '@/components/AiRunProgress/index.vue'
 import { moveWikiNode } from '../wiki-node-ops'
 import { pageTypeColor, pageTypeLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 // 生成内容：一级目录 llm-gen 的真实入口。
 // 目录是真实节点（出现在作者目录树里），页面只有被移入后才会归到它下面；
 // 按页面类型分组只是同一批页面的阅读视图，不代表它们已经在 llm-gen 里。
-// 生成来源（run/model/prompt revision/source refs）字段尚未提供，因此不展示任何「AI 生成」徽标。
+// 来源事实只用已存在的链路推导：页面 sources → 产出它的摄入任务 AI 运行；
+// 模型与 prompt revision 需要写入时固化的字段，尚未提供，界面不显示「AI 生成」徽标也不猜。
 const store = inject(wikiWorkbenchKey)!
 const toast = useYdToast()
 const modal = useYdModal()
+const account = useAppAccountStore()
+
+// —— 页面来源：资料标题 + 产出该页面的 AI 运行（与摄入面板同口径：只对发起人可见）——
+const sourceTitles = ref<Record<string, string>>({})
+const runBySourceId = ref<Record<string, { runId: string, requestedByUserId?: string }>>({})
+const provenanceRunId = ref('')
+const runDrawerOpen = ref(false)
+
+async function loadProvenance() {
+  if (!store.spaceId.value) {
+    sourceTitles.value = {}
+    runBySourceId.value = {}
+    return
+  }
+  try {
+    const [sources, tasks] = await Promise.all([
+      fetchWikiSources(store.spaceId.value),
+      fetchWikiIngestTasks(store.spaceId.value),
+    ])
+    const titles: Record<string, string> = {}
+    for (const source of sources.data || []) {
+      titles[source.id] = source.title || source.fileName
+    }
+    sourceTitles.value = titles
+    const runs: Record<string, { runId: string, requestedByUserId?: string }> = {}
+    for (const task of [...(tasks.data || [])].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))) {
+      if (task.sourceId && task.aiRunId) {
+        runs[task.sourceId] = { runId: task.aiRunId, requestedByUserId: task.requestedByUserId }
+      }
+    }
+    runBySourceId.value = runs
+  }
+  catch {
+    // 来源是只读补充：拉取失败时列表照常展示，不误导成「没有来源」
+    sourceTitles.value = {}
+    runBySourceId.value = {}
+  }
+}
+
+function sourceLabels(page: WikiNode): string[] {
+  return (page.sources || []).map(id => sourceTitles.value[id] || `资料 ${id}`)
+}
+
+function pageRun(page: WikiNode) {
+  for (const sourceId of page.sources || []) {
+    const run = runBySourceId.value[sourceId]
+    if (run) {
+      return run
+    }
+  }
+  return undefined
+}
+
+function canViewRun(page: WikiNode) {
+  const run = pageRun(page)
+  return Boolean(run) && account.isLogin && String(run?.requestedByUserId || '') === String(account.userId)
+}
+
+function viewRun(page: WikiNode) {
+  const run = pageRun(page)
+  if (!run || !canViewRun(page)) {
+    return
+  }
+  provenanceRunId.value = run.runId
+  runDrawerOpen.value = true
+}
+
+onMounted(loadProvenance)
+watch(() => store.spaceId.value, loadProvenance)
 
 const keyword = ref('')
 const creatingDir = ref(false)
@@ -252,7 +323,18 @@ function moveAllInto() {
                   <span class="generated__path" :title="page.path || page.slug">{{ page.path || page.slug }}</span>
                 </div>
                 <span class="generated__state">{{ insideLlmGen(page) ? '已在 llm-gen' : page.publishedVersionId ? '已发布' : '未发布' }}</span>
+                <span v-if="sourceLabels(page).length" class="generated__origin" :title="sourceLabels(page).join('、')">
+                  <YdIcon name="morph:database" /> 资料 {{ sourceLabels(page).length }}
+                </span>
                 <div class="generated__ops">
+                  <YdButton
+                    v-if="canViewRun(page)"
+                    size="sm"
+                    variant="ghost"
+                    @click="viewRun(page)"
+                  >
+                    <YdIcon name="morph:bot" /> 生成运行
+                  </YdButton>
                   <YdButton
                     v-if="llmGenDirectory && generatedOrigin(page) && !insideLlmGen(page)"
                     size="sm"
@@ -272,6 +354,9 @@ function moveAllInto() {
         </template>
       </div>
     </YdScrollArea>
+    <YdDrawer v-model="runDrawerOpen" title="产出该页面的 AI 运行" :footer="false" content-class="w-[760px] max-w-full">
+      <AiRunProgress v-if="provenanceRunId" :run-id="provenanceRunId" />
+    </YdDrawer>
   </div>
 </template>
 
@@ -448,6 +533,15 @@ function moveAllInto() {
   color: var(--color-text-3);
   background: var(--color-fill-2);
   border-radius: 999px;
+}
+
+.generated__origin {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-3);
 }
 
 .generated__ops {
