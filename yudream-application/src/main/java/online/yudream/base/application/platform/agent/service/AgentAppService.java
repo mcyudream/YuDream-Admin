@@ -68,6 +68,29 @@ public class AgentAppService {
     private final AgentWorkflowValidator workflowValidator;
     private final AgentPermissionGateway permissionGateway;
     private final AgentRuntimeApplicationRegistry runtimeApplications;
+    /** 系统工具模块服务（可选注入：单测直接构造时为空，视为全部开放）。 */
+    private online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
+    /** MCP 工具桥接（可选注入）。 */
+    private ObjectProvider<online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider> mcpTools;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setToolModules(online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules) {
+        this.toolModules = toolModules;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setMcpTools(ObjectProvider<online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider> mcpTools) {
+        this.mcpTools = mcpTools;
+    }
+
+    /** 工具是否在当前模块开关下可用（未注入模块服务时全部开放）。 */
+    private boolean toolAllowed(AiAgentTool tool) {
+        return toolModules == null || toolModules.toolAllowed(tool);
+    }
+
+    private boolean moduleOpen(String moduleCode) {
+        return toolModules == null || toolModules.moduleOpen(moduleCode);
+    }
 
     @Transactional(readOnly = true)
     public PageResult<AgentApplicationDTO> page(AgentPageQuery query) {
@@ -194,8 +217,13 @@ public class AgentAppService {
                 .map(AgentAssembler::toCandidate)
                 .forEach(candidate -> candidates.put(candidate.getCode(), candidate));
         systemToolProvider.stream()
+                .filter(this::toolAllowed)
                 .map(AiAgentTool::descriptor)
                 .map(descriptor -> toCandidate(descriptor, "system"))
+                .forEach(candidate -> candidates.putIfAbsent(candidate.getCode(), candidate));
+        mcpTools().stream()
+                .map(AiAgentTool::descriptor)
+                .map(descriptor -> toCandidate(descriptor, "mcp"))
                 .forEach(candidate -> candidates.putIfAbsent(candidate.getCode(), candidate));
         pluginToolGateways.stream()
                 .flatMap(gateway -> gateway.pluginTools().stream())
@@ -309,7 +337,8 @@ public class AgentAppService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> systemTools() {
         ensureEnabled();
-        List<Map<String, Object>> result = new java.util.ArrayList<>(systemToolProvider.stream().map(tool -> {
+        List<Map<String, Object>> result = new java.util.ArrayList<>(systemToolProvider.stream()
+                .filter(this::toolAllowed).map(tool -> {
             var descriptor = tool.descriptor();
             return Map.<String, Object>of(
                     "code", descriptor.name(),
@@ -334,7 +363,31 @@ public class AgentAppService {
             item.put("source", "plugin");
             result.add(item);
         });
+        for (AiAgentTool tool : mcpTools()) {
+            var descriptor = tool.descriptor();
+            if (descriptor == null || descriptor.name() == null || !listed.add(descriptor.name())) {
+                continue;
+            }
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("code", descriptor.name());
+            item.put("name", descriptor.title() == null || descriptor.title().isBlank() ? descriptor.name() : descriptor.title());
+            item.put("description", descriptor.description() == null ? "" : descriptor.description());
+            item.put("permissionCode", descriptor.permissionCode() == null ? "" : descriptor.permissionCode());
+            item.put("inputSchema", descriptor.inputSchema() == null ? Map.of() : descriptor.inputSchema());
+            item.put("source", "mcp");
+            result.add(item);
+        }
         return List.copyOf(result);
+    }
+
+    /** MCP 工具提供方（能力未启用时为空的兜底）。 */
+    private List<AiAgentTool> mcpTools() {
+        var provider = mcpTools == null ? null : mcpTools.getIfAvailable();
+        if (provider == null) {
+            return List.of();
+        }
+        List<AiAgentTool> tools = provider.tools();
+        return tools == null ? List.of() : tools.stream().filter(this::toolAllowed).toList();
     }
 
     @Transactional(readOnly = true)
@@ -583,6 +636,11 @@ public class AgentAppService {
                 .map(tool -> tool.descriptor().name())
                 .collect(java.util.stream.Collectors.toSet());
         systemTools.stream()
+                .filter(this::toolAllowed)
+                .filter(tool -> selected.contains(tool.descriptor().name()))
+                .filter(tool -> permissionGateway.hasPermission(tool.descriptor().permissionCode()))
+                .forEach(tool -> result.add(tool.descriptor().name()));
+        mcpTools().stream()
                 .filter(tool -> selected.contains(tool.descriptor().name()))
                 .filter(tool -> permissionGateway.hasPermission(tool.descriptor().permissionCode()))
                 .forEach(tool -> result.add(tool.descriptor().name()));
@@ -594,12 +652,18 @@ public class AgentAppService {
                         pluginTools.putIfAbsent(descriptor.name(), descriptor);
                     }
                 });
+        Map<String, String> pluginModules = new java.util.HashMap<>();
+        pluginToolGateways.stream().forEach(gateway -> pluginModules.putAll(gateway.pluginToolModules()));
         selected.stream()
                 .filter(code -> !systemToolCodes.contains(code))
                 .filter(code -> {
                     var descriptor = pluginTools.get(code);
-                    return descriptor != null && permissionGateway.hasPermission(
-                            descriptor.permissionCode() == null ? "" : descriptor.permissionCode());
+                    if (descriptor == null || !permissionGateway.hasPermission(
+                            descriptor.permissionCode() == null ? "" : descriptor.permissionCode())) {
+                        return false;
+                    }
+                    String module = pluginModules.get(code);
+                    return module == null || moduleOpen(module);
                 })
                 .forEach(result::add);
         selected.stream()

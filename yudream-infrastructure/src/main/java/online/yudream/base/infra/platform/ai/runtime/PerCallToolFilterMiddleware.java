@@ -55,8 +55,11 @@ public class PerCallToolFilterMiddleware implements MiddlewareBase {
         List<String> codes = permissions == null ? List.of() : permissions.codes();
         boolean explicit = permissions != null && permissions.explicitContext();
         java.util.Set<String> allowed = catalog.allowed();
+        online.yudream.base.domain.platform.ai.valobj.AiToolLoadState loadState =
+                runtimeContext.get(online.yudream.base.domain.platform.ai.valobj.AiToolLoadState.class);
         List<ToolSchema> visible = input.tools().stream()
                 .filter(schema -> allowed.isEmpty() || allowed.contains(schema.getName()))
+                .filter(schema -> loadState == null || loadState.visible(schema.getName()))
                 .filter(schema -> hasPermission(catalog.permissions().get(schema.getName()), codes, explicit))
                 .toList();
         report(runtimeContext, visible.stream().map(ToolSchema::getName).toList());
@@ -73,9 +76,13 @@ public class PerCallToolFilterMiddleware implements MiddlewareBase {
                                      Function<ActingInput, Flux<AgentEvent>> next) {
         AgentToolCatalog catalog = context == null ? null : context.get(AgentToolCatalog.class);
         if (catalog == null) return next.apply(input);
+        online.yudream.base.domain.platform.ai.valobj.AiToolLoadState loadState =
+                context.get(online.yudream.base.domain.platform.ai.valobj.AiToolLoadState.class);
         for (var call : input.toolCalls()) {
             String permission = catalog.permissions().get(call.getName());
-            if (!catalog.enabled() || !catalog.allowed().isEmpty() && !catalog.allowed().contains(call.getName())) {
+            if (!catalog.enabled()
+                    || !catalog.allowed().isEmpty() && !catalog.allowed().contains(call.getName())
+                    || loadState != null && !loadState.visible(call.getName())) {
                 String message = "当前会话未授权 AI 工具：" + call.getName();
                 failure(context, call, permission, message, true);
                 return Flux.error(new online.yudream.base.domain.common.exception.BizException(message));

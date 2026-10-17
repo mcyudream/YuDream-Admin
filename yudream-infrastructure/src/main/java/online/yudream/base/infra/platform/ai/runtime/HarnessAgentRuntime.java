@@ -94,6 +94,20 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
     private AiUsageQuotaGateway usageQuotaGateway;
     private online.yudream.base.domain.platform.ai.service.AiInvocationContextGateway invocationContexts;
     private online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry pluginTools;
+    /** 系统工具模块服务：模块开关、按需加载计划与 load_tools 元工具；测试直接构造时为 null（全部开放）。 */
+    private online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
+    /** MCP 工具桥接（能力未启用时为空）。 */
+    private online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpTools;
+
+    @Autowired(required = false)
+    void setToolModules(online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules) {
+        this.toolModules = toolModules;
+    }
+
+    @Autowired(required = false)
+    void setMcpTools(online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpTools) {
+        this.mcpTools = mcpTools;
+    }
 
     @Autowired(required = false)
     void setPluginTools(online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry tools) {
@@ -268,13 +282,24 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
             HarnessExecutionScope.reportRequest(preparedRequest);
         }
         ToolkitHolder tools = toolkit();
+        // 系统工具按模块提供：常驻模块默认可⻅，其余模块经 load_tools 在本次运行内按需加载。
+        // 调用方显式授权的 scoped 工具（CMS 画布/前端工具/插件）视为已授权，不做按需过滤；
+        // 恢复/审批续跑时同样不做按需过滤（原 turn 已规划的工具必须仍可执行）。
+        boolean resuming = resumeTurnId != null || !answers.isEmpty() || !request.confirmDecisions().isEmpty();
+        online.yudream.base.domain.platform.ai.valobj.AiToolModulePlan modulePlan =
+                toolModules == null || tools.scoped() ? null : toolModules.plan(tools.registeredTools());
+        online.yudream.base.domain.platform.ai.valobj.AiToolLoadState loadState =
+                modulePlan == null ? null : modulePlan.newLoadState(!resuming);
+        if (modulePlan != null && modulePlan.onDemandActive()) {
+            tools.toolkit().registerAgentTool(new LoadToolsTool(toolModules, modulePlan));
+        }
         HarnessRunEvents events = new HarnessRunEvents(onDelta, onReasoningDelta, onProgress,
                 HarnessExecutionScope.currentReferenceConsumer());
         String idempotencyKey = HarnessExecutionScope.currentIdempotencyKey();
         HarnessExecutionControl control = new HarnessExecutionControl();
         HarnessToolCollector collector = new HarnessToolCollector(onTool);
         String sessionId = request.sessionId() == null ? "once-" + UUID.randomUUID() : request.sessionId();
-        RuntimeContext context = RuntimeContext.builder()
+        var contextBuilder = RuntimeContext.builder()
                 .userId(userId(request))
                 .sessionId(sessionId)
                 .put(AgentToolPermissions.class, AgentToolPermissions.explicit(request.permissionCodes()))
@@ -282,8 +307,11 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .put(AgentToolSchemaObserver.class, new AgentToolSchemaObserver(
                         HarnessExecutionScope.captureAllowedToolsReporter()))
                 .put(AgentSystemPromptOverride.class, new AgentSystemPromptOverride(request.systemPrompt()))
-                .put(HarnessToolCollector.class, collector)
-                .build();
+                .put(HarnessToolCollector.class, collector);
+        if (loadState != null) {
+            contextBuilder.put(online.yudream.base.domain.platform.ai.valobj.AiToolLoadState.class, loadState);
+        }
+        RuntimeContext context = contextBuilder.build();
         AiUsageReservation reservation = usageQuotaGateway == null ? null
                 : usageQuotaGateway.reserve(request.userId(), quotaBudget(config(request)));
         if (reservation != null) events.onModelStarted(() -> usageQuotaGateway.markStarted(reservation));
@@ -569,6 +597,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
     private ToolkitHolder toolkit() {
         io.agentscope.core.tool.Toolkit toolkit = new io.agentscope.core.tool.Toolkit();
         Map<String, String> nameToPermission = new LinkedHashMap<>();
+        Map<String, AiAgentTool> registeredTools = new LinkedHashMap<>();
         // 同平台名工具（如 wiki.search 的管理端/公开端两实现）确定性消解：
         // 有权限码的实现保留安全名，无权限码的公开实现派生「_public」别名，
         // 运行次经 allowedToolNames 白名单精确选择，互不越权。
@@ -579,9 +608,25 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .map(tool -> tool.descriptor().name()).collect(java.util.stream.Collectors.toSet());
         List<AiAgentTool> scoped = AiAgentToolExecutionScope.currentTools();
         if (scoped == null) {
-            tools.addAll(globalTools);
+            // 全局工具集：按模块开关过滤（关闭模块的工具不注册、不进模型视野）；MCP 工具随模块提供。
+            for (AiAgentTool tool : globalTools) {
+                if (moduleEnabled(tool)) {
+                    tools.add(tool);
+                }
+            }
+            if (mcpTools != null) {
+                for (AiAgentTool tool : mcpTools.tools()) {
+                    if (tool != null && moduleEnabled(tool)) {
+                        tools.add(tool);
+                    }
+                }
+            }
         } else {
-            tools.addAll(scoped);
+            for (AiAgentTool tool : scoped) {
+                if (tool != null && moduleEnabled(tool)) {
+                    tools.add(tool);
+                }
+            }
         }
         tools.sort(java.util.Comparator.comparing(
                 (AiAgentTool tool) -> StringUtils.hasText(tool.descriptor().permissionCode()) ? 0 : 1));
@@ -606,6 +651,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
             }
             toolkit.registerAgentTool(adapter);
             nameToPermission.put(adapter.getName(), adapter.permissionCode() == null ? "" : adapter.permissionCode());
+            registeredTools.put(adapter.getName(), tool);
         }
         var pluginContext = online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope.current();
         if (!selectedPluginNames.isEmpty() && (pluginContext == null || pluginTools == null)) {
@@ -621,17 +667,97 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                     continue;
                 }
                 if (nameToPermission.containsKey(adapter.getName())) throw new BizException("插件与系统 AI 工具名称冲突：" + adapter.getName());
+                String module = pluginModuleCode(tool);
+                if (!moduleAllowed(module)) {
+                    if (selectedPluginNames.contains(tool.descriptor().name())) {
+                        throw new BizException("插件工具模块已关闭：" + module);
+                    }
+                    continue;
+                }
                 toolkit.registerAgentTool(adapter);
                 String permission = tool.descriptor().permissionCode();
                 nameToPermission.put(adapter.getName(), permission == null ? "" : permission);
+                registeredTools.put(adapter.getName(), new PluginPlanTool(tool.descriptor(), module));
                 registeredPluginNames.add(tool.descriptor().name());
             }
         }
         if (!registeredPluginNames.containsAll(selectedPluginNames)) throw new BizException("原工作流选择的插件工具当前不可用");
-        return new ToolkitHolder(toolkit, Map.copyOf(nameToPermission));
+        return new ToolkitHolder(toolkit, Map.copyOf(nameToPermission), Map.copyOf(registeredTools),
+                AiAgentToolExecutionScope.currentTools() != null);
     }
 
-    private record ToolkitHolder(io.agentscope.core.tool.Toolkit toolkit, Map<String, String> catalog) {
+    /** 插件工具在模块计划中的只读投影：只提供名称/描述/风险/模块，不参与执行。 */
+    private static final class PluginPlanTool implements AiAgentTool {
+        private final online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor descriptor;
+        private final online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk risk;
+        private final boolean requiresConfirmation;
+        private final String moduleCode;
+
+        private PluginPlanTool(online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor source, String moduleCode) {
+            this.descriptor = new online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor(
+                    source.name(), source.title(), source.description(), source.permissionCode(),
+                    source.title(), "插件工具", source.description(),
+                    source.inputSchema() == null ? Map.of() : source.inputSchema());
+            this.risk = source.risk() == online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.READ
+                    ? online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk.READ
+                    : online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk.WRITE;
+            this.requiresConfirmation = source.requiresConfirmation()
+                    || source.risk() == online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.DESTRUCTIVE;
+            this.moduleCode = moduleCode;
+        }
+
+        @Override
+        public online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor descriptor() {
+            return descriptor;
+        }
+
+        @Override
+        public online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk risk() {
+            return risk;
+        }
+
+        @Override
+        public boolean requiresConfirmation() {
+            return requiresConfirmation;
+        }
+
+        @Override
+        public String moduleCode() {
+            return moduleCode;
+        }
+
+        @Override
+        public online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult execute(
+                online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall call) {
+            throw new BizException("插件工具必须经插件适配器执行：" + descriptor.name());
+        }
+    }
+
+    /** 工具模块是否开放（模块开关关闭的工具不注册，工具目录为空时视为开放）。 */
+    private boolean moduleEnabled(AiAgentTool tool) {
+        if (toolModules == null || tool == null) {
+            return true;
+        }
+        return moduleAllowed(toolModules.moduleCodeOf(tool));
+    }
+
+    private boolean moduleAllowed(String moduleCode) {
+        return toolModules == null || moduleCode == null || moduleCode.isBlank()
+                || toolModules.settings().isModuleEnabled(moduleCode);
+    }
+
+    private String pluginModuleCode(Object tool) {
+        if (tool instanceof AiAgentTool agentTool && agentTool.moduleCode() != null) {
+            return agentTool.moduleCode();
+        }
+        return online.yudream.base.domain.platform.ai.valobj.AiToolModules.PLUGIN_PREFIX + "plugin";
+    }
+
+    private record ToolkitHolder(
+            io.agentscope.core.tool.Toolkit toolkit,
+            Map<String, String> catalog,
+            Map<String, AiAgentTool> registeredTools,
+            boolean scoped) {
     }
 
     private Path workspaceDir() {

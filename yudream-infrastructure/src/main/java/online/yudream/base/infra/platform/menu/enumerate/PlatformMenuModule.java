@@ -19,8 +19,8 @@ public enum PlatformMenuModule {
             path = "/platform/connection-hub", component = "Layout", icon = "i-ri:links-line", sort = 70)
     CONNECTION_HUB,
 
-    @MenuNode(code = "platform:app-hub", name = "智能应用", type = MenuNodeType.LAYOUT,
-            path = "/platform/app-hub", component = "Layout", icon = "i-ri:robot-2-line", sort = 60)
+    @MenuNode(code = "platform:app-hub", name = "AI 管理", type = MenuNodeType.LAYOUT,
+            path = "/platform/app-hub", component = "Layout", icon = "i-ri:sparkling-2-line", sort = 60)
     APP_HUB,
 
     @MenuNode(code = "platform:ops-hub", name = "平台运维", type = MenuNodeType.LAYOUT,
@@ -391,14 +391,43 @@ public enum PlatformMenuModule {
             icon = "i-ri:node-tree", sort = 58, visible = false, permission = "platform:agent:edit")
     AGENT_EDITOR,
 
-    @MenuNode(code = "platform:agent:tools", name = "Agent 工具", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:agent:tools", name = "系统工具", type = MenuNodeType.MENU,
             parentName = "APP_HUB", path = "/platform/agent/tools", component = "platform/agent/tools.vue",
             icon = "i-ri:tools-line", sort = 57, permission = "platform:agent:tool:view")
     AGENT_TOOLS,
 
+    @MenuNode(code = "platform:mcp", name = "MCP 服务", type = MenuNodeType.MENU,
+            parentName = "APP_HUB", path = "/platform/mcp", component = "platform/mcp/index.vue",
+            icon = "i-ri:plug-line", sort = 56, permission = "platform:mcp:server:view")
+    MCP,
+
+    @MenuNode(code = "platform:mcp:server:view", name = "查看 MCP 服务", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:view")
+    MCP_SERVER_VIEW,
+
+    @MenuNode(code = "platform:mcp:server:create", name = "新建 MCP 服务", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:create")
+    MCP_SERVER_CREATE,
+
+    @MenuNode(code = "platform:mcp:server:edit", name = "编辑 MCP 服务", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:edit")
+    MCP_SERVER_EDIT,
+
+    @MenuNode(code = "platform:mcp:server:delete", name = "删除 MCP 服务", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:delete")
+    MCP_SERVER_DELETE,
+
+    @MenuNode(code = "platform:mcp:server:test", name = "测试 MCP 服务", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:test")
+    MCP_SERVER_TEST,
+
+    @MenuNode(code = "platform:mcp:server:use", name = "调用 MCP 工具", type = MenuNodeType.BUTTON,
+            parentName = "MCP", permission = "platform:mcp:server:use")
+    MCP_SERVER_USE,
+
     @MenuNode(code = "platform:mobile-config", name = "移动端配置", type = MenuNodeType.MENU,
-            parentName = "APP_HUB", path = "/platform/mobile-config", component = "platform/mobile-config/index.vue",
-            icon = "i-ri:smartphone-line", sort = 56, permission = "platform:mobile-config:view")
+            parentName = "OPS_HUB", path = "/platform/mobile-config", component = "platform/mobile-config/index.vue",
+            icon = "i-ri:smartphone-line", sort = 45, permission = "platform:mobile-config:view")
     MOBILE_CONFIG,
 
     @MenuNode(code = "platform:mobile-config:view", name = "查看移动端配置", type = MenuNodeType.BUTTON,
@@ -437,7 +466,7 @@ public enum PlatformMenuModule {
             parentName = "AGENT_TOOLS", permission = "platform:agent:tool:delete")
     AGENT_TOOL_DELETE,
 
-    @MenuNode(code = "platform:agent-skill", name = "平台技能库", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:agent-skill", name = "技能库", type = MenuNodeType.MENU,
             parentName = "APP_HUB", path = "/platform/agent-skill", component = "platform/agent-skill/index.vue",
             icon = "i-ri:book-2-line", sort = 55, permission = "platform:agent-skill:view")
     AGENT_SKILL,

@@ -10,6 +10,7 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.agent.assembler.AgentWebAssembler;
+import online.yudream.base.interfaces.platform.agent.assembler.AiToolModuleWebAssembler;
 import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSaveRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
@@ -20,6 +21,7 @@ import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolCandidateRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
+import online.yudream.base.interfaces.platform.agent.res.AiToolModuleRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,6 +58,7 @@ public class AgentController {
         }
     }
 private final AgentAppService agentAppService;
+    private final online.yudream.base.application.platform.ai.service.AiToolModuleAppService aiToolModuleAppService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
@@ -108,6 +111,19 @@ private final AgentAppService agentAppService;
     @GetMapping("/tools/system")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看系统 Agent 工具", module = "平台能力", desc = "查看系统提供的 Agent 工具")
     public Result<List<Map<String, Object>>> systemTools() { return Result.ok(agentAppService.systemTools()); }
+    @GetMapping("/tools/modules")
+    @PermissionRegister(code = "platform:agent:tool:view", name = "查看系统工具模块", module = "平台能力", desc = "查看系统工具模块目录与开关状态")
+    public Result<AiToolModuleRes> toolModules() { return Result.ok(AiToolModuleWebAssembler.toRes(aiToolModuleAppService.catalog())); }
+    @PutMapping("/tools/system/enabled/{enabled}")
+    @PermissionRegister(code = "platform:agent:tool:edit", name = "启停系统工具", module = "平台能力", desc = "全局开启或关闭系统工具")
+    public Result<AiToolModuleRes> updateSystemToolsEnabled(@PathVariable boolean enabled) {
+        return Result.ok(AiToolModuleWebAssembler.toRes(aiToolModuleAppService.updateSystemEnabled(enabled)));
+    }
+    @PutMapping("/tools/modules/{code}/enabled/{enabled}")
+    @PermissionRegister(code = "platform:agent:tool:edit", name = "启停系统工具模块", module = "平台能力", desc = "按模块开启或关闭系统工具")
+    public Result<AiToolModuleRes> updateToolModuleEnabled(@PathVariable String code, @PathVariable boolean enabled) {
+        return Result.ok(AiToolModuleWebAssembler.toRes(aiToolModuleAppService.updateModuleEnabled(code, enabled)));
+    }
     @GetMapping("/tools/{id}")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看 Agent 工具详情", module = "平台能力", desc = "查看 Python 工具详情")
     public Result<AgentToolRes> toolDetail(@PathVariable Long id) { return Result.ok(AgentWebAssembler.toRes(agentAppService.toolDetail(id))); }

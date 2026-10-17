@@ -66,6 +66,25 @@ public class AgentWorkflowRuntimeService {
     private final AgentPermissionGateway permissionGateway;
     private final CapabilityAppService capabilityAppService;
     private final AgentExecutionTracer executionTracer;
+    /** 系统工具模块服务（可选注入：单测直接构造时为空，视为全部开放）。 */
+    private online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
+    /** MCP 工具桥接（可选注入）。 */
+    private org.springframework.beans.factory.ObjectProvider<online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider> mcpTools;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setToolModules(online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules) {
+        this.toolModules = toolModules;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setMcpTools(org.springframework.beans.factory.ObjectProvider<online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider> mcpTools) {
+        this.mcpTools = mcpTools;
+    }
+
+    /** MCP 工具提供方（未启用能力或未注入时为空）。 */
+    private online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpToolProvider() {
+        return mcpTools == null ? null : mcpToolProvider();
+    }
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
     private online.yudream.base.domain.platform.agent.repo.AgentWorkflowCheckpointRepo checkpoints;
 
@@ -145,7 +164,7 @@ public class AgentWorkflowRuntimeService {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         AgentToolExecutor toolExecutor = new AgentToolExecutor(
                 objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways,
-                toolExecutionGuard
+                toolExecutionGuard, toolModules, mcpToolProvider()
         );
         AgentWorkflowRunState state = new AgentWorkflowRunState(
                 application,
@@ -214,7 +233,7 @@ public class AgentWorkflowRuntimeService {
         Set<String> systemCodes = systemTools.stream().map(tool -> tool.descriptor().name())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         var toolExecutor = new AgentToolExecutor(objectMapper, runtimeExecutor, toolRepo, systemTools,
-                permissionGateway, pluginToolGateways, toolExecutionGuard);
+                permissionGateway, pluginToolGateways, toolExecutionGuard, toolModules, mcpToolProvider());
         var state = new AgentWorkflowRunState(application, command, aiConfig, systemCodes, onDelta, onReasoning,
                 onTool, onProgress, new AgentModelToolResolver(toolExecutor), checkpoint.runKey());
         var tools = new ArrayList<>(checkpoint.toolResults()); tools.addAll(nativeResult.toolResults());
@@ -259,7 +278,7 @@ public class AgentWorkflowRuntimeService {
         if ("NONE".equalsIgnoreCase(node.data().path("toolMode").asText())) return List.of();
         var systemTools = systemToolProvider.stream().toList();
         var executor = new AgentToolExecutor(objectMapper, runtimeExecutor, toolRepo, systemTools,
-                permissionGateway, pluginToolGateways, toolExecutionGuard);
+                permissionGateway, pluginToolGateways, toolExecutionGuard, toolModules, mcpToolProvider());
         List<String> codes = new ArrayList<>();
         if (node.data().path("toolCodes").isArray()) node.data().path("toolCodes").forEach(code -> codes.add(code.asText()));
         ensurePythonRuntime(new AgentWorkflowGraphParser(objectMapper).parse(checkpoint.workflowJson()),

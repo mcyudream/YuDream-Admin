@@ -44,6 +44,10 @@ public final class AgentToolExecutor {
     private final AgentPermissionGateway permissionGateway;
     private final ObjectProvider<AgentPluginToolGateway> pluginToolGateways;
     private final AgentToolExecutionGuard executionGuard;
+    /** 工具模块开关（模块关闭的工具不可解析）；测试直接构造时为 null（不额外限制）。 */
+    private final online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
+    /** MCP 工具桥接（能力未启用时为空）。 */
+    private final online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpTools;
 
     public AgentToolExecutor(
             ObjectMapper objectMapper,
@@ -77,6 +81,21 @@ public final class AgentToolExecutor {
             ObjectProvider<AgentPluginToolGateway> pluginToolGateways,
             AgentToolExecutionGuard executionGuard
     ) {
+        this(objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways,
+                executionGuard, null, null);
+    }
+
+    public AgentToolExecutor(
+            ObjectMapper objectMapper,
+            RuntimeExecutor runtimeExecutor,
+            AgentToolRepo toolRepo,
+            List<AiAgentTool> systemTools,
+            AgentPermissionGateway permissionGateway,
+            ObjectProvider<AgentPluginToolGateway> pluginToolGateways,
+            AgentToolExecutionGuard executionGuard,
+            online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules,
+            online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpTools
+    ) {
         this.objectMapper = objectMapper;
         this.runtimeExecutor = runtimeExecutor;
         this.toolRepo = toolRepo;
@@ -84,6 +103,8 @@ public final class AgentToolExecutor {
         this.permissionGateway = permissionGateway;
         this.pluginToolGateways = pluginToolGateways;
         this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard.capture();
+        this.toolModules = toolModules;
+        this.mcpTools = mcpTools;
     }
 
     /**
@@ -111,20 +132,41 @@ public final class AgentToolExecutor {
                 .findFirst()
                 .orElse(null);
         if (systemTool != null) {
+            ensureModuleOpen(systemTool);
             ensurePermission(systemTool.descriptor().permissionCode(), systemTool.descriptor().title(), permissionSnapshot);
             return guarded(systemTool);
         }
         // 插件运行时注册的工具：描述符权限快照校验后交插件通道执行（执行时再按插件触发上下文复核）
         AiAgentTool pluginTool = pluginTool(code);
         if (pluginTool != null) {
+            ensureModuleOpen(pluginTool);
             ensurePermission(pluginTool.descriptor().permissionCode(), pluginTool.descriptor().title(), permissionSnapshot);
             return guarded(pluginTool);
+        }
+        // MCP 服务端工具：按服务登记的连接参数在当前运行内调用
+        AiAgentTool mcpTool = mcpTool(code);
+        if (mcpTool != null) {
+            ensureModuleOpen(mcpTool);
+            ensurePermission(mcpTool.descriptor().permissionCode(), mcpTool.descriptor().title(), permissionSnapshot);
+            return guarded(mcpTool);
         }
         AgentTool pythonTool = toolRepo.findByCode(code)
                 .orElseThrow(() -> new BizException("Tool does not exist: " + code));
         ensurePythonAvailable(pythonTool);
         ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
         return guarded(new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot));
+    }
+
+    /** 系统工具模块闸门：关闭的模块不允许被应用引用或调用。 */
+    private void ensureModuleOpen(AiAgentTool tool) {
+        if (toolModules == null || tool == null) {
+            return;
+        }
+        toolModules.ensureToolAvailable(tool);
+    }
+
+    private AiAgentTool mcpTool(String code) {
+        return mcpTools == null ? null : mcpTools.tool(code);
     }
 
     /**

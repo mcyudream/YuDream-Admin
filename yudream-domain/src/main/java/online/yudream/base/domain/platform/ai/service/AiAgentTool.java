@@ -9,6 +9,14 @@ public interface AiAgentTool {
 
     AiAgentToolDescriptor descriptor();
 
+    /**
+     * 工具所属模块（如 plugin:&lt;code&gt;、mcp:&lt;server&gt;）；返回 null 时按工具名前缀推导。
+     * 模块是按需加载与全局开关的单位。
+     */
+    default String moduleCode() {
+        return null;
+    }
+
     default AgentToolRisk risk() {
         return AgentToolRisk.WRITE;
     }

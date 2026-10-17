@@ -24,6 +24,11 @@ public class PluginAiToolRegistry {
         return tools.values().stream().flatMap(List::stream).toList();
     }
 
+    /** 插件编码 → 工具清单快照，供工具模块分组读取。 */
+    public Map<String, List<PluginAiTool>> toolsByPlugin() {
+        return Map.copyOf(tools);
+    }
+
     public List<PluginAiTool> tools(String pluginCode) {
         List<PluginAiTool> values = tools.get(pluginCode);
         return values == null ? List.of() : List.copyOf(values);

@@ -42,11 +42,30 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
             return null;
         }
         String code = toolCode.trim();
-        return registry.tools().stream()
-                .filter(tool -> tool.descriptor() != null && code.equals(tool.descriptor().name()))
-                .findFirst()
-                .map(PluginAiToolAdapter::new)
-                .orElse(null);
+        for (Map.Entry<String, List<PluginAiTool>> entry : registry.toolsByPlugin().entrySet()) {
+            for (PluginAiTool tool : entry.getValue()) {
+                if (tool.descriptor() != null && code.equals(tool.descriptor().name())) {
+                    return new PluginAiToolAdapter(tool, pluginModuleCode(entry.getKey()));
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Map<String, String> pluginToolModules() {
+        Map<String, String> modules = new java.util.LinkedHashMap<>();
+        registry.toolsByPlugin().forEach((pluginCode, tools) -> tools.forEach(tool -> {
+            if (tool.descriptor() != null && tool.descriptor().name() != null && !tool.descriptor().name().isBlank()) {
+                modules.putIfAbsent(tool.descriptor().name(), pluginModuleCode(pluginCode));
+            }
+        }));
+        return Map.copyOf(modules);
+    }
+
+    private static String pluginModuleCode(String pluginCode) {
+        return online.yudream.base.domain.platform.ai.valobj.AiToolModules.PLUGIN_PREFIX
+                + (pluginCode == null ? "plugin" : pluginCode);
     }
 
     private AiAgentToolDescriptor toDescriptor(PluginAiToolDescriptor descriptor) {
@@ -69,9 +88,15 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
         private final PluginAiTool tool;
         private final AiAgentToolDescriptor descriptor;
         private final PluginAiExecutionContext context;
+        private final String moduleCode;
 
         private PluginAiToolAdapter(PluginAiTool tool) {
+            this(tool, null);
+        }
+
+        private PluginAiToolAdapter(PluginAiTool tool, String moduleCode) {
             this.tool = tool;
+            this.moduleCode = moduleCode;
             this.context = PluginAiToolExecutionScope.current();
             PluginAiToolDescriptor source = tool.descriptor();
             this.descriptor = new AiAgentToolDescriptor(
@@ -89,6 +114,11 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
         @Override
         public AiAgentToolDescriptor descriptor() {
             return descriptor;
+        }
+
+        @Override
+        public String moduleCode() {
+            return moduleCode;
         }
 
         @Override
