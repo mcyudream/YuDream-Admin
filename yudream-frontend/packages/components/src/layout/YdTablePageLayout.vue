@@ -243,7 +243,7 @@ const foldedActions = computed(() => {
                 v-for="(action, index) in visibleActions"
                 :key="index"
                 :ref="action.ref"
-                :variant="action.variant || 'default'"
+                :variant="action.variant || (action.danger ? 'destructive' : 'default')"
                 :disabled="action.disabled"
                 @click="action.onClick"
               >

@@ -108,8 +108,9 @@ function getStatusConfig(row: TData): StatusPresentation | undefined {
   if (!props.statusColumn) {
     return undefined
   }
-  const value = String((row as Record<string, any>)[props.statusColumn.statusKey as string] || '')
-  return props.statusColumn.statusMap[value]
+  // 布尔状态列必须保留 false（`|| ''` 会把 false 归一成空串，导致 statusMap 里配的 false 永远命不中）
+  const raw = (row as Record<string, any>)[props.statusColumn.statusKey as string]
+  return props.statusColumn.statusMap[raw === undefined || raw === null ? '' : String(raw)]
 }
 
 interface DropdownMenuItem {
