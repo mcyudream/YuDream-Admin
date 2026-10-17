@@ -95,9 +95,9 @@ public record WikiTextAnchor(
                 draft.startOffset(), draft.endOffset(), versionId, revision, contentHash);
     }
 
-    /** 已盖章锚点能否在给定正文中按上下文精确唯一命中；未盖章草稿一律不可定位。 */
+    /** 已盖章锚点能否在给定正文中唯一命中（消歧规则与定锚一致）；未盖章草稿一律不可定位。 */
     public boolean uniquelyResolvableIn(String content) {
-        return versionId != null && matchCount(normalizeWhitespace(content)) == 1;
+        return versionId != null && resolvableIn(content);
     }
 
     /**
@@ -143,33 +143,65 @@ public record WikiTextAnchor(
         return builder.toString();
     }
 
-    /** 可定位 = 命中次数为 1；前缀/后缀各按「紧邻且完整匹配」参与消歧。 */
+    /**
+     * 可定位 = 唯一命中。
+     * <p>
+     * 上下文只在引用文本有多处候选时参与消歧：引用文本本身唯一就直接命中——前缀/后缀来自
+     * 渲染文本，附近有行内格式（加粗、链接、行内代码）时与 Markdown 源并不一致，
+     * 不能因此把一个唯一的引用判成无法定位；多处命中且上下文也无法收敛到一处才拒绝。
+     */
     private boolean resolvableIn(String content) {
-        return matchCount(normalizeWhitespace(content)) == 1;
-    }
-
-    private int matchCount(String content) {
-        if (content.isEmpty() || exact.isEmpty()) {
-            return 0;
+        String normalized = normalizeWhitespace(content);
+        if (normalized.isEmpty() || exact.isEmpty()) {
+            return false;
         }
-        int count = 0;
-        int index = content.indexOf(exact);
+        int first = normalized.indexOf(exact);
+        if (first < 0) {
+            return false;
+        }
+        if (normalized.indexOf(exact, first + 1) < 0) {
+            return true;
+        }
+        int matched = 0;
+        int index = first;
         while (index >= 0) {
-            if (contextMatches(content, index)) {
-                count++;
-                if (count > 1) {
-                    return count;
+            if (contextMatches(normalized, index)) {
+                matched++;
+                if (matched > 1) {
+                    return false;
                 }
             }
-            index = content.indexOf(exact, index + 1);
+            index = normalized.indexOf(exact, index + 1);
         }
-        return count;
+        return matched == 1;
     }
 
     private boolean contextMatches(String content, int index) {
-        if (!prefix.isEmpty() && !content.substring(0, index).endsWith(prefix)) {
+        if (!prefix.isEmpty() && !matchesBefore(content, index, prefix)) {
             return false;
         }
-        return suffix.isEmpty() || content.startsWith(suffix, index + exact.length());
+        return suffix.isEmpty() || matchesAfter(content, index + exact.length(), suffix);
+    }
+
+    /**
+     * 前缀紧邻匹配：引用文本与前缀之间的分隔空白不算差异。
+     * 三处文本都按 {@link #normalizeWhitespace} 去掉了首尾空白，内容侧那一个分隔空格
+     * 若参与比较，「中文+空格+拉丁词」这类选区（如「…通过 JEP 453…」）会被误判为无法定位。
+     */
+    private boolean matchesBefore(String content, int index, String prefix) {
+        int boundary = index;
+        while (boundary > 0 && content.charAt(boundary - 1) == ' ') {
+            boundary--;
+        }
+        return content.substring(0, boundary).endsWith(prefix);
+    }
+
+    /** 后缀紧邻匹配：同上，跳过引用文本与后缀之间的分隔空白。 */
+    private boolean matchesAfter(String content, int start, String suffix) {
+        int boundary = start;
+        while (boundary < content.length() && content.charAt(boundary) == ' ') {
+            boundary++;
+        }
+        return content.startsWith(suffix, boundary);
     }
 }

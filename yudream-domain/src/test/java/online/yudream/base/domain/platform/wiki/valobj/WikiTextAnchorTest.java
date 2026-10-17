@@ -99,6 +99,54 @@ class WikiTextAnchorTest {
     }
 
     @Test
+    void sealedDelimitersAreNotRequiredToBeImmediatelyAdjacent() {
+        // 归一化会去掉前后缀的首尾空白，比较时必须同样忽略引用文本与上下文之间的那一个分隔空格，
+        // 否则「中文 + 空格 + 拉丁词」这种常见选区会被误判为无法定位（真实页面：…通过 JEP 453…）
+        String content = "结构化并发在 Java 21 中通过 JEP 453 作为预览特性提供。";
+
+        WikiTextAnchor suffixOnly = WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("结构化并发在 Java 21 中通过", null, "JEP 453 作为预览特性提供。", null, null, null),
+                200L, 1L, "hash-1", content);
+        assertEquals("hash-1", suffixOnly.contentHash());
+        assertTrue(suffixOnly.uniquelyResolvableIn(content));
+
+        WikiTextAnchor prefixOnly = WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("JEP 453", "Java 21 中通过", "作为预览特性提供。", null, null, null),
+                200L, 1L, "hash-1", content);
+        assertTrue(prefixOnly.uniquelyResolvableIn(content));
+    }
+
+    @Test
+    void contextIsADisambiguatorNotAConstraintOnAUniqueQuote() {
+        // 引用文本唯一时上下文不参与判定：附近有行内格式时，渲染文本里的上下文与 Markdown 源不一致，
+        // 不该因此把唯一引用判成无法定位（契约：命中多处时才用前后缀消歧）
+        String content = "虚拟线程提供低成本的线程执行模型；结构化并发把一组子任务视为一个工作单元。";
+        WikiTextAnchor unique = WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("低成本的线程执行模型", "与源码不一致的前缀", "与源码不一致的后缀", null, null, null),
+                200L, 1L, "hash-1", content);
+        assertTrue(unique.uniquelyResolvableIn(content));
+        assertEquals(WikiTextAnchorState.ACTIVE, unique.stateAgainst("hash-1", content));
+
+        // 引用文本出现两次且上下文都收敛不到一处：仍然拒绝，宁可不建锚点也不挂到错的文字上
+        String twice = "结论：先做缓存预热。\n结论：先做缓存。";
+        assertThrows(BizException.class, () -> WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("先做缓存", "与源码不一致的前缀", "！", null, null, null), 200L, 1L, "hash-1", twice));
+    }
+
+    @Test
+    void contextStillDisambiguatesAcrossWhitespaceBoundaries() {
+        // 同一句话出现两次，只有带分隔空格的上下文能命中其中一处
+        String content = "结论：先做缓存预热。\n结论：先做缓存。";
+        WikiTextAnchor stamped = WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("先做缓存", "结论：", "。", null, null, null), 200L, 1L, "hash-1", content);
+        assertTrue(stamped.uniquelyResolvableIn(content));
+
+        // 上下文两边都对不上：拒绝，不退回「随便挑一处」
+        assertThrows(BizException.class, () -> WikiTextAnchor.stamp(
+                WikiTextAnchor.draft("先做缓存", "前言：", "！", null, null, null), 200L, 1L, "hash-1", content));
+    }
+
+    @Test
     void blockHintValidatesTableShapeAndWireNames() {
         WikiTextBlockHint paragraph = WikiTextBlockHint.of("paragraph", 3, null, null);
         assertEquals(WikiTextBlockType.PARAGRAPH, paragraph.type());
