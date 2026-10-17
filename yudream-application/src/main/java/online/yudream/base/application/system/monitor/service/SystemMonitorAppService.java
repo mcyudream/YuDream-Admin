@@ -44,7 +44,9 @@ public class SystemMonitorAppService {
     }
 
     public PageResult<LoginLogDTO> pageLoginLogs(String keyword, Boolean success, int page, int size) {
-        return loginLogRepo.page(keyword, success, page, size);
+        PageResult<LoginLogDTO> result = loginLogRepo.page(keyword, success, page, size);
+        enrichLoginLogAvatars(result.getRecords());
+        return result;
     }
 
     public long clearApiLogs() {
@@ -112,6 +114,30 @@ public class SystemMonitorAppService {
             if (user != null) {
                 log.setUsername(user.getUsername());
                 log.setNickname(user.getNickname());
+                log.setAvatarUrl(fileAppService.fileUrl(user.getAvatarFileId()));
+            }
+        }
+    }
+
+    /** 登录日志会话用户头像：按 userId 批量补齐，取不到给 null。 */
+    private void enrichLoginLogAvatars(List<LoginLogDTO> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = logs.stream()
+                .map(LoginLogDTO::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<Long, User> userMap = userRepo.findByIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity(), (left, right) -> left));
+        for (LoginLogDTO log : logs) {
+            User user = userMap.get(log.getUserId());
+            if (user != null) {
+                log.setAvatarUrl(fileAppService.fileUrl(user.getAvatarFileId()));
             }
         }
     }

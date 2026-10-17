@@ -24,6 +24,8 @@ public class ApiLogDTO {
     private Long loginId;
     private String username;
     private String nickname;
+    /** 会话用户头像 URL，可空，取不到为 null。 */
+    private String avatarUrl;
     private String ip;
     private String userAgent;
     private String errorMessage;

@@ -16,6 +16,8 @@ public class LoginLogDTO {
     private Long id;
     private String username;
     private Long userId;
+    /** 会话用户头像 URL，可空，取不到为 null。 */
+    private String avatarUrl;
     private Boolean success;
     private String message;
     private String ip;

@@ -11,6 +11,7 @@ public class LoginLogRes {
     private Long id;
     private String username;
     private Long userId;
+    private String avatarUrl;
     private Boolean success;
     private String message;
     private String ip;

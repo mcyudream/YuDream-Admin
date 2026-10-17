@@ -19,6 +19,7 @@ public class ApiLogRes {
     private Long loginId;
     private String username;
     private String nickname;
+    private String avatarUrl;
     private String ip;
     private String userAgent;
     private String errorMessage;
