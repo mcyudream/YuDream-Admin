@@ -1,6 +1,11 @@
 package online.yudream.base.application.platform.ai.service;
 
+import online.yudream.base.application.platform.ai.dto.AiToolCatalogRowDTO;
 import online.yudream.base.application.platform.ai.dto.AiToolModuleDTO;
+import online.yudream.base.application.platform.ai.query.AiToolCatalogPageQuery;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
@@ -10,11 +15,13 @@ import online.yudream.base.domain.platform.ai.aggregate.AiToolSettings;
 import online.yudream.base.domain.platform.ai.repo.AiToolSettingsRepo;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolSchemas;
 import online.yudream.base.domain.platform.ai.valobj.AiToolLoadState;
 import online.yudream.base.domain.platform.ai.valobj.AiToolModulePlan;
 import online.yudream.base.domain.platform.ai.valobj.AiToolModules;
 import online.yudream.base.domain.platform.mcp.aggregate.McpServer;
 import online.yudream.base.domain.platform.mcp.repo.McpServerRepo;
+import online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import org.springframework.beans.factory.ObjectProvider;
@@ -50,6 +57,8 @@ public class AiToolModuleAppService {
     private final ObjectProvider<AiAgentTool> systemTools;
     private final ObjectProvider<AgentPluginToolGateway> pluginToolGateways;
     private final ObjectProvider<PluginRuntimeGateway> pluginRuntime;
+    /** MCP 工具桥接（能力未启用时为空），用于测试调用解析。 */
+    private final ObjectProvider<McpAgentToolProvider> mcpTools;
     private final McpServerRepo mcpServerRepo;
     private final AgentToolRepo toolRepo;
     private final AiToolSettingsRepo settingsRepo;
@@ -61,6 +70,7 @@ public class AiToolModuleAppService {
             ObjectProvider<AiAgentTool> systemTools,
             ObjectProvider<AgentPluginToolGateway> pluginToolGateways,
             ObjectProvider<PluginRuntimeGateway> pluginRuntime,
+            ObjectProvider<McpAgentToolProvider> mcpTools,
             McpServerRepo mcpServerRepo,
             AgentToolRepo toolRepo,
             AiToolSettingsRepo settingsRepo,
@@ -71,6 +81,7 @@ public class AiToolModuleAppService {
         this.systemTools = systemTools;
         this.pluginToolGateways = pluginToolGateways;
         this.pluginRuntime = pluginRuntime;
+        this.mcpTools = mcpTools;
         this.mcpServerRepo = mcpServerRepo;
         this.toolRepo = toolRepo;
         this.settingsRepo = settingsRepo;
@@ -111,9 +122,9 @@ public class AiToolModuleAppService {
             AiToolModules.ModuleMeta meta = AiToolModules.mcpModule(server.getCode(), server.getName(),
                     server.getDescription(), server.isPreload());
             metas.put(meta.code(), meta);
-            List<AiToolModuleDTO.Tool> mcpTools = new ArrayList<>();
+            List<AiToolModuleDTO.Tool> mcpRows = new ArrayList<>();
             for (var definition : server.toolsOrEmpty()) {
-                mcpTools.add(new AiToolModuleDTO.Tool(
+                mcpRows.add(new AiToolModuleDTO.Tool(
                         AiToolModules.mcpToolName(server.getCode(), definition.name()),
                         definition.title(),
                         definition.description(),
@@ -124,7 +135,7 @@ public class AiToolModuleAppService {
                         server.isEnabled()
                 ));
             }
-            toolsByModule.put(meta.code(), mcpTools);
+            toolsByModule.put(meta.code(), mcpRows);
         }
         for (AgentPluginToolGateway gateway : pluginToolGateways) {
             Map<String, String> pluginModules = gateway.pluginToolModules();
@@ -210,6 +221,235 @@ public class AiToolModuleAppService {
         settings.updateModuleEnabled(moduleCode, enabled);
         settingsRepo.save(settings);
         return catalog();
+    }
+
+    // ------------------------------------------------------------------ 统一工具目录（管理端一张表）
+
+    /**
+     * 工具目录分页：系统、插件、MCP、Python 工具合并成同构行，按关键词/来源/模块/状态过滤。
+     * 模块关闭的行仍保留在列表中（标记 available=false），便于管理端解释原因。
+     */
+    public PageResult<AiToolCatalogRowDTO> pageCatalog(AiToolCatalogPageQuery query) {
+        ensureManageable();
+        List<AiToolCatalogRowDTO> rows = catalogRows();
+        String keyword = query == null || query.getKeyword() == null ? "" : query.getKeyword().trim().toLowerCase();
+        String source = query == null || query.getSource() == null ? "" : query.getSource().trim();
+        String moduleCode = query == null || query.getModuleCode() == null ? "" : query.getModuleCode().trim();
+        String status = query == null || query.getStatus() == null ? "" : query.getStatus().trim();
+        List<AiToolCatalogRowDTO> filtered = rows.stream()
+                .filter(row -> keyword.isBlank()
+                        || row.code().toLowerCase().contains(keyword)
+                        || row.name().toLowerCase().contains(keyword)
+                        || row.description().toLowerCase().contains(keyword)
+                        || row.moduleName().toLowerCase().contains(keyword))
+                .filter(row -> source.isBlank() || source.equalsIgnoreCase(row.source()))
+                .filter(row -> moduleCode.isBlank() || moduleCode.equals(row.moduleCode()))
+                .filter(row -> matchesStatus(row, status))
+                .toList();
+        int page = Math.max(1, query == null ? 1 : query.getPage());
+        int size = Math.max(1, Math.min(200, query == null ? 20 : query.getSize()));
+        int start = Math.min((page - 1) * size, filtered.size());
+        int end = Math.min(start + size, filtered.size());
+        return new PageResult<>(filtered.subList(start, end), filtered.size(), page, size);
+    }
+
+    private boolean matchesStatus(AiToolCatalogRowDTO row, String status) {
+        if (status.isBlank()) {
+            return true;
+        }
+        return switch (status.toUpperCase()) {
+            case "ENABLED" -> row.available();
+            case "DISABLED" -> !row.enabled();
+            case "MODULE_CLOSED" -> !row.moduleEnabled();
+            default -> true;
+        };
+    }
+
+    /** 全部工具行（未分页），供分页、测试解析与统计复用。 */
+    public List<AiToolCatalogRowDTO> catalogRows() {
+        AiToolSettings settings = settings();
+        List<AiToolCatalogRowDTO> rows = new ArrayList<>();
+        List<AiAgentTool> holders = new ArrayList<>();
+        for (AiAgentTool tool : systemTools) {
+            if (tool != null && tool.descriptor() != null && tool.descriptor().name() != null) {
+                holders.add(tool);
+            }
+        }
+        holders.sort(Comparator.comparing(tool -> tool.descriptor().name()));
+        for (AiAgentTool tool : holders) {
+            AiAgentToolDescriptor descriptor = tool.descriptor();
+            String moduleCode = moduleCodeOf(tool);
+            AiToolModules.ModuleMeta meta = moduleMeta(moduleCode);
+            rows.add(new AiToolCatalogRowDTO(
+                    null,
+                    descriptor.name(),
+                    displayName(descriptor),
+                    descriptor.description() == null ? "" : descriptor.description(),
+                    "system",
+                    moduleCode,
+                    meta.name(),
+                    settings.isModuleEnabled(moduleCode),
+                    meta.alwaysOn(),
+                    tool.risk() == null ? AgentToolRisk.WRITE.name() : tool.risk().name(),
+                    tool.requiresConfirmation(),
+                    true,
+                    false,
+                    false,
+                    true,
+                    descriptor.permissionCode() == null ? "" : descriptor.permissionCode(),
+                    schemaOf(descriptor)
+            ));
+        }
+        for (AgentPluginToolGateway gateway : pluginToolGateways) {
+            Map<String, String> pluginModules = gateway.pluginToolModules();
+            for (AiAgentToolDescriptor descriptor : gateway.pluginTools()) {
+                if (descriptor == null || descriptor.name() == null) {
+                    continue;
+                }
+                String moduleCode = pluginModules.getOrDefault(descriptor.name(),
+                        AiToolModules.PLUGIN_PREFIX + "plugin");
+                AiToolModules.ModuleMeta meta = pluginModuleMeta(moduleCode);
+                rows.add(new AiToolCatalogRowDTO(
+                        null,
+                        descriptor.name(),
+                        displayName(descriptor),
+                        descriptor.description() == null ? "" : descriptor.description(),
+                        "plugin",
+                        moduleCode,
+                        meta.name(),
+                        settings.isModuleEnabled(moduleCode),
+                        meta.alwaysOn(),
+                        AgentToolRisk.WRITE.name(),
+                        true,
+                        true,
+                        false,
+                        false,
+                        true,
+                        descriptor.permissionCode() == null ? "" : descriptor.permissionCode(),
+                        AiAgentToolSchemas.normalize(descriptor.inputSchema())
+                ));
+            }
+        }
+        for (McpServer server : mcpServerRepo.findAll()) {
+            String moduleCode = AiToolModules.mcpModuleName(server.getCode());
+            for (var definition : server.toolsOrEmpty()) {
+                rows.add(new AiToolCatalogRowDTO(
+                        null,
+                        AiToolModules.mcpToolName(server.getCode(), definition.name()),
+                        definition.title(),
+                        definition.description(),
+                        "mcp",
+                        moduleCode,
+                        server.getName() == null || server.getName().isBlank() ? server.getCode() : server.getName(),
+                        settings.isModuleEnabled(moduleCode),
+                        server.isPreload(),
+                        definition.risk(),
+                        definition.requiresConfirmation(),
+                        server.isEnabled(),
+                        false,
+                        false,
+                        true,
+                        PERMISSION_CODE_MCP_USE,
+                        AiAgentToolSchemas.normalize(definition.inputSchema())
+                ));
+            }
+        }
+        for (AgentTool tool : customToolList()) {
+            rows.add(new AiToolCatalogRowDTO(
+                    tool.getId(),
+                    tool.getCode(),
+                    tool.getName(),
+                    tool.getDescription() == null ? "" : tool.getDescription(),
+                    "python",
+                    AiToolModules.MODULE_CUSTOM,
+                    AiToolModules.customModule().name(),
+                    systemToolsEnabled(),
+                    false,
+                    AgentToolRisk.WRITE.name(),
+                    false,
+                    Boolean.TRUE.equals(tool.getEnabled()),
+                    true,
+                    true,
+                    true,
+                    tool.getPermissionCode() == null ? "" : tool.getPermissionCode(),
+                    parseSchema(tool.getInputSchemaJson())
+            ));
+        }
+        return rows.stream()
+                .sorted(Comparator.comparing(AiToolCatalogRowDTO::source)
+                        .thenComparing(AiToolCatalogRowDTO::moduleName)
+                        .thenComparing(AiToolCatalogRowDTO::code))
+                .toList();
+    }
+
+    private Map<String, Object> schemaOf(AiAgentToolDescriptor descriptor) {
+        return AiAgentToolSchemas.normalize(descriptor);
+    }
+
+    /**
+     * 按平台工具编码解析可执行的宿主工具（系统 → 插件 → MCP）；Python 工具与未知编码返回 null。
+     */
+    public AiAgentTool resolveTool(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        String target = code.trim();
+        for (AiAgentTool tool : systemTools) {
+            if (tool != null && tool.descriptor() != null && target.equals(tool.descriptor().name())) {
+                return tool;
+            }
+        }
+        for (AgentPluginToolGateway gateway : pluginToolGateways) {
+            AiAgentTool pluginTool = gateway.pluginTool(target);
+            if (pluginTool != null) {
+                return pluginTool;
+            }
+        }
+        return null;
+    }
+
+    /** MCP 工具解析（能力未启用或服务关闭时返回 null）。 */
+    public AiAgentTool resolveMcpTool(String code) {
+        McpAgentToolProvider provider = mcpTools == null ? null : mcpTools.getIfAvailable();
+        return provider == null ? null : provider.tool(code);
+    }
+
+    /** 工具行元数据（含 Python 工具）；不存在返回 null。 */
+    public AiToolCatalogRowDTO row(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        String target = code.trim();
+        return catalogRows().stream().filter(row -> target.equals(row.code())).findFirst().orElse(null);
+    }
+
+    List<AgentTool> customToolList() {
+        return toolRepo.page(null, 1, 1000).getRecords();
+    }
+
+    private Map<String, Object> parseSchema(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> schema = SCHEMA_MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {
+            });
+            return schema == null ? Map.of() : schema;
+        } catch (Exception exception) {
+            return Map.of();
+        }
+    }
+
+    private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
+
+    /** 登记消失时清除模块状态（MCP 服务删除等），不校验能力闸门：属于清理动作。 */
+    public void clearModuleState(String moduleCode) {
+        if (moduleCode == null || moduleCode.isBlank()) {
+            return;
+        }
+        AiToolSettings settings = settings();
+        settings.removeModuleState(moduleCode);
+        settingsRepo.save(settings);
     }
 
     // ------------------------------------------------------------------ 运行期计划

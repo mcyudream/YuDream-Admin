@@ -70,8 +70,10 @@ public class McpServerAppService {
 
     public void delete(Long id) {
         ensureEnabled();
-        server(id);
+        McpServer server = server(id);
         serverRepo.deleteById(id);
+        // 服务登记消失后其工具模块也随之消失，残留的模块开关状态会在同编码重新登记时误导管理员
+        toolModuleAppService.clearModuleState(AiToolModules.mcpModuleName(server.getCode()));
     }
 
     /** 连接测试：完成 initialize 与 tools/list，并把结果写入连接状态与工具快照。 */

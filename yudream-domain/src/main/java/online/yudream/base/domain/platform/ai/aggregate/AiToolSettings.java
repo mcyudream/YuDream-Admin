@@ -51,6 +51,17 @@ public class AiToolSettings {
         this.systemEnabled = enabled;
     }
 
+    /**
+     * 清除模块状态：登记消失（如删除 MCP 服务）后回到默认启用，
+     * 避免同编码重新登记时继承上一次的关闭状态。
+     */
+    public void removeModuleState(String moduleCode) {
+        if (moduleCode == null || moduleCode.isBlank()) {
+            return;
+        }
+        moduleStates.remove(moduleCode.trim());
+    }
+
     public void updateModuleEnabled(String moduleCode, boolean enabled) {
         if (moduleCode == null || moduleCode.isBlank()) {
             return;

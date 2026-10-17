@@ -466,6 +466,10 @@ public enum PlatformMenuModule {
             parentName = "AGENT_TOOLS", permission = "platform:agent:tool:delete")
     AGENT_TOOL_DELETE,
 
+    @MenuNode(code = "platform:agent:tool:test", name = "测试 Agent 工具", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TOOLS", permission = "platform:agent:tool:test")
+    AGENT_TOOL_TEST,
+
     @MenuNode(code = "platform:agent-skill", name = "技能库", type = MenuNodeType.MENU,
             parentName = "APP_HUB", path = "/platform/agent-skill", component = "platform/agent-skill/index.vue",
             icon = "i-ri:book-2-line", sort = 55, permission = "platform:agent-skill:view")

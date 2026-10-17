@@ -36,20 +36,9 @@ public final class ToolSchemas {
         return wrapped;
     }
 
+    /** 与领域侧共用同一归一化实现（管理端工具目录也用同一份，避免简写 schema 只在一边生效）。 */
     public static Map<String, Object> normalizeSimple(Map<String, Object> inputSchema) {
-        if (inputSchema == null || inputSchema.isEmpty()) {
-            return Map.of("type", "object", "additionalProperties", true, "properties", Map.of());
-        }
-        if (inputSchema.get("properties") instanceof Map) {
-            return inputSchema;
-        }
-        Map<String, Object> properties = new java.util.LinkedHashMap<>();
-        inputSchema.forEach((key, value) -> properties.put(key, propertySchema(value)));
-        Map<String, Object> wrapped = new java.util.LinkedHashMap<>();
-        wrapped.put("type", "object");
-        wrapped.put("additionalProperties", true);
-        wrapped.put("properties", properties);
-        return wrapped;
+        return online.yudream.base.domain.platform.ai.valobj.AiAgentToolSchemas.normalize(inputSchema);
     }
 
     private static Map<String, Object> propertySchema(Object value) {

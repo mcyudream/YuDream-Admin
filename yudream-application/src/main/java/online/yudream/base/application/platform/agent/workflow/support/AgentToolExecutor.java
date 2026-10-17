@@ -194,6 +194,26 @@ public final class AgentToolExecutor {
     }
 
     /**
+     * 管理端工具测试入口：不要求应用授权（测试端点自带 {@code platform:agent:tool:test} 权限），
+     * 但 Python 工具启用状态、权限快照与运行器可用性照旧复核。
+     */
+    public AiAgentToolResult executePythonTool(
+            String toolCode,
+            Map<String, Object> arguments,
+            PermissionSnapshot permissionSnapshot
+    ) {
+        AgentTool pythonTool = toolRepo.findByCode(requiredCode(toolCode))
+                .orElseThrow(() -> new BizException("Tool does not exist: " + toolCode));
+        ensurePythonAvailable(pythonTool);
+        ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
+        if (runtimeExecutor == null) {
+            throw new BizException("Python 运行器不可用，请先启用集成能力");
+        }
+        Map<String, Object> safeArguments = arguments == null ? Map.of() : new LinkedHashMap<>(arguments);
+        return executePython(pythonTool, safeArguments);
+    }
+
+    /**
      * Makes old tool nodes use the exact same resolution and Python execution contract.
      */
     public AiAgentToolResult execute(

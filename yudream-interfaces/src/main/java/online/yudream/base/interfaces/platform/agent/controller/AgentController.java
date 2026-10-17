@@ -14,6 +14,7 @@ import online.yudream.base.interfaces.platform.agent.assembler.AiToolModuleWebAs
 import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSaveRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
+import online.yudream.base.interfaces.platform.agent.request.AiToolTestRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentCatalogRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
@@ -21,7 +22,9 @@ import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolCandidateRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
+import online.yudream.base.interfaces.platform.agent.res.AiToolCatalogRowRes;
 import online.yudream.base.interfaces.platform.agent.res.AiToolModuleRes;
+import online.yudream.base.interfaces.platform.agent.res.AiToolTestRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -59,6 +62,7 @@ public class AgentController {
     }
 private final AgentAppService agentAppService;
     private final online.yudream.base.application.platform.ai.service.AiToolModuleAppService aiToolModuleAppService;
+    private final online.yudream.base.application.platform.ai.service.AiToolTestAppService aiToolTestAppService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
@@ -111,6 +115,19 @@ private final AgentAppService agentAppService;
     @GetMapping("/tools/system")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看系统 Agent 工具", module = "平台能力", desc = "查看系统提供的 Agent 工具")
     public Result<List<Map<String, Object>>> systemTools() { return Result.ok(agentAppService.systemTools()); }
+    @GetMapping("/tools/catalog")
+    @PermissionRegister(code = "platform:agent:tool:view", name = "查看工具目录", module = "平台能力", desc = "分页查看系统、插件、MCP 与 Python 工具")
+    public Result<PageResult<AiToolCatalogRowRes>> toolCatalog(
+            online.yudream.base.application.platform.ai.query.AiToolCatalogPageQuery query) {
+        return Result.ok(AiToolModuleWebAssembler.toRowPage(aiToolModuleAppService.pageCatalog(query)));
+    }
+    @PostMapping("/tools/test")
+    @PermissionRegister(code = "platform:agent:tool:test", name = "测试 Agent 工具", module = "平台能力", desc = "按当前用户权限真实调用一次工具")
+    public Result<AiToolTestRes> testTool(@Valid @RequestBody AiToolTestRequest request) {
+        SecurityPrincipalSupport.SecurityPrincipal principal = SecurityPrincipalSupport.current();
+        return Result.ok(AiToolModuleWebAssembler.toRes(aiToolTestAppService.test(
+                AiToolModuleWebAssembler.toCmd(request, principal == null ? null : principal.permissions()))));
+    }
     @GetMapping("/tools/modules")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看系统工具模块", module = "平台能力", desc = "查看系统工具模块目录与开关状态")
     public Result<AiToolModuleRes> toolModules() { return Result.ok(AiToolModuleWebAssembler.toRes(aiToolModuleAppService.catalog())); }
