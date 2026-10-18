@@ -79,8 +79,8 @@ RESOLVER_DUPES=$(grep -oE "^[[:space:]]*'[A-Za-z0-9]+'," yudream-frontend/packag
 [ -z "$RESOLVER_DUPES" ] || fail "components resolver must not repeat component names: $RESOLVER_DUPES"
 
 echo "[verify-contract-packages] checking @yudream/dataviz"
-grep -q '"version":[[:space:]]*"0.1.2"' yudream-frontend/packages/dataviz/package.json \
-  || fail "@yudream/dataviz must use stable version 0.1.2"
+grep -q '"version":[[:space:]]*"0.1.3"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must use stable version 0.1.3"
 grep -q '"./src/index.ts"' yudream-frontend/packages/dataviz/package.json \
   || fail "@yudream/dataviz must export the published src entry"
 grep -q '"./echarts"' yudream-frontend/packages/dataviz/package.json \
