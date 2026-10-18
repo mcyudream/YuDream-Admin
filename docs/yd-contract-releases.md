@@ -85,3 +85,26 @@ Nexus 回读完整性值：
 插件仓同步（`main`，提交 `07cdda8` 规范副本、`cb802c1` 依赖升级，均已推送）：`docs/yd-ui-guidelines.md` 副本补齐设置页布局与响应式增强表格条目；catalog/lockfile 升到 components `1.8.1` / SDK `1.12.0`；12 个 Web 插件 tsconfig 补齐 `types`（9 个 `vite/client`，3 个 `vite/client` + `node`）。下游验证：`ci/verify-plugin-repo-readiness.sh` 通过，`pnpm -r --filter=@yudream/plugin-* run build` 覆盖 33 个 Web 插件与移动端插件，0 失败。
 
 地图入口遗留：`@yudream/components/map` 需调用方自行安装 leaflet 并显式导入，瓦片服务、许可与访问密钥由调用方负责；未进入预览站示例与公开目录，使用前按组件文档核对。此轮没有发布业务插件 JAR 到市场。
+
+## v1.4.9-1 全量契约发布（已发布与验签）
+
+2026-10-19 以 host tag `v1.4.9-1`（流水线 [#407](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/407)，提交 `e7703da8`）一次性发布验签四个契约包并构建 Harbor/阿里云 backend+frontend 镜像（`e7703da8` + `latest`）。发布提交链：`5191de4f` 契约升版、`abdb016f` 后端测试桩修复、`55d18808` 前端自动导入声明补提交、`df355537` 宿主 SDK 常量与验签钉版、`7b08927d` 组件目录补登记 `YdEntityPeek`、`e7703da8` 审计边界修复。
+
+| 契约 | 发布版本 | 变化 | registry |
+| --- | --- | --- | --- |
+| `online.yudream.base:yudream-plugin-spi`（Maven） | `2.37.0`（首发，含 2.35.0 AI 持久运行 / 2.36.0 新手引导 / 2.37.0 飞书云文档与站点目录） | `maven-releases`（经 `maven-public` 读取） |
+| `@yudream/plugin-sdk` | `1.13.0` | 表格页组件（`YdTablePageLayout`/`YdDynamicSearchForm`/`YdNumberRange`）登记宿主共享桥、关联实体预览卡试点、列表工具栏与宽度受控筛选选择器 | `npm-public` |
+| `@yudream/components` | `1.9.0` | 表格页统计情报区与状态语义色、表头固定、默认常用字段、关联实体铺开部门/角色与跨页定位、mermaid 预览修复等 11 项 | `npm-public` |
+| `@yudream/dataviz` | `0.1.3` | 消费侧 `tsconfig.consumer-lib.json` 编译修复（随 1.8.1 批次补齐） | `npm-public` |
+
+失败与重试记录：首次 tag `v1.4.9`（[#406](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/406)）53 秒即失败于 `validate:yd-ui`——`audit:ui` 检出基线外违规 `component-showcase/src/fa-fix/main.ts` 直接依赖 `@arco-design/web-vue/dist/arco.css`；根因是多入口子目录 bootstrap 不在 `IMPLEMENTATION_BOUNDARIES`（`src/main.ts` 在列）。修复提交 `e7703da8` 定点把 `fa-fix/main.ts` 纳入边界白名单（未放宽通用模式、未动基线），按惯例重打后缀 tag，失败 tag 保留。发布前已在干净 worktree（`D:/code/yd-rel-v149`）完成 CI 等价验证：后端 `mvn install` 全链、宿主前端 `vue-tsc -b + vite build`、三契约包构建、`verify-contract-packages.sh` 与 170 组件台账三方一致。
+
+Nexus 回读完整性值：
+
+| 契约 | `dist.integrity` |
+| --- | --- |
+| components `1.9.0` | `sha512-h7uPjrejr3tn1NIVDRDyMyubwnuw6s6bJ6RO55m2WfQRLMe3CkpWjQOnoML2StWIaWK1odRXndwUqWqoThCPew==` |
+| SDK `1.13.0` | `sha512-2Nt/V1pXf71ycb+XNfi3u0DQaLdR/RjwsARfkKI2ZKXiKFRlMUYjx5aq9PQqV0Qo6xNRjuEPOdD5ny5tgpTW/g==` |
+| dataviz `0.1.3` | `sha512-akP+neZnVPqTnU/VLhYVCDVEoMkXCQwyS4H47Nv4l0oVb4DYLJFvjKU6v5qwn/veMESc4scAES+KkOmbwe0+bw==` |
+
+插件仓同步状态：**未同步**。插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），按同步地图先保留其 WIP；待其落定后改根 pom 属性至 SPI 2.37.0、`pnpm-workspace.yaml` catalog 升到 SDK `1.13.0` / components `1.9.0` / dataviz `0.1.3`，刷新 lockfile 并跑 `ci/verify-plugin-repo-readiness.sh`，单独提交。
