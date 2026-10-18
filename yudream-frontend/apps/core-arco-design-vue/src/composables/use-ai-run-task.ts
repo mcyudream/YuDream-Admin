@@ -2,6 +2,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { AiRunSnapshot } from '@/api/modules/platform-ai-runs'
 import { computed, ref, toValue, watch } from 'vue'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { aiRunPhaseLabel } from '@/utils/ai-run-projection'
 import { isActiveAiRun } from '@/utils/ai-run-stream'
 
 /** Business tasks share the root's resumable event transport, including when their panel is destroyed. */
@@ -13,7 +14,7 @@ export function useAiRunTask(taskSessionId: MaybeRefOrGetter<string | undefined>
   const running = computed(() => starting.value || (!!run.value && isActiveAiRun(run.value.status)))
   const activities = computed(() => (run.value?.activities || []).map((activity, index) => ({
     key: `${activity.phase || index}`,
-    title: activity.title || activity.phase || '执行进度',
+    title: activity.title || aiRunPhaseLabel(activity.phase) || activity.phase || '执行进度',
     description: activity.content,
     status: activity.status === 'complete' || activity.status === 'completed' ? 'success' as const : activity.status === 'error' ? 'error' as const : activity.status === 'running' ? 'running' as const : 'pending' as const,
   })))

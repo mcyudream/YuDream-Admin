@@ -9,7 +9,7 @@ import apiAi from '@/api/modules/platform-ai'
 import { cancelAiRun, getAiRun, listAiRuns, replyAiFrontendTool, respondAiInteraction, resumeAiRun, startAiAssistantRun, subscribeAiRun } from '@/api/modules/platform-ai-runs'
 import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession } from '@/api/modules/platform-chat'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, parseAiAssistantPreferences, parseAiFrontendToolRequest } from '@/utils/ai-assistant-context'
-import { projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
+import { aiRunPhaseLabel, projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { canReconnectAiRun, isActiveAiRun, isNewAiCursor } from '@/utils/ai-run-stream'
 import { hintForMessage } from '@/utils/api-error'
 
@@ -68,6 +68,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
   const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const retries = new Map<string, number>()
   const consumedTools = new Set<string>()
+  /** 业务面板注册的前端工具执行器：画布等页面在自己的生命周期内挂载与卸载。 */
+  const frontendToolHandlers = new Map<string, (request: AiFrontendToolRequest) => Promise<Record<string, unknown>>>()
   let owner = ''
   let epoch = 0
   let observerInitialized = false
@@ -92,10 +94,12 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     messageCount: session.messageCount,
     updatedAt: session.lastMessageAt,
     status: statusProjection(Object.values(runs.value).find(run => run.sessionId === session.id && isActiveAiRun(run.status))?.status),
+    scopeType: session.scopeType,
+    agentCode: session.agentCode,
   })))
   const activities = computed<YdAgentActivity[]>(() => (messages.value.at(-1)?.activities || []).map((activity, index) => ({
     id: `${activity.messageId || activeRun.value?.id || 'activity'}:${activity.phase || index}`,
-    title: activity.title || activity.phase || '执行进度',
+    title: activity.title || aiRunPhaseLabel(activity.phase) || activity.phase || '执行进度',
     kind: 'context',
     status: activity.status === 'complete' || activity.status === 'completed' ? 'complete' : activity.status === 'error' ? 'error' : activity.status === 'waiting' ? 'waiting' : activity.status === 'cancelled' ? 'complete' : 'running',
     detail: activity.content,
@@ -137,6 +141,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     reconnectTimers.clear()
     retries.clear()
     consumedTools.clear()
+    frontendToolHandlers.clear()
     owner = nextOwner
     observerInitialized = false
     observerLoading = undefined
@@ -855,7 +860,21 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     }
   }
 
-  async function decideFrontendTool(id: string, approved: boolean, execute: (request: AiFrontendToolRequest) => Promise<Record<string, unknown>>) {
+  /** 注册前端工具执行器（按工具名）；返回注销函数，面板卸载时必须调用。 */
+  function registerFrontendToolHandler(name: string, handler: (request: AiFrontendToolRequest) => Promise<Record<string, unknown>>) {
+    frontendToolHandlers.set(name, handler)
+    return () => {
+      if (frontendToolHandlers.get(name) === handler) {
+        frontendToolHandlers.delete(name)
+      }
+    }
+  }
+
+  function frontendToolHandler(name: string) {
+    return frontendToolHandlers.get(name)
+  }
+
+  async function decideFrontendTool(id: string, approved: boolean, execute: (request: AiFrontendToolRequest) => Promise<Record<string, unknown>>, reason?: string) {
     const pending = frontendRequests.value[id]
     if (!pending || consumedTools.has(id)) {
       return
@@ -865,7 +884,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     const started = epoch
     let reply: { ok: boolean, result?: Record<string, unknown>, error?: string }
     if (!approved) {
-      reply = { ok: false, error: '用户拒绝本次前端工具操作' }
+      reply = { ok: false, error: reason && reason.trim() ? reason.trim() : '用户拒绝本次前端工具操作' }
     }
     else {
       try {
@@ -930,6 +949,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     setPreferences,
     setError,
     decideFrontendTool,
+    registerFrontendToolHandler,
+    frontendToolHandler,
     attachRun,
     restoreTask,
     lifecycleVersion,

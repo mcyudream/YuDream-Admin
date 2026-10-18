@@ -94,3 +94,24 @@ export function projectAiRunActivity(value: unknown, runId: string): AiRunActivi
       : undefined,
   }
 }
+
+/** Harness/工作流进度阶段的中文标签（与组件包 YdChatProcess 内部映射保持一致）。 */
+const PHASE_LABELS: Record<string, string> = {
+  subscribed: '任务已接收',
+  accepted: '任务已接收',
+  analysis: '生成回答',
+  reasoning: '深度思考',
+  waiting: '等待输入',
+  'awaiting-approval': '等待工具确认',
+  'tool-start': '执行工具',
+  'tool-complete': '工具完成',
+  start: '开始处理',
+  complete: '处理完成',
+  failed: '处理失败',
+  cancelled: '已取消',
+}
+
+export function aiRunPhaseLabel(phase?: string): string | undefined {
+  if (!phase) return undefined
+  return PHASE_LABELS[phase] ?? undefined
+}

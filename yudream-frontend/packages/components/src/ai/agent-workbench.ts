@@ -11,6 +11,10 @@ export interface YdAgentSession {
   updatedAt?: string
   workspaceId?: string
   status?: YdAgentRunStatus
+  /** 网关会话范围（GENERAL/AGENT/WIKI/CONSOLE），用于业务面板筛选自己的会话 */
+  scopeType?: string
+  /** 网关会话绑定的 agent（如 cms-canvas / cms-builder） */
+  agentCode?: string
 }
 export interface YdAgentWorkspace {
   id: string
@@ -93,4 +97,27 @@ export interface YdAgentSendRequest {
   mode: YdAgentMode
   skillCodes: string[]
   contextPaths: string[]
+}
+
+/** Harness/工作流进度阶段的统一中文标签；后端事件只带 phase 时不至于露出英文键。 */
+export const YD_ACTIVITY_PHASE_LABELS: Record<string, string> = {
+  subscribed: '任务已接收',
+  accepted: '任务已接收',
+  running: '执行中',
+  analysis: '生成回答',
+  reasoning: '深度思考',
+  waiting: '等待输入',
+  'awaiting-approval': '等待工具确认',
+  'tool-start': '执行工具',
+  'tool-complete': '工具完成',
+  'waiting-approval': '等待批准',
+  start: '开始处理',
+  complete: '处理完成',
+  failed: '处理失败',
+  cancelled: '已取消',
+}
+
+export function ydActivityPhaseLabel(phase?: string): string | undefined {
+  if (!phase) return undefined
+  return YD_ACTIVITY_PHASE_LABELS[phase] ?? undefined
 }

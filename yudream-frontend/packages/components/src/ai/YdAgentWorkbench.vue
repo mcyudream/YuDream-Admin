@@ -235,7 +235,7 @@ defineExpose({ scrollToBottom })
             <YdIcon name="morph:panel-left" />
           </YdButton>
           <div class="yd-agent-title">
-            <span>YU DREAM / AGENT</span><h2>{{ session?.title || '开始一个新任务' }}</h2>
+            <span v-if="wide">YU DREAM / AGENT</span><h2>{{ session?.title || '开始一个新任务' }}</h2>
           </div>
           <div class="yd-agent-heading-actions">
             <YdButton variant="outline" size="sm" :aria-expanded="changesDrawer" @click="changesDrawer = true">

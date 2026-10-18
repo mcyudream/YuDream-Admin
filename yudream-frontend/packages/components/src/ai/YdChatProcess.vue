@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { YdChatActivity, YdChatGraphNode, YdChatRetrievalHit } from './useYdChatStream'
 import { computed, ref, watch } from 'vue'
+import { ydActivityPhaseLabel } from './agent-workbench'
 import YdChatGraph from './YdChatGraph.vue'
 
 const props = withDefaults(defineProps<{
@@ -39,7 +40,7 @@ function activityLabel(activity: YdChatActivity): string {
   if (activity.title) return activity.title
   if (activity.activityType === 'wiki-retrieval') return '检索知识库'
   if (activity.activityType === 'wiki-graph') return '分析关联图谱'
-  return activity.phase || '处理任务'
+  return ydActivityPhaseLabel(activity.phase) || activity.phase || '处理任务'
 }
 
 function scoreText(score?: number): string {
@@ -72,7 +73,7 @@ watch(() => props.activities, (activities) => {
           <div class="yd-chat-process__main">
             <div class="yd-chat-process__head">
               <span>{{ activityLabel(activity) }}</span>
-              <span v-if="activity.phase" class="yd-chat-process__phase">{{ activity.phase }}</span>
+              <span v-if="activity.phase && activity.phase !== activityLabel(activity)" class="yd-chat-process__phase">{{ activity.phase }}</span>
             </div>
             <p v-if="activity.content" class="yd-chat-process__description">{{ activity.content }}</p>
             <p v-else-if="activity.query && activity.activityType !== 'wiki-retrieval'" class="yd-chat-process__description">{{ activity.query }}</p>
