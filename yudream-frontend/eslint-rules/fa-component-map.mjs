@@ -33,6 +33,7 @@ const IMPLEMENTATION_BOUNDARIES = [
   /^packages\/components\/src\//,
   /^packages\/plugin-sdk\/src\/host-components\.ts$/,
   /^apps\/[^/]+\/src\/(?:main|bootstrap|ui\/provider)\.[jt]sx?$/,
+  /^apps\/component-showcase\/src\/fa-fix\/main\.[jt]sx?$/,
   /^apps\/[^/]+\/src\/ui\/YdUiProvider\.vue$/,
   /^apps\/core-arco-design-vue\/src\/ui\/provider\/index\.(?:ts|vue)$/,
   /^apps\/core-arco-design-vue\/src\/ui\/shadcn\/ui\//,
