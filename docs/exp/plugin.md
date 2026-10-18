@@ -33,6 +33,13 @@
 - **规避**：所有可逆软停用成对实现 enable/disable，恢复只改生命周期状态，不覆盖业务配置。
 - **来源**：`reversible-disable`；`docs/dev/backend-architecture.md`。
 
+### 插件目录读接口 500：同步注册表撞乐观锁
+
+- **现象**：`GET /api/platform/plugins/summary`（以及同页并发的 `/page`）偶发 500，`OptimisticLockingFailureException: Cannot save entity ... with version N to collection platformPlugin`，栈顶是 `PluginAppService.syncDiscoveredPlugins`。
+- **根因**：读接口每次都无条件保存所有已发现插件（`refreshDescriptor` 后直接 `save`），而 `platformPlugin` 走 Mongo `@Version` 乐观锁：表格页并发拉「分页 + 状态概览」时两个线程读到同一版本、各自保存，后写的必然失败；多实例同库（IDEA 实例 + CLI 实例）同样互撞。旧页面只调一次列表，所以这个写热点长期没暴露。
+- **规避**：三层一起做——① 无变化不写库：域对象给 `matchesDescriptor`，描述符派生字段统一在 `DescriptorFields` 快照里（与 `refreshDescriptor`、`fromDescriptor` 共用一份映射，新增字段不会只改一边），`status` 为空的历史记录仍视为需要补写；② 进程内把「读-改-写」放进同一把锁；③ 跨进程冲突重读重试（最多 3 次），仍冲突只记 WARN 跳过写库，不让读接口 500。验收断言用「并发打读接口 + 比对记录版本号」：无变化时版本号必须不变，换 JAR 版本时必须只自增一次（`tmp/verify-registry-sync.cjs`）。
+- **来源**：`plugin-registry-sync-optimistic-lock`；域测试 `PluginModuleDescriptorSyncTest`。
+
 ## 2. 打包与开发模式
 
 ### 源码模式编译成功，运行插件报 NoClassDefFoundError
