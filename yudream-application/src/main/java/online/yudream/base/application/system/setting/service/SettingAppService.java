@@ -230,12 +230,14 @@ public class SettingAppService {
     }
 
     private Map<String, Boolean> capabilityStatusMap() {
+        // 历史库可能存在同 code 重复行：启用行优先，避免陈旧的停用行遮蔽真实能力状态、
+        // 让前端误关入口（如全局 AI 助手）。
         Map<String, Boolean> result = new LinkedHashMap<>();
         for (CapabilityModule module : capabilityModuleRepo.findAll()) {
             if (module == null || !StringUtils.hasText(module.getCode())) {
                 continue;
             }
-            result.put(module.getCode(), module.enabled());
+            result.merge(module.getCode(), module.enabled(), Boolean::logicalOr);
         }
         return result;
     }

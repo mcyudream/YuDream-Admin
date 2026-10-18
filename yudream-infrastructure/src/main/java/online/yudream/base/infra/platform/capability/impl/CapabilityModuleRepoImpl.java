@@ -37,7 +37,10 @@ public class CapabilityModuleRepoImpl implements CapabilityModuleRepo {
 
     @Override
     public Optional<CapabilityModule> findByCode(String code) {
-        Query query = Query.query(Criteria.where("code").is(code));
+        // 历史库里可能存在同 code 的重复行（重复安装残留）；启用行优先、再取最近更新，
+        // 保证运行时闸门不会被陈旧的停用行遮蔽，也与前端能力投影保持一致。
+        Query query = Query.query(Criteria.where("code").is(code))
+                .with(Sort.by(Sort.Direction.DESC, "enabled", "updateTime"));
         return Optional.ofNullable(CapabilityModuleInfraMapper.toDomain(mongoTemplate.findOne(query, CapabilityModuleDO.class), credentialCipher));
     }
 

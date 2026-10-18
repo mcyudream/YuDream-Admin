@@ -36,4 +36,10 @@ public class HarnessRuntimeProperties {
 
     /** 允许工作区 profile 委派子 Agent；默认关闭，需先配置真实执行边界。 */
     private boolean subagentsEnabled = false;
+
+    /** 任务提交后的启动观察窗口：超时仍无任何真实执行事件则判定会话执行器卡死并快速失败。 */
+    private java.time.Duration startupTimeout = java.time.Duration.ofSeconds(90);
+
+    /** 启动超时后是否自动重置该会话的原生日志（自愈上一回合失败遗留的卡死会话）。 */
+    private boolean resetSessionOnStartupTimeout = true;
 }

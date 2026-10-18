@@ -55,6 +55,11 @@ public class AiRunAppService {
     public AiRunDTO start(Long userId, String module, String sessionId,
                           Function<RunEmitter, Object> action, Runnable onCancel) {
         ensureEnabled();
+        // 同会话遗留的僵尸运行先按陈旧规则回收（服务中断/进程被杀的 RUNNING 占位），
+        // 否则唯一索引会一直阻塞该会话的新运行，直到有人先读取过那条运行。
+        for (AiRun stale : repo.list(userId, sessionId, true)) {
+            recoverStale(stale);
+        }
         AiRun run = repo.create(AiRun.start(userId, sessionId, module, instanceId));
         RunEmitter emitter = new RunEmitter(run, onCancel);
         return launch(run, emitter, action);
@@ -79,6 +84,10 @@ public class AiRunAppService {
         } catch (RuntimeException error) {
             if (!emitter.terminal) emitter.fail(error instanceof BizException ? error.getMessage() : "AI 运行失败，请稍后重试");
             throw error;
+        } catch (Throwable error) {
+            // Error（如栈溢出、内存不足）同样要落终态，否则运行会停留在 RUNNING 直到超时回收。
+            if (!emitter.terminal) emitter.fail("AI 运行失败，请稍后重试");
+            throw error;
         } finally { active.remove(run.getId()); }
     }
 
@@ -95,11 +104,14 @@ public class AiRunAppService {
                     result = action.apply(emitter);
                 }
                 emitter.complete(result);
-            } catch (Exception error) {
+            } catch (Throwable error) {
                 if (!emitter.terminal) {
                     log.warn("AI 运行失败，runId={}", run.getId(), error);
                     emitter.fail(error instanceof BizException ? error.getMessage() : "AI 运行失败，请稍后重试");
                 }
+                if (error instanceof Error runtimeError) throw runtimeError;
+                if (!(error instanceof RuntimeException runtimeException)) throw new IllegalStateException(error);
+                throw runtimeException;
             } finally {
                 active.remove(run.getId());
             }

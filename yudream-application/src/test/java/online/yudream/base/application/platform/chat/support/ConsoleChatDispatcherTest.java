@@ -25,7 +25,8 @@ class ConsoleChatDispatcherTest {
         CapabilityModuleRepo modules = (CapabilityModuleRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{CapabilityModuleRepo.class},(proxy,method,args)->Optional.of(ai));
         List<String> actualPermissions = List.of("platform:chat:use");
-        var dispatcher = new ConsoleChatDispatcher(gateway, modules);
+        // 站点设置服务在本用例中不参与断言；dispatcher 的 siteName() 对空依赖有回落保护。
+        var dispatcher = new ConsoleChatDispatcher(gateway, modules, null);
         dispatcher.dispatch(new ChatDispatchContext(7L,"session","帮助编辑",null,null,"cms-builder",null,List.of(),List.of(),
                 actualPermissions,ignored->{},ignored->{},ignored->{}));
         assertEquals("cms-builder",seen.get().agentCode());

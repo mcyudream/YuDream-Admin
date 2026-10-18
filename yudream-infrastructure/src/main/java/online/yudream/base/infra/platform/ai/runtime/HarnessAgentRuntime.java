@@ -319,8 +319,10 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         HarnessRunResult result;
         try (HarnessAgent agent = buildAgent(agentCode(request), selection, tools, events, control,
                 request.userId() == null || sandboxWorkspace(invocation))) {
+            log.debug("[harness-step] agent built sessionId={}", sessionId);
             AgentSession session = agent.session(context);
             importLegacyState(session, request, sessionId);
+            log.debug("[harness-step] session ready sessionId={}", sessionId);
             ActiveExecution execution = new ActiveExecution(agent, session, context, control);
             java.util.Set<ActiveExecution> live = activeSessions.computeIfAbsent(key,
                     ignored -> ConcurrentHashMap.newKeySet());
@@ -332,10 +334,29 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                                 StringUtils.hasText(idempotencyKey) ? idempotencyKey : UUID.randomUUID().toString(),
                                 inputMessages(request))
                         : respondConfirmations(session, request.confirmDecisions());
+                log.debug("[harness-step] task submitted sessionId={} taskId={}", sessionId, task == null ? "null" : "ok");
                 if (onProgress != null) {
                     onProgress.accept(new AiGenerationProgress("subscribed", "任务已持久接收。"));
                 }
-                AgentSession.Task finished = session.await(task).block(aiClientProperties.getReadTimeout());
+                // 启动观察窗口：提交后 onAgent 一直不触发，说明框架执行器没有消费任务
+                // （实测于上一回合失败后的会话：submit 已落库但后台执行永不开始，且跨重启保持）。
+                // 必须快速失败并重置会话日志，否则运行会占住会话直到 readTimeout（30 分钟）。
+                AgentSession.Task finished;
+                try {
+                    finished = session.await(task).block(properties.getStartupTimeout());
+                } catch (IllegalStateException startupTimeout) {
+                    if (events.started()) {
+                        // 已在真实执行只是超过了观察窗口：按完整读超时继续等。
+                        finished = session.await(task).block(aiClientProperties.getReadTimeout());
+                    }
+                    else {
+                        resetSessionLog(agentCode(request), request.userId(), sessionId);
+                        throw new BizException("AI 会话执行无响应，已自动重置该会话的执行日志，请重新发送");
+                    }
+                }
+                if (finished == null) {
+                    finished = session.await(task).block(aiClientProperties.getReadTimeout());
+                }
                 events.awaitObserver();
                 if (finished == null) {
                     throw new BizException("Agent 任务没有返回执行状态");
@@ -455,6 +476,34 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
 
     private static String sessionKey(String userId, String sessionId, String code) {
         return code + ":" + userId + ":" + sessionId;
+    }
+
+    /**
+     * 框架会话执行器在上一回合失败后可能拒绝消费新任务（submit 已落库但后台执行永不开始，
+     * 且状态持久在会话日志里，重启无效）。清空该会话的原生日志，让下一次提交从干净会话开始。
+     * 平台侧聊天/调试记录不受影响，仅丢失该会话的模型侧上下文与记忆引用。
+     */
+    private void resetSessionLog(String agentCode, Long userId, String sessionId) {
+        if (!properties.isResetSessionOnStartupTimeout()) {
+            return;
+        }
+        try {
+            // 框架按 s_ + base64url（无填充）编码 agent/user/session 三段构造日志键。
+            var encoder = java.util.Base64.getUrlEncoder().withoutPadding();
+            List<String> ns = List.of("yudream", "agent-session-history", "__agentscope_session_log_v1__",
+                    "agents", "s_" + encoder.encodeToString(agentCode.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    "sessions", "s_" + encoder.encodeToString(String.valueOf(userId == null ? "" : userId)
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    "s_" + encoder.encodeToString(sessionId.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            int removed = 0;
+            for (var item : baseStore.search(ns, 10_000, 0)) {
+                baseStore.delete(ns, item.key());
+                removed++;
+            }
+            log.warn("已重置无响应的 Agent 会话日志：agent={} sessionId={} entries={}", agentCode, sessionId, removed);
+        } catch (Exception error) {
+            log.warn("重置 Agent 会话日志失败：agent={} sessionId={}", agentCode, sessionId, error);
+        }
     }
 
     private record ActiveExecution(HarnessAgent agent, AgentSession session, RuntimeContext context,

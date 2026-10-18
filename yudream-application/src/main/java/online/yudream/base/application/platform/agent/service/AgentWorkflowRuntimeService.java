@@ -83,7 +83,7 @@ public class AgentWorkflowRuntimeService {
 
     /** MCP 工具提供方（未启用能力或未注入时为空）。 */
     private online.yudream.base.domain.platform.mcp.service.McpAgentToolProvider mcpToolProvider() {
-        return mcpTools == null ? null : mcpToolProvider();
+        return mcpTools == null ? null : mcpTools.getIfAvailable();
     }
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
     private online.yudream.base.domain.platform.agent.repo.AgentWorkflowCheckpointRepo checkpoints;
