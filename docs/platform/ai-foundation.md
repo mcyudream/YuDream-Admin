@@ -16,7 +16,14 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 
 每次运行持有独立 Harness Agent，模型连接可复用。状态、长期记忆、远程文件系统与 Session Log 使用共享 Mongo，Session Log 必须显式配置，不能因配置远程工作区而隐式落到本机日志。
 
-普通聊天禁用文件系统和 shell。CMS 文件工作区与明确授权的工作流可使用隔离工作区，编辑与发布分别进行。工具由技能库和运行范围提供，经过 schema 过滤、框架规则/模式、执行时权限复核及沙箱守卫。隐藏工具即使被模型伪造调用也不能执行。
+普通聊天禁用主机文件系统和 shell；对用户自己工作区的读取走平台只读工具（见下）。CMS 文件工作区与明确授权的工作流可使用隔离工作区，编辑与发布分别进行。工具由技能库和运行范围提供，经过 schema 过滤、框架规则/模式、执行时权限复核及沙箱守卫。隐藏工具即使被模型伪造调用也不能执行。
+
+### 用户工作区（每用户一个）
+
+- 每个账号默认拥有一个工作区：助手会话与上传文件都在其中，不需要额外开通步骤。文件存在 Harness KV 命名空间 `agents/general/users/&lt;uid&gt;/workspace`（集合 `platformAgentWorkspace`，`{content, encoding}` 载荷，单文件 8 MB 上限）。
+- HTTP 端点 `/api/platform/chat/workspace`：列表/读取需 `platform:chat:workspace:view`，上传/删除需 `platform:chat:workspace:edit`；列表限 2000 个文件。
+- 模型侧只有只读工具 `workspace.list` / `workspace.read`（模块 `workspace`，常驻，权限码同 `platform:chat:workspace:view`），由 `ChatRunAppService` 按调用方权限快照装配到本次运行；写入与删除只经界面端点，模型侧不提供。单次读取超 60000 字符截断，二进制只返回大小与类型说明。
+- 附件上传（`POST /api/platform/chat/attachments`）与工作区文件是两套存储：附件走 S3 + `sysFileObject`（随消息传给模型），工作区走 KV（模型按需读）；两者都受 `platform:chat:use` 与 AI 能力闸门。
 
 ## 工具模块与按需加载
 
@@ -29,7 +36,8 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 
 ### 管理端工具目录与工具测试
 
-- 「系统工具」页按**表格页规范**落地：`YdTablePageLayout` + `YdDynamicSearchForm`（筛选来自 `AiToolCatalogPageQuery` 的 `@Searchable` 声明：关键词/来源/模块/状态）+ `YdResponsiveEnhancedTable`。系统、插件、MCP、Python 工具**合并成一张表**，用来源标签区分；行级操作统一进表格 `actions`（测试 / 编辑 / 删除，仅 Python 工具可编辑删除），模块开关集中在页头「工具模块开关」弹窗，表格里只表达模块名与「模块已关闭 / 按需加载」状态。`GET /api/platform/agents/tools/catalog` 提供分页行（含 `toolId`、`moduleEnabled`、`risk`、`inputSchema`），开关状态与运行期同源。
+- 「系统工具」页按**表格页规范**落地：`YdTablePageLayout` + `YdDynamicSearchForm`（筛选来自 `AiToolCatalogPageQuery` 的 `@Searchable` 声明：关键词/来源/模块/状态）+ `YdResponsiveEnhancedTable`。系统、插件、MCP、Python 工具**合并成一张表**，用来源标签区分；行级操作统一进表格 `actions`（测试 / 编辑 / 删除，仅 Python 工具可编辑删除）。`GET /api/platform/agents/tools/catalog` 提供分页行（含 `toolId`、`moduleEnabled`、`risk`、`inputSchema`），开关状态与运行期同源。
+- **开关一律在表格里**，不再另设开关弹窗：模块开关落在「模块」列（同一模块的行各自渲染一个开关，切任意一个即作用于整个模块，切完刷新列表让所有同模块行同步）；Python 工具自身的启停开关落在「状态」列（`PUT /api/platform/agents/tools/{id}/enabled/{enabled}`，只改启用位不回写整对象）。系统/插件工具的启停跟随模块开关、MCP 工具跟随服务启用，因此它们的「状态」列只读。总开关（系统工具总开关）是页面级口径，放在表格上方说明条里，与「加载只影响可见性、不授予权限」的说明同排；禁用原因（不可关闭 / 部署配置已关闭 / 随总开关停用）就近显示在开关旁，不靠弹窗解释。
 - `POST /api/platform/agents/tools/test`（权限码 `platform:agent:tool:test`）按当前登录用户的权限快照**真实调用一次**工具：系统 → 插件 → MCP → Python 四条通道分别解析。与运行期的唯一差别是不要求工具被某个 Agent 应用授权（测试端点自身权限即授权来源）；模块开关、工具启用状态、工具权限码、Python 运行器可用性照旧全部复核，返回 `success/message/durationMillis/payload` 而非抛 500，失败原因直接给管理员看。写入类工具由前端在调用前二次确认。
 - 工具输入 schema 的归一化只有一处（领域 `AiAgentToolSchemas`，infra `ToolSchemas` 复用同一实现）：运行期模型侧与目录行共用同一换算，声明「属性名 → 描述」简写的工具也能在测试弹窗里生成参数骨架。
 - 删除 MCP 服务时同步清除其工具模块开关状态（`clearModuleState`），否则同编码重新登记会继承上一次的关闭状态。
@@ -112,7 +120,9 @@ AI/Agent/Wiki 等 provider 和端点受项目配置限制，每个用例继续�
 - 画布预览 JS 必须可重复初始化并可释放：`addEventListener`/`setInterval`/`requestAnimationFrame`/Three.js `setAnimationLoop` 等长生命周期资源经 `window.__YU_CMS_REGISTER_CLEANUP__` 注册清理；预览更新防抖，普通 HTML/CSS 更新不重跑整段页面 JS。
 - 工具状态、payload、cursor、业务上下文是结构化请求/运行时元数据：经 `message.tools`/`message.activities` 渲染，**禁止**序列化 `[工具上下文]` 之类的内部标记进 assistant 历史（模型会把它回声进用户可见回答）。
 - 画布 CSS 编辑与 AI CSS 工具保留选择器与 at-rule 语义：整规则替换，按规范化选择器在同一 at-rule 路径内合并、后声明覆盖；禁止裸拼 CSS 串或子串判重；Grid/Flex 子项可能含长内容要 `min-width: 0`，弹性轨道优先 `minmax(0, 1fr)`。
-- 构建器聊天历史按编辑目标隔离（`home:home`/`page:{id}`），前端懒加载；列表只存轻量摘要，大图 base64 附件不入历史。
+- **画布与站点工作区的 AI 统一走 AI 助手网关**：不再有 CMS 专用生成/画布流式端点与 AG-UI WebSocket。会话是真实的聊天会话（`CONSOLE` 范围 + `agentCode`：`cms-canvas` 画布、`cms-builder` 站点工作区），启动只能用 `POST /api/platform/chat/sessions/{id}/runs`，订阅用 `/api/platform/ai/runs/{id}/events`，回复用 `/frontend-tools/{toolCallId}`。画布客户端工具（`cms.canvas.*` / `cms.ask.user`）由 `ChatRunAppService` 按 agentCode 绑定 `CmsCanvasClientBridge.external` 为本次运行的 scoped 工具，前端面板在挂载期注册执行器（`registerFrontendToolHandler`），卸载即注销；没有执行器的请求必须显式拒绝，不让模型空等。画布提示词由 `CmsCanvasAgentPrompt` 单一来源供应（网关与历史检查点共用）。
+- 画布上下文（站点/页面/模板/选中元素/结构纲要/变量与深度思考开关）由前端合成到本轮消息文本；样图作为运行附件（image data URL）传入。
+- 对话历史不再在浏览器端存：会话与消息由 `platformChatSession`/`platformChatMessage` 持久化，加载历史会话时从服务端拉取，画布面板只展示 `agentCode=cms-canvas` 的会话。
 - 编辑器与公开站共用 Header/Footer chrome CSS 契约、排版基线与固定设备宽；公开基础样式不得压过持久化动态 CMS CSS；已登录账号控件继承 chrome 样式。
 - 构建器默认在后端/应用边界开深思考，发送器 UI 不暴露独立开关（产品明确要求除外）。
 - 通用工具（`web.fetch` 等）须声明为 `AiAgentTool`、带权限元数据，用于变更前的分析；只有 `cms.canvas.patch` 类变更工具直接改前端状态。

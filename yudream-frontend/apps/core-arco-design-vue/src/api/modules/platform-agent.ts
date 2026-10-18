@@ -233,6 +233,7 @@ export default {
   createTool: (data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.post<unknown, ApiResponse<AgentTool>>('api/platform/agents/tools', data),
   updateTool: (id: string, data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.put<unknown, ApiResponse<AgentTool>>(`api/platform/agents/tools/${id}`, data),
   deleteTool: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/agents/tools/${id}`),
+  toggleTool: (id: string, enabled: boolean) => systemClient.put<unknown, ApiResponse<AgentTool>>(`api/platform/agents/tools/${id}/enabled/${enabled}`),
 }
 
 function streamEndpoint(path: string) {
