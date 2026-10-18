@@ -106,12 +106,11 @@ class LifecycleEnableAppServiceTest {
 
     @Test
     void enablesChartDefinition() {
-        CapabilityAppService capabilityService = mock(CapabilityAppService.class);
         ChartDefinitionRepo repo = mock(ChartDefinitionRepo.class);
         ChartDefinition chart = ChartDefinition.builder().id(5L).enabled(false).build();
         when(repo.findById(5L)).thenReturn(Optional.of(chart));
         ChartAppService service = new ChartAppService(
-                capabilityService, mock(ChartDomainService.class), repo, mock(ChartDatasetGateway.class));
+                mock(ChartDomainService.class), repo, mock(ChartDatasetGateway.class));
 
         service.enableDefinition(5L);
 
