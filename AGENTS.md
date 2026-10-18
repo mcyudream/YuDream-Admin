@@ -45,12 +45,12 @@
 - 破坏性、不可逆或对外动作先确认；读取、分析、可逆本地改动及按明确要求的工作自主完成。
 - 发现验证失败如实报告，不将单测描述成运行环境启动验收。
 
-## 5. 当前工程基线（2026-10-14）
+## 5. 当前工程基线（2026-10-19）
 
 - 后端 AI 底座使用 AgentScope Java Harness，AI 持久运行/工具/额度规则见 `docs/platform/ai-foundation.md`。
-- 插件持久 AI 运行契约见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；该版本在对应工作项中只完成本仓提交，未获发布授权前不得推 Nexus 或让插件仓消费。
-- 插件新手引导契约见 `docs/plugin-system/spi-2.36.0-guides.md`（SPI 2.36.0 本仓已升版）；与 2.35.0 同样未获发布授权，不得推 Nexus 或让插件仓消费。
-- 插件飞书云文档与站点目录文件契约见 `docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`（SPI 2.37.0 本仓已升版，根 pom 镜像同版）：飞书端口只读 Drive/Wiki（知识空间与空间节点列表）/文档/文档块 + 块级编辑原语，按用户分钟/日额度（额度只在宿主页面）；站点目录端口锚定 `sites/{siteCode}/plugins/{pluginCode}/`，写隔离、跨插件读需授权；与 2.35.0/2.36.0 同样未获发布授权，不得推 Nexus 或让插件仓消费。
+- 插件持久 AI 运行契约见 `docs/plugin-system/spi-2.35.0-ai-runs.md`；SPI 2.35.0/2.36.0/2.37.0 已随主仓 `v1.4.9-1` 全量发布 Nexus 并验签（2026-10-19），插件可消费 2.37.0；插件仓依赖与文档同步待其 WIP 落定（见同步地图待同步节）。
+- 插件新手引导契约见 `docs/plugin-system/spi-2.36.0-guides.md`（SPI 2.36.0 本仓已升版）；发布状态同上，插件仓同步待办。
+- 插件飞书云文档与站点目录文件契约见 `docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`（SPI 2.37.0 本仓已升版，根 pom 镜像同版）：飞书端口只读 Drive/Wiki（知识空间与空间节点列表）/文档/文档块 + 块级编辑原语，按用户分钟/日额度（额度只在宿主页面）；站点目录端口锚定 `sites/{siteCode}/plugins/{pluginCode}/`，写隔离、跨插件读需授权；发布状态同上，插件仓同步待办。
 - 宿主前端 YD 零违规门禁以已提交基线为准；禁止从工作区生成基线或恢复历史例外。
 - 双仓同步地图：`docs/dev/repo-sync.md`；待同步事项以该文件为准。
 
