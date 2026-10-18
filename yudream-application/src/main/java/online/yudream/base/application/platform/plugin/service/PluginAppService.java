@@ -29,6 +29,7 @@ import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -66,6 +67,10 @@ public class PluginAppService {
     private static final int MARKETPLACE_RESTORE_ATTEMPTS = 3;
     private static final long MARKETPLACE_RESTORE_RETRY_MILLIS = 150L;
     private static final long REGISTER_SUPPRESS_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(30);
+    private static final int REGISTRY_SYNC_ATTEMPTS = 3;
+
+    /** 注册表同步的进程内串行锁：并发读接口的「读-改-写」不能交错。 */
+    private final Object registrySyncLock = new Object();
 
     private final PluginModuleRepo pluginModuleRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
@@ -875,11 +880,57 @@ public class PluginAppService {
     }
 
     private void syncDiscoveredPlugins() {
-        for (PluginDescriptorInfo descriptor : pluginRuntimeGateway.discover()) {
-            PluginModule module = pluginModuleRepo.findByCode(descriptor.code())
-                    .orElseGet(() -> PluginModule.fromDescriptor(descriptor));
-            module.refreshDescriptor(descriptor);
+        List<PluginDescriptorInfo> descriptors = pluginRuntimeGateway.discover();
+        if (descriptors.isEmpty()) {
+            return;
+        }
+        // 同一进程内串行，跨进程（多实例同库）冲突交给下面的重试收敛
+        synchronized (registrySyncLock) {
+            for (PluginDescriptorInfo descriptor : descriptors) {
+                syncDiscoveredPlugin(descriptor);
+            }
+        }
+    }
+
+    /**
+     * 同步单个插件记录：声明与库内一致时不写库。
+     * <p>
+     * 无变化也写库会让每个读请求（分页与概览并发、多标签页）都产生一批版本自增写入，
+     * 两个线程读到同一版本后各自保存就撞乐观锁、读接口直接 500；跨进程冲突时重读重试，
+     * 重试仍冲突说明另一个实例刚写过，本次跳过写库而不是打挂请求。
+     */
+    private void syncDiscoveredPlugin(PluginDescriptorInfo descriptor) {
+        for (int attempt = 0; attempt < REGISTRY_SYNC_ATTEMPTS; attempt++) {
+            Optional<PluginModule> existing = pluginModuleRepo.findByCode(descriptor.code());
+            if (existing.isPresent()) {
+                PluginModule module = existing.get();
+                if (module.matchesDescriptor(descriptor)) {
+                    return;
+                }
+                module.refreshDescriptor(descriptor);
+                if (saveRegistryModule(module, descriptor, attempt)) {
+                    return;
+                }
+                continue;
+            }
+            // 新发现的插件必须落库，否则目录里永远看不到它
+            if (saveRegistryModule(PluginModule.fromDescriptor(descriptor), descriptor, attempt)) {
+                return;
+            }
+        }
+        log.warn("插件 {} 注册表同步连续冲突，本次跳过写库（记录已被其它实例更新）", descriptor.code());
+    }
+
+    /** 保存同步结果；撞乐观锁返回 false，让调用方重读重试。 */
+    private boolean saveRegistryModule(PluginModule module, PluginDescriptorInfo descriptor, int attempt) {
+        try {
             pluginModuleRepo.save(module);
+            return true;
+        }
+        catch (OptimisticLockingFailureException exception) {
+            log.debug("插件 {} 注册表同步撞乐观锁，第 {} 次重试：{}",
+                    descriptor.code(), attempt + 1, rootMessage(exception));
+            return false;
         }
     }
 

@@ -16,6 +16,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -81,59 +82,124 @@ public class PluginModule extends BaseDomain {
     private String mobileFeedTitle;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
-        MobilePluginSupport mobile = descriptor.mobileSupport();
-        return PluginModule.builder()
+        PluginModule module = PluginModule.builder()
                 .code(descriptor.code())
-                .name(descriptor.name())
-                .pluginVersion(descriptor.version())
-                .description(descriptor.description())
-                .icon(descriptor.icon())
-                .mainClass(descriptor.mainClass())
-                .jarPath(descriptor.jarPath())
-                .gitUrl(descriptor.gitUrl())
-                .dependencies(descriptor.dependencies())
-                .softDependencies(descriptor.softDependencies())
-                .mobilePlatforms(mobile.declared() ? mobile.platforms() : null)
-                .mobileMinHostVersion(mobile.declared() ? mobile.minHostVersion() : null)
-                .mobileRequiredNativeCapabilities(mobile.declared() ? mobile.requiredNativeCapabilities() : null)
-                .mobileName(mobile.declared() ? emptyToNull(mobile.name()) : null)
-                .mobileDescription(mobile.declared() ? emptyToNull(mobile.description()) : null)
-                .mobileIcon(mobile.declared() ? emptyToNull(mobile.icon()) : null)
-                .mobileHomeCards(mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null)
-                .mobileAdminCards(mobile.declared() && !mobile.adminCards().isEmpty() ? mobile.adminCards() : null)
-                .mobileFeedEndpoint(mobile.declared() && mobile.homeFeed() != null
-                        ? emptyToNull(mobile.homeFeed().endpoint()) : null)
-                .mobileFeedTitle(mobile.declared() && mobile.homeFeed() != null
-                        ? emptyToNull(mobile.homeFeed().title()) : null)
                 .status(PluginStatus.INSTALLED)
                 .build();
+        DescriptorFields.of(descriptor).applyTo(module);
+        return module;
     }
 
     public void refreshDescriptor(PluginDescriptorInfo descriptor) {
-        MobilePluginSupport mobile = descriptor.mobileSupport();
-        this.name = descriptor.name();
-        this.pluginVersion = descriptor.version();
-        this.description = descriptor.description();
-        this.icon = descriptor.icon();
-        this.mainClass = descriptor.mainClass();
-        this.jarPath = descriptor.jarPath();
-        this.gitUrl = descriptor.gitUrl();
-        this.dependencies = descriptor.dependencies();
-        this.softDependencies = descriptor.softDependencies();
-        this.mobilePlatforms = mobile.declared() ? mobile.platforms() : null;
-        this.mobileMinHostVersion = mobile.declared() ? mobile.minHostVersion() : null;
-        this.mobileRequiredNativeCapabilities = mobile.declared() ? mobile.requiredNativeCapabilities() : null;
-        this.mobileName = mobile.declared() ? emptyToNull(mobile.name()) : null;
-        this.mobileDescription = mobile.declared() ? emptyToNull(mobile.description()) : null;
-        this.mobileIcon = mobile.declared() ? emptyToNull(mobile.icon()) : null;
-        this.mobileHomeCards = mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null;
-        this.mobileAdminCards = mobile.declared() && !mobile.adminCards().isEmpty() ? mobile.adminCards() : null;
-        this.mobileFeedEndpoint = mobile.declared() && mobile.homeFeed() != null
-                ? emptyToNull(mobile.homeFeed().endpoint()) : null;
-        this.mobileFeedTitle = mobile.declared() && mobile.homeFeed() != null
-                ? emptyToNull(mobile.homeFeed().title()) : null;
+        DescriptorFields.of(descriptor).applyTo(this);
         if (this.status == null) {
             this.status = PluginStatus.INSTALLED;
+        }
+    }
+
+    /**
+     * 声明的元数据是否已与持久化状态一致。
+     * <p>
+     * 注册表同步据此跳过无变化的写库：读接口并发（表格页同时拉分页与概览、多标签页）
+     * 不再各自制造一批版本自增写入，也就不会互撞乐观锁；status 为空的历史记录
+     * 一律视为需要补写，保留原有的自愈行为。
+     */
+    public boolean matchesDescriptor(PluginDescriptorInfo descriptor) {
+        return status != null && DescriptorFields.of(descriptor).sameAs(this);
+    }
+
+    /**
+     * descriptor 派生的持久化字段快照。
+     * refreshDescriptor / fromDescriptor / matchesDescriptor 三处共用同一份映射，
+     * 避免新增字段时只改一边导致同步判断与写入内容不一致。
+     */
+    private record DescriptorFields(
+            String name,
+            String pluginVersion,
+            String description,
+            String icon,
+            String mainClass,
+            String jarPath,
+            String gitUrl,
+            List<String> dependencies,
+            List<String> softDependencies,
+            List<MobilePlatform> mobilePlatforms,
+            String mobileMinHostVersion,
+            List<String> mobileRequiredNativeCapabilities,
+            String mobileName,
+            String mobileDescription,
+            String mobileIcon,
+            List<MobileHomeCard> mobileHomeCards,
+            List<MobileAdminCard> mobileAdminCards,
+            String mobileFeedEndpoint,
+            String mobileFeedTitle) {
+
+        static DescriptorFields of(PluginDescriptorInfo descriptor) {
+            MobilePluginSupport mobile = descriptor.mobileSupport();
+            return new DescriptorFields(
+                    descriptor.name(),
+                    descriptor.version(),
+                    descriptor.description(),
+                    descriptor.icon(),
+                    descriptor.mainClass(),
+                    descriptor.jarPath(),
+                    descriptor.gitUrl(),
+                    descriptor.dependencies(),
+                    descriptor.softDependencies(),
+                    mobile.declared() ? mobile.platforms() : null,
+                    mobile.declared() ? mobile.minHostVersion() : null,
+                    mobile.declared() ? mobile.requiredNativeCapabilities() : null,
+                    mobile.declared() ? emptyToNull(mobile.name()) : null,
+                    mobile.declared() ? emptyToNull(mobile.description()) : null,
+                    mobile.declared() ? emptyToNull(mobile.icon()) : null,
+                    mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null,
+                    mobile.declared() && !mobile.adminCards().isEmpty() ? mobile.adminCards() : null,
+                    mobile.declared() && mobile.homeFeed() != null ? emptyToNull(mobile.homeFeed().endpoint()) : null,
+                    mobile.declared() && mobile.homeFeed() != null ? emptyToNull(mobile.homeFeed().title()) : null);
+        }
+
+        void applyTo(PluginModule module) {
+            module.name = name;
+            module.pluginVersion = pluginVersion;
+            module.description = description;
+            module.icon = icon;
+            module.mainClass = mainClass;
+            module.jarPath = jarPath;
+            module.gitUrl = gitUrl;
+            module.dependencies = dependencies;
+            module.softDependencies = softDependencies;
+            module.mobilePlatforms = mobilePlatforms;
+            module.mobileMinHostVersion = mobileMinHostVersion;
+            module.mobileRequiredNativeCapabilities = mobileRequiredNativeCapabilities;
+            module.mobileName = mobileName;
+            module.mobileDescription = mobileDescription;
+            module.mobileIcon = mobileIcon;
+            module.mobileHomeCards = mobileHomeCards;
+            module.mobileAdminCards = mobileAdminCards;
+            module.mobileFeedEndpoint = mobileFeedEndpoint;
+            module.mobileFeedTitle = mobileFeedTitle;
+        }
+
+        boolean sameAs(PluginModule module) {
+            return Objects.equals(name, module.name)
+                    && Objects.equals(pluginVersion, module.pluginVersion)
+                    && Objects.equals(description, module.description)
+                    && Objects.equals(icon, module.icon)
+                    && Objects.equals(mainClass, module.mainClass)
+                    && Objects.equals(jarPath, module.jarPath)
+                    && Objects.equals(gitUrl, module.gitUrl)
+                    && Objects.equals(dependencies, module.dependencies)
+                    && Objects.equals(softDependencies, module.softDependencies)
+                    && Objects.equals(mobilePlatforms, module.mobilePlatforms)
+                    && Objects.equals(mobileMinHostVersion, module.mobileMinHostVersion)
+                    && Objects.equals(mobileRequiredNativeCapabilities, module.mobileRequiredNativeCapabilities)
+                    && Objects.equals(mobileName, module.mobileName)
+                    && Objects.equals(mobileDescription, module.mobileDescription)
+                    && Objects.equals(mobileIcon, module.mobileIcon)
+                    && Objects.equals(mobileHomeCards, module.mobileHomeCards)
+                    && Objects.equals(mobileAdminCards, module.mobileAdminCards)
+                    && Objects.equals(mobileFeedEndpoint, module.mobileFeedEndpoint)
+                    && Objects.equals(mobileFeedTitle, module.mobileFeedTitle);
         }
     }
 
