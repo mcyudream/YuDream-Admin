@@ -319,6 +319,22 @@ public class AgentAppService {
         }
     }
 
+    /** 只切换 Python 工具的启用状态：表格内联开关用它，不再要求整对象回写。 */
+    @Transactional
+    public AgentToolDTO toggleToolEnabled(Long id, boolean enabled) {
+        ensureEnabled();
+        AgentTool tool = tool(id);
+        if (tool.getType() != AgentToolType.PYTHON) {
+            throw new BizException("系统工具由平台提供，不能单独启停");
+        }
+        tool.update(
+                tool.getName(), tool.getCode(), tool.getDescription(), AgentToolType.PYTHON,
+                tool.getInputSchemaJson(), tool.getOutputExampleJson(), tool.getPythonCode(),
+                tool.getTimeoutMillis(), tool.getPermissionCode(), enabled
+        );
+        return AgentAssembler.toDTO(toolRepo.save(tool));
+    }
+
     @Transactional
     public void deleteTool(Long id) {
         ensureEnabled();

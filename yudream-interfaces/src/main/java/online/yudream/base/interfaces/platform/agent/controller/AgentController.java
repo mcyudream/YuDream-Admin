@@ -150,6 +150,11 @@ private final AgentAppService agentAppService;
     @PutMapping("/tools/{id}")
     @PermissionRegister(code = "platform:agent:tool:edit", name = "编辑 Python Agent 工具", module = "平台能力", desc = "编辑 Python 工具")
     public Result<AgentToolRes> updateTool(@PathVariable Long id, @Valid @RequestBody AgentToolSaveRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.saveTool(AgentWebAssembler.toCmd(id, request)))); }
+    @PutMapping("/tools/{id}/enabled/{enabled}")
+    @PermissionRegister(code = "platform:agent:tool:edit", name = "启停 Python Agent 工具", module = "平台能力", desc = "启停 Python 工具")
+    public Result<AgentToolRes> toggleTool(@PathVariable Long id, @PathVariable boolean enabled) {
+        return Result.ok(AgentWebAssembler.toRes(agentAppService.toggleToolEnabled(id, enabled)));
+    }
     @DeleteMapping("/tools/{id}")
     @PermissionRegister(code = "platform:agent:tool:delete", name = "删除 Python Agent 工具", module = "平台能力", desc = "删除 Python 工具")
     public Result<Void> deleteTool(@PathVariable Long id) { agentAppService.deleteTool(id); return Result.ok(); }
