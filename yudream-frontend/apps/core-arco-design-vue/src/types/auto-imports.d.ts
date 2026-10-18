@@ -109,6 +109,7 @@ declare global {
   const useId: typeof import('vue').useId
   const useIsMobile: typeof import('@yudream/components').useIsMobile
   const useLink: typeof import('vue-router').useLink
+  const useLinkedFocus: typeof import('../composables/use-linked-focus').useLinkedFocus
   const useModel: typeof import('vue').useModel
   const usePagination: typeof import('@fantastic-admin/composables').usePagination
   const usePluginDevtoolsStore: typeof import('../store/modules/app/plugin-devtools').usePluginDevtoolsStore
@@ -151,4 +152,7 @@ declare global {
   // @ts-ignore
   export type { TourStepDefinition, TourDefinition } from '../store/modules/tour'
   import('../store/modules/tour')
+  // @ts-ignore
+  export type { LinkedFocusOptions } from '../composables/use-linked-focus'
+  import('../composables/use-linked-focus')
 }
