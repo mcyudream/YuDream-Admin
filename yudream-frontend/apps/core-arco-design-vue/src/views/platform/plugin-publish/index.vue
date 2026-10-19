@@ -453,6 +453,7 @@ async function copyAllCiTemplates() {
         @size-change="onSizeChange"
       />
     </template>
+  </YdTablePageLayout>
 
     <!-- 流水线发布说明：不常用，收在操作栏的「更多」里 -->
     <YdModal
@@ -585,7 +586,6 @@ async function copyAllCiTemplates() {
         </YdTabs>
       </div>
     </YdModal>
-  </YdTablePageLayout>
 </template>
 
 <style scoped>

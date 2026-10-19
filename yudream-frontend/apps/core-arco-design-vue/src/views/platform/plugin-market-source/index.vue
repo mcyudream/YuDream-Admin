@@ -517,8 +517,9 @@ function openPublicMarket() {
         </YdResponsiveEnhancedTable>
       </YdLoadingOverlay>
     </template>
+  </YdTablePageLayout>
 
-    <YdModal
+  <YdModal
       v-model="formVisible"
       :title="editing ? '编辑市场源' : '添加市场源'"
       show-cancel-button
@@ -572,7 +573,6 @@ function openPublicMarket() {
         </div>
       </YdForm>
     </YdModal>
-  </YdTablePageLayout>
 </template>
 
 <style scoped>
