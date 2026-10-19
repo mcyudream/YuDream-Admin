@@ -37,10 +37,11 @@
 
 - 权限动作词表新增 `purge`（危险组，永久删除不可恢复；`docs/dev/permission-codes.md` §2、`docs/system/permission-management.md` 动作分类、`permission-catalog.ts` 三处已同步）：插件仓 `docs/dev/conventions.md` 按引用跟随主仓词表，本仓暂无插件注册 `purge`，待插件仓 WIP 落定后随下一次规范同步一并核对。
 - `docs/dev/backend-architecture.md` 新增「账号级联删除（purge）」条目（级联回收范围、守卫与保留项）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
-- SPI 2.36.0 新手引导契约（`docs/plugin-system/spi-2.36.0-guides.md` + SPI/SDK 消费）：主仓已完成本地提交，未获发布授权；待 Nexus 发布验签后同步插件仓依赖与文档。
+- SPI 2.35.0/2.36.0/2.37.0 与 SDK `1.14.0`、components `1.10.0`（2026-10-19 v1.4.9-1 首发 SPI 2.37.0 并随 v1.4.10 升级 npm 契约；dataviz 0.1.3 随 v1.4.9-1）已发布 Nexus 并全部验签：插件仓根 pom SPI 属性、pnpm catalog/lockfile 与对应消费文档待其 WIP 落定后一并同步（catalog 直接升 1.14.0/1.10.0，跳过 1.13.0/1.9.0），验证走 `ci/verify-plugin-repo-readiness.sh`。
+- SPI 2.36.0 新手引导契约（`docs/plugin-system/spi-2.36.0-guides.md` + SPI/SDK 消费）：已随主仓发布验签；待插件仓 WIP 落定后同步依赖与文档。
 - `docs/yd-ui-guidelines.md` 设置页布局与响应式增强表格条目（YdSettingsLayout 居中/窄屏分区选择器、YdResponsiveEnhancedTable 卡片按 cell 渲染）：插件仓同名副本存在未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待插件仓 WIP 落定后重跑同步。
 - `docs/yd-ui-guidelines.md` 设置页保存按钮页头规范与 `YdSettingsLayout surface` 铺满白底（宿主设置页新约定），以及 YdMarkdownEditor 可控工具栏、内链插入和预览能力：插件仓同名副本存在未提交改动，先保留其 WIP，待落定后再一并 `pnpm sync:ui-docs`。
-- SPI 2.37.0 飞书云文档（含 Wiki 知识空间节点列表）与站点目录文件端口（`docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`、`AGENTS.md` 基线条目、`docs/plugin-system/specification.md` 第 11 节与 `docs/dev/plugin-system.md` 的对应条目 → 插件仓 `AGENTS.md`/`docs/dev/plugin-development.md` 引用与消费）：主仓只完成源码升版，未获发布授权，不得推 Nexus 或让插件仓消费；插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），待发布验签且 WIP 落定后同工作项同步，先保留其 WIP 不动。
+- SPI 2.37.0 飞书云文档（含 Wiki 知识空间节点列表）与站点目录文件端口（`docs/plugin-system/spi-2.37.0-feishu-and-site-files.md`、`AGENTS.md` 基线条目、`docs/plugin-system/specification.md` 第 11 节与 `docs/dev/plugin-system.md` 的对应条目 → 插件仓 `AGENTS.md`/`docs/dev/plugin-development.md` 引用与消费）：已随主仓发布验签；插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），待 WIP 落定后同工作项同步，先保留其 WIP 不动。
 - `docs/yd-ui-guidelines.md` 的 `YdSortableTree` 拖拽落点提示与 `YdMarkdownEditor` 只读区域/错误呈现条目（本次宿主组件视觉细化）：插件仓同名副本仍有未提交改动，写入型 `pnpm sync:ui-docs` 会覆盖，待其 WIP 落定后一并重跑同步。
 - `docs/yd-ui-guidelines.md` §7 目录新增 `YdTablePageLayout`、`YdDynamicSearchForm`、`YdNumberRange` 与表格页版式约定（宿主表格页规范落地），SDK `host-components.ts` 已同步导出：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
 - `docs/dev/backend-architecture.md` 第 5.8 节内置基础设施（SSE/WebSocket/数据可视化直接内置为底层能力、取消双闸门与 sse 依赖声明）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。

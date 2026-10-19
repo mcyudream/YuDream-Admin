@@ -108,3 +108,17 @@ Nexus 回读完整性值：
 | dataviz `0.1.3` | `sha512-akP+neZnVPqTnU/VLhYVCDVEoMkXCQwyS4H47Nv4l0oVb4DYLJFvjKU6v5qwn/veMESc4scAES+KkOmbwe0+bw==` |
 
 插件仓同步状态：**未同步**。插件仓当前存在大量未提交 WIP（含 `docs/yd-ui-guidelines.md` 副本），按同步地图先保留其 WIP；待其落定后改根 pom 属性至 SPI 2.37.0、`pnpm-workspace.yaml` catalog 升到 SDK `1.13.0` / components `1.9.0` / dataviz `0.1.3`，刷新 lockfile 并跑 `ci/verify-plugin-repo-readiness.sh`，单独提交。
+
+## v1.4.10 AI 统一网关与浮动球契约（已发布与验签）
+
+2026-10-19 host tag `v1.4.10`（流水线 [#408](https://gitlab.yudream.online/yudream/yudreamadmin/-/pipelines/408)，提交 `a52c4b8d`）随 AI 统一网关重构一次通过：CMS 画布/站点工作区改走 chat 网关会话、下线 AG-UI WebSocket；`YdFloatBall` 可拖拽圆球与 `YdChatWindow` 非模态浮动窗随 components 发布；dataviz 与 SPI 无变化（publish 幂等跳过，verify 照常回读）。本版同批含 Agent 调试与 Harness 运行链路修复（`84d93897`）与 tmp 验证脚本归档（`29631611`，提交前剔除浏览器调试 Profile 与含凭据文件）。
+
+| 契约 | 发布版本 | 变化 |
+| --- | --- | --- |
+| `@yudream/plugin-sdk` | `1.14.0` | 宿主共享桥登记 `YdFloatBall`，同步 `YdChatWindow` 非模态浮动窗能力 |
+| `@yudream/components` | `1.10.0` | 新增 `YdFloatBall`（resolver/extended 导出），`YdChatWindow` 浮动窗改造 |
+| SPI / dataviz | 不变 | SPI 2.37.0、dataviz 0.1.3 沿用，发布作业幂等跳过 |
+
+Nexus 回读完整性值：SDK `1.14.0` `sha512-2uVjYKwmORSqTi9KalA429NZR/E8JET/HKC/e4jWvgpjxbk3Lriju5KYrF3TqKAGwE9vEDRc2Ub3MKdlfRNufQ==`；components `1.10.0` `sha512-JpmEF+aEuqRMAqTZkhyDkVlOwvuJPFXzXSwAS9hxGiL3gV0MQcmnuQn3JrzmJPTKmjLLq2BS1/8jAUk3HL+l1w==`。
+
+插件仓同步状态：仍**未同步**，落定后 catalog 直接升 SDK `1.14.0` / components `1.10.0`（跳过 1.13.0/1.9.0），SPI 属性 2.37.0 不变。
