@@ -1,26 +1,23 @@
 <script setup lang="ts">
-import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolCallReply, YdChatToolCallRequest, YdChatToolEvent, YdFilePickerInstance, YdPageBuilderAsset, YdPageBuilderEditorFacade, YdPageBuilderOptions } from '@yudream/components'
+import type { YdAgentSendRequest, YdAgentSession, YdChatAttachment, YdChatMessage, YdFilePickerInstance, YdPageBuilderAsset, YdPageBuilderEditorFacade, YdPageBuilderOptions } from '@yudream/components'
+import type { ChatSession } from '@/api/modules/platform-chat'
 import type { CmsModelSelectOption } from '../config/cms-model-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
-import type { AiToolCallResult, CmsChatHistoryMessage } from '@/api/modules/platform-ai'
 import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
-import type { YdAgentChatSession, YdAgentChatSessionStore } from '@/components/YdAgentChatPanel/types'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
 import { useYdDomAction } from '@yudream/components'
+import { uploadChatAttachment } from '@/api/modules/platform-chat'
+import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import apiFiles from '@/api/modules/files'
-import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
-import YdAgentChatPanel from '@/components/YdAgentChatPanel/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
-import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSessionId } from '@/utils/cms-ai-chat-history'
 import { executeCanvasTool, type CanvasToolExecOptions } from '@/utils/cms-canvas-agent-tools'
 import { extractRelatedCss as extractRelatedCssRules, mergeCss as mergeCanvasCss, replaceRelatedCss as replaceRelatedCssRules } from '@/utils/cms-related-css'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { findCmsModelOption, resolveCmsModelValue } from '../config/cms-model-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
-import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
 import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
 import CmsCodeEditor from './CmsCodeEditor.vue'
 import TokuiBlock from './TokuiBlock.vue'
@@ -128,7 +125,19 @@ const pageBuilderOptions = computed<YdPageBuilderOptions>(() => ({
   panels: { defaults: [] },
 }))
 const mediaInput = ref<YdFilePickerInstance | null>(null)
-const aiChatPanelRef = ref<InstanceType<typeof YdAgentChatPanel>>()
+const assistant = useAiAssistantStore()
+const { auth } = useAppAuth()
+const canvasAttachments = ref<YdChatAttachment[]>([])
+const canvasUploading = ref(false)
+const canvasRenameOpen = ref(false)
+const canvasRemoveOpen = ref(false)
+const canvasTargetSession = ref<YdAgentSession>()
+const canvasRenameTitle = ref('')
+/** 画布 AI 走全局网关：需要助手使用与会话管理权限，面板据此给出明确提示。 */
+const canvasAiReady = computed(() => auth('platform:chat:use') && auth('platform:chat:session:view') && auth('platform:chat:session:edit'))
+/** 画布会话 = 网关会话中 agentCode=cms-canvas 的那些，与助手面板共享同一份会话与运行进度。 */
+const canvasSessions = computed(() => assistant.sessionItems.filter(session => session.agentCode === 'cms-canvas'))
+const canvasMessages = computed(() => (canvasSessions.value.some(session => session.id === assistant.sessionId) ? assistant.messages : []))
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 // CMS 助手直接选模型（provider/model），不再绑定 Agent
@@ -198,7 +207,7 @@ const aiSuggestions = [
 const pendingAskDsl = ref('')
 const pendingAskOptions = ref<AskOption[]>([])
 const pendingAskMessageId = ref('')
-let pendingAskResolver: ((reply: YdChatToolCallReply) => void) | null = null
+let pendingAskResolver: ((choice: string) => void) | null = null
 let editor: Editor | null = null
 let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
@@ -525,23 +534,11 @@ const jsSourceCompletions = computed<CodeCompletionItem[]>(() => {
 
 const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
 const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
-const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
+const chatHistoryTargetKey = computed(() => `${chatHistoryTargetType.value}:${chatHistoryTargetId.value}`)
 const chatHistoryTargetLabel = computed(() => props.historyTargetLabel || props.title || (chatHistoryTargetType.value === 'home' ? '首页' : '未命名页面'))
 
-// CMS 画布 AI 会话存储：按编辑目标（页面 / 首页）分组，多会话可管理
-const aiSessionStore: YdAgentChatSessionStore = createCmsAiChatSessionStore({
-  targetKey: () => chatHistoryTargetKey.value,
-  targetType: () => chatHistoryTargetType.value,
-  targetId: () => chatHistoryTargetId.value,
-  targetLabel: () => chatHistoryTargetLabel.value,
-})
-
-function aiChatEndpoint() {
-  return apiAi.generateCmsPageAguiWsEndpoint()
-}
-
-/** v2 coding-agent 式画布工具名（客户端真实执行，结果回流模型循环；不走旧 applyAiTool 盲应用） */
-const V2_CANVAS_TOOL_NAMES = new Set([
+/** 画布工具名：服务端 cms-canvas profile 声明，前端在真实 GrapesJS 画布上执行并回传结果。 */
+const CANVAS_TOOL_NAMES = [
   'cms.canvas.get_outline',
   'cms.canvas.get_selected',
   'cms.canvas.find',
@@ -555,7 +552,17 @@ const V2_CANVAS_TOOL_NAMES = new Set([
   'cms.canvas.remove_component',
   'cms.canvas.list_blocks',
   'cms.canvas.insert_block',
-])
+  'cms.ask.user',
+]
+
+let unregisterCanvasTools: (() => void) | undefined
+
+/** 注册画布工具执行器：请求到达时在真实画布上执行，结果经运行的前端工具通道回流模型循环。 */
+function registerCanvasTools() {
+  unregisterCanvasTools?.()
+  const offs = CANVAS_TOOL_NAMES.map(name => assistant.registerFrontendToolHandler(name, request => handleCanvasToolRequest(name, request.arguments)))
+  unregisterCanvasTools = () => offs.forEach(off => off())
+}
 
 function canvasToolExecOptions(): CanvasToolExecOptions {
   return {
@@ -576,128 +583,130 @@ function canvasToolExecOptions(): CanvasToolExecOptions {
   }
 }
 
-/** v2 客户端工具请求：在真实 GrapesJS 画布上执行并回传结果/报错，服务端模型循环据此继续 */
-async function handleCanvasToolRequest(request: YdChatToolCallRequest): Promise<YdChatToolCallReply> {
+async function handleCanvasToolRequest(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!editor || !editorReady.value) {
-    return { ok: false, error: '画布尚未就绪，请稍后重试' }
+    throw new Error('画布尚未就绪，请稍后重试')
   }
-  try {
-    if (request.toolName === 'cms.ask.user') {
-      return await waitForAskUser(request)
-    }
-    const result = executeCanvasTool(editor, request.toolName, request.args, canvasToolExecOptions())
-    return { ok: true, result }
+  if (name === 'cms.ask.user') {
+    return await waitForAskUser(args)
   }
-  catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : '画布工具执行失败' }
-  }
+  return executeCanvasTool(editor, name, args, canvasToolExecOptions())
 }
 
-function buildAiChatBody(question: string, history: YdChatHistoryTurn[], attachments: YdChatAttachment[] = []) {
-  const historyMessages: CmsChatHistoryMessage[] = history
-    .filter(item => item.role === 'user' || item.role === 'assistant')
-    .map(item => ({ role: item.role as 'user' | 'assistant', content: item.content }))
-  return buildAiPayload(question, attachments, historyMessages)
-}
-
-// 持久化前裁剪消息：保留工具分页/澄清上下文，剥离大 HTML、dataUrl 等字段。
-function sanitizeCmsToolPayload(payload?: Record<string, unknown>) {
-  if (!payload) {
-    return undefined
-  }
-  const result: Record<string, unknown> = {}
-  for (const key of ['resource', 'cursor', 'nextCursor', 'hasMore', 'startLine', 'endLine', 'totalLines', 'nodeCount', 'truncated', 'message', 'error']) {
-    if (payload[key] !== undefined) {
-      result[key] = payload[key]
-    }
-  }
-  if (typeof payload.content === 'string') {
-    result.content = payload.content.slice(0, 4000)
-  }
-  return result
-}
-
-function sanitizeCmsAiMessage(message: YdChatMessage): YdChatMessage {
-  return {
-    ...message,
-    pending: false,
-    context: message.context ? JSON.parse(JSON.stringify(message.context)) : undefined,
-    tools: message.tools?.map(tool => ({ ...tool, payload: sanitizeCmsToolPayload(tool.payload) })),
-    attachments: message.attachments?.map(({ dataUrl: _dataUrl, ...rest }) => rest),
-  }
-}
-
-function aiSessionMeta() {
-  return {
-    modelValue: aiModelValue.value,
-    thinkingEnabled: aiThinkingEnabled.value,
-    askUser: pendingAskOptions.value.length
-      ? {
-          dsl: pendingAskDsl.value,
-          options: JSON.parse(JSON.stringify(pendingAskOptions.value)) as AskOption[],
-        }
-      : undefined,
-  }
-}
-
-function onAiSessionChange(session: YdAgentChatSession | null) {
-  if (pendingAskResolver && aiChatPanelRef.value?.streaming) return
-  if (pendingAskResolver) {
-    pendingAskResolver({ ok: false, error: '会话已切换，已取消等待中的澄清问题' })
-    pendingAskResolver = null
-  }
-  pendingAskDsl.value = ''
-  pendingAskOptions.value = []
-  pendingAskMessageId.value = ''
-  const meta = session?.meta
-  if (meta && typeof meta.modelValue === 'string' && meta.modelValue) {
-    aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], meta.modelValue)
-  }
-  if (meta && typeof meta.thinkingEnabled === 'boolean') {
-    aiThinkingEnabled.value = meta.thinkingEnabled
-  }
-  const restoredMessage = [...(session?.messages || [])].reverse().find(item => item.role === 'assistant' && item.context?.askUser && !(item.context.askUser as Record<string, unknown>).answered)
-  const restoredAsk = restoredMessage?.context?.askUser
-  if (restoredAsk && typeof restoredAsk === 'object') {
-    const record = restoredAsk as Record<string, unknown>
-    pendingAskDsl.value = typeof record.dsl === 'string' ? record.dsl : ''
-    pendingAskOptions.value = parseAskOptions(record.options)
-    pendingAskMessageId.value = restoredMessage?.id || ''
-  }
-  else {
-    const askUser = meta?.askUser
-    if (askUser && typeof askUser === 'object') {
-      const record = askUser as Record<string, unknown>
-      pendingAskDsl.value = typeof record.dsl === 'string' ? record.dsl : ''
-      pendingAskOptions.value = parseAskOptions(record.options)
-    }
-  }
-}
-
-// AGUI 工具结果 → 画布应用 / 需求澄清 UI
-function onAiToolEvent(tool: YdChatToolEvent) {
-  if (tool.status !== 'complete' || !tool.toolName) {
+/** 切到画布面板时优先选中最近的画布会话；没有会话时等首次发送再创建。 */
+async function selectCanvasSession() {
+  if (!canvasAiReady.value || canvasSessions.value.some(session => session.id === assistant.sessionId)) {
     return
   }
-  const result: AiToolCallResult = {
-    toolName: tool.toolName,
-    action: tool.action,
-    message: tool.message,
-    payload: tool.payload,
+  const latest = canvasSessions.value[0]
+  if (latest) {
+    await assistant.selectSession(latest.id)
   }
-  if (isCanvasTool(result) && !V2_CANVAS_TOOL_NAMES.has(result.toolName || '')) {
-    // v2 客户端工具在请求时已真实应用，结果事件仅作确认展示；旧版 action 工具仍按透传指令应用
-    applyAiTool(result)
+}
+
+function canvasSessionData(): Partial<ChatSession> {
+  return {
+    title: `画布构建 · ${chatHistoryTargetLabel.value}`.slice(0, 40),
+    scopeType: 'CONSOLE',
+    agentCode: 'cms-canvas',
   }
-  if (isAskUserTool(result)) {
-    showAskUserUi(result)
+}
+
+async function ensureCanvasSession(): Promise<boolean> {
+  if (canvasSessions.value.some(session => session.id === assistant.sessionId)) {
+    return true
+  }
+  const latest = canvasSessions.value[0]
+  if (latest) {
+    await assistant.selectSession(latest.id)
+    return true
+  }
+  const id = await assistant.createSession(canvasSessionData())
+  return Boolean(id)
+}
+
+async function createCanvasSession() {
+  if (!canvasAiReady.value) {
+    return
+  }
+  await assistant.createSession(canvasSessionData())
+}
+
+function renameCanvasSession(session: YdAgentSession) {
+  canvasTargetSession.value = session
+  canvasRenameTitle.value = session.title
+  canvasRenameOpen.value = true
+}
+
+async function submitCanvasRename() {
+  const session = canvasTargetSession.value
+  const title = canvasRenameTitle.value.trim()
+  if (!session || !title) {
+    return
+  }
+  await assistant.updateSession(session.id, { title })
+  canvasRenameOpen.value = false
+}
+
+function removeCanvasSession(session: YdAgentSession) {
+  canvasTargetSession.value = session
+  canvasRemoveOpen.value = true
+}
+
+async function submitCanvasRemove() {
+  const session = canvasTargetSession.value
+  if (!session) {
+    return
+  }
+  try {
+    await assistant.removeSession(session.id)
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '删除会话失败')
+  }
+  canvasRemoveOpen.value = false
+}
+
+/** 画布对话发送：把画布元信息与需求合成一条消息，附件按运行图片附件传给模型。 */
+async function onCanvasSend(request: YdAgentSendRequest) {
+  const text = String(request.text || '').trim()
+  if (!text || assistant.busy) {
+    return
+  }
+  if (!canvasAiReady.value) {
+    toast.warning('需要「使用 AI 助手」与「管理 AI 助手会话」权限，请联系管理员开通')
+    return
+  }
+  if (!(await ensureCanvasSession())) {
+    toast.error('会话创建失败，请稍后重试')
+    return
+  }
+  const payload: YdAgentSendRequest = { ...request, text: composeCanvasPrompt(text, request.attachments || []) }
+  await assistant.send(payload, undefined, { scopeType: 'CONSOLE', agentCode: 'cms-canvas' })
+  if (!assistant.error) {
+    canvasAttachments.value = []
+  }
+}
+
+async function attachCanvasFiles(files: File[]) {
+  canvasUploading.value = true
+  try {
+    for (const file of files) {
+      canvasAttachments.value.push(await uploadChatAttachment(file))
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '附件上传失败')
+  }
+  finally {
+    canvasUploading.value = false
   }
 }
 
 async function sendAiPrompt(prompt: string) {
   const content = String(prompt || '').trim()
   if (content) {
-    await aiChatPanelRef.value?.sendPrompt(content)
+    await onCanvasSend({ text: content, attachments: [], mode: 'ask', skillCodes: [], contextPaths: [] })
   }
 }
 
@@ -705,22 +714,6 @@ function onAiFollowUp(event: CustomEvent<string>) {
   const message = event.detail
   if (typeof message === 'string' && message.trim()) {
     void sendAiPrompt(message.trim())
-  }
-}
-
-// 重新打开 AI 面板或切换编辑目标时，恢复该目标最近一次打开的会话
-let restoreAiSessionSequence = 0
-
-async function restoreAiSession() {
-  const sequence = ++restoreAiSessionSequence
-  await nextTick()
-  await aiChatPanelRef.value?.reloadSessions()
-  if (sequence !== restoreAiSessionSequence) {
-    return
-  }
-  const sessionId = readActiveCmsAiChatSessionId(chatHistoryTargetKey.value)
-  if (sessionId) {
-    await aiChatPanelRef.value?.selectSession(sessionId)
   }
 }
 
@@ -739,7 +732,7 @@ watch(() => props.aiModelOptions, (options) => {
 
 watch([rightPanelTab, chatHistoryTargetKey], () => {
   if (rightPanelTab.value === 'ai') {
-    void restoreAiSession()
+    void selectCanvasSession()
   }
   if (rightPanelTab.value === 'source') {
     syncSelectedSource()
@@ -828,14 +821,19 @@ async function onBuilderReady(facade: YdPageBuilderEditorFacade) {
   aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], aiModelValue.value)
   registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
-    void restoreAiSession()
+    void selectCanvasSession()
   }
 }
 
 function onBuilderError(error: Error) {
   toast.error(error.message)
 }
+onMounted(() => {
+  registerCanvasTools()
+})
+
 onBeforeUnmount(() => {
+  unregisterCanvasTools?.()
   blockFavoriteActions.forEach(action => action.dispose())
   blockFavoriteActions.clear()
   editorReady.value = false
@@ -1435,38 +1433,36 @@ function fitCanvasToWorkspace() {
   centerCanvasFrame()
 }
 
-function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], history: CmsChatHistoryMessage[] = []) {
+/** 画布上下文与需求合成一条消息：网关会话只接收文本，画布元信息随消息一起发送。 */
+function composeCanvasPrompt(prompt: string, attachments: YdChatAttachment[] = []) {
   if (!editor) {
     throw new Error('构建器未初始化')
   }
   removeLayoutBlocks(editor)
   const image = firstImageAttachment(attachments)
-  if (image && aiModelOption.value && !aiModelOption.value.vision) {
-    toast.warning(`当前模型「${aiModelOption.value.label}」不支持识图，样图可能无法被参考`)
+  const option = findCmsModelOption(props.aiModelOptions || [], assistant.modelId)
+  if (image && option && !option.vision) {
+    toast.warning(`当前模型「${option.label}」不支持识图，样图可能无法被参考`)
   }
-  return {
-    target: props.historyTargetType,
-    contextKey: `${chatHistoryTargetType.value}:${chatHistoryTargetId.value}`,
-    title: props.title || '',
-    siteName: appSettingsStore.siteName || '',
-    prompt: prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
-    pageType: 'GrapesJS 可视化页面',
-    template: props.pageTemplate || 'DEFAULT',
-    style: props.chromeFrame
-      ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
-      : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
-    // v2：coding-agent 式客户端工具闭环（WebSocket 双向）
-    mode: 'agent',
-    providerCode: aiModelOption.value?.providerCode || undefined,
-    modelCode: aiModelOption.value?.modelCode || undefined,
-    imageDataUrl: image?.dataUrl || image?.url || undefined,
-    // v2 不再回传整页快照，只附一份结构纲要；模型用 cms.canvas.* 工具按需读取真实画布
-    currentHtml: canvasOutlineForPrompt(),
-    currentSelectionJson: currentSelectionJson(),
-    cmsVariableContextJson: cmsVariableContextJson(),
-    thinkingEnabled: aiThinkingEnabled.value,
-    history,
-  }
+  const styleHint = props.chromeFrame
+    ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
+    : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。'
+  return [
+    '【画布上下文】',
+    `站点：${appSettingsStore.siteName || '当前站点'}`,
+    `页面标题：${props.title || '未命名页面'}`,
+    '页面类型：GrapesJS 可视化页面',
+    `页面模板：${props.pageTemplate || 'DEFAULT'}`,
+    `风格偏好：${styleHint}`,
+    `样图参考：${image ? `已提供（${image.fileName || '样图'}）` : '未提供'}`,
+    `深度思考：${aiThinkingEnabled.value ? '开启（先简要输出分析阶段、参考判断、布局策略和修改计划，再调用工具）' : '关闭（保持过程反馈简短）'}`,
+    `CMS 可用动态变量：${cmsVariableContextJson()}`,
+    `当前选中元素：${currentSelectionJson() || '无'}`,
+    `画布结构纲要：${canvasOutlineForPrompt()}`,
+    '',
+    '【修改需求】',
+    prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
+  ].join(String.fromCharCode(10))
 }
 
 /** 初始请求只提供轻量统计，HTML/CSS/JS 由模型通过 get_outline 的 resource/cursor 分段读取。 */
@@ -1786,32 +1782,23 @@ function firstImageAttachment(attachments: YdChatAttachment[]) {
   return attachments.find(item => (item.kind === 'IMAGE' || item.contentType?.startsWith('image/')) && (item.dataUrl || item.url))
 }
 
-function isCanvasTool(tool?: AiToolCallResult) {
-  return Boolean(
-    (tool?.toolName?.startsWith('cms.canvas.') && tool.toolName !== 'cms.canvas.validate')
-    || tool?.toolName === 'cms.chrome.style',
-  )
-}
-
-function isAskUserTool(tool?: AiToolCallResult) {
-  return tool?.toolName === 'cms.ask.user'
-}
-
-async function waitForAskUser(request: YdChatToolCallRequest): Promise<YdChatToolCallReply> {
+async function waitForAskUser(args: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (pendingAskResolver) {
-    pendingAskResolver({ ok: false, error: '新的澄清问题已替代上一条问题' })
+    pendingAskResolver('')
   }
-  showAskUserUi({ toolName: request.toolName, action: 'ask', message: '需求澄清', payload: request.args })
-  return await new Promise<YdChatToolCallReply>((resolve) => {
+  showAskUserUi(args)
+  const choice = await new Promise<string>((resolve) => {
     pendingAskResolver = resolve
   })
+  return choice
+    ? { selectedOption: choice, message: `用户选择了：${choice}` }
+    : { selectedOption: '', message: '用户未选择，已跳过本次澄清' }
 }
 
 // 展示 AI 的澄清问题与可点击选项（后端已生成 TokUI DSL）。
-function showAskUserUi(tool?: AiToolCallResult) {
-  const dsl = String(tool?.payload?.tokui || '')
-  const options = parseAskOptions(tool?.payload?.options)
-  // v2 结果确认帧没有 options，不能用它清空请求帧已展示的选项
+function showAskUserUi(payload: Record<string, unknown>) {
+  const dsl = String(payload?.tokui || '')
+  const options = parseAskOptions(payload?.options)
   if (!dsl && !options.length) {
     return
   }
@@ -1833,7 +1820,7 @@ function showAskUserUi(tool?: AiToolCallResult) {
   }
 }
 
-// 用户点击某个选项后，回传挂起的工具结果，恢复同一条 WebSocket 上的模型循环。
+// 用户点击某个选项后，把选择作为工具结果回传，同一条运行里的模型循环继续。
 function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
   const card = element.closest('.tokui-suggestion') as HTMLElement | null
   const title = card?.querySelector('.tokui-suggestion__title')?.textContent?.trim()
@@ -1846,9 +1833,7 @@ function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
 }
 
 function getLatestAssistantMessage(): YdChatMessage | null {
-  const raw = aiChatPanelRef.value?.messages as unknown as YdChatMessage[] | { value?: YdChatMessage[] } | undefined
-  const messages = Array.isArray(raw) ? raw : raw?.value || []
-  return [...messages].reverse().find(item => item.role === 'assistant') || null
+  return [...assistant.messages].reverse().find(item => item.role === 'assistant') || null
 }
 
 async function chooseAskOption(title: string) {
@@ -1865,13 +1850,10 @@ async function chooseAskOption(title: string) {
   const resolver = pendingAskResolver
   pendingAskResolver = null
   if (resolver) {
-    resolver({ ok: true, result: { selectedOption: title, message: `用户选择了：${title}` } })
+    resolver(title)
     return
   }
-  if (await aiChatPanelRef.value?.respondToPendingAsk(title)) {
-    return
-  }
-  // 已完成的历史问题可作为新的追问；持久等待交互始终核销原始 requestId。
+  // 已完成的历史问题可作为新的追问
   void sendAiPrompt(title)
 }
 
@@ -1896,182 +1878,7 @@ function parseAskOptions(raw: unknown): AskOption[] {
     .filter(item => item.title)
 }
 
-function applyAiTool(tool?: AiToolCallResult): boolean {
-  if (!editor || !tool) {
-    return false
-  }
-  if (!tool.toolName?.startsWith('cms.canvas.') && tool.toolName !== 'cms.chrome.style') {
-    toast.warning(`暂不支持的 AI 工具：${tool.toolName || '未知工具'}`)
-    return false
-  }
-  const payload = tool.payload || {}
-  const action = tool.action || 'replace-page'
-  if (tool.toolName === 'cms.chrome.style' && action === 'validate') {
-    toast.success(tool.message || 'Header/Footer 结构校验完成')
-    return true
-  }
-  if (props.chromeFrame && action === 'load-project') {
-    toast.warning('首页画布的 Header/Footer 结构已锁定，不能加载完整 Project JSON')
-    return false
-  }
-  if (action === 'load-project' || (action === 'replace-page' && payload.builderProjectJson)) {
-    try {
-      if (props.chromeFrame) {
-        toast.warning('首页画布的 Header/Footer 结构已锁定，不能加载完整 Project JSON')
-        return false
-      }
-      editor.loadProjectData(JSON.parse(String(payload.builderProjectJson)))
-      if (hasPayloadKey(payload, 'jsContent')) {
-        setCanvasJs(String(payload.jsContent || ''))
-      }
-      canvasRevision.value += 1
-      return true
-    }
-    catch {
-      toast.warning('AI 返回的 Project JSON 无法解析，已继续应用 HTML/CSS')
-    }
-  }
-  if (action === 'add-html') {
-    orderedAddHtmlAssets(payload).forEach((asset) => {
-      if (asset.kind === 'html') {
-        if (props.chromeFrame) {
-          appendHomeContent(asset.content)
-        }
-        else {
-          highlightAddedComponents(editor!.addComponents(asset.content))
-        }
-      }
-      else if (asset.kind === 'css') {
-        appendCanvasCss(asset.content)
-      }
-      else {
-        appendCanvasJs(asset.content)
-      }
-    })
-    canvasRevision.value += 1
-    return true
-  }
-  if (action === 'replace-page' || action === 'set-html') {
-    if (props.chromeFrame) {
-      if (!replaceHomeContent(String(payload.htmlContent || ''))) {
-        return false
-      }
-    }
-    else {
-      editor.setComponents(String(payload.htmlContent || ''))
-    }
-  }
-  if (action === 'replace-page' || action === 'set-css') {
-    editor.setStyle(String(payload.cssContent || ''))
-  }
-  if (action === 'set-js' || (action === 'replace-page' && hasPayloadKey(payload, 'jsContent'))) {
-    setCanvasJs(String(payload.jsContent || ''))
-  }
-  if (action === 'append-css' && payload.cssContent) {
-    appendCanvasCss(String(payload.cssContent))
-  }
-  if (action === 'append-js' && payload.jsContent) {
-    appendCanvasJs(String(payload.jsContent))
-  }
-  if (action === 'remove-selector' && payload.selector) {
-    editor.getWrapper()?.find(String(payload.selector)).forEach((component) => {
-      if (props.chromeFrame && isProtectedChromeComponent(component)) {
-        toast.warning('Header/Footer 结构已锁定，不能删除其中的组件')
-        return
-      }
-      component.remove()
-    })
-  }
-  if ([
-    'replace-selected',
-    'set-selected-html',
-    'append-to-selected',
-    'prepend-to-selected',
-    'set-selected-text',
-    'set-attributes',
-    'set-styles',
-    'add-class',
-    'remove-class',
-    'remove-selected',
-  ].includes(action)) {
-    applySelectedComponentTool(action, payload)
-  }
-  if (['set-selected-html', 'append-to-selected', 'prepend-to-selected'].includes(action) && payload.cssContent) {
-    appendCanvasCss(String(payload.cssContent))
-  }
-  canvasRevision.value += 1
-  return true
-}
 
-function hasPayloadKey(payload: Record<string, any>, key: string) {
-  return Object.prototype.hasOwnProperty.call(payload, key)
-}
-
-function applySelectedComponentTool(action: string, payload: Record<string, any>) {
-  const component = resolveToolTarget(payload)
-  if (!component) {
-    toast.warning('请先在画布中选择一个元素，AI 才能执行局部操作。')
-    return
-  }
-  if (props.chromeFrame && isProtectedChromeComponent(component) && action !== 'set-styles') {
-    toast.warning('Header/Footer 结构和数据绑定已锁定，只能修改样式')
-    return
-  }
-  if (action === 'replace-selected') {
-    replaceComponent(component, String(payload.htmlContent || ''))
-  }
-  else if (action === 'set-selected-html') {
-    component.components?.(String(payload.htmlContent || ''))
-  }
-  else if (action === 'append-to-selected') {
-    appendToComponent(component, String(payload.htmlContent || ''), false)
-  }
-  else if (action === 'prepend-to-selected') {
-    appendToComponent(component, String(payload.htmlContent || ''), true)
-  }
-  else if (action === 'set-selected-text') {
-    const text = String(payload.textContent || payload.htmlContent || '')
-    component.components?.(escapeHtml(text))
-  }
-  else if (action === 'set-attributes') {
-    const attributes = normalizeObject(payload.attributes)
-    if (Object.keys(attributes).length) {
-      component.addAttributes?.(attributes)
-    }
-  }
-  else if (action === 'set-styles') {
-    const styles = normalizeStylePatch(payload.styles || payload.style)
-    if (Object.keys(styles).length) {
-      component.addStyle?.(styles)
-    }
-  }
-  else if (action === 'add-class') {
-    splitClassNames(payload.className).forEach(name => component.addClass?.(name))
-  }
-  else if (action === 'remove-class') {
-    splitClassNames(payload.className).forEach(name => component.removeClass?.(name))
-  }
-  else if (action === 'remove-selected') {
-    component.remove?.()
-  }
-  highlightComponent(component)
-}
-
-function resolveToolTarget(payload: Record<string, any>) {
-  const selector = String(payload.selector || '').trim()
-  if (selector) {
-    const matched = editor?.getWrapper()?.find(selector) || []
-    if (matched.length > 0) {
-      return matched[0] as any
-    }
-  }
-  return editor?.getSelected() as any
-}
-
-function replaceHomeContent(html: string): boolean {
-  rebuildHomeChrome(html)
-  return true
-}
 
 function appendHomeContent(html: string) {
   rebuildHomeChrome(`${currentHomeContent()}${html}`)
@@ -2142,34 +1949,6 @@ function replaceComponent(component: any, html: string) {
   return undefined
 }
 
-function appendToComponent(component: any, html: string, prepend: boolean) {
-  if (!html.trim()) {
-    return
-  }
-  const children = component.components?.()
-  const added = children?.add ? children.add(html, prepend ? { at: 0 } : undefined) : component.append?.(html)
-  highlightAddedComponents(added)
-}
-
-function normalizeStylePatch(value: unknown): Record<string, string> {
-  if (typeof value === 'string') {
-    return Object.fromEntries(
-      value.split(';')
-        .map(item => item.trim())
-        .filter(Boolean)
-        .map((item) => {
-          const index = item.indexOf(':')
-          return index > 0 ? [item.slice(0, index).trim(), item.slice(index + 1).trim()] : ['', '']
-        })
-        .filter(([key, item]) => key && item),
-    )
-  }
-  return Object.fromEntries(Object.entries(normalizeObject(value)).map(([key, item]) => [key, String(item)]))
-}
-
-function splitClassNames(value: unknown) {
-  return String(value || '').split(/\s+/).map(item => item.trim()).filter(Boolean)
-}
 
 // 向画布 iframe 注入高亮动画样式（非页面 CSS，不会被导出/保存）。
 function injectCanvasHighlightStyle(instance: Editor) {
@@ -2377,17 +2156,7 @@ function fullCanvasCss(instance: Editor | null = editor) {
   return instance?.getCss({ keepUnusedStyles: true }) || ''
 }
 
-function setCanvasJs(js: string) {
-  pageJsContent.value = stripScriptTags(js)
-}
 
-function appendCanvasJs(js: string) {
-  const clean = stripScriptTags(js)
-  if (!clean.trim()) {
-    return
-  }
-  pageJsContent.value = [pageJsContent.value, clean].filter(item => item.trim()).join('\n\n')
-}
 
 function scheduleCanvasJsSync(delay = 450) {
   if (pageJsSyncTimer) {
@@ -2894,29 +2663,44 @@ function selectBreadcrumb(component: any) {
         </div>
 
         <section v-if="aiEnabled && rightPanelTab === 'ai'" class="right-panel ai-panel active">
-          <YdAgentChatPanel
-            ref="aiChatPanelRef"
-            :endpoint="aiChatEndpoint"
-            transport="websocket"
-            :durable-context-key="`${chatHistoryTargetType}:${chatHistoryTargetId}`"
-            :tools-ready="editorReady"
-            :history-limit="20"
-            :history-content="message => message.content"
-            :build-body="buildAiChatBody"
-            :on-tool-call-request="handleCanvasToolRequest"
-            :session-store="aiSessionStore"
-            :sanitize-message="sanitizeCmsAiMessage"
-            :session-meta="aiSessionMeta"
-            welcome-title="我是 CMS 页面构建助手"
-            welcome-description="我可以读取当前画布、CSS、JS 和项目 JSON，按你的描述直接修改或增加区块，也可以附一张样图作参考。"
+          <div v-if="!canvasAiReady" class="ai-panel-blocked">
+            <strong>需要 AI 助手权限</strong>
+            <p>画布构建助手走全局 AI 网关，需要「使用 AI 助手」（platform:chat:use）与「管理 AI 助手会话」（platform:chat:session:edit）权限；请联系管理员开通后再使用。</p>
+          </div>
+          <YdAgentWorkbench
+            v-else
+            :sessions="canvasSessions"
+            :session-id="assistant.sessionId"
+            :models="[]"
+            :model-id="assistant.modelId"
+            :messages="canvasMessages"
+            :harness="assistant.harness"
+            :activities="assistant.activities"
+            :attachments="canvasAttachments"
+            :attachments-enabled="true"
+            :available-modes="['ask']"
+            :disabled="assistant.loading || canvasUploading || !editorReady"
             :suggestions="aiSuggestions"
             placeholder="描述要如何修改当前画布，或附一张样图"
-            thinking-text="正在分析画布…"
-            disclaimer="AI 修改会直接作用于当前画布，保存前请确认效果"
-            @tool="onAiToolEvent"
-            @session-change="onAiSessionChange"
+            class="cms-canvas-workbench"
+            @send="onCanvasSend"
+            @stop="assistant.stop()"
+            @attach="attachCanvasFiles"
+            @remove-attachment="attachment => canvasAttachments = canvasAttachments.filter(item => item !== attachment)"
+            @update:session-id="id => assistant.selectSession(id)"
+            @session-create="createCanvasSession"
+            @session-rename="renameCanvasSession"
+            @session-pin="session => assistant.updateSession(session.id, { pinned: !session.pinned })"
+            @session-remove="removeCanvasSession"
           >
+            <template #empty>
+              <div class="ai-panel-empty">
+                <strong>我是 CMS 页面构建助手</strong>
+                <p>我可以读取当前画布、CSS、JS 和项目 JSON，按你的描述直接修改或增加区块，也可以附一张样图作参考。会话与运行进度保存在全局 AI 网关。</p>
+              </div>
+            </template>
             <template #message-extra="{ message }">
+
                <section v-if="message.id === pendingAskMessageId && (pendingAskDsl || pendingAskOptions.length)" class="ai-ask ai-ask--message" aria-label="AI 需求澄清">
                  <TokuiBlock v-if="pendingAskDsl" :dsl="pendingAskDsl" />
                  <div v-if="pendingAskOptions.length" class="ai-ask-options">
@@ -2926,8 +2710,10 @@ function selectBreadcrumb(component: any) {
                    </YdAction>
                  </div>
                </section>
-             </template>
-             <template #actions>
+             
+            </template>
+            <template #sender-actions>
+
               <div class="ai-panel-actions">
                 <div v-if="aiModelOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换模型">
                   <YdAction
@@ -2964,8 +2750,10 @@ function selectBreadcrumb(component: any) {
                   <span>深度思考</span>
                 </label>
               </div>
+            
             </template>
-            <template #footer>
+            <template #composer-before>
+
               <section v-if="pendingAskDsl && !pendingAskMessageId" class="ai-ask" aria-label="AI 需求澄清">
                 <TokuiBlock :dsl="pendingAskDsl" />
                 <div v-if="pendingAskOptions.length" class="ai-ask-options">
@@ -2982,10 +2770,17 @@ function selectBreadcrumb(component: any) {
                   {{ item.label }} {{ item.value }}
                 </span>
               </div>
+            
             </template>
-          </YdAgentChatPanel>
+          </YdAgentWorkbench>
         </section>
 
+        <YdModal v-model="canvasRenameOpen" title="重命名画布会话" show-cancel-button :confirm-button-disabled="!canvasRenameTitle.trim()" @confirm="submitCanvasRename">
+          <YdInput v-model="canvasRenameTitle" aria-label="会话标题" :maxlength="100" />
+        </YdModal>
+        <YdModal v-model="canvasRemoveOpen" title="删除画布会话" show-cancel-button @confirm="submitCanvasRemove">
+          <p>确定删除“{{ canvasTargetSession?.title }}”及其消息记录？</p>
+        </YdModal>
         <section class="right-panel" :class="{ active: rightPanelTab === 'layers' }">
           <h3>图层</h3>
           <div ref="layersEl" />
@@ -3897,10 +3692,11 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-panel.active {
-  display: block !important;
+  display: flex !important;
   height: 100%;
   padding: 0;
   overflow: hidden;
+  flex-direction: column;
 }
 
 .ai-panel-actions {
@@ -4033,111 +3829,79 @@ function selectBreadcrumb(component: any) {
   white-space: nowrap;
 }
 
-/* ---- AI 助手面板：极简中性风（对齐 coding 助手的聊天审美） ---- */
-.ai-panel :deep(.yd-agent-chat__welcome .yd-welcome) {
-  padding: 20px 14px 12px;
+/* ---- AI 助手面板：网关工作台，紧凑中性风 ---- */
+.ai-panel-blocked {
+  display: grid;
+  gap: 8px;
+  padding: 20px 14px;
+  color: var(--color-text-2);
+  font-size: 12.5px;
+  line-height: 1.7;
 }
 
-.ai-panel :deep(.yd-welcome__mark) {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 10px;
-  border-radius: 12px;
-  font-size: 20px;
-  box-shadow: none;
+.ai-panel-blocked strong {
+  color: var(--color-text-1);
+  font-size: 14px;
 }
 
-.ai-panel :deep(.yd-welcome__title) {
-  font-size: 15px;
+.ai-panel-blocked p {
+  margin: 0;
 }
 
-.ai-panel :deep(.yd-welcome__desc) {
-  margin-top: 6px;
+.ai-panel-empty {
+  display: grid;
+  gap: 6px;
+  padding: 12px 4px 4px;
+  color: var(--color-text-3);
   font-size: 12px;
+  text-align: center;
+}
+
+.ai-panel-empty strong {
+  color: var(--color-text-1);
+}
+
+.ai-panel-empty p {
+  margin: 0;
   line-height: 1.6;
 }
 
-.ai-panel :deep(.yd-welcome__grid) {
+/* 画布内的网关工作台：填满右栏，去掉独立卡片外壳 */
+.cms-canvas-workbench {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.cms-canvas-workbench :deep(.yd-agent-heading) {
+  padding: 8px 10px;
+}
+
+.cms-canvas-workbench :deep(.yd-agent-welcome) {
+  padding: 18px 12px 8px;
+}
+
+.cms-canvas-workbench :deep(.yd-agent-starters) {
   gap: 6px;
-  margin-top: 16px;
 }
 
-.ai-panel :deep(.yd-welcome__prompt) {
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 12.5px;
-}
-
-.ai-panel :deep(.yd-welcome__prompt:hover) {
-  transform: none;
-}
-
-.ai-panel :deep(.yd-agent-chat__footer) {
-  display: grid;
-  gap: 8px;
-  padding: 0 10px 10px;
-}
-
-.ai-panel :deep(.yd-agent-chat__controls) {
-  padding: 0 2px;
-}
-
-.ai-panel :deep(.yd-sender) {
+.cms-canvas-workbench :deep(.yd-sender) {
   padding: 0;
 }
 
-.ai-panel :deep(.yd-sender__composer) {
+.cms-canvas-workbench :deep(.yd-sender__composer) {
   border-color: var(--color-border-2);
   border-radius: 12px;
   box-shadow: none;
 }
 
-.ai-panel :deep(.yd-sender__composer.is-focused) {
+.cms-canvas-workbench :deep(.yd-sender__composer.is-focused) {
   border-color: var(--color-border-3);
   box-shadow: none;
 }
-
-/* 工具过程：在 CMS 窄面板里改成紧凑的过程轨道，避免连续胶囊挤满消息区 */
-.ai-panel :deep(.yd-tools) {
-  gap: 4px;
-  margin: 8px 0 12px;
-  padding-left: 10px;
-  border-left: 1px solid var(--color-border-2);
-}
-
-.ai-panel :deep(.yd-tool) {
-  width: 100%;
-  min-width: 0;
-  min-height: 28px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  background: var(--color-fill-1);
-  font-size: 11px;
-}
-
-.ai-panel :deep(.yd-tool__name) {
-  min-width: 0;
-  overflow: hidden;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-panel :deep(.yd-tool__message) {
-  min-width: 0;
-  max-width: 42%;
-  margin-left: auto;
-}
-
-.ai-panel :deep(.yd-tool.is-complete) {
-  color: var(--color-text-3);
-}
-
-.ai-panel :deep(.yd-tool.is-complete .yd-tool__name) {
-  color: var(--color-text-2);
-}
-
-
 
 .source-panel.active {
   grid-template-rows: auto minmax(0, 1fr) auto;

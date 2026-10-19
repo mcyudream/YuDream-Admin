@@ -15,7 +15,6 @@ const router = useRouter()
 const canEdit = computed(() => auth('platform:chat:session:edit'))
 const scope = ref<ChatScopeType>('GENERAL')
 const selectedAgent = ref('')
-const consoleProfile = ref('general')
 const wikiSlug = ref('')
 const agents = ref<AgentApplication[]>([])
 const catalog = ref<AgentCatalog>()
@@ -33,9 +32,8 @@ async function perform(action: () => Promise<unknown>) {
 }
 
 watch(() => assistant.activeSession, (session) => {
-  scope.value = session?.scopeType || 'GENERAL'
+  scope.value = session?.scopeType === 'CONSOLE' ? 'GENERAL' : session?.scopeType || 'GENERAL'
   selectedAgent.value = session?.scopeType === 'AGENT' ? session.agentCode || '' : ''
-  consoleProfile.value = session?.scopeType === 'CONSOLE' ? session.agentCode || 'general' : 'general'
   wikiSlug.value = session?.spaceSlug || ''
   attachments.value = []
 }, { immediate: true })
@@ -44,7 +42,7 @@ function sessionData() {
   const model = assistant.models.find(item => item.id === assistant.modelId)
   return {
     scopeType: scope.value,
-    agentCode: scope.value === 'CONSOLE' ? consoleProfile.value : scope.value === 'AGENT' ? selectedAgent.value : undefined,
+    agentCode: scope.value === 'AGENT' ? selectedAgent.value : undefined,
     spaceSlug: wikiSlug.value || undefined,
     providerCode: model?.providerCode,
     modelCode: model?.modelCode,
@@ -145,14 +143,12 @@ onMounted(() => perform(async () => {
       @retrieval-select="openSource"
     >
       <template #sender-actions>
-        <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="[{ label: '通用助手', value: 'GENERAL' }, { label: 'Agent 应用', value: 'AGENT' }, { label: '知识库问答', value: 'WIKI' }, { label: '工作区控制台', value: 'CONSOLE' }]" />
+        <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="[{ label: '通用助手', value: 'GENERAL' }, { label: 'Agent 应用', value: 'AGENT' }, { label: '知识库问答', value: 'WIKI' }]" />
         <YdSelect v-if="scope === 'AGENT'" v-model="selectedAgent" :disabled="assistant.busy" aria-label="Agent 应用" :options="agents.map(item => ({ label: item.name, value: item.code }))" />
-        <YdSelect v-if="scope === 'CONSOLE'" v-model="consoleProfile" :disabled="assistant.busy" aria-label="工作区范围" :options="[{ label: '通用对话', value: 'general' }, { label: 'CMS 站点工作区', value: 'cms-builder' }]" />
         <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
       </template>
       <template #header-actions>
         <span v-if="assistant.quota" class="chat-page__quota">今日可用 {{ assistant.quota.remainingTokens.toLocaleString() }} tokens</span>
-        <YdButton variant="ghost" size="icon-sm" aria-label="打开全局助手设置" @click="assistant.open = true"><YdIcon name="morph:settings" /></YdButton>
       </template>
     </YdAgentWorkbench>
     <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :confirm-button-disabled="!title.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: title.trim() }))">

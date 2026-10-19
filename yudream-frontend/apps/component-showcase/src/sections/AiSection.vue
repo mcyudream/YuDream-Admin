@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { YdAgentContextFile, YdAgentReference, YdAgentSendRequest, YdAgentSession, YdAgentToolCall, YdChatAttachment, YdChatMessage, YdPromptItem, YdThoughtChainItem } from '@yudream/components'
-import { YdAgentWorkbench, YdBubble, YdButton, YdChatLoading, YdCheckbox, YdCode, YdIcon, YdInput, YdModal, YdPrompts, YdThoughtChain } from '@yudream/components'
+import { YdAgentWorkbench, YdBubble, YdButton, YdChatLoading, YdCheckbox, YdCode, YdFloatBall, YdIcon, YdInput, YdModal, YdPrompts, YdThoughtChain } from '@yudream/components'
 import { computed, ref } from 'vue'
 import { useAgentWorkbenchDemo } from './useAgentWorkbenchDemo'
 
@@ -8,22 +8,28 @@ const demo = useAgentWorkbenchDemo()
 const { sessionId, workspaceId, modelId, mode } = demo
 const galleryOpen = ref(false)
 const protocolOpen = ref(false)
-const persistentContract = `const stream = useYdPersistentChatStream({
-  ownerKey: () => account.userId,
-  contextKey: () => 'page:' + page.id,
-  toolsReady: () => editor.ready,
-  endpoint: '/api/platform/cms/generate/agui/ws',
-  persistence: { latest, snapshot, cancel, toolResult },
-  onToolCallRequest: executeRegisteredCanvasTool,
-})
+const floatBallOpen = ref(false)
+const floatBallVisible = ref(false)
+const floatBallBusy = ref(false)
+const floatBallBadge = ref('3')
+const persistentContract = `// 宿主统一 AI 网关：会话在 platformChatSession，运行在 platformAiRun
+// 业务面板（CMS 画布 / 站点工作区）不再有专用流式端点，统一走
+//   POST /api/platform/chat/sessions/{id}/runs   创建可恢复运行
+//   GET  /api/platform/ai/runs/{id}/events       订阅 SSE（游标续传，断线只关订阅）
+//   POST /api/platform/ai/runs/{id}/frontend-tools/{toolCallId}  回传前端工具真实结果
+// 业务会话 = CONSOLE 范围 + agentCode（cms-canvas 画布 / cms-builder 站点工作区）
+const assistant = useAiAssistantStore()
+await assistant.send(request, pageContext, { scopeType: 'CONSOLE', agentCode: 'cms-canvas' })
 
-// 首次提交创建后端 run；重連只订阅原 run
-// WebSocket: { resumeRunId: stream.runId, after: stream.cursor }
-// WAITING 保存原生 pendingInteractions，真实回执续原 turn
-// 卸载视图不取消；显式停止才调用 persistence.cancel
-// message-extra: 宿主业务工具结果
+// 画布工具在浏览器真实执行：面板挂载期注册执行器，卸载即注销
+assistant.registerFrontendToolHandler('cms.canvas.update_text', request =>
+  executeCanvasTool(editor, request.name, request.arguments, execOptions))
+
+// message-extra: 宿主业务工具结果（需求澄清卡片等）
 // composer-before: 等待输入、恢复连接与业务提示
-// sender-actions: 业务模型或范围选择`
+// sender-actions: 业务模型或范围选择
+// 普通助手工作区：每用户默认工作区（platform:chat:workspace:view/edit），
+// 助手经 workspace.list / workspace.read 只读工具读取，写入只经界面端点`
 const attachments = ref<YdChatAttachment[]>([])
 const renameOpen = ref(false)
 const renameId = ref('')
@@ -160,6 +166,39 @@ const prompts: YdPromptItem[] = [
       </div>
     </section>
 
+    <section class="agent-gallery">
+      <YdButton variant="ghost" class="gallery-toggle" :aria-expanded="floatBallOpen" aria-controls="ai-float-ball" @click="floatBallOpen = !floatBallOpen">
+        <YdIcon name="morph:circle" />
+        <span>可拖拽圆球入口</span>
+        <span class="gallery-description">图标 + 角标 + 吸附边缘的悬浮入口</span>
+        <YdIcon :name="floatBallOpen ? 'morph:chevron-up' : 'morph:chevron-down'" />
+      </YdButton>
+      <div v-if="floatBallOpen" id="ai-float-ball" class="gallery-content">
+        <p class="float-ball-note">
+          开启后圆球固定在视口右下角：可拖拽，松手吸附最近的左右边缘，位置按 storage-key 记忆；
+          拖拽超过 4px 不触发点击，busy 时图标旋转并带脉冲圈，badge 显示待处理数量。
+        </p>
+        <div class="float-ball-controls">
+          <YdButton variant="outline" size="sm" @click="floatBallVisible = !floatBallVisible">
+            {{ floatBallVisible ? '隐藏圆球' : '显示圆球' }}
+          </YdButton>
+          <YdCheckbox v-model="floatBallBusy">
+            运行中（旋转 + 脉冲）
+          </YdCheckbox>
+          <YdInput v-model="floatBallBadge" class="float-ball-badge-input" aria-label="角标文本" placeholder="角标" :maxlength="3" />
+        </div>
+      </div>
+    </section>
+
+    <YdFloatBall
+      v-if="floatBallVisible"
+      :badge="floatBallBadge"
+      :busy="floatBallBusy"
+      label="AI 助手演示入口"
+      storage-key="yd.showcase.floatBall"
+      @click="floatBallVisible = false"
+    />
+
     <YdModal v-model="renameOpen" title="重命名会话" description="名称仅保存在当前页面的本地演示状态。" show-cancel-button :confirm-button-disabled="!renameTitle.trim()" @confirm="saveRename">
       <YdInput v-model="renameTitle" aria-label="会话名称" placeholder="输入会话名称" :maxlength="60" @keydown.enter.prevent="renameTitle.trim() && (saveRename(), renameOpen = false)" />
     </YdModal>
@@ -258,6 +297,24 @@ const prompts: YdPromptItem[] = [
   background: var(--color-fill-1);
   border-inline-start: 3px solid var(--color-border-3);
   border-radius: var(--yd-control-radius);
+}
+
+.float-ball-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-text-3);
+}
+
+.float-ball-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.float-ball-badge-input {
+  width: 96px;
 }
 
 @media (width <= 768px) {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { YdAgentSendRequest, YdAgentWorkspace, YdFilePickerInstance } from '@yudream/components'
+import type { YdAgentSendRequest, YdAgentSession, YdAgentWorkspace, YdChatAttachment, YdFilePickerInstance } from '@yudream/components'
+import type { ChatSession } from '@/api/modules/platform-chat'
 import type { WorkspaceEntry } from '@/api/modules/platform-cms-workspace'
 import { YdAgentWorkbench, YdAlert } from '@yudream/components'
 import { computed, ref, watch } from 'vue'
 import apiWorkspace from '@/api/modules/platform-cms-workspace'
+import { uploadChatAttachment } from '@/api/modules/platform-chat'
 import AiRunProgress from '@/components/AiRunProgress/index.vue'
-import { useAiRunTask } from '@/composables/use-ai-run-task'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import CmsGrapesEditor from '@/views/platform/theme-center/components/CmsGrapesEditor.vue'
 
@@ -36,11 +37,38 @@ const chatOpen = ref(false)
 const preparing = ref(false)
 
 const runtime = useAiAssistantStore()
-const task = useAiRunTask(`cms-${targetKey}`)
+const { auth } = useAppAuth()
 const workspaces = computed<YdAgentWorkspace[]>(() => workspaceLoaded.value ? [{ id: `cms-${targetKey}`, name: 'CMS 站点工作区', kind: 'remote', access: 'write', description: '由服务端保存的站点页面与资产文件' }] : [])
-const messages = computed(() => runtime.taskMessages(`cms-${targetKey}`))
-const harness = computed(() => ({ name: 'AgentScope Harness', runId: task.run.value?.id, status: task.running.value || preparing.value ? task.run.value?.status === 'WAITING' ? 'waiting' as const : 'running' as const : task.run.value?.status === 'FAILED' ? 'error' as const : task.run.value?.status === 'CANCELLED' ? 'cancelled' as const : task.run.value ? 'completed' as const : 'idle' as const }))
-watch(() => task.run.value?.status, (status) => {
+/** 站点构建会话：网关会话中 agentCode=cms-builder 的那些，与助手面板共享同一份会话与运行进度。 */
+const siteSessions = computed(() => runtime.sessionItems.filter(session => session.agentCode === 'cms-builder'))
+const messages = computed(() => (siteSessions.value.some(session => session.id === runtime.sessionId) ? runtime.messages : []))
+const harness = computed(() => ({
+  ...runtime.harness,
+  status: preparing.value ? 'running' as const : runtime.harness.status,
+}))
+const siteAiReady = computed(() => auth('platform:chat:use') && auth('platform:chat:session:view') && auth('platform:chat:session:edit'))
+const siteAttachments = ref<YdChatAttachment[]>([])
+const siteUploading = ref(false)
+
+async function attachSiteFiles(files: File[]) {
+  siteUploading.value = true
+  try {
+    for (const file of files) {
+      siteAttachments.value.push(await uploadChatAttachment(file))
+    }
+  }
+  catch (cause) {
+    toast.error(cause instanceof Error ? cause.message : '附件上传失败')
+  }
+  finally {
+    siteUploading.value = false
+  }
+}
+const renameOpen = ref(false)
+const removeOpen = ref(false)
+const targetSession = ref<YdAgentSession>()
+const sessionTitle = ref('')
+watch(() => runtime.activeRun?.status, (status) => {
   if (status === 'COMPLETED') {
     void refresh()
   }
@@ -222,12 +250,79 @@ const workspaceFiles = computed(() =>
 function toggleReference(path: string, included: boolean) {
   pendingRefs.value = included ? [...new Set([...pendingRefs.value, path])] : pendingRefs.value.filter(item => item !== path)
 }
+function sessionData(): Partial<ChatSession> {
+  return {
+    title: `站点构建 · ${targetKey}`.slice(0, 40),
+    scopeType: 'CONSOLE',
+    agentCode: 'cms-builder',
+  }
+}
+
+/** 确保当前选中的是站点构建会话；没有会话时在首次发送前创建。 */
+async function ensureSiteSession(): Promise<boolean> {
+  if (siteSessions.value.some(session => session.id === runtime.sessionId)) {
+    return true
+  }
+  const latest = siteSessions.value[0]
+  if (latest) {
+    await runtime.selectSession(latest.id)
+    return true
+  }
+  const id = await runtime.createSession(sessionData())
+  return Boolean(id)
+}
+
+async function createSiteSession() {
+  if (!siteAiReady.value) {
+    return
+  }
+  await runtime.createSession(sessionData())
+}
+
+function renameSession(session: YdAgentSession) {
+  targetSession.value = session
+  sessionTitle.value = session.title
+  renameOpen.value = true
+}
+
+async function submitRename() {
+  const session = targetSession.value
+  const title = sessionTitle.value.trim()
+  if (!session || !title) {
+    return
+  }
+  await runtime.updateSession(session.id, { title })
+  renameOpen.value = false
+}
+
+function removeSession(session: YdAgentSession) {
+  targetSession.value = session
+  removeOpen.value = true
+}
+
+async function submitRemove() {
+  const session = targetSession.value
+  if (!session) {
+    return
+  }
+  try {
+    await runtime.removeSession(session.id)
+  }
+  catch (cause) {
+    toast.error(cause instanceof Error ? cause.message : '删除会话失败')
+  }
+  removeOpen.value = false
+}
+
 async function ask(request: YdAgentSendRequest) {
-  if (task.running.value || preparing.value) {
+  if (runtime.busy || preparing.value) {
+    return
+  }
+  if (!siteAiReady.value) {
+    toast.warning('需要「使用 AI 助手」与「管理 AI 助手会话」权限，请联系管理员开通')
     return
   }
   preparing.value = true
-  const started = runtime.lifecycleVersion()
   try {
     let full = request.text
     for (const refPath of pendingRefs.value) {
@@ -242,11 +337,14 @@ async function ask(request: YdAgentSendRequest) {
       }
     }
     pendingRefs.value = []
-    if (started !== runtime.lifecycleVersion()) {
+    if (!(await ensureSiteSession())) {
+      toast.error('会话创建失败，请稍后重试')
       return
     }
-    runtime.appendTaskInput(`cms-${targetKey}`, full)
-    await task.start(() => apiWorkspace.startChat(targetKey, full))
+    await runtime.send({ ...request, text: full }, undefined, { scopeType: 'CONSOLE', agentCode: 'cms-builder' })
+    if (!runtime.error) {
+      siteAttachments.value = []
+    }
   }
   finally {
     preparing.value = false
@@ -267,6 +365,12 @@ async function onCanvasSave(payload: { htmlContent: string, cssContent: string, 
 }
 function openChat() {
   chatOpen.value = true
+  if (siteAiReady.value && !siteSessions.value.some(session => session.id === runtime.sessionId)) {
+    const latest = siteSessions.value[0]
+    if (latest) {
+      void runtime.selectSession(latest.id)
+    }
+  }
 }
 function formatSize(size: number) {
   const value = Number(size || 0)
@@ -423,8 +527,38 @@ function fileName(path: string) {
 
     <YdDrawer v-model="chatOpen" title="AI 构建助手" :footer="false" content-class="w-[760px] max-w-full">
       <div class="chat-drawer__body">
-        <YdAlert v-if="task.failure.value" variant="destructive" :title="task.failure.value" />
-        <YdAgentWorkbench :messages="messages" :harness="harness" :available-modes="['ask']" :workspaces="workspaces" :workspace-id="`cms-${targetKey}`" :files="workspaceFiles" class="workspace-agent-workbench" @send="ask" @stop="task.stop" @file-toggle="toggleReference" @file-select="file => openEdit(file.path)">
+        <YdAlert v-if="runtime.error" variant="destructive" :title="runtime.error" />
+        <YdAlert v-if="!siteAiReady" variant="destructive" title="需要「使用 AI 助手」与「管理 AI 助手会话」权限，请联系管理员开通" />
+        <YdAgentWorkbench
+          v-else
+          :sessions="siteSessions"
+          :session-id="runtime.sessionId"
+          :models="runtime.models"
+          :model-id="runtime.modelId"
+          :messages="messages"
+          :harness="harness"
+          :activities="runtime.activities"
+          :available-modes="['ask']"
+          :workspaces="workspaces"
+          :workspace-id="`cms-${targetKey}`"
+          :files="workspaceFiles"
+          :attachments="siteAttachments"
+          :attachments-enabled="true"
+          :disabled="runtime.loading || preparing || siteUploading"
+          class="workspace-agent-workbench"
+          @send="ask"
+          @stop="runtime.stop()"
+          @attach="attachSiteFiles"
+          @remove-attachment="attachment => siteAttachments = siteAttachments.filter(item => item !== attachment)"
+          @file-toggle="toggleReference"
+          @file-select="file => openEdit(file.path)"
+          @update:session-id="id => runtime.selectSession(id)"
+          @update:model-id="value => runtime.modelId = value"
+          @session-create="createSiteSession"
+          @session-rename="renameSession"
+          @session-pin="session => runtime.updateSession(session.id, { pinned: !session.pinned })"
+          @session-remove="removeSession"
+        >
           <template #empty>
             <div class="chat-empty">
               <strong>描述你想要的页面</strong>
@@ -432,11 +566,17 @@ function fileName(path: string) {
             </div>
           </template>
           <template #composer-before>
-            <AiRunProgress v-if="task.run.value?.status === 'WAITING'" :run-id="task.run.value.id" />
+            <AiRunProgress v-if="runtime.activeRun?.status === 'WAITING'" :run-id="runtime.activeRun.id" />
           </template>
         </YdAgentWorkbench>
       </div>
     </YdDrawer>
+    <YdModal v-model="renameOpen" title="重命名构建会话" show-cancel-button :confirm-button-disabled="!sessionTitle.trim()" @confirm="submitRename">
+      <YdInput v-model="sessionTitle" aria-label="会话标题" :maxlength="100" />
+    </YdModal>
+    <YdModal v-model="removeOpen" title="删除构建会话" show-cancel-button @confirm="submitRemove">
+      <p>确定删除“{{ targetSession?.title }}”及其消息记录？</p>
+    </YdModal>
   </div>
 </template>
 
