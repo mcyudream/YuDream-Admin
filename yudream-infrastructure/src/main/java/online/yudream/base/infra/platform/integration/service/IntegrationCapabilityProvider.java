@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class IntegrationCapabilityProvider implements CapabilityProvider {
 
     public static final String CODE = "integration";
-    private static final String DEFAULT_PYTHON_COMMAND = "python";
 
     private final LocalPythonRuntimeExecutor localPythonRuntimeExecutor;
     private final AtomicBoolean enabled = new AtomicBoolean(false);
@@ -34,7 +33,7 @@ public class IntegrationCapabilityProvider implements CapabilityProvider {
                 "提供 HTTP 调用和 Python 运行脚本能力",
                 "i-ri:terminal-box-line",
                 70,
-                Map.of("pythonCommand", DEFAULT_PYTHON_COMMAND)
+                Map.of("pythonCommand", LocalPythonRuntimeExecutor.DEFAULT_PYTHON_COMMAND)
         );
     }
 
@@ -51,8 +50,8 @@ public class IntegrationCapabilityProvider implements CapabilityProvider {
     @Override
     public void enable(Map<String, String> config) {
         localPythonRuntimeExecutor.configurePythonCommand(config == null
-                ? DEFAULT_PYTHON_COMMAND
-                : config.getOrDefault("pythonCommand", DEFAULT_PYTHON_COMMAND));
+                ? LocalPythonRuntimeExecutor.DEFAULT_PYTHON_COMMAND
+                : config.getOrDefault("pythonCommand", LocalPythonRuntimeExecutor.DEFAULT_PYTHON_COMMAND));
         enabled.set(true);
     }
 

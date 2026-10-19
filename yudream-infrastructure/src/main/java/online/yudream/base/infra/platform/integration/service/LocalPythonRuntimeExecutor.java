@@ -25,31 +25,34 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
     private static final int MAX_OUTPUT_BYTES = 128 * 1024;
     private static final long PYTHON_CHECK_TIMEOUT_MILLIS = 5_000L;
     private static final String OUTPUT_TRUNCATED = "\n...输出已截断...";
-    private static final String DEFAULT_PYTHON_COMMAND = "python";
+    public static final String DEFAULT_PYTHON_COMMAND = "python";
+    /** 未显式配置时按序探测的解释器候选：PATH 的 python/python3 与 Windows 启动器 py -3。 */
+    private static final List<String> FALLBACK_CANDIDATES = List.of("python", "python3", "py -3");
 
     private volatile String pythonCommand = DEFAULT_PYTHON_COMMAND;
+    /** 默认配置下探测到的可用解释器缓存；配置变更时失效，解析失败也缓存以避免每次执行都反复探测。 */
+    private volatile List<String> resolvedBaseCommand;
 
     public void configurePythonCommand(String pythonCommand) {
         this.pythonCommand = pythonCommand == null || pythonCommand.isBlank()
                 ? DEFAULT_PYTHON_COMMAND
                 : pythonCommand.trim();
+        this.resolvedBaseCommand = null;
     }
 
     public void resetPythonCommand() {
-        this.pythonCommand = DEFAULT_PYTHON_COMMAND;
+        configurePythonCommand(null);
     }
 
+    /** 当前实际生效的解释器命令（默认配置时含自动探测结果），用于健康信息展示。 */
     public String pythonCommand() {
-        return pythonCommand;
+        return String.join(" ", baseCommand());
     }
 
     public RuntimeExecutionResult checkPythonCommand() {
         long start = System.currentTimeMillis();
         try {
-            List<String> command = new ArrayList<>(splitCommand(pythonCommand));
-            if (command.isEmpty()) {
-                command.add(DEFAULT_PYTHON_COMMAND);
-            }
+            List<String> command = new ArrayList<>(baseCommand());
             command.add("--version");
             ProcessBuilder builder = new ProcessBuilder(command);
             configureEnvironment(builder, null);
@@ -149,12 +152,56 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
     }
 
     private List<String> commandLine(Path scriptFile) {
-        List<String> command = new ArrayList<>(splitCommand(pythonCommand));
-        if (command.isEmpty()) {
-            command.add(DEFAULT_PYTHON_COMMAND);
-        }
+        List<String> command = new ArrayList<>(baseCommand());
         command.add(scriptFile.toAbsolutePath().toString());
         return command;
+    }
+
+    /** 显式配置优先；默认配置时用探测结果，保证裸 PATH 的后端进程也能找到可用解释器。 */
+    private List<String> baseCommand() {
+        if (!pythonCommand.equals(DEFAULT_PYTHON_COMMAND)) {
+            return splitCommand(pythonCommand);
+        }
+        List<String> resolved = resolvedBaseCommand;
+        if (resolved == null) {
+            resolved = resolveBaseCommand();
+            resolvedBaseCommand = resolved;
+        }
+        return resolved;
+    }
+
+    /** 依次用 --version 探测候选解释器，全部失败时回落 python，保持原有的报错语义。 */
+    private synchronized List<String> resolveBaseCommand() {
+        for (String candidate : FALLBACK_CANDIDATES) {
+            List<String> command = splitCommand(candidate);
+            if (command.isEmpty()) {
+                continue;
+            }
+            command.add("--version");
+            try {
+                ProcessBuilder builder = new ProcessBuilder(command);
+                configureEnvironment(builder, null);
+                Process process = builder.start();
+                CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getInputStream()));
+                CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getErrorStream()));
+                boolean finished = process.waitFor(PYTHON_CHECK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                if (finished && process.exitValue() == 0) {
+                    output(stdoutFuture);
+                    output(stderrFuture);
+                    return splitCommand(candidate);
+                }
+                process.destroyForcibly();
+                process.waitFor(1, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            catch (Exception ignored) {
+                // 探测失败换下一个候选
+            }
+        }
+        return splitCommand(DEFAULT_PYTHON_COMMAND);
     }
 
     private List<String> splitCommand(String command) {
