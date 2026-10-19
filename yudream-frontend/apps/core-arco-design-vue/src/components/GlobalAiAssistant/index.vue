@@ -563,11 +563,7 @@ async function playTour(tourCode?: string) {
           工作区还是空的，先上传一个文件吧。
         </p>
       </div>
-      <YdFilePicker ref="uploadInput" label="选择工作区文件" @select="onUpload">
-        <template #default="{ open }">
-          <button type="button" class="hidden" @click="open">选择工作区文件</button>
-        </template>
-      </YdFilePicker>
+      <YdFilePicker ref="uploadInput" label="选择工作区文件" class="hidden" @select="onUpload"><template #default /></YdFilePicker>
     </YdDrawer>
     <YdDrawer v-model="tasksOpen" title="统一 AI 运行任务" :footer="false" :z-index="2200" content-class="w-[760px] max-w-full">
       <YdSelect v-model="taskRunId" :options="runOptions" allow-search aria-label="选择 AI 运行任务" class="mb-4 w-full" />
