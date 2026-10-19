@@ -38,5 +38,13 @@ public enum ChatMenuModule {
 
     @MenuNode(code = "platform:chat:quota:config", name = "配置 AI 助手额度", type = MenuNodeType.BUTTON,
             parentName = "CHAT", permission = "platform:chat:quota:config")
-    CHAT_QUOTA_CONFIG
+    CHAT_QUOTA_CONFIG,
+
+    @MenuNode(code = "platform:chat:workspace:view", name = "查看我的工作区", type = MenuNodeType.BUTTON,
+            parentName = "CHAT", permission = "platform:chat:workspace:view")
+    CHAT_WORKSPACE_VIEW,
+
+    @MenuNode(code = "platform:chat:workspace:edit", name = "管理我的工作区文件", type = MenuNodeType.BUTTON,
+            parentName = "CHAT", permission = "platform:chat:workspace:edit")
+    CHAT_WORKSPACE_EDIT
 }

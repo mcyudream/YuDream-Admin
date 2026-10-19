@@ -30,6 +30,7 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
 
     private final HarnessAgentGateway harnessAgents;
     private final CapabilityModuleRepo capabilityModuleRepo;
+    private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
 
     @Override
     public ChatScopeType scopeType() {
@@ -73,6 +74,8 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
             case "cms-builder" -> List.of(
                     "read_file", "write_file", "edit_file", "list_files", "grep_files", "glob_files",
                     "cms_chrome_style");
+            // CMS 画布：工具面由本次运行的客户端画布工具集定义，这里不再额外设限。
+            case "cms-canvas" -> List.of();
             default -> List.of();
         };
     }
@@ -85,7 +88,7 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
         if (normalized.equals("cms")) {
             return "cms-builder";
         }
-        return normalized.equals("general") || normalized.equals("cms-builder")
+        return normalized.equals("general") || normalized.equals("cms-builder") || normalized.equals("cms-canvas")
                 || normalized.startsWith("workflow-")
                 ? normalized
                 : "general";
@@ -102,6 +105,12 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
     }
 
     private String consoleSystemPrompt(String agentCode) {
+        if ("cms-canvas".equals(agentCode)) {
+            return online.yudream.base.application.platform.cms.service.CmsCanvasAgentPrompt.systemPrompt(
+                    siteName(),
+                    online.yudream.base.application.platform.cms.service.CmsCanvasAgentPrompt.templateDescription(null),
+                    false);
+        }
         if ("cms-builder".equals(agentCode)) {
             return "你是 YuDreamAdmin CMS 静态站点工作区的构建代理。工作区是多文件静态站点："
                     + "pages/ 下每页一个 HTML（pages/index.html 为首页），assets/ 存放样式、脚本与资产。"
@@ -123,5 +132,16 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
                 .filter(CapabilityModule::enabled)
                 .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
                 .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("AI 能力未启用"));
+    }
+
+    /** 站点名用于画布 Agent 提示词；读取失败时回落中性名称，不阻断会话。 */
+    private String siteName() {
+        try {
+            String name = settingAppService.siteSettings().getSiteName();
+            return StringUtils.hasText(name) ? name : "当前站点";
+        }
+        catch (Exception ignored) {
+            return "当前站点";
+        }
     }
 }

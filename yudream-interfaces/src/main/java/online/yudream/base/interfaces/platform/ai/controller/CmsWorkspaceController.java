@@ -1,15 +1,10 @@
 package online.yudream.base.interfaces.platform.ai.controller;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
-import online.yudream.base.application.platform.ai.service.AiAppService;
 import online.yudream.base.application.platform.cms.service.CmsWorkspaceStore;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
-import online.yudream.base.interfaces.platform.ai.assembler.AiWebAssembler;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
@@ -21,18 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Base64;
 
 /**
@@ -46,12 +35,7 @@ import java.util.Base64;
 public class CmsWorkspaceController {
 
     private final CmsWorkspaceStore workspaceStore;
-    private final online.yudream.base.application.platform.ai.service.AiBusinessRunAppService businessRuns;
-    private final online.yudream.base.interfaces.platform.ai.support.AiRunStreamSupport runStreams;
     private final online.yudream.base.application.platform.cms.service.CmsWorkspacePublishService publishService;
-
-    @Value("${yudream.platform.ai.client.sse-timeout:30m}")
-    private Duration sseTimeout;
 
     @GetMapping
     @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区文件列表", module = "平台能力", desc = "列出 CMS 静态站点工作区文件树")
@@ -103,29 +87,6 @@ public class CmsWorkspaceController {
     }
 
     public record PublishRequest(String themeCode, Boolean published) {
-    }
-
-    @PostMapping("/{targetKey}/chat/runs")
-    @PermissionRegister(code = "platform:ai:generate", name = "提交 CMS 工作区构建", module = "平台能力", desc = "创建后台可恢复工作区构建运行")
-    public Result<online.yudream.base.interfaces.platform.ai.res.AiRunRes> startChat(@PathVariable String targetKey, @Valid @RequestBody WorkspaceChatRequest request) {
-        var principal = SecurityPrincipalSupport.current();
-        return Result.ok(online.yudream.base.interfaces.platform.ai.assembler.AiRunWebAssembler.run(
-                businessRuns.workspace(principal.userId(), principal.permissions(), targetKey, request.question(), request.history(), request.providerCode(), request.modelCode())));
-    }
-
-    @PostMapping(value = "/{targetKey}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区 AI 构建", module = "平台能力", desc = "订阅后台工作区构建运行")
-    public SseEmitter chatStream(@PathVariable String targetKey, @Valid @RequestBody WorkspaceChatRequest request) {
-        var principal = SecurityPrincipalSupport.current();
-        var run = businessRuns.workspace(principal.userId(), principal.permissions(), targetKey, request.question(), request.history(), request.providerCode(), request.modelCode());
-        return runStreams.subscribe(principal.userId(), run.id(), 0, true);
-    }
-
-    public record WorkspaceChatRequest(
-            @NotBlank(message = "问题不能为空") String question,
-            List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
-            String providerCode,
-            String modelCode) {
     }
 
     /** 框架运行时库：静态页一行 <script src> 接入 data-yb-* 渲染与后端数据互通。 */

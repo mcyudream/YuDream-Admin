@@ -38,7 +38,7 @@ public class ChatAttachmentAppService {
     @Transactional
     public ChatAttachmentDTO upload(InputStream inputStream, String originalName, String contentType,
                                     long size, Long uploaderId) {
-        capabilities.ensureEnabled("chat", "AI 助手");
+        capabilities.ensureEnabled("ai", "AI 助手");
         if (inputStream == null || size <= 0) {
             throw new BizException("附件不能为空");
         }

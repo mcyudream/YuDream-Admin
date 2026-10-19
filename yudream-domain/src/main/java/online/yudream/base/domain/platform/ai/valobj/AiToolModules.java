@@ -17,6 +17,7 @@ public final class AiToolModules {
     public static final String MODULE_CMS = "cms";
     public static final String MODULE_WIKI = "wiki";
     public static final String MODULE_UI = "ui";
+    public static final String MODULE_WORKSPACE = "workspace";
     /** 无模块归属的宿主工具兜底模块。 */
     public static final String MODULE_GENERAL = "general";
     /** Python 自定义工具（工作流路径），仅管理端展示。 */
@@ -50,6 +51,7 @@ public final class AiToolModules {
         put(modules, new ModuleMeta(MODULE_WEB, "网页访问", "抓取公开网页作为分析参考。", "morph:globe", true));
         put(modules, new ModuleMeta(MODULE_WIKI, "知识库", "检索知识库与公开 Wiki 内容。", "morph:book", true));
         put(modules, new ModuleMeta(MODULE_UI, "界面助手", "页面跳转、元素高亮与引导播放。", "morph:cursor", true));
+        put(modules, new ModuleMeta(MODULE_WORKSPACE, "我的工作区", "列出与读取用户自己的工作区文件。", "morph:folder-open", true));
         put(modules, new ModuleMeta(MODULE_CMS, "站点画布", "CMS 画布的选取、读写、样式与区块工具。", "morph:layout", false));
         put(modules, new ModuleMeta(MODULE_GENERAL, "其他工具", "未归入其他模块的宿主工具。", "morph:puzzle", false));
         return Map.copyOf(modules);
