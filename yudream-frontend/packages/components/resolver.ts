@@ -170,6 +170,7 @@ const YD_COMPONENT_NAMES = [
   'YdEnhancedTable',
   'YdResponsiveEnhancedTable',
   'YdFab',
+  'YdFloatBall',
   'YdFlipCard',
   'YdFlipWords',
   'YdGlowyCard',

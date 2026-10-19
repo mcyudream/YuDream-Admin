@@ -155,6 +155,7 @@ export const YdImageCaptcha = components.YdImageCaptcha
 export const YdInfiniteScroll = components.YdInfiniteScroll
 export const YdAnchor = components.YdAnchor
 export const YdFlipCard = components.YdFlipCard
+export const YdFloatBall = components.YdFloatBall
 export const YdFlipWords = components.YdFlipWords
 export const YdGlowyCard = components.YdGlowyCard
 export const YdGlowyCardWrapper = components.YdGlowyCardWrapper

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import FaIcon from '../basic/icon/index.vue'
 
 const props = withDefaults(defineProps<{
@@ -13,6 +13,12 @@ const props = withDefaults(defineProps<{
   fullscreenable?: boolean
   /** 最大化/全屏按钮是否改为对外抛出 expand（由父级跳转全屏页），而非就地放大 */
   expandOnly?: boolean
+  /** 传入后按账号/场景持久化窗口位置与尺寸，例如 yd.chatWindow.ai.123 */
+  storageKey?: string
+  /** 首次出现时贴靠的横向边缘 */
+  initialSide?: 'left' | 'right'
+  /** 首次出现时距视口边缘的距离 */
+  initialOffset?: number
 }>(), {
   title: 'AI 助手',
   width: 480,
@@ -23,12 +29,16 @@ const props = withDefaults(defineProps<{
   maximizable: true,
   fullscreenable: true,
   expandOnly: false,
+  initialSide: 'right',
+  initialOffset: 24,
 })
 
 const emits = defineEmits<{
   close: []
   /** 请求在全屏页打开（父级负责路由跳转） */
   expand: []
+  /** 位置或尺寸变化后抛出当前几何信息，便于调用方联动 */
+  geometry: [{ x: number, y: number, width: number, height: number }]
 }>()
 
 const rootEl = ref<HTMLElement | null>(null)
@@ -43,6 +53,79 @@ const state = reactive({
 
 const dragState = reactive({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 })
 const resizeState = reactive({ active: false, startX: 0, startY: 0, originWidth: 0, originHeight: 0 })
+
+/** 视口边界：标题栏必须留在视口内，尺寸不超过视口。 */
+function limits() {
+  const gutter = 8
+  return {
+    minX: gutter - Math.min(props.minWidth, window.innerWidth) + 140,
+    maxX: Math.max(gutter, window.innerWidth - 140),
+    minY: gutter,
+    maxY: Math.max(gutter, window.innerHeight - 48),
+    maxWidth: Math.max(props.minWidth, window.innerWidth - gutter * 2),
+    maxHeight: Math.max(props.minHeight, window.innerHeight - gutter * 2),
+  }
+}
+
+function clampX(value: number) {
+  const limit = limits()
+  return Math.min(Math.max(value, limit.minX), limit.maxX)
+}
+
+function clampY(value: number) {
+  const limit = limits()
+  return Math.min(Math.max(value, limit.minY), limit.maxY)
+}
+
+function defaultGeometry() {
+  const limit = limits()
+  const width = Math.min(props.width, limit.maxWidth)
+  const height = Math.min(props.height, limit.maxHeight)
+  const offset = Math.max(0, props.initialOffset)
+  const x = props.initialSide === 'left' ? offset : Math.max(offset, window.innerWidth - width - offset)
+  return { x: clampX(x), y: clampY(offset), width, height }
+}
+
+function persist() {
+  if (!props.storageKey) {
+    return
+  }
+  try {
+    localStorage.setItem(props.storageKey, JSON.stringify({
+      x: state.x, y: state.y, width: state.width, height: state.height, maximized: state.maximized,
+    }))
+  }
+  catch {
+    /* 存储不可用时仅保留本次会话几何 */
+  }
+}
+
+function applyStored() {
+  const fallback = defaultGeometry()
+  let stored: Partial<{ x: number, y: number, width: number, height: number, maximized: boolean }> | undefined
+  if (props.storageKey) {
+    try {
+      stored = JSON.parse(localStorage.getItem(props.storageKey) || 'null') || undefined
+    }
+    catch {
+      stored = undefined
+    }
+  }
+  const limit = limits()
+  state.width = typeof stored?.width === 'number' ? Math.min(Math.max(stored.width, props.minWidth), limit.maxWidth) : fallback.width
+  state.height = typeof stored?.height === 'number' ? Math.min(Math.max(stored.height, props.minHeight), limit.maxHeight) : fallback.height
+  state.x = typeof stored?.x === 'number' ? clampX(stored.x) : fallback.x
+  state.y = typeof stored?.y === 'number' ? clampY(stored.y) : fallback.y
+  state.maximized = stored?.maximized === true
+}
+
+function reflow() {
+  const limit = limits()
+  state.width = Math.min(state.width, limit.maxWidth)
+  state.height = Math.min(state.height, limit.maxHeight)
+  state.x = clampX(state.x)
+  state.y = clampY(state.y)
+}
 
 const style = computed(() => {
   if (state.maximized || state.fullscreen) {
@@ -78,14 +161,19 @@ function onDrag(event: PointerEvent) {
   if (!dragState.active) {
     return
   }
-  state.x = Math.max(0, dragState.originX + event.clientX - dragState.startX)
-  state.y = Math.max(0, dragState.originY + event.clientY - dragState.startY)
+  state.x = clampX(dragState.originX + event.clientX - dragState.startX)
+  state.y = clampY(dragState.originY + event.clientY - dragState.startY)
 }
 
 function stopDrag() {
+  if (!dragState.active) {
+    return
+  }
   dragState.active = false
   window.removeEventListener('pointermove', onDrag)
   window.removeEventListener('pointerup', stopDrag)
+  persist()
+  emits('geometry', { x: state.x, y: state.y, width: state.width, height: state.height })
 }
 
 function startResize(event: PointerEvent) {
@@ -105,14 +193,20 @@ function onResize(event: PointerEvent) {
   if (!resizeState.active) {
     return
   }
-  state.width = Math.max(props.minWidth, resizeState.originWidth + event.clientX - resizeState.startX)
-  state.height = Math.max(props.minHeight, resizeState.originHeight + event.clientY - resizeState.startY)
+  const limit = limits()
+  state.width = Math.min(Math.max(props.minWidth, resizeState.originWidth + event.clientX - resizeState.startX), limit.maxWidth)
+  state.height = Math.min(Math.max(props.minHeight, resizeState.originHeight + event.clientY - resizeState.startY), limit.maxHeight)
 }
 
 function stopResize() {
+  if (!resizeState.active) {
+    return
+  }
   resizeState.active = false
   window.removeEventListener('pointermove', onResize)
   window.removeEventListener('pointerup', stopResize)
+  persist()
+  emits('geometry', { x: state.x, y: state.y, width: state.width, height: state.height })
 }
 
 function toggleMaximize() {
@@ -124,6 +218,7 @@ function toggleMaximize() {
     return
   }
   state.maximized = !state.maximized
+  persist()
 }
 
 async function toggleFullscreen() {
@@ -148,9 +243,30 @@ function onFullscreenChange() {
 }
 
 watch(() => document.fullscreenElement, onFullscreenChange)
+watch(() => [props.width, props.height], () => {
+  if (props.storageKey) {
+    return
+  }
+  state.width = props.width
+  state.height = props.height
+  reflow()
+})
+onMounted(() => {
+  applyStored()
+  window.addEventListener('resize', reflow)
+})
 onBeforeUnmount(() => {
   stopDrag()
   stopResize()
+  window.removeEventListener('resize', reflow)
+})
+defineExpose({
+  /** 恢复到首次出现的默认几何并清理持久化记录 */
+  resetGeometry: () => {
+    Object.assign(state, defaultGeometry())
+    state.maximized = false
+    persist()
+  },
 })
 </script>
 
@@ -159,6 +275,7 @@ onBeforeUnmount(() => {
     <header class="yd-chat-window__head" @pointerdown="startDrag">
       <span class="yd-chat-window__title"><FaIcon name="morph:message-circle" />{{ title }}</span>
       <span class="yd-chat-window__tools">
+        <slot name="head-actions" />
         <button v-if="maximizable" type="button" title="最大化" @click="toggleMaximize">
           <FaIcon :name="state.maximized ? 'morph:fold-horizontal' : 'morph:unfold-horizontal'" />
         </button>
@@ -221,7 +338,7 @@ onBeforeUnmount(() => {
 }
 
 .yd-chat-window__title :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: oklch(var(--primary));
 }
 
 .yd-chat-window__tools {
@@ -244,7 +361,7 @@ onBeforeUnmount(() => {
 
 .yd-chat-window__tools button:hover {
   background: var(--color-bg-1);
-  color: rgb(var(--primary-6));
+  color: oklch(var(--primary));
 }
 
 .yd-chat-window__body {
