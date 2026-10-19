@@ -197,7 +197,7 @@ async function fetchResources(query: YdTablePickerQuery): Promise<YdTablePickerR
 
 ## 6. AI 与 Agent 界面
 
-Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPanel`，回答复用 `YdAgentAnswer`。知识库问答与简单聊天可组合 `YdChatWindow`、`YdChatMessageList`、`YdChatSender` 等元件，不为全部场景强塞工作区侧栏。
+Coding/工具任务优先 `YdAgentWorkbench`，上下文复用 `YdAgentContextPanel`，回答复用 `YdAgentAnswer`。知识库问答与简单聊天可组合 `YdChatWindow`、`YdChatMessageList`、`YdChatSender` 等元件，不为全部场景强塞工作区侧栏。`YdChatWindow` 是**非模态**浮动窗口：无遮罩、不阻断页面操作，可拖拽/可缩放且始终留在视口内，`storageKey` 按账号记住位置与尺寸；需要强交互的确认仍用 `YdModal`/`YdDrawer`。
 
 生产 AI 使用统一后端持久运行快照和游标，正文、真实推理、工具与进度独立；切页或关闭窗口不取消后台任务。`YdAgentWorkbench` 的 `availableModes` 只开放宿主实际支持的模式，`attachments` 与移除事件保持宿主上传列表一致，业务范围控件放 `sender-actions` 插槽。全局助手要求登录与权限，路由/页面感知及导航/高亮可分别关闭；工具只定位已授权路由和显式注册操作，不收集表单数据或代用户点击。
 
@@ -221,12 +221,13 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | --- | --- |
 | 页面、布局与分区 | `YdPageHeader`、`YdPageMain`、`YdTablePageLayout`、`YdCard`、`YdDivider`、`YdFixedBar`、`YdScrollArea`、`YdTabs`、`YdCollapsible`、`YdLayoutContainer`、`YdWorkspaceLayout`、`YdWorkspaceTabs`、`YdBreadcrumb`、`YdAnchor`、`YdSettingsLayout`、`YdSettingsSection` |
 | 普通动作 | `YdButton`、`YdButtonGroup`、`YdCopyButton`、`YdAction`、`YdFab`、`YdPopconfirm` |
+| 悬浮入口 | `YdFloatBall` |
 | 表单与输入 | `YdForm`、`YdFormItem`、`YdInput`、`YdTextarea`、`YdInputOTP`、`YdNumberField`、`YdNumberRange`、`YdSwitch`、`YdSlider`、`YdPasswordStrength`、`YdMention`、`YdInputTag`、`YdRate`、`YdColorPicker`、`YdTreeSelect` |
 | 集合选择 | `YdSelect`、`YdCombobox`、`YdMultiSelect`、`YdCascader`、`YdCheckbox`、`YdCheckboxGroup`、`YdRadioGroup`、`YdSegmented` |
 | 层级与专用选择 | `YdTree`、`YdTreeSelect`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
 | 查询与分页 | `YdListToolbar`、`YdFilterSelect`、`YdSearchBar`、`YdDynamicSearchForm`、`YdPagination` |
-| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll`、`YdEntityPeek` |
+| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
 | 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdMockupBrowser`、`YdMockupWindow`、`YdTour`、`YdPopconfirm` |
@@ -245,6 +246,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 组合式公开入口包括 `useYdDrawer`、`useYdModal`、`useYdImagePreview`、`useYdToast`、`useYdLoading`、`useYdFilePicker`、`useYdMotion`、`useYdChat`、`useYdChatStream`、`useYdPersistentChatStream`、`clearYdPersistentChatOwner`、`provideYdChatConfig`、`useYdChatConfig`。`useIsMobile` 是现有断点能力，不为改前缀另实现重复观察器。组件与模型详细边界见 [YD 通用组件库](yd-components.md)。
 
 - `YdFab` 用 `v-model:open` 控制开合，动作配置支持图标、标签、禁用态；扇形最多四个动作，超过改用纵向布局。Escape/外点/焦点离开收起，动作由调用方处理。
+- `YdFloatBall` 是固定在视口角落的圆球入口（图标 + 可选角标）：可拖拽、松手吸附最近的左右边缘，`storageKey` 按账号记住位置；拖拽超过 4px 不触发点击。入口只负责“打开面板/视图”，`busy`/角标只表达状态；全屏接管页由调用方隐藏，不在组件内探测业务路由。
 - `YdStats` 提供指标组合布局，卡片间使用主题间距；`YdStat` 以具名插槽承载图表和动作，数字动画通过 `YdCountTo` / `YdAnimatedCountTo` 组合。它们与 `YdDigitalCard` 的带强调边框单卡视觉用途不同。
 - `YdEmpty` 与 `YdResult` 承载空态与结果状态，插画位由 `YdStateIllustration` 提供 `empty`/`no-result`/`error`/`forbidden`/`success`/`warning` 六个命名场景。默认仍是 56px 图标盒，显式选择场景或传 `#illustration` 插槽才渲染插画；插画是纯装饰（`aria-hidden`、不可聚焦），颜色只取中性语义变量与 `--yd-status-*`，随三套外观、明暗与减少动效偏好变化。它不替代状态文案与恢复动作，业务也不得因此自建插画素材库。
 - `YdColorPicker`、`YdTreeSelect` 的面板传送到 body，必须由共享弹层样式承载，不允许把面板样式留在会被裁切的容器里。
