@@ -12,6 +12,15 @@ export interface RouteMetaRaw {
   auth?: string | string[]
 
   /**
+   * 平台能力
+   * @description 路由所属的平台能力编码；任一能力未启用时路由按不存在处理（404），配置为数组时需全部启用
+   * @default undefined
+   * @example
+   * 'cms' - 内容定制能力启用后才可访问
+   */
+  capability?: string | string[]
+
+  /**
    * 标题
    * @description 标题会在导航、标签页、面包屑等需要的展示位置显示
    * @default undefined

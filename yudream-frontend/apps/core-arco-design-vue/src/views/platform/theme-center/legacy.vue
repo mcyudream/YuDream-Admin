@@ -154,7 +154,8 @@ const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] =
 ]
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
-const aiEnabled = computed(() => aiModelOptions.value.length > 0)
+// 能力未启用的功能不展示入口：AI 能力关闭或没有可用模型时不出现 AI 面板
+const aiEnabled = computed(() => useAppFeatureStore().capabilityEnabled('ai') && aiModelOptions.value.length > 0)
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const previewNavigationItems = computed(() => {
   const items = navigationItems.value.filter(item => item.visible !== false)

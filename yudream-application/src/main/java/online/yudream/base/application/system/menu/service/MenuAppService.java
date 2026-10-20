@@ -65,6 +65,16 @@ public class MenuAppService {
     private final MenuDomainService menuDomainService;
     private final MenuRepo menuRepo;
     private final CapabilityModuleRepo capabilityModuleRepo;
+    /** 菜单注解声明的能力归属，优先于历史映射与编码推断。 */
+    private online.yudream.base.domain.system.menu.service.MenuCapabilityRegistry menuCapabilities =
+            new online.yudream.base.domain.system.menu.service.MenuCapabilityRegistry(Map.of());
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void menuCapabilities(online.yudream.base.domain.system.menu.service.MenuCapabilityRegistry registry) {
+        if (registry != null) {
+            menuCapabilities = registry;
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<MenuManageDTO> tree(MenuTreeQuery query) {
@@ -679,6 +689,12 @@ public class MenuAppService {
     private String resolvePlatformCapability(Menu menu) {
         if (menu == null) {
             return null;
+        }
+        String declared = menuCapabilities.capabilityOf(menu.getCode())
+                .or(() -> menuCapabilities.capabilityOf(menu.getParentCode()))
+                .orElse(null);
+        if (declared != null) {
+            return declared;
         }
         String capabilityCode = platformCapabilityOf(menu.getCode());
         if (capabilityCode != null) {

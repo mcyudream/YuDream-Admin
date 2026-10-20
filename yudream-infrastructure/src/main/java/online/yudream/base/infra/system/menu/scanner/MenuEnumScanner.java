@@ -33,6 +33,26 @@ public class MenuEnumScanner {
         return modules;
     }
 
+    /**
+     * 汇总菜单注解声明的能力归属（code → capability），未声明的节点不出现在结果中。
+     */
+    public static Map<String, String> capabilityIndex(List<Class<? extends Enum<?>>> moduleClasses) {
+        Map<String, String> index = new LinkedHashMap<>();
+        for (Class<? extends Enum<?>> clazz : moduleClasses) {
+            Enum<?>[] constants = clazz.getEnumConstants();
+            if (constants == null) {
+                continue;
+            }
+            for (Enum<?> constant : constants) {
+                MenuNode nodeAnno = getMenuNode(constant);
+                if (nodeAnno != null && StringUtils.hasText(nodeAnno.capability())) {
+                    index.put(nodeAnno.code(), nodeAnno.capability().trim());
+                }
+            }
+        }
+        return index;
+    }
+
     private static Menu scanModule(Class<? extends Enum<?>> clazz) {
         MenuModule moduleAnno = clazz.getAnnotation(MenuModule.class);
         if (moduleAnno == null) {

@@ -11,9 +11,8 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
-import online.yudream.base.infra.platform.menu.enumerate.PlatformMenuModule;
 import online.yudream.base.infra.system.menu.config.SystemSeedProperties;
-import online.yudream.base.infra.system.menu.enumerate.SystemMenuModule;
+import online.yudream.base.infra.system.menu.enumerate.SystemMenuModules;
 import online.yudream.base.infra.system.menu.scanner.MenuEnumScanner;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
@@ -45,11 +44,7 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
     public void onApplicationEvent(ApplicationReadyEvent event) {
         SeedSyncMode syncMode = systemSeedProperties.getMenu().getSyncMode();
         log.info("Initializing system menus from enums, syncMode={}", syncMode);
-        List<Class<? extends Enum<?>>> moduleClasses = List.of(
-                SystemMenuModule.class,
-                PlatformMenuModule.class,
-                online.yudream.base.infra.platform.menu.enumerate.ChatMenuModule.class);
-        List<Menu> modules = MenuEnumScanner.scan(moduleClasses);
+        List<Menu> modules = MenuEnumScanner.scan(SystemMenuModules.CLASSES);
         List<Menu> syncedMenus = menuDomainService.syncMenus(modules, syncMode);
         int rebound = rebindSeededParents(modules);
 

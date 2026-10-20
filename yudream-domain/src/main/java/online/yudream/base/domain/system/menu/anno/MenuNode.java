@@ -83,4 +83,10 @@ public @interface MenuNode {
      * 显式权限码；为空时继承 code。
      */
     String permission() default "";
+
+    /**
+     * 所属平台能力编码（如 cms、ai、agent）。能力未启用时该节点及其按钮不进入菜单与动态路由，
+     * 父级分组因此没有可见子节点时一并隐藏。为空时沿用父节点或历史推断规则。
+     */
+    String capability() default "";
 }

@@ -322,12 +322,12 @@ public enum PlatformMenuModule {
             parentName = "FORM", permission = "platform:form:statistics:view")
     FORM_STATISTICS_VIEW,
 
-    @MenuNode(code = "platform:theme-center", name = "网站工作台", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:theme-center", capability = "cms", name = "网站工作台", type = MenuNodeType.MENU,
             parentName = "CONTENT_HUB", path = "/platform/theme-center", component = "platform/site-studio/index.vue",
             icon = "i-ri:palette-line", sort = 60)
     THEME_CENTER,
 
-    @MenuNode(code = "platform:cms-workspace", name = "站点工作区", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:cms-workspace", capability = "cms", name = "站点工作区", type = MenuNodeType.MENU,
             parentName = "CONTENT_HUB", path = "/platform/cms/workspace", component = "platform/cms/workspace/index.vue",
             icon = "i-ri:layout-masonry-line", sort = 59, permission = "platform:ai:generate")
     CMS_WORKSPACE,
@@ -470,7 +470,7 @@ public enum PlatformMenuModule {
             parentName = "AGENT_TOOLS", permission = "platform:agent:tool:test")
     AGENT_TOOL_TEST,
 
-    @MenuNode(code = "platform:agent-skill", name = "技能库", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:agent-skill", capability = "agent", name = "技能库", type = MenuNodeType.MENU,
             parentName = "APP_HUB", path = "/platform/agent-skill", component = "platform/agent-skill/index.vue",
             icon = "i-ri:book-2-line", sort = 55, permission = "platform:agent-skill:view")
     AGENT_SKILL,

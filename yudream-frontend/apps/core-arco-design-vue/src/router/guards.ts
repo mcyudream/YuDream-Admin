@@ -210,7 +210,26 @@ function setupRedirectAuthChildrenRoute(router: Router) {
 }
 
 // 路由级权限兜底。后端动态路由会按权限裁剪；本地隐藏路由也需要同一套 auth 判断。
+// 平台能力同理：后端菜单按能力裁剪，本地路由以 meta.capability 声明，能力未启用时按不存在处理。
 function setupRoutePermission(router: Router) {
+  router.beforeEach(async (to) => {
+    const required = to.matched.flatMap((route) => {
+      const value = route.meta?.capability
+      return value ? (Array.isArray(value) ? value : [value]) : []
+    })
+    if (!required.length) {
+      return
+    }
+    const features = useAppFeatureStore()
+    await features.load().catch(() => undefined)
+    if (required.some(code => !features.capabilityEnabled(code))) {
+      return {
+        name: 'notFound',
+        params: { all: to.path.replace(/^\/+/, '').split('/') },
+        replace: true,
+      }
+    }
+  })
   router.beforeEach((to) => {
     const authValue = to.matched
       .map(route => route.meta?.auth)

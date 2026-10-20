@@ -2,7 +2,7 @@
 import type { YdAgentSendRequest, YdAgentSession, YdAgentWorkspace, YdChatAttachment, YdFilePickerInstance } from '@yudream/components'
 import type { ChatSession } from '@/api/modules/platform-chat'
 import type { WorkspaceEntry } from '@/api/modules/platform-cms-workspace'
-import { YdAgentWorkbench, YdAlert } from '@yudream/components'
+import { YdAgentWorkbench, YdAlert, YdChatWindow } from '@yudream/components'
 import { computed, ref, watch } from 'vue'
 import apiWorkspace from '@/api/modules/platform-cms-workspace'
 import { uploadChatAttachment } from '@/api/modules/platform-chat'
@@ -34,6 +34,8 @@ const canvasJs = ref('')
 const canvasProjectJson = ref('')
 const canvasFilePath = computed(() => selectedPath.value || 'pages/index.html')
 const chatOpen = ref(false)
+// 能力未启用的功能不展示入口：AI 能力关闭时隐藏「AI 构建」
+const aiCapability = computed(() => useAppFeatureStore().capabilityEnabled('ai'))
 const preparing = ref(false)
 
 const runtime = useAiAssistantStore()
@@ -394,7 +396,7 @@ function fileName(path: string) {
         <YdButton size="sm" variant="outline" @click="pickUpload">
           上传资产
         </YdButton>
-        <YdButton size="sm" variant="outline" @click="openChat">
+        <YdButton v-if="aiCapability" size="sm" variant="outline" @click="openChat">
           AI 构建
         </YdButton>
         <YdButton size="sm" @click="confirmPublish">
@@ -525,7 +527,18 @@ function fileName(path: string) {
       />
     </div>
 
-    <YdDrawer v-model="chatOpen" title="AI 构建助手" :footer="false" content-class="w-[760px] max-w-full">
+    <!-- AI 助手统一以浮动窗口呈现，不使用抽屉 -->
+    <YdChatWindow
+      v-if="chatOpen && aiCapability"
+      title="AI 构建助手"
+      storage-key="yd.cmsWorkspace.aiWindow"
+      :width="760"
+      :height="680"
+      :min-width="420"
+      :min-height="420"
+      initial-side="right"
+      @close="chatOpen = false"
+    >
       <div class="chat-drawer__body">
         <YdAlert v-if="runtime.error" variant="destructive" :title="runtime.error" />
         <YdAlert v-if="!siteAiReady" variant="destructive" title="需要「使用 AI 助手」与「管理 AI 助手会话」权限，请联系管理员开通" />
@@ -570,7 +583,7 @@ function fileName(path: string) {
           </template>
         </YdAgentWorkbench>
       </div>
-    </YdDrawer>
+    </YdChatWindow>
     <YdModal v-model="renameOpen" title="重命名构建会话" show-cancel-button :confirm-button-disabled="!sessionTitle.trim()" @confirm="submitRename">
       <YdInput v-model="sessionTitle" aria-label="会话标题" :maxlength="100" />
     </YdModal>
@@ -623,6 +636,9 @@ function fileName(path: string) {
 }
 
 .chat-drawer__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
 }

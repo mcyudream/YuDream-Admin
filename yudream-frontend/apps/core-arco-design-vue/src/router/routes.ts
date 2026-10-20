@@ -98,6 +98,7 @@ const constantRoutes: RouteRecordRaw[] = [
     name: 'publicDynamicForm',
     component: () => import('@/views/forms/public.vue'),
     meta: {
+      capability: 'form',
       title: '表单填写',
       public: true,
     },
@@ -116,6 +117,7 @@ const constantRoutes: RouteRecordRaw[] = [
     name: 'publicWikiHome',
     component: () => import('@/views/wiki/home.vue'),
     meta: {
+      capability: 'wiki',
       title: '知识库',
       public: true,
     },
@@ -125,6 +127,7 @@ const constantRoutes: RouteRecordRaw[] = [
     name: 'publicWikiSearch',
     component: () => import('@/views/wiki/search.vue'),
     meta: {
+      capability: 'wiki',
       title: '搜索知识库',
       public: true,
     },
@@ -134,6 +137,7 @@ const constantRoutes: RouteRecordRaw[] = [
     name: 'publicWiki',
     component: () => import('@/views/wiki/index.vue'),
     meta: {
+      capability: 'wiki',
       title: '知识库',
       public: true,
     },
@@ -199,6 +203,7 @@ const systemRoutes: RouteRecordRaw[] = [
         name: 'themeCenterConfig',
         component: () => import('@/views/platform/theme-center/config-page.vue'),
         meta: {
+          capability: 'cms',
           title: '主题配置',
           auth: 'platform:theme-center:config',
           menu: false,
@@ -210,6 +215,7 @@ const systemRoutes: RouteRecordRaw[] = [
         name: 'siteStudio',
         component: () => import('@/views/platform/site-studio/index.vue'),
         meta: {
+          capability: 'cms',
           title: '网站工作台',
           auth: 'platform:cms:view',
           menu: false,
@@ -221,6 +227,7 @@ const systemRoutes: RouteRecordRaw[] = [
         name: 'themeCenterLegacy',
         component: () => import('@/views/platform/theme-center/legacy.vue'),
         meta: {
+          capability: 'cms',
           title: '旧版主题中心',
           auth: 'platform:cms:view',
           menu: false,

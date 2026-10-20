@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { YdWorkspaceRailItem, YdWorkspaceStatusItem } from '@yudream/components'
 import type { StudioCommand } from '@/types/site-studio'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import apiTheme from '@/api/modules/platform-theme'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
@@ -18,6 +18,13 @@ import StudioThemeView from './components/StudioThemeView.vue'
 defineOptions({ name: 'SiteStudio' })
 
 const store = useSiteStudioStore()
+const features = useAppFeatureStore()
+// 能力未启用的功能不展示入口：AI 能力关闭时不出现“AI 设计助手”
+const aiEnabled = computed(() => features.capabilityEnabled('ai'))
+const inspectorOptions = computed(() => [
+  { label: '元素属性', value: 'properties' },
+  ...(aiEnabled.value ? [{ label: 'AI 设计助手', value: 'assistant' }] : []),
+])
 const toast = useYdToast()
 const modal = useYdModal()
 
@@ -26,6 +33,11 @@ const sidebarOpen = ref(true)
 const asideOpen = ref(true)
 const pane = ref<'sidebar' | 'main' | 'aside'>('main')
 const inspectorView = ref('properties')
+watch(aiEnabled, (enabled) => {
+  if (!enabled && inspectorView.value === 'assistant') {
+    inspectorView.value = 'properties'
+  }
+})
 const themeOptions = ref<{ label: string, value: string }[]>([])
 const themeLoading = ref(false)
 const activeThemeCode = ref('default')
@@ -301,13 +313,14 @@ void store.load()
         <template #aside>
           <div class="flex flex-col h-full min-h-0">
             <div class="p-2 border-b shrink-0">
-              <YdSegmented v-model="inspectorView" :options="[{ label: '元素属性', value: 'properties' }, { label: 'AI 设计助手', value: 'assistant' }]" aria-label="检查器视图" />
+              <YdSegmented v-if="inspectorOptions.length > 1" v-model="inspectorView" :options="inspectorOptions" aria-label="检查器视图" />
+              <strong v-else class="text-sm">元素属性</strong>
             </div>
             <div v-show="inspectorView === 'properties'" class="flex-1 min-h-0 overflow-auto">
               <StudioInspector />
             </div>
             <CmsStudioAgentPanel
-              v-if="store.doc"
+              v-if="store.doc && aiEnabled"
               v-show="inspectorView === 'assistant'"
               :document="store.doc"
               :selected-node-id="store.selectedNodeId"

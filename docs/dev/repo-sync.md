@@ -36,6 +36,8 @@
 
 ## 4. 待同步
 
+- `docs/dev/backend-architecture.md` §5.5 能力菜单过滤改为声明式（`@MenuNode(capability)` 优先 + 能力未启用不展示入口 + 前端 `meta.capability` 路由守卫）：插件菜单的能力归属不变，待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
+
 - 权限动作词表新增 `purge`（危险组，永久删除不可恢复；`docs/dev/permission-codes.md` §2、`docs/system/permission-management.md` 动作分类、`permission-catalog.ts` 三处已同步）：插件仓 `docs/dev/conventions.md` 按引用跟随主仓词表，本仓暂无插件注册 `purge`，待插件仓 WIP 落定后随下一次规范同步一并核对。
 - `docs/dev/backend-architecture.md` 新增「账号级联删除（purge）」条目（级联回收范围、守卫与保留项）：待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
 - SPI 2.35.0/2.36.0/2.37.0 与 SDK `1.14.0`、components `1.10.0`（2026-10-19 v1.4.9-1 首发 SPI 2.37.0 并随 v1.4.10 升级 npm 契约；dataviz 0.1.3 随 v1.4.9-1）已发布 Nexus 并全部验签：插件仓根 pom SPI 属性、pnpm catalog/lockfile 与对应消费文档待其 WIP 落定后一并同步（catalog 直接升 1.14.0/1.10.0，跳过 1.13.0/1.9.0），验证走 `ci/verify-plugin-repo-readiness.sh`。

@@ -94,7 +94,9 @@ Assembler 归属：接口 assembler 负责 `request -> cmd`、`DTO -> res`、`Ex
 
 ### 5.5 能力菜单过滤
 
-- 除 `platform:capability` 能力管理入口外，平台功能菜单在对应能力关闭/未注册时从 `/api/menu/routes` 隐藏：`MenuAppService.PLATFORM_MENU_CAPABILITIES` 显式映射（命中后能力文档缺失即隐藏）；未映射的 `platform:*` 菜单按 code 第二段推断能力码，但推断路径在能力文档缺失时放行——**菜单 code 与能力码不一致时必须显式映射**（如 `platform:mobile-config → mobile-app`）。
+- 除 `platform:capability` 能力管理入口外，平台功能菜单在对应能力关闭/未注册时从 `/api/menu/routes` 隐藏。能力归属解析顺序：①菜单注解 `@MenuNode(capability = "…")`（本节点或父节点声明，经 `MenuCapabilityRegistry` 运行期索引，已有库中的菜单无需重新同步）；②`MenuAppService.PLATFORM_MENU_CAPABILITIES` 历史显式映射；③按 `platform:*` code 第二段推断（能力文档缺失时放行）。
+- **新增或调整平台能力入口时必须在 `@MenuNode` 上声明 `capability`**，不再扩充历史映射；菜单 code 与能力码不一致（如 `platform:theme-center → cms`、`platform:agent-skill → agent`）时尤其不能依赖推断。
+- 能力未启用的功能**不展示入口**，而不是展示“需要启用”的占位：前端本地路由以 `meta.capability` 声明（守卫按不存在处理为 404），页面内入口（标签、按钮、面板、浮动入口）以 `useAppFeatureStore().capabilityEnabled(code)` 判定后不渲染。
 
 ### 5.6 插件市场源（plugin-market-source）
 
