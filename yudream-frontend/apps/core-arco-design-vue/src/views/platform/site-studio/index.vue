@@ -323,3 +323,12 @@ void store.load()
     </YdLoadingOverlay>
   </div>
 </template>
+
+<style scoped>
+/* 网站工作台使用直角编辑器外观：只在工作台作用域内把圆角变量归零，不影响后台其他页面 */
+.site-studio {
+  --yd-surface-radius: 0;
+  --yd-control-radius: 0;
+  --radius: 0px;
+}
+</style>
