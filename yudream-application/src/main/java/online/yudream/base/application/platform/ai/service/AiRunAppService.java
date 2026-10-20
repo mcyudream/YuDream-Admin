@@ -43,6 +43,9 @@ public class AiRunAppService {
     private List<AiRunContinuation> continuations = List.of();
     private online.yudream.base.domain.platform.ai.service.AiInvocationContextGateway invocationContexts;
     private online.yudream.base.domain.platform.ai.service.AiActorPermissionGateway actorPermissions;
+    private CmsStudioClientTools studioTools;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void studioTools(CmsStudioClientTools tools) { this.studioTools = tools; }
     private final String instanceId = UUID.randomUUID().toString();
     private final Map<String, RunEmitter> active = new ConcurrentHashMap<>();
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -243,6 +246,10 @@ public class AiRunAppService {
             if (run.getStatus() == AiRunStatus.RUNNING) throw new BizException("原生交互仍在保存，请稍后重试");
             if (run.getStatus().terminal()) throw new BizException("运行已结束，不能再提交工具结果");
         }
+        if (run.getNativeReference() != null && "cms-studio".equals(run.getNativeReference().agentCode())) {
+            // Recheck before persisting the receipt: revoked permissions must not consume a pending tool.
+            requestFor(run, executionPermissions(run, permissions));
+        }
         var response = frontendResponse(ok, result, error);
         if (!repo.acknowledgeFrontend(id, toolCallId, response)) {
             // 回执已提交而进程在 native.respond 前退出：只消费原回执，不能替换或重复执行前端操作。
@@ -334,11 +341,23 @@ public class AiRunAppService {
     }
 
     private online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest requestFor(AiRun run, List<String> permissions) {
+        return requestFor(run, permissions, true);
+    }
+    private online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest requestFor(AiRun run, List<String> permissions, boolean execution) {
         var ref = run.getNativeReference(); var profile = run.getNativeProfile();
         if (!profile.exactToolScopeCaptured()) throw new BizException("此历史检查点未记录准确的工具授权边界，请取消后继续会话");
         if (!profile.nativeActorCaptured()) throw new BizException("此历史检查点未记录原生调用身份，请取消后继续会话");
         if ("plugin-ai".equals(run.getModule()) && profile.invocationContext() == null)
             throw new BizException("此历史插件检查点未保存触发上下文，请取消后继续会话");
+        if ("cms-studio".equals(ref.agentCode())) {
+            if (studioTools == null) throw new BizException("站点设计器 AI 工具不可用");
+            if (execution) studioTools.ensureAccess(permissions);
+            else studioTools.ensureEnabled();
+            if (execution && profile.allowedToolNames().stream().anyMatch(name -> name.equals("cms.studio.apply") || name.equals("cms_studio_apply"))
+                    && !permissions.contains("*") && !permissions.contains("platform:cms:edit"))
+                throw new BizException("站点设计器写入权限已被撤销");
+            studioTools.contextKey(run.getUserId(), run.getSessionId());
+        }
         var config = capabilityRepo.findByCode("ai").filter(online.yudream.base.domain.platform.capability.aggregate.CapabilityModule::enabled)
                 .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
                 .orElseThrow(() -> new BizException("AI 能力未启用"));
@@ -383,6 +402,10 @@ public class AiRunAppService {
         for (var continuation : continuations) {
             var restored = continuation.restoreTools(run, java.util.Set.copyOf(permissions), emitter);
             if (restored.isPresent()) return restored.get();
+        }
+        if ("cms-studio".equals(run.getNativeReference().agentCode())) {
+            if (studioTools == null) throw new BizException("站点设计器 AI 工具不可用");
+            return studioTools.bind(run.getUserId(), run.getSessionId(), permissions, emitter::frontendRequest);
         }
         if ("cms-canvas".equals(run.getNativeReference().agentCode())) return CmsCanvasClientTools.bind(CmsCanvasClientBridge.external(emitter::frontendRequest));
         if (run.getFrontendContext() != null) return AiFrontendTools.create(json.convertValue(run.getFrontendContext(),
@@ -429,7 +452,7 @@ public class AiRunAppService {
                     && harness != null && capabilityRepo != null) {
                 try {
                     // 只读取框架日志；发现原生挂起时恢复投影，不提交输入或自动执行工具。
-                    var state = harness.inspect(requestFor(run, List.of()));
+                    var state = harness.inspect(requestFor(run, List.of(), false));
                     if (!state.pendingInteractions().isEmpty() || !state.pendingConfirmations().isEmpty()) {
                         repo.nativeSnapshot(run.getId(), state);
                         if (repo.waitForInput(run.getId(), run.getResult())) {

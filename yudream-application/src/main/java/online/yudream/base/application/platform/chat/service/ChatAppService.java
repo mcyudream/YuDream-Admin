@@ -72,7 +72,7 @@ public class ChatAppService {
         }
         List<String> permissionCodes = permissionSnapshot(cmd);
         ChatWikiContextResolver.ResolvedContext wikiContext = wikiContextResolver.resolve(
-                cmd.getContextRefs(), cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
+                cmd.getContextRefs(), "cms-studio".equalsIgnoreCase(cmd.getAgentCode()) ? null : cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
         List<AiChatMessage> history = List.of();
         ChatMessage userMessage = persistUserMessage(session, userId, cmd);
         ChatRunState runState = new ChatRunState();
@@ -172,7 +172,7 @@ public class ChatAppService {
         }
         List<String> permissionCodes = permissionSnapshot(cmd);
         ChatWikiContextResolver.ResolvedContext wikiContext = wikiContextResolver.resolve(
-                cmd.getContextRefs(), cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
+                cmd.getContextRefs(), "cms-studio".equalsIgnoreCase(cmd.getAgentCode()) ? null : cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
         ChatScopeType scopeType = cmd.getScopeType() == null ? ChatScopeType.GENERAL : cmd.getScopeType();
         ChatRunState runState = new ChatRunState();
         ChatDispatchContext context = new ChatDispatchContext(

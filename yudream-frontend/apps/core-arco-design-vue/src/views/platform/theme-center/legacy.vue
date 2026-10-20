@@ -1,0 +1,2771 @@
+<script setup lang="ts">
+import type { CmsModelSelectOption } from './config/cms-model-options'
+import type { FileObject } from '@/api/modules/files'
+import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomePagePreset, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
+import type { ThemeCenterOverview, ThemeCenterTheme } from '@/api/modules/platform-theme'
+import apiFiles from '@/api/modules/files'
+import apiAi from '@/api/modules/platform-ai'
+import apiCms from '@/api/modules/platform-cms'
+import apiTheme from '@/api/modules/platform-theme'
+import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
+import { pluginFrontendAssetUrl } from '@/plugins/frontend-assets'
+import { toBackendAssetUrl } from '@/utils/backend-url'
+import { readChromeCss } from '@/utils/cms-chrome'
+import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
+import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
+import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
+import { toCmsModelOptions } from './config/cms-model-options'
+
+type WorkbenchTab = 'theme' | 'pages' | 'home' | 'navigation' | 'media' | 'presets'
+type EditorMode = 'builder' | 'markdown' | 'html'
+type EditorTarget = 'page' | 'home'
+type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
+interface CmsNavigationItem {
+  id: string
+  label: string
+  url: string
+  parentId?: string
+  visible: boolean
+  sort: number
+  embed?: boolean
+  children?: CmsNavigationItem[]
+}
+
+const toast = useYdToast()
+const modal = useYdModal()
+const router = useRouter()
+const appSettingsStore = useAppSettingsStore()
+const appAccountStore = useAppAccountStore()
+
+const activeTab = ref<WorkbenchTab>('theme')
+const editorMode = ref<EditorMode>('builder')
+const loading = ref(false)
+const saving = ref(false)
+const grapesEditorVisible = ref(false)
+const blockLibraryVisible = ref(false)
+const editorTarget = ref<EditorTarget>('page')
+const pages = ref<CmsPage[]>([])
+const navigationItems = ref<CmsNavigationItem[]>([])
+const wikiEnabled = ref(false)
+const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
+const mediaItems = ref<FileObject[]>([])
+const presets = ref<HomePagePreset[]>([])
+const themeOverview = ref<ThemeCenterOverview | null>(null)
+const themeSwitching = ref(false)
+/** 工作台正在编辑的主题编码；null 表示跟随当前激活的公开站主题 */
+const selectedTheme = ref<string | null>(null)
+/** 当前激活的公开站主题编码（无插件主题激活时为内置 default） */
+const activeSiteTheme = computed(() => themeOverview.value?.themes.find(item => item.active)?.pluginCode || 'default')
+const currentTheme = computed({
+  get: () => selectedTheme.value || activeSiteTheme.value,
+  set: (value: string) => {
+    selectedTheme.value = value
+  },
+})
+const editableThemeOptions = computed(() => {
+  const codes = themeOverview.value?.editableThemes?.length ? themeOverview.value.editableThemes : ['default']
+  return codes.map(code => ({
+    label: code === activeSiteTheme.value ? `${themeLabel(code)}（当前站点主题）` : themeLabel(code),
+    value: code,
+  }))
+})
+
+function themeLabel(code?: string | null) {
+  const safeCode = code || 'default'
+  const card = themeOverview.value?.themes.find(item => (item.pluginCode || 'default') === safeCode)
+  return card?.name || safeCode
+}
+const currentThemeCard = computed(() => themeOverview.value?.themes.find(item => (item.pluginCode || 'default') === currentTheme.value))
+/** 当前编辑主题声明了 homeComponent：公开站首页由插件 Vue 页面承载，首页设计器不再适用 */
+const currentThemeHasHomeComponent = computed(() => !!currentThemeCard.value?.hasHomeComponent)
+/** 当前编辑主题的 style.css 资产链接，注入 Grapes 画布实现内容页主题下所见即所得 */
+const currentThemeStyleUrls = computed(() => {
+  const card = currentThemeCard.value
+  return card?.pluginCode ? [pluginFrontendAssetUrl(card.pluginCode, 'style.css', card.assetRevision)] : []
+})
+const presetDialogVisible = ref(false)
+const presetSaving = ref(false)
+const presetForm = reactive({ name: '', description: '' })
+const mediaInput = ref<InstanceType<typeof YdFilePicker>>()
+const aiModelOptions = ref<CmsModelSelectOption[]>([])
+const pagination = reactive({ page: 1, size: 20, total: 0 })
+const search = reactive({ keyword: '' })
+const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
+const selectedPageId = ref<string | null>(null)
+const showAllVariables = ref(false)
+type PublishTab = 'publish' | 'seo' | 'js' | 'variables'
+const publishTab = ref<PublishTab>('publish')
+const publishTabs: { label: string, value: PublishTab, icon: string }[] = [
+  { label: '发布', value: 'publish', icon: 'morph:send' },
+  { label: 'SEO', value: 'seo', icon: 'morph:zoom-in' },
+  { label: 'JS', value: 'js', icon: 'morph:code' },
+  { label: '变量', value: 'variables', icon: 'morph:braces' },
+]
+
+const pageForm = reactive<CmsPagePayload>({
+  title: '',
+  slug: '',
+  summary: '',
+  excerpt: '',
+  coverImageUrl: '',
+  categories: [],
+  tags: [],
+  markdownContent: '',
+  htmlContent: '',
+  cssContent: '',
+  jsContent: '',
+  builderProjectJson: '',
+  seoTitle: '',
+  seoDescription: '',
+  template: 'DEFAULT',
+  status: 'DRAFT',
+})
+
+const home = reactive<HomePageLayout>({
+  title: appSettingsStore.siteName || '',
+  subtitle: '自定义首页',
+  theme: 'default',
+  heroImageUrl: '',
+  settings: {},
+  sections: [],
+  published: false,
+})
+
+const templateOptions: { label: string, value: PageTemplate }[] = [
+  { label: '默认页面（文章头：标题+描述+封面）', value: 'DEFAULT' },
+  { label: '营销落地页（仅页头页脚，全宽）', value: 'LANDING' },
+  { label: '文档页面（紧凑标题 + 窄栏阅读）', value: 'DOC' },
+  { label: '空白画布（纯白，无站点元素）', value: 'BLANK' },
+]
+const statusOptions: { label: string, value: PageStatus }[] = [
+  { label: '草稿', value: 'DRAFT' },
+  { label: '已发布', value: 'PUBLISHED' },
+]
+const layoutOptions: { label: string, value: SiteLayoutMode }[] = [
+  { label: 'Header + Footer', value: 'HEADER_FOOTER' },
+  { label: 'Header + 版权', value: 'HEADER_COPYRIGHT' },
+  { label: '后台管理布局', value: 'ADMIN' },
+]
+const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] = [
+  { type: 'HERO', label: '首屏', icon: 'morph:panel-top' },
+  { type: 'FEATURE', label: '特色', icon: 'morph:sparkles' },
+  { type: 'CONTENT', label: '内容', icon: 'morph:newspaper' },
+  { type: 'CTA', label: '行动', icon: 'morph:mouse-pointer' },
+]
+
+const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
+const aiEnabled = computed(() => aiModelOptions.value.length > 0)
+const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
+const previewNavigationItems = computed(() => {
+  const items = navigationItems.value.filter(item => item.visible !== false)
+  return wikiEnabled.value && !items.some(item => item.url === '/wiki')
+    ? [...items, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
+    : items
+})
+const templatePreviewContext = computed(() => {
+  const siteName = appSettingsStore.siteName || home.title || ''
+  const siteDescription = appSettingsStore.siteDescription || home.subtitle || ''
+  const siteInfo = {
+    name: siteName,
+    description: siteDescription,
+    logo: appSettingsStore.logo || '',
+    currentYear: String(new Date().getFullYear()),
+  }
+  return {
+    site: siteInfo,
+    system: {
+      ...siteInfo,
+      copyright: {
+        company: appSettingsStore.settings.app.copyright.company || '',
+        website: appSettingsStore.settings.app.copyright.website || '',
+        dates: appSettingsStore.settings.app.copyright.dates || siteInfo.currentYear,
+      },
+    },
+    page: {
+      title: editorTarget.value === 'page' ? pageForm.title : home.title,
+      summary: editorTarget.value === 'page' ? pageForm.summary : home.subtitle,
+      slug: editorTarget.value === 'page' ? pageForm.slug : '',
+      template: editorTarget.value === 'page' ? pageForm.template : 'DEFAULT',
+    },
+    auth: {
+      isLoggedIn: appAccountStore.isLogin ? 'true' : 'false',
+      welcome: appAccountStore.isLogin ? `欢迎回来，${appAccountStore.account || '用户'}` : '欢迎访问',
+    },
+    user: {
+      username: appAccountStore.account || 'guest',
+      nickname: appAccountStore.account || '访客',
+      avatar: appAccountStore.avatar || '',
+    },
+    route: { path: '/site', slug: '' },
+    navigation: previewNavigationItems.value,
+    chromeNavigation: buildNavigationTree(previewNavigationItems.value),
+    navUsers: appAccountStore.isLogin
+      ? [{ name: appAccountStore.account || '用户', avatar: appAccountStore.avatar || '', url: '/' }]
+      : [{ name: '登录', avatar: appSettingsStore.logo || '', url: '/login' }],
+    pages: templateContext.value.cms.pages.latest,
+    cms: templateContext.value.cms,
+    knowledge: templateContext.value.knowledge,
+    categories: [],
+    tags: [],
+  }
+})
+const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
+const homeHtml = computed({
+  get: () => home.settings?.homeHtml || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeHtml: value,
+    }
+  },
+})
+const homeCss = computed({
+  get: () => [
+    home.settings?.homeCss,
+    readChromeCss(home.settings, 'header'),
+    readChromeCss(home.settings, 'footer'),
+  ].filter(Boolean).join('\n'),
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeCss: value,
+    }
+    delete home.settings.chromeHeaderCss
+    delete home.settings.chromeFooterCss
+  },
+})
+const homeJs = computed({
+  get: () => home.settings?.homeJs || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeJs: value,
+    }
+  },
+})
+const homeProjectJson = computed({
+  get: () => home.settings?.homeProjectJson || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeProjectJson: value,
+    }
+  },
+})
+const homeLayoutMode = computed<SiteLayoutMode>({
+  get: () => (home.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER',
+  set: (value) => {
+    home.settings = {
+      ...(home.settings || {}),
+      siteLayout: value,
+    }
+  },
+})
+const rootNavigationItems = computed(() => [...navigationItems.value].filter(item => !item.parentId).sort((a, b) => a.sort - b.sort))
+const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
+const visibleCmsVariables = computed(() => showAllVariables.value ? cmsVariables : cmsVariables.slice(0, 8))
+const cmsVariables = [
+  { key: '{{cms.pages.latest.count}}', label: '最新 CMS 页面数' },
+  { key: '{{knowledge.spaces.count}}', label: '公开知识库数' },
+  { key: '{{knowledge.pages.count}}', label: '已发布知识库页面数' },
+  { key: '{{site.name}}', label: '站点名称' },
+  { key: '{{site.description}}', label: '站点描述' },
+  { key: '{{site.logo}}', label: '站点 Logo' },
+  { key: '{{site.favicon}}', label: '站点图标' },
+  { key: '{{site.loginBanner}}', label: '登录页 Banner' },
+  { key: '{{site.currentYear}}', label: '当前年份' },
+  { key: '{{system.name}}', label: '系统名称' },
+  { key: '{{system.description}}', label: '系统描述' },
+  { key: '{{system.logo}}', label: '系统 Logo' },
+  { key: '{{system.currentYear}}', label: '系统当前年份' },
+  { key: '{{system.copyright.company}}', label: '版权公司' },
+  { key: '{{system.copyright.website}}', label: '版权网站' },
+  { key: '{{system.copyright.dates}}', label: '版权年份' },
+  { key: '{{page.title}}', label: '页面标题' },
+  { key: '{{page.slug}}', label: '页面路径' },
+  { key: '{{page.categories}}', label: '页面分类' },
+  { key: '{{page.tags}}', label: '页面标签' },
+  { key: '{{auth.isLoggedIn}}', label: '是否登录' },
+  { key: '{{auth.welcome}}', label: '登录欢迎语' },
+  { key: '{{user.username}}', label: '用户名' },
+  { key: '{{user.nickname}}', label: '昵称' },
+  { key: '{{user.avatar}}', label: '头像地址' },
+  { key: '{{route.path}}', label: '当前路径' },
+  { key: '{{route.slug}}', label: '当前 Slug' },
+  { key: '{{navigation.count}}', label: '导航数量' },
+  { key: '{{navUsers.count}}', label: '头像用户数' },
+  { key: '{{pages.count}}', label: '公开页面数' },
+  { key: '{{categories.count}}', label: '分类数量' },
+  { key: '{{tags.count}}', label: '标签数量' },
+  { key: '{{archive.title}}', label: '归档标题' },
+  { key: '{{archive.category}}', label: '当前分类' },
+  { key: '{{archive.tag}}', label: '当前标签' },
+  { key: '{{archive.keyword}}', label: '当前搜索词' },
+  { key: 'data-visible-when="guest"', label: '仅游客可见' },
+  { key: 'data-visible-when="logged-in"', label: '仅登录可见' },
+  { key: 'data-yb-repeat="navigation"', label: '循环导航' },
+  { key: 'data-yb-repeat="navUsers"', label: '循环头像用户' },
+  { key: 'data-yb-repeat="pages"', label: '循环公开页面' },
+  { key: 'data-yb-repeat="categories"', label: '循环分类' },
+  { key: 'data-yb-repeat="tags"', label: '循环标签' },
+  { key: 'data-yb-repeat="cms.pages.latest"', label: '循环最新 CMS 页面' },
+  { key: 'data-yb-repeat="knowledge.pages"', label: '循环知识库页面' },
+  { key: 'data-yb-repeat="knowledge.latest"', label: '循环最新知识库内容' },
+  { key: 'data-yb-repeat="knowledge.featured"', label: '循环编辑推荐知识库内容' },
+  { key: 'data-yb-repeat="knowledge.spaces"', label: '循环公开知识库' },
+  { key: 'data-yb-for="item in knowledge.latest"', label: '最新知识库 for 循环' },
+  { key: 'data-yb-limit="6"', label: '限制最多展示 6 条' },
+  { key: 'data-yb-if="knowledge.latest.count > 0"', label: '有知识内容时显示' },
+]
+
+watch(activeTab, async () => {
+  if (activeTab.value === 'pages') {
+    await loadPages()
+  }
+  else if (activeTab.value === 'media') {
+    await loadMedia()
+  }
+  else if (activeTab.value === 'presets') {
+    await loadPresets()
+  }
+  else if (activeTab.value === 'theme') {
+    await loadThemeOverview()
+  }
+  else {
+    await loadHome()
+  }
+})
+
+// 切换编辑目标主题：丢弃未保存的页面编辑状态，并按目标主题重新加载当前页签数据
+watch(currentTheme, async (next, prev) => {
+  if (next === prev) {
+    return
+  }
+  pagination.page = 1
+  resetPageForm()
+  if (activeTab.value === 'pages') {
+    await loadPages()
+  }
+  else if (activeTab.value === 'presets') {
+    await loadPresets()
+  }
+  else if (activeTab.value === 'home' || activeTab.value === 'navigation') {
+    await loadHome()
+  }
+})
+
+onMounted(async () => {
+  await Promise.all([loadAiModels(), loadWikiNavigation(), loadThemeOverview()])
+  await loadPages()
+  await loadTemplatePreviewContext()
+})
+
+async function loadAiModels() {
+  try {
+    // 走 AI 场景端点而非 Agent 管理台端点：CMS 操作者通常没有 platform:agent:view 权限
+    const res = await apiAi.availableModels()
+    aiModelOptions.value = toCmsModelOptions(res.data || [])
+  }
+  catch {
+    aiModelOptions.value = []
+  }
+}
+
+async function loadPages() {
+  loading.value = true
+  try {
+    const res = await apiCms.page({
+      page: pagination.page,
+      size: pagination.size,
+      keyword: search.keyword || undefined,
+      theme: currentTheme.value,
+    })
+    pages.value = res.data.records
+    pagination.total = res.data.total
+    if (!selectedPageId.value && pages.value.length) {
+      selectPage(pages.value[0])
+    }
+    else if (selectedPageId.value && !pages.value.some(item => item.id === selectedPageId.value)) {
+      resetPageForm()
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '页面列表加载失败')
+    pages.value = []
+    pagination.total = 0
+    if (!selectedPageId.value) {
+      resetPageForm()
+    }
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function loadTemplatePreviewContext() {
+  try {
+    templateContext.value = (await apiCms.publicTemplateContext()).data
+  }
+  catch {
+    templateContext.value = emptyTemplateContext()
+  }
+}
+
+async function loadWikiNavigation() {
+  wikiEnabled.value = await hasPublicWikiSpaces()
+}
+
+function emptyTemplateContext(): CmsTemplateContext {
+  return {
+    cms: { pages: { latest: [] } },
+    knowledge: { spaces: [], pages: [], latest: [], featured: [] },
+  }
+}
+
+async function loadHome() {
+  loading.value = true
+  try {
+    const res = await apiCms.home(currentTheme.value)
+    Object.assign(home, {
+      title: res.data.title || appSettingsStore.siteName || '',
+      subtitle: res.data.subtitle || '',
+      theme: res.data.theme || 'default',
+      heroImageUrl: res.data.heroImageUrl || '',
+      settings: res.data.settings || {},
+      sections: res.data.sections || [],
+      published: Boolean(res.data.published),
+    })
+    navigationItems.value = parseNavigationItems(res.data.settings?.navigationJson)
+    await Promise.all([loadTemplatePreviewContext(), loadWikiNavigation()])
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '首页配置加载失败')
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function loadMedia() {
+  loading.value = true
+  try {
+    const res = await apiFiles.page({
+      page: mediaSearch.page,
+      size: mediaSearch.size,
+      keyword: mediaSearch.keyword || undefined,
+      module: 'cms',
+      publicAccess: true,
+    })
+    mediaItems.value = res.data.records
+    mediaSearch.total = res.data.total
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '媒体库加载失败')
+    mediaItems.value = []
+    mediaSearch.total = 0
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function loadPresets() {
+  loading.value = true
+  try {
+    const res = await apiCms.presets(currentTheme.value)
+    presets.value = res.data || []
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '方案列表加载失败')
+    presets.value = []
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function presetSourceText(source: HomePagePreset['source']) {
+  return source === 'PLUGIN' ? '插件' : source === 'SNAPSHOT' ? '快照' : '用户'
+}
+
+function presetSourceVariant(source: HomePagePreset['source']) {
+  return source === 'PLUGIN' ? 'secondary' as const : source === 'SNAPSHOT' ? 'outline' as const : 'default' as const
+}
+
+const themeCards = computed(() => themeOverview.value?.themes || [])
+
+async function loadThemeOverview() {
+  try {
+    const res = await apiTheme.overview()
+    themeOverview.value = res.data
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '主题总览加载失败')
+    themeOverview.value = null
+  }
+}
+
+function themePreviewUrl(theme: ThemeCenterTheme) {
+  if (!theme.pluginCode || !theme.preview) {
+    return ''
+  }
+  return pluginFrontendAssetUrl(theme.pluginCode, theme.preview, theme.assetRevision)
+}
+
+function openThemeConfig(theme: ThemeCenterTheme) {
+  router.push(`/platform/theme-center/config/${theme.code}`)
+}
+
+function confirmActivateTheme(theme: ThemeCenterTheme) {
+  if (!theme.pluginCode || theme.active) {
+    return
+  }  modal.confirm({
+    title: '切换整站主题',
+    content: `确认启用「${theme.name}」作为公开站主题吗？主题是一整套独立模板：${theme.hasHomeComponent ? '它的公开站首页由插件自带的 Vue 页面承载' : theme.hasHomePreset ? '它自带的首页设计将应用到它自己的首页' : '它将以默认主题当前首页为起点生成自己的首页'}${theme.hasChromeComponent ? '，页头页脚也由插件自管' : ''}${theme.hasPageSet ? '，随附页面会导入到它自己的页面集并发布' : ''}。各主题内容完全独立，切换后原主题内容原样保留，互不影响。`,
+    onConfirm: async () => {
+      themeSwitching.value = true
+      try {
+        await apiTheme.activate(theme.pluginCode!)
+        toast.success(`已切换到「${theme.name}」`)
+        selectedTheme.value = theme.pluginCode ?? null
+        await loadThemeOverview()
+      }
+      catch (error) {
+        toast.error(error instanceof Error ? error.message : '主题切换失败')
+      }
+      finally {
+        themeSwitching.value = false
+      }
+    },
+  })
+}
+
+function confirmRestoreDefaultTheme() {
+  const active = themeCards.value.find(item => item.active && item.pluginCode)
+  if (!active) {
+    return
+  }
+  modal.confirm({
+    title: '恢复默认主题',
+    content: `确认停用「${active.name}」并恢复内置默认主题吗？该主题的首页设计、页面集与导航会完整保留在其主题名下，对外不再可见，再次启用即原样恢复。`,
+    onConfirm: async () => {
+      themeSwitching.value = true
+      try {
+        await apiTheme.deactivate()
+        toast.success('已恢复内置默认主题')
+        selectedTheme.value = null
+        await loadThemeOverview()
+      }
+      catch (error) {
+        toast.error(error instanceof Error ? error.message : '恢复默认主题失败')
+      }
+      finally {
+        themeSwitching.value = false
+      }
+    },
+  })
+}
+
+function openPresetDialog() {
+  presetForm.name = ''
+  presetForm.description = ''
+  presetDialogVisible.value = true
+}
+
+async function savePreset() {
+  if (!presetForm.name.trim()) {
+    toast.error('请输入方案名称')
+    return
+  }
+  presetSaving.value = true
+  try {
+    await apiCms.savePreset({ name: presetForm.name.trim(), description: presetForm.description.trim() || undefined }, currentTheme.value)
+    toast.success('已把当前首页定制存为方案')
+    presetDialogVisible.value = false
+    await loadPresets()
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '方案保存失败')
+  }
+  finally {
+    presetSaving.value = false
+  }
+}
+
+function confirmApplyPreset(preset: HomePagePreset) {
+  modal.confirm({
+    title: '应用方案',
+    content: `确认应用「${preset.name}」吗？当前首页定制会自动保存为快照，可随时从这里一键切回。`,
+    onConfirm: async () => {
+      await apiCms.applyPreset(preset.code)
+      toast.success('方案已应用')
+      await loadPresets()
+    },
+  })
+}
+
+function confirmDeletePreset(preset: HomePagePreset) {
+  modal.confirm({
+    title: '删除方案',
+    content: `确认删除方案「${preset.name}」吗？删除后不可恢复。`,
+    onConfirm: async () => {
+      await apiCms.deletePreset(preset.code)
+      toast.success('方案已删除')
+      await loadPresets()
+    },
+  })
+}
+
+function selectPage(page: CmsPage) {
+  selectedPageId.value = page.id
+  Object.assign(pageForm, {
+    title: page.title,
+    slug: page.slug,
+    summary: page.summary || '',
+    excerpt: page.excerpt || '',
+    coverImageUrl: page.coverImageUrl || '',
+    categories: page.categories || [],
+    tags: page.tags || [],
+    markdownContent: page.markdownContent || '',
+    htmlContent: page.htmlContent || '',
+    cssContent: page.cssContent || '',
+    jsContent: page.jsContent || '',
+    builderProjectJson: page.builderProjectJson || '',
+    seoTitle: page.seoTitle || '',
+    seoDescription: page.seoDescription || '',
+    template: page.template || 'DEFAULT',
+    status: page.status || 'DRAFT',
+  })
+  editorMode.value = page.builderProjectJson ? 'builder' : page.htmlContent ? 'html' : 'builder'
+}
+
+function pickMedia() {
+  mediaInput.value?.open()
+}
+
+async function uploadMedia(files: File[]) {
+  const file = files[0]
+  mediaInput.value?.reset()
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
+  loading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    data.append('module', 'cms')
+    data.append('publicAccess', 'true')
+    await apiFiles.upload(data)
+    toast.success('媒体已上传')
+    await loadMedia()
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function copyMediaUrl(item: FileObject) {
+  const url = toBackendAssetUrl(item.url)
+  await navigator.clipboard?.writeText(url)
+  toast.success('媒体地址已复制')
+}
+
+function useMediaAsCover(item: FileObject) {
+  pageForm.coverImageUrl = toBackendAssetUrl(item.url)
+  activeTab.value = 'pages'
+  toast.success('已设为当前页面封面')
+}
+
+function splitTerms(value?: string[]) {
+  return value?.join(', ') || ''
+}
+
+function updateTerms(key: 'categories' | 'tags', value: string) {
+  pageForm[key] = value
+    .split(/[,，\n\r]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function mediaUrl(item: FileObject) {
+  return toBackendAssetUrl(item.url)
+}
+
+function formatFileSize(size?: number) {
+  if (!size) {
+    return '-'
+  }
+  if (size < 1024) {
+    return `${size} B`
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function createPage() {
+  selectedPageId.value = null
+  resetPageForm()
+  editorMode.value = 'builder'
+}
+
+function resetPageForm() {
+  Object.assign(pageForm, {
+    title: '新页面',
+    slug: `page-${Date.now()}`,
+    summary: '',
+    excerpt: '',
+    coverImageUrl: '',
+    categories: [],
+    tags: [],
+    markdownContent: '# 新页面\n\n在这里编写 Markdown 内容。',
+    htmlContent: '',
+    cssContent: '',
+    jsContent: '',
+    builderProjectJson: '',
+    seoTitle: '',
+    seoDescription: '',
+    template: 'DEFAULT' as PageTemplate,
+    status: 'DRAFT' as PageStatus,
+  })
+  selectedPageId.value = null
+}
+
+async function savePage() {
+  saving.value = true
+  try {
+    const payload = { ...pageForm }
+    payload.htmlContent = resolvePageHtmlForSave()
+    payload.jsContent = stripScriptTags(pageForm.jsContent || '')
+    // 页面模板由用户显式选择（四种模板版式差异明确），不再静默改写
+    const res = selectedPageId.value
+      ? await apiCms.updatePage(selectedPageId.value, payload)
+      : await apiCms.createPage(payload, currentTheme.value)
+    selectedPageId.value = res.data.id
+    toast.success('页面已保存')
+    await loadPages()
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+function confirmDeletePage(page: CmsPage = selectedPage.value!) {
+  if (!page) {
+    return
+  }
+  modal.confirm({
+    title: '删除页面',
+    content: `确认删除「${page.title}」吗？删除后公开页将无法访问。`,
+    onConfirm: async () => {
+      await apiCms.deletePage(page.id)
+      toast.success('页面已删除')
+      if (selectedPageId.value === page.id) {
+        selectedPageId.value = null
+        resetPageForm()
+      }
+      await loadPages()
+    },
+  })
+}
+
+function confirmPublish() {
+  if (!selectedPage.value) {
+    pageForm.status = 'PUBLISHED'
+    savePage()
+    return
+  }
+  const published = selectedPage.value.status === 'PUBLISHED'
+  modal.confirm({
+    title: published ? '取消发布' : '发布页面',
+    content: `确认${published ? '取消发布' : '发布'}「${selectedPage.value.title}」吗？`,
+    onConfirm: async () => {
+      published ? await apiCms.unpublish(selectedPage.value!.id) : await apiCms.publish(selectedPage.value!.id)
+      toast.success(published ? '已取消发布' : '页面已发布')
+      await loadPages()
+    },
+  })
+}
+
+async function persistHome(successMessage = '首页已保存') {
+  saving.value = true
+  try {
+    homeHtml.value = resolveHomeHtmlForSave()
+    homeJs.value = stripScriptTags(homeJs.value)
+    const currentHomeCss = homeCss.value
+    home.settings = {
+      ...(home.settings || {}),
+      homeCss: currentHomeCss,
+      navigationJson: JSON.stringify(navigationItems.value),
+    }
+    delete home.settings.chromeHeaderCss
+    delete home.settings.chromeFooterCss
+    await apiCms.saveHome({
+      ...home,
+      sections: home.sections,
+      settings: home.settings || {},
+    }, currentTheme.value)
+    toast.success(successMessage)
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function saveHome() {
+  await persistHome()
+}
+
+async function saveNavigation() {
+  await persistHome('导航菜单已保存')
+}
+
+function addNavigationItem(parentId?: string) {
+  const sort = navigationItems.value.reduce((max, item) => Math.max(max, Number(item.sort) || 0), 0) + 1
+  navigationItems.value.push({
+    id: `nav-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    label: '',
+    url: '',
+    parentId: parentId || undefined,
+    visible: true,
+    sort,
+  })
+}
+
+function removeNavigationItem(item: CmsNavigationItem) {
+  // 删除一级菜单时，其子菜单提升为一级，避免整组消失
+  navigationItems.value.forEach(child => {
+    if (child.parentId === item.id) {
+      child.parentId = undefined
+    }
+  })
+  navigationItems.value = navigationItems.value.filter(nav => nav.id !== item.id)
+}
+
+function confirmToggleHomePublish() {
+  const nextPublished = !home.published
+  modal.confirm({
+    title: nextPublished ? '发布首页' : '取消发布首页',
+    content: nextPublished
+      ? '发布后公开站点首页将可以访问，确认发布首页吗？'
+      : '取消发布后公开站点首页将显示“首页未发布”，确认取消发布吗？',
+    onConfirm: async () => {
+      const previous = home.published
+      home.published = nextPublished
+      try {
+        await persistHome(nextPublished ? '首页已发布' : '已取消发布首页')
+      }
+      catch (error) {
+        home.published = previous
+        throw error
+      }
+    },
+  })
+}
+
+function openGrapesEditor(target: EditorTarget = 'page') {
+  editorTarget.value = target
+  grapesEditorVisible.value = true
+}
+
+async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, jsContent: string, builderProjectJson: string }) {
+  grapesEditorVisible.value = false
+  await nextTick()
+  if (editorTarget.value === 'home') {
+    homeHtml.value = payload.htmlContent
+    homeCss.value = payload.cssContent
+    homeJs.value = payload.jsContent
+    homeProjectJson.value = payload.builderProjectJson
+    await saveHome()
+    return
+  }
+  pageForm.htmlContent = payload.htmlContent
+  pageForm.cssContent = payload.cssContent
+  pageForm.jsContent = payload.jsContent
+  pageForm.builderProjectJson = payload.builderProjectJson
+  editorMode.value = 'builder'
+  await savePage()
+}
+
+function resolvePageHtmlForSave() {
+  if (editorMode.value === 'html') {
+    return stripLayoutBlocks(pageForm.htmlContent || '')
+  }
+  const existingHtml = pageForm.htmlContent?.trim()
+  if (existingHtml) {
+    return stripLayoutBlocks(existingHtml)
+  }
+  return editorMode.value === 'markdown' ? '' : stripLayoutBlocks(pageForm.htmlContent || '')
+}
+
+function resolveHomeHtmlForSave() {
+  return stripLayoutBlocks(homeHtml.value?.trim() || '')
+}
+
+function stripLayoutBlocks(value?: string) {
+  if (!value) {
+    return ''
+  }
+  const doc = new DOMParser().parseFromString(`<div>${value}</div>`, 'text/html')
+  doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
+  return doc.body.firstElementChild?.innerHTML || value
+}
+
+function stripScriptTags(value?: string) {
+  return String(value || '')
+    .replace(/<script[^>]*>/gi, '')
+    .replace(/<\/script>/gi, '')
+    .trim()
+}
+
+function insertVariable(variable: string) {
+  if (activeTab.value === 'home') {
+    homeHtml.value = `${homeHtml.value || emptyHomeBuilderHtml()}\n${variable}`
+  }
+  else if (editorMode.value === 'markdown') {
+    pageForm.markdownContent = `${pageForm.markdownContent || ''}\n${variable}`
+  }
+  else {
+    pageForm.htmlContent = `${pageForm.htmlContent || emptyBuilderHtml()}\n${variable}`
+  }
+}
+
+function addHomeSection(type: HomeSectionType) {
+  home.sections.push({
+    id: `${type.toLowerCase()}-${Date.now()}`,
+    type,
+    title: sectionTitle(type),
+    subtitle: '',
+    mediaUrl: '',
+    actionText: type === 'CTA' ? '立即开始' : '',
+    actionUrl: '',
+    settings: {},
+    sort: home.sections.length + 1,
+    visible: true,
+  })
+}
+
+function removeHomeSection(section: HomeSection) {
+  home.sections = home.sections.filter(item => item !== section)
+}
+
+function parseNavigationItems(value?: string): CmsNavigationItem[] {
+  if (!value) {
+    return [
+      { id: 'home', label: '首页', url: '/site', visible: true, sort: 1 },
+      { id: 'login', label: '登录', url: '/login', visible: true, sort: 2 },
+    ]
+  }
+  try {
+    const parsed = JSON.parse(value) as CmsNavigationItem[]
+    return Array.isArray(parsed) ? parsed : []
+  }
+  catch {
+    return []
+  }
+}
+
+function buildNavigationTree(items: CmsNavigationItem[]) {
+  const itemMap = new Map<string, CmsNavigationItem>()
+  const roots: CmsNavigationItem[] = []
+  items.forEach((item) => {
+    itemMap.set(item.id, { ...item, children: [] })
+  })
+  items.forEach((item) => {
+    const current = itemMap.get(item.id)
+    if (!current) {
+      return
+    }
+    const parent = item.parentId ? itemMap.get(item.parentId) : undefined
+    if (parent) {
+      parent.children = [...(parent.children || []), current]
+    }
+    else {
+      roots.push(current)
+    }
+  })
+  const sortItems = (list: CmsNavigationItem[]) => {
+    list.sort((a, b) => a.sort - b.sort)
+    list.forEach(item => sortItems(item.children || []))
+    return list
+  }
+  return sortItems(roots)
+}
+
+function emptyBuilderHtml() {
+  return '<main class="yb-empty"><section><h1>打开 GrapesJS 构建器开始设计页面</h1><p>发布后会保存 HTML、CSS 和可继续编辑的 Project JSON。</p></section></main>'
+}
+
+function emptyHomeBuilderHtml() {
+  return '<main class="yb-empty"><section><h1>打开 GrapesJS 构建器设计首页</h1><p>首页可以自由编排首屏、图文、CTA、表单和动态内容。</p></section></main>'
+}
+
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 16) : '未发布'
+}
+
+function sectionTitle(type: HomeSectionType) {
+  return {
+    HERO: '首页首屏',
+    FEATURE: '核心特色',
+    CONTENT: '内容区块',
+    CTA: '行动引导',
+  }[type]
+}
+</script>
+
+<template>
+  <div class="cms-workbench">
+    <YdPageHeader title="主题中心" class="cms-header">
+      <YdButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
+        <YdIcon name="morph:save" />
+        保存页面
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
+        <YdIcon name="morph:save" />
+        保存首页
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveNavigation">
+        <YdIcon name="morph:save" />
+        保存首页配置
+      </YdButton>
+      <YdButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
+        <YdIcon :name="home.published ? 'morph:archive-restore' : 'morph:send'" />
+        {{ home.published ? '取消发布首页' : '发布首页' }}
+      </YdButton>
+      <YdButton v-else-if="activeTab === 'presets'" v-auth="'platform:cms:edit'" @click="openPresetDialog">
+        <YdIcon name="morph:bookmark" />
+        把当前首页存为方案
+      </YdButton>
+      <YdButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+        <YdIcon name="morph:cloud-upload" />
+        上传媒体
+      </YdButton>
+      <YdFilePicker ref="mediaInput" accept="image/*" label="选择媒体图片" class="hidden" @select="uploadMedia"><template #default /></YdFilePicker>
+    </YdPageHeader>
+
+    <YdPageMain>
+      <div class="cms-tabs">
+        <YdAction type="button" :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
+          <YdIcon name="morph:palette" />
+          整站主题
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'pages' }" @click="activeTab = 'pages'">
+          <YdIcon name="morph:file-text" />
+          页面库
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'home' }" @click="activeTab = 'home'">
+          <YdIcon name="morph:house" />
+          首页外观
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
+          <YdIcon name="morph:text-search" />
+          导航菜单
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'presets' }" @click="activeTab = 'presets'">
+          <YdIcon name="morph:layers" />
+          首页方案
+        </YdAction>
+        <YdAction type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
+          <YdIcon name="morph:image" />
+          媒体库
+        </YdAction>
+        <div class="theme-scope-picker">
+          <span class="theme-scope-picker__label">编辑主题</span>
+          <YdSelect v-model="currentTheme" :options="editableThemeOptions" />
+        </div>
+        <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
+          <YdIcon name="morph:external-link" />
+          访问站点
+        </a>
+      </div>
+
+      <YdLoadingOverlay v-if="activeTab === 'theme'" :loading="themeSwitching"><section   class="theme-workspace">
+        <div class="preset-toolbar">
+          <div>
+            <h3>整站主题</h3>
+            <p>收纳公开站可用的全部主题：内置默认主题与主题插件。一个主题是一整套独立模板——首页设计、页面集、导航与样式都归属该主题本身，而不是全局共享。切换主题只是把公开站整套切到另一套内容，双方互不影响；停用主题无需还原，内容保留在其名下、对外不可见，再次启用即原样恢复。顶部「编辑主题」选择器可离线预编辑任意主题的内容。</p>
+          </div>
+        </div>
+        <div v-if="themeCards.length" class="theme-grid">
+          <article v-for="theme in themeCards" :key="theme.pluginCode || theme.code" class="theme-card" :class="{ active: theme.active }">
+            <div class="theme-card__preview">
+              <img v-if="themePreviewUrl(theme)" :src="themePreviewUrl(theme)" :alt="theme.name">
+              <div v-else class="theme-card__preview-fallback">
+                <YdIcon :name="theme.pluginCode ? 'morph:puzzle' : 'morph:house'" />
+              </div>
+              <YdTag v-if="theme.active" class="theme-card__current" variant="default">
+                当前
+              </YdTag>
+            </div>
+            <div class="theme-card__body">
+              <div class="preset-card__head">
+                <strong>{{ theme.name }}</strong>
+                <YdTag v-if="theme.pluginCode && theme.enabled === false" variant="outline">
+                  未启用
+                </YdTag>
+              </div>
+              <p v-if="theme.description" class="preset-card__desc">
+                {{ theme.description }}
+              </p>
+              <div class="preset-card__meta">
+                <YdTag v-if="theme.hasHomePreset" variant="secondary">
+                  含首页方案
+                </YdTag>
+                <YdTag v-if="theme.hasPageSet" variant="secondary">
+                  含页面集
+                </YdTag>
+                <YdTag v-if="!theme.pluginCode" variant="secondary">
+                  系统内置
+                </YdTag>
+              </div>
+              <div class="preset-card__actions">
+                <YdButton
+                  v-if="theme.hasConfigSchema" v-auth="'platform:theme-center:config'"
+                  size="sm" variant="outline" @click="openThemeConfig(theme)"
+                >
+                  <YdIcon name="morph:settings" />
+                  配置
+                </YdButton>
+                <YdButton
+                  v-if="theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" :loading="themeSwitching" @click="confirmActivateTheme(theme)"
+                >
+                  <YdIcon name="morph:check" />
+                  启用主题
+                </YdButton>
+                <YdButton
+                  v-if="theme.pluginCode && theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" variant="outline" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
+                >
+                  <YdIcon name="morph:refresh-cw" />
+                  恢复默认
+                </YdButton>
+                <YdButton
+                  v-if="!theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
+                >
+                  <YdIcon name="morph:refresh-cw" />
+                  恢复默认主题
+                </YdButton>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">
+          暂无可用主题。
+        </div>
+      </section></YdLoadingOverlay>
+
+      <section v-else-if="activeTab === 'pages'" class="cms-layout">
+        <aside class="page-list">
+          <div class="page-list__toolbar">
+            <YdInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
+            <YdButton v-auth="'platform:cms:edit'" @click="createPage">
+              <YdIcon name="morph:plus" />
+            </YdButton>
+            <YdButton v-auth="'platform:cms:edit'" variant="outline" @click="blockLibraryVisible = true">
+              <YdIcon name="morph:building-2" />
+              区块库
+            </YdButton>
+          </div>
+          <YdLoadingOverlay :loading="loading"><div  class="page-list__items">
+            <article v-for="item in pages" :key="item.id" class="page-list-card" :class="{ active: item.id === selectedPageId }">
+              <YdAction type="button" class="page-list-card__main" @click="selectPage(item)">
+                <span class="page-list-card__title">{{ item.title }}</span>
+                <span class="page-list-card__path">/site/{{ item.slug }}</span>
+                <span class="page-list-card__meta">
+                  <YdTag :variant="item.status === 'PUBLISHED' ? 'default' : 'secondary'">
+                    {{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }}
+                  </YdTag>
+                  <YdTag variant="outline">
+                    {{ themeLabel(item.themeCode) }}
+                  </YdTag>
+                  <YdTag v-if="item.sourcePluginCode" variant="secondary">
+                    插件托管
+                  </YdTag>
+                  <span>{{ dateText(item.publishedAt || item.updateTime || item.createTime) || '未发布' }}</span>
+                </span>
+              </YdAction>
+              <div class="page-list-card__actions">
+                <a :href="`/site/${item.slug}`" target="_blank" rel="noopener noreferrer" title="预览">
+                  <YdIcon name="morph:external-link" />
+                </a>
+                <YdAction v-auth="'platform:cms:delete'" type="button" title="删除" @click.stop="confirmDeletePage(item)">
+                  <YdIcon name="morph:trash-2" />
+                </YdAction>
+              </div>
+            </article>
+            <div v-if="!pages.length" class="empty-state">
+              暂无页面
+            </div>
+          </div></YdLoadingOverlay>
+        </aside>
+
+        <main class="page-editor">
+          <div class="editor-top">
+            <YdInput v-model="pageForm.title" class="title-input" />
+            <div class="editor-mode">
+              <YdAction type="button" :class="{ active: editorMode === 'builder' }" @click="editorMode = 'builder'">可视化</YdAction>
+              <YdAction type="button" :class="{ active: editorMode === 'markdown' }" @click="editorMode = 'markdown'">Markdown</YdAction>
+              <YdAction type="button" :class="{ active: editorMode === 'html' }" @click="editorMode = 'html'">HTML</YdAction>
+            </div>
+          </div>
+
+          <template v-if="editorMode === 'builder'">
+            <section class="builder-entry">
+              <div>
+                <span class="builder-entry__status">{{ builderContentStatus }}</span>
+                <h2>可视化页面构建器</h2>
+                <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS、JS 和可继续编辑的 Project JSON。</p>
+              </div>
+              <div class="builder-entry__actions">
+                <YdButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
+                  <YdIcon name="i-ri:drag-drop-line" />
+                  打开构建器
+                </YdButton>
+                <YdButton variant="outline" @click="editorMode = 'html'">
+                  <YdIcon name="morph:code" />
+                  查看 HTML
+                </YdButton>
+              </div>
+            </section>
+            <section class="cms-runtime-overview">
+              <div class="runtime-overview__head">
+                <div>
+                  <span>YD 内容引擎</span>
+                  <strong>{{ aiEnabled ? 'AI 页面构建助手已就绪' : '等待配置 AI 模型' }}</strong>
+                </div>
+                <YdTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</YdTag>
+              </div>
+              <div class="runtime-overview__grid">
+                <article>
+                  <YdIcon name="morph:clock" />
+                  <strong>{{ templateContext.knowledge.latest.length }}</strong>
+                  <span>最新 Wiki 条目</span>
+                </article>
+                <article>
+                  <YdIcon name="morph:star" />
+                  <strong>{{ templateContext.knowledge.featured.length }}</strong>
+                  <span>编辑推荐条目</span>
+                </article>
+                <article>
+                  <YdIcon name="morph:newspaper" />
+                  <strong>{{ templateContext.cms.pages.latest.length }}</strong>
+                  <span>最新 CMS 页面</span>
+                </article>
+              </div>
+              <div class="runtime-content-list">
+                <a v-for="item in templateContext.knowledge.latest.slice(0, 5)" :key="item.id" :href="item.url" target="_blank" rel="noopener noreferrer">
+                  <span><strong>{{ item.title }}</strong><small>{{ item.summary || item.excerpt || '暂无摘要' }}</small></span>
+                  <time>{{ dateText(item.publishedAt || item.updatedAt || item.createdAt) }}</time>
+                </a>
+                <div v-if="!templateContext.knowledge.latest.length" class="runtime-content-empty">发布 Wiki 页面后，最新内容会在此供 YD 引擎动态渲染。</div>
+              </div>
+            </section>
+          </template>
+
+          <CmsMarkdownEditor v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" />
+          <YdTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
+        </main>
+
+        <aside class="publish-panel">
+          <nav class="publish-panel__tabs" role="tablist" aria-label="页面设置">
+            <YdAction
+              v-for="tab in publishTabs"
+              :key="tab.value"
+              type="button"
+              role="tab"
+              :class="{ active: publishTab === tab.value }"
+              :aria-selected="publishTab === tab.value"
+              @click="publishTab = tab.value"
+            >
+              <YdIcon :name="tab.icon" />
+              {{ tab.label }}
+            </YdAction>
+          </nav>
+
+          <section v-if="publishTab === 'publish'" class="publish-panel__section">
+            <h3>发布</h3>
+            <YdForm :model="pageForm" layout="vertical">
+              <YdFormItem label="路径">
+                <YdInput v-model="pageForm.slug" />
+              </YdFormItem>
+              <YdFormItem label="状态">
+                <YdSelect v-model="pageForm.status" :options="statusOptions" />
+              </YdFormItem>
+              <YdFormItem label="模板">
+                <YdSelect v-model="pageForm.template" :options="templateOptions" />
+              </YdFormItem>
+              <YdFormItem label="分类">
+                <YdInput
+                  :model-value="splitTerms(pageForm.categories)"
+                  placeholder="新闻, 产品, 案例"
+                  @update:model-value="value => value && updateTerms('categories', value)"
+                />
+              </YdFormItem>
+              <YdFormItem label="标签">
+                <YdInput
+                  :model-value="splitTerms(pageForm.tags)"
+                  placeholder="低代码, CMS, 首页"
+                  @update:model-value="value => value && updateTerms('tags', value)"
+                />
+              </YdFormItem>
+            </YdForm>
+            <div class="term-chips">
+              <YdTag v-for="item in pageForm.categories" :key="`cat-${item}`" variant="secondary">
+                {{ item }}
+              </YdTag>
+              <YdTag v-for="item in pageForm.tags" :key="`tag-${item}`">
+                #{{ item }}
+              </YdTag>
+            </div>
+            <div class="publish-actions">
+              <YdButton v-auth="'platform:cms:publish'" variant="outline" @click="confirmPublish">
+                {{ selectedPage?.status === 'PUBLISHED' ? '取消发布' : '发布' }}
+              </YdButton>
+              <YdButton v-if="selectedPage" v-auth="'platform:cms:delete'" variant="ghost" @click="confirmDeletePage()">
+                <YdIcon name="morph:trash-2" />
+                删除
+              </YdButton>
+              <a :href="pagePublicUrl" target="_blank" rel="noopener noreferrer">预览公开页</a>
+            </div>
+          </section>
+
+          <section v-else-if="publishTab === 'seo'" class="publish-panel__section">
+            <h3>SEO 与封面</h3>
+            <YdForm :model="pageForm" layout="vertical">
+              <YdFormItem label="摘要">
+                <YdInput v-model="pageForm.summary" />
+              </YdFormItem>
+              <YdFormItem label="摘录">
+                <YdTextarea v-model="pageForm.excerpt" rows="3" />
+              </YdFormItem>
+              <YdFormItem label="封面图">
+                <YdInput v-model="pageForm.coverImageUrl" />
+              </YdFormItem>
+              <YdFormItem label="SEO 标题">
+                <YdInput v-model="pageForm.seoTitle" />
+              </YdFormItem>
+              <YdFormItem label="SEO 描述">
+                <YdTextarea v-model="pageForm.seoDescription" rows="3" />
+              </YdFormItem>
+            </YdForm>
+          </section>
+
+          <section v-else-if="publishTab === 'js'" class="publish-panel__section">
+            <h3>页面 JS</h3>
+            <YdTextarea
+              v-model="pageForm.jsContent"
+              rows="8"
+              input-class="font-mono"
+              placeholder="document.querySelector(...)"
+            />
+          </section>
+
+          <section v-else-if="publishTab === 'variables'" class="publish-panel__section">
+            <div class="panel-title-row">
+              <h3>动态变量</h3>
+              <YdAction type="button" @click="showAllVariables = !showAllVariables">
+                {{ showAllVariables ? '收起' : `全部 ${cmsVariables.length}` }}
+              </YdAction>
+            </div>
+            <div class="variable-list compact">
+              <YdAction v-for="item in visibleCmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
+                <strong>{{ item.key }}</strong>
+                <span>{{ item.label }}</span>
+              </YdAction>
+            </div>
+          </section>
+
+        </aside>
+      </section>
+
+      <YdLoadingOverlay v-else-if="activeTab === 'home'" :loading="loading"><section   class="home-layout">
+        <main class="home-form">
+          <section v-if="currentThemeHasHomeComponent" class="builder-entry">
+            <div>
+              <h2>该主题首页由插件页面承载</h2>
+              <p>「{{ themeLabel(currentTheme) }}」声明了首页组件（homeComponent），公开站首页由插件自带的 Vue 页面渲染，不再使用这里的动态首页内容与兼容区块；下方的首页基础信息仍用于 SEO 与站点页头页脚。若停用该主题或切换回默认主题，这里的首页设计会原样恢复生效。</p>
+            </div>
+          </section>
+          <template v-else>
+            <section class="builder-entry">
+              <div>
+                <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
+                <h2>动态首页构建器</h2>
+                <p>画布会同时展示固定 Header、首页主体和固定 Footer；首页主体可自由组合内容，Header/Footer 只开放样式调整。</p>
+              </div>
+              <div class="builder-entry__actions">
+                <YdButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
+                  <YdIcon name="morph:layout-grid" />
+                  打开首页构建器
+                </YdButton>
+                <YdButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
+                  <YdIcon name="morph:eraser" />
+                  清空动态内容
+                </YdButton>
+              </div>
+            </section>
+
+            <section class="legacy-sections">
+            <div class="legacy-sections__head">
+              <div>
+                <h3>兼容区块</h3>
+                <p>没有动态首页内容时，公开站点会回退渲染这些旧区块。</p>
+              </div>
+              <div class="block-toolbar">
+                <YdButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" @click="addHomeSection(preset.type)">
+                  <YdIcon :name="preset.icon" />
+                  {{ preset.label }}
+                </YdButton>
+              </div>
+            </div>
+            <article v-for="section in home.sections" :key="section.id || section.title" class="builder-block">
+              <div class="builder-block__head">
+                <YdTag variant="secondary">{{ section.type }}</YdTag>
+                <YdButton size="sm" variant="ghost" @click="removeHomeSection(section)">
+                  <YdIcon name="morph:trash-2" />
+                </YdButton>
+              </div>
+              <YdInput v-model="section.title" placeholder="区块标题" />
+              <YdTextarea v-model="section.subtitle" rows="3" placeholder="区块说明" />
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <YdInput v-model="section.mediaUrl" placeholder="图片地址" />
+                <YdInput v-model="section.actionUrl" placeholder="按钮链接" />
+                <YdInput v-model="section.actionText" placeholder="按钮文案" />
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <YdSwitch v-model="section.visible" />
+                  显示区块
+                </label>
+              </div>
+            </article>
+            </section>
+          </template>
+        </main>
+
+        <aside class="home-preview">
+          <section>
+            <h3>首页基础信息</h3>
+            <YdForm :model="home" layout="vertical">
+              <YdFormItem label="首页标题">
+                <YdInput v-model="home.title" />
+              </YdFormItem>
+              <YdFormItem label="站点布局">
+                <YdSelect v-model="homeLayoutMode" :options="layoutOptions" />
+              </YdFormItem>
+              <YdFormItem label="副标题">
+                <YdInput v-model="home.subtitle" />
+              </YdFormItem>
+              <YdFormItem label="首屏图片">
+                <YdInput v-model="home.heroImageUrl" />
+              </YdFormItem>
+              <YdFormItem label="发布首页">
+                <div class="home-publish-field">
+                  <YdSwitch v-model="home.published" />
+                  <YdTag :variant="home.published ? 'default' : 'secondary'">
+                    {{ home.published ? '已发布' : '未发布' }}
+                  </YdTag>
+                </div>
+              </YdFormItem>
+            </YdForm>
+          </section>
+        </aside>
+      </section></YdLoadingOverlay>
+
+      <YdLoadingOverlay v-else-if="activeTab === 'navigation'" :loading="loading"><section   class="navigation-layout">
+        <main class="navigation-panel">
+          <div class="legacy-sections__head">
+            <div>
+              <h3>站点导航</h3>
+              <p>管理当前编辑主题的导航菜单：可新增、删除、改名、调整链接、上级与排序。导航随主题保存与切换，当该主题是公开站当前主题时立即生效。</p>
+            </div>
+            <YdButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
+              <YdIcon name="morph:plus" />
+              新增菜单
+            </YdButton>
+          </div>
+          <YdEmpty v-if="!navigationItems.length" description="暂无导航菜单，点击右上角新增" />
+          <article v-for="item in navigationItems" :key="item.id" class="builder-block">
+            <div class="builder-block__head">
+              <div class="navigation-item-title">
+                <YdTag variant="secondary">{{ item.parentId ? '二级菜单' : '一级菜单' }}</YdTag>
+                <span>{{ item.label || '未命名菜单' }}</span>
+              </div>
+              <div class="navigation-item-actions">
+                <YdButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="addNavigationItem(item.id)">
+                  <YdIcon name="morph:plus" />
+                  子菜单
+                </YdButton>
+                <YdButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="removeNavigationItem(item)">
+                  <YdIcon name="morph:trash-2" />
+                  删除
+                </YdButton>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <YdInput v-model="item.label" placeholder="菜单名称" />
+              <YdInput v-model="item.url" placeholder="/site/about 或 https://..." />
+              <label class="cms-field">
+                <span>上级菜单</span>
+                <YdSelect v-model="item.parentId" :options="[{ label: '一级菜单', value: '' }, ...rootNavigationItems.filter(parent => parent.id !== item.id).map(parent => ({ label: parent.label, value: parent.id }))]" class="w-full" />
+              </label>
+              <label class="cms-field"><span>排序</span><YdNumberField v-model="item.sort" class="w-full" /></label>
+              <label class="cms-field">
+                <span>外链打开方式</span>
+                <span class="inline-flex items-center gap-2 text-sm">
+                  <YdSwitch v-model="item.embed" :disabled="!/^https?:\/\//i.test(item.url.trim())" />
+                  {{ /^https?:\/\//i.test(item.url.trim()) ? '在站内 iframe 嵌入' : '仅 http(s) 外链可嵌入' }}
+                </span>
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <YdSwitch v-model="item.visible" />
+                显示菜单
+              </label>
+            </div>
+          </article>
+        </main>
+        <aside class="home-preview">
+          <section>
+            <h3>导航预览</h3>
+            <nav class="cms-nav-preview">
+              <div class="cms-nav-preview__bar">
+                <span class="cms-nav-preview__brand">{{ appSettingsStore.siteName || home.title || '站点' }}</span>
+                <div class="cms-nav-preview__menus">
+                  <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__menu">
+                    <a :href="item.url" class="cms-nav-preview__link">
+                      {{ item.label }}
+                      <YdIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="morph:chevron-down" />
+                    </a>
+                    <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__dropdown">
+                      <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url" class="cms-nav-preview__sublink">
+                        {{ child.label }}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </nav>
+          </section>
+          <section>
+            <h3>使用说明</h3>
+            <p class="cms-help-text">
+              导航菜单随首页配置一起保存（点右上角「保存首页配置」生效）；删除一级菜单时其子菜单会自动提升为一级。外链默认新窗口打开，勾选「站内 iframe 嵌入」后会在公开站内容框内打开，类似新闻页那种带导航的内嵌页。首页构建器中的 Header/Footer 结构、Logo、认证入口和数据绑定仍由系统固定，画布仅开放整体 CSS 定制。
+            </p>
+          </section>
+        </aside>
+      </section></YdLoadingOverlay>
+
+      <YdLoadingOverlay v-else-if="activeTab === 'media'" :loading="loading"><section   class="media-workspace">
+        <div class="media-toolbar-main">
+          <div>
+            <h3>媒体库</h3>
+            <p>用于 CMS 构建器、首页和文章封面的图片资产，上传后会进入 RustFS/S3 对象存储。</p>
+          </div>
+          <div class="media-actions">
+            <YdInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
+            <YdButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+              <YdIcon name="morph:cloud-upload" />
+              上传
+            </YdButton>
+          </div>
+        </div>
+
+        <div v-if="mediaItems.length" class="media-grid">
+          <article v-for="item in mediaItems" :key="item.id" class="media-card">
+            <div class="media-card__preview">
+              <img :src="mediaUrl(item)" :alt="item.originalName || 'CMS 媒体'">
+              <div class="media-card__overlay">
+                <div class="media-card__actions">
+                  <YdButton size="sm" variant="outline" @click="copyMediaUrl(item)">
+                    <YdIcon name="morph:copy" />
+                    复制地址
+                  </YdButton>
+                  <YdButton size="sm" @click="useMediaAsCover(item)">
+                    <YdIcon name="i-ri:image-edit-line" />
+                    设为封面
+                  </YdButton>
+                </div>
+              </div>
+            </div>
+            <div class="media-card__body">
+              <strong>{{ item.originalName || `文件 #${item.id}` }}</strong>
+              <span>{{ item.contentType || 'image/*' }} · {{ formatFileSize(item.size) }}</span>
+              <small>{{ dateText(item.createTime) }}</small>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state media-empty">
+          暂无媒体，点击上传添加第一张 CMS 图片。
+        </div>
+      </section></YdLoadingOverlay>
+
+      <YdLoadingOverlay v-else-if="activeTab === 'presets'" :loading="loading"><section   class="preset-workspace">
+        <div class="preset-toolbar">
+          <div>
+            <h3>首页方案</h3>
+            <p>把当前编辑主题的首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。方案按主题隔离，每个主题只看到自己的方案；启用自带方案的主题时，对应方案出现在该主题名下。</p>
+          </div>
+          <YdButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
+            <YdIcon name="morph:bookmark" />
+            存为方案
+          </YdButton>
+        </div>
+
+        <div v-if="presets.length" class="preset-grid">
+          <article v-for="preset in presets" :key="preset.code" class="preset-card">
+            <div class="preset-card__head">
+              <strong>{{ preset.name }}</strong>
+              <YdTag v-if="preset.active" variant="default">
+                当前
+              </YdTag>
+              <YdTag :variant="presetSourceVariant(preset.source)">
+                {{ presetSourceText(preset.source) }}
+              </YdTag>
+            </div>
+            <p v-if="preset.description" class="preset-card__desc">
+              {{ preset.description }}
+            </p>
+            <div class="preset-card__meta">
+              <span v-if="preset.sectionCount != null">{{ preset.sectionCount }} 个区块</span>
+              <span>{{ dateText(preset.updateTime || preset.createTime) }}</span>
+            </div>
+            <div class="preset-card__actions">
+              <YdButton v-auth="'platform:cms:publish'" size="sm" @click="confirmApplyPreset(preset)">
+                <YdIcon name="morph:check" />
+                应用
+              </YdButton>
+              <YdButton v-auth="'platform:cms:delete'" size="sm" variant="ghost" @click="confirmDeletePreset(preset)">
+                <YdIcon name="morph:trash-2" />
+                删除
+              </YdButton>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">
+          暂无方案，点击右上角「把当前首页存为方案」保存当前首页定制。
+        </div>
+      </section></YdLoadingOverlay>
+    </YdPageMain>
+
+    <YdModal v-model="presetDialogVisible" title="把当前首页存为方案" class="sm:max-w-lg">
+      <div class="gap-4 grid">
+        <div>
+          <label class="preset-form-label">方案名称</label>
+          <YdInput v-model="presetForm.name" placeholder="例如：活动专题首页" maxlength="50" />
+        </div>
+        <div>
+          <label class="preset-form-label">方案描述（可选）</label>
+          <YdTextarea v-model="presetForm.description" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="记录这套首页定制的用途" maxlength="200" />
+        </div>
+        <div class="preset-form-actions">
+          <YdButton :loading="presetSaving" @click="savePreset">
+            <YdIcon name="morph:save" />
+            保存方案
+          </YdButton>
+        </div>
+      </div>
+    </YdModal>
+
+    <div v-if="grapesEditorVisible" class="grapes-editor-shell">
+      <CmsGrapesEditor
+        :title="editorTarget === 'home' ? home.title : pageForm.title"
+        :html-content="editorTarget === 'home' ? homeHtml : pageForm.htmlContent"
+        :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
+        :js-content="editorTarget === 'home' ? homeJs : pageForm.jsContent"
+        :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
+        :page-template="editorTarget === 'home' ? 'DEFAULT' : pageForm.template"
+        :chrome-frame="editorTarget === 'home'"
+        :chrome-layout="editorTarget === 'home' ? homeLayoutMode : undefined"
+        :template-preview-context="templatePreviewContext"
+        :ai-enabled="aiEnabled"
+        :ai-model-options="aiModelOptions"
+        :history-target-type="editorTarget"
+        :history-target-id="editorTarget === 'home' ? 'home' : (selectedPageId || pageForm.slug || pageForm.title || 'draft')"
+        :history-target-label="editorTarget === 'home' ? home.title : pageForm.title"
+        :theme-style-urls="currentThemeStyleUrls"
+        @close="grapesEditorVisible = false"
+        @save="saveGrapesEditor"
+      />
+    </div>
+
+    <CmsBlockLibrary v-model:visible="blockLibraryVisible" />
+  </div>
+</template>
+
+<style scoped>
+.cms-tabs,
+.page-list__toolbar,
+.editor-top,
+.editor-mode,
+.block-toolbar,
+.publish-actions,
+.home-publish-field,
+.builder-block__head,
+.builder-entry__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.block-toolbar {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.block-toolbar :deep([data-slot="button"]) {
+  min-width: 84px;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.block-toolbar :deep([data-slot="button"]:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+}
+
+.cms-tabs {
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.cms-tabs button,
+.editor-mode button,
+.public-link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+}
+
+.cms-tabs button.active,
+.editor-mode button.active {
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
+}
+
+.theme-scope-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.theme-scope-picker__label {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.public-link {
+  text-decoration: none;
+}
+
+.cms-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(300px, 340px);
+  gap: 16px;
+  align-items: start;
+}
+
+.page-list,
+.page-editor,
+.publish-panel,
+.home-form,
+.home-preview {
+  min-width: 0;
+}
+
+.page-list {
+  position: sticky;
+  top: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.page-list__toolbar {
+  align-items: stretch;
+}
+
+.page-list__items {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  max-height: calc(100vh - 270px);
+  overflow: auto;
+}
+
+.page-list-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-1);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.page-list-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.page-list-card.active {
+  border-color: var(--color-text-1);
+  box-shadow: inset 3px 0 0 var(--color-text-1), 0 4px 12px color-mix(in srgb, var(--color-fill-2), transparent 8%);
+}
+
+.page-list-card__main {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: var(--color-text-1);
+  text-align: left;
+}
+
+.page-list-card__title,
+.page-list-card__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-list-card__title {
+  font-weight: 800;
+}
+
+.page-list-card__path,
+.page-list-card__meta {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.page-list-card__meta,
+.page-list-card__actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.page-list-card__actions {
+  align-self: start;
+}
+
+.page-list-card__actions a,
+.page-list-card__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--color-text-3);
+  text-decoration: none;
+}
+
+.page-list-card__actions a:hover,
+.page-list-card__actions button:hover {
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+}
+
+.page-list-card__meta :deep([data-slot="tag"]) {
+  font-weight: 700;
+}
+
+.page-list-card__meta :deep([data-slot="tag"].bg-primary) {
+  background: rgb(var(--success-6));
+  border-color: rgb(var(--success-6));
+  color: #fff;
+}
+
+.title-input :deep(input) {
+  height: 44px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.page-editor {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.editor-top {
+  justify-content: space-between;
+}
+
+.editor-mode {
+  flex-shrink: 0;
+}
+
+.builder-entry,
+.home-form,
+.legacy-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.builder-entry {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.18s ease;
+}
+
+.builder-entry:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.builder-entry h2,
+.builder-entry p {
+  margin: 0;
+}
+
+.builder-entry h2 {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.builder-entry p {
+  color: var(--color-text-2);
+}
+
+.builder-entry__status {
+  color: var(--color-text-1);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.builder-entry__actions,
+.block-toolbar {
+  flex-wrap: wrap;
+}
+
+.cms-runtime-overview {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.runtime-overview__head,
+.runtime-content-list a {
+  display: flex;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.runtime-overview__head > div,
+.runtime-content-list a > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.runtime-overview__head span,
+.runtime-content-list small,
+.runtime-content-list time,
+.runtime-content-empty {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.runtime-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-overview__grid article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.runtime-overview__grid article > :deep(svg) {
+  grid-row: 1 / 3;
+  color: var(--color-text-2);
+  font-size: 20px;
+}
+
+.runtime-overview__grid strong {
+  font-size: 18px;
+}
+
+.runtime-overview__grid span {
+  color: var(--color-text-3);
+  font-size: 11px;
+}
+
+.runtime-content-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+}
+
+.runtime-content-list a {
+  padding: 10px 12px;
+  color: var(--color-text-1);
+  text-decoration: none;
+}
+
+.runtime-content-list a + a {
+  border-top: 1px solid var(--color-border-2);
+}
+
+.runtime-content-list a:hover {
+  background: var(--color-fill-1);
+}
+
+.runtime-content-list strong,
+.runtime-content-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-content-list time {
+  flex-shrink: 0;
+}
+
+.runtime-content-empty {
+  padding: 18px;
+  text-align: center;
+}
+
+.builder-block {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.builder-block:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.legacy-sections {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+}
+
+.legacy-sections__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.legacy-sections__head h3,
+.legacy-sections__head p {
+  margin: 0;
+}
+
+.legacy-sections__head p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+  font-size: 13px;
+}
+
+.builder-block__head {
+  justify-content: space-between;
+}
+
+.publish-panel {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  max-height: calc(100vh - 130px);
+  overflow: hidden auto;
+  align-content: start;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.publish-panel__tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
+}
+
+.publish-panel__tabs button {
+  display: inline-flex;
+  min-width: 0;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.publish-panel__tabs button:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
+}
+
+.publish-panel__tabs button.active {
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.publish-panel__section {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px;
+}
+
+.publish-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.panel-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title-row button {
+  color: var(--color-text-1);
+  font-size: 12px;
+}
+
+.publish-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.publish-actions a {
+  color: var(--color-text-1);
+  text-decoration: none;
+}
+
+.term-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 24px;
+  margin-bottom: 12px;
+}
+
+.variable-list {
+  display: grid;
+  gap: 8px;
+}
+
+.variable-list.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.variable-list button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  color: var(--color-text-2);
+  text-align: left;
+}
+
+.variable-list button:hover {
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
+}
+
+.variable-list strong,
+.variable-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-list strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+
+.variable-list span {
+  color: var(--color-text-3);
+  font-size: 11px;
+}
+
+.home-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.navigation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.navigation-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.navigation-item-title,
+.navigation-item-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cms-field {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-2);
+  font-size: 13px;
+}
+
+.footer-settings {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.footer-settings h3,
+.footer-settings p {
+  margin: 0;
+}
+
+.footer-settings p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
+.cms-nav-preview {
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-1);
+  overflow: hidden;
+}
+
+.cms-nav-preview__bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.cms-nav-preview__brand {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-1);
+}
+
+.cms-nav-preview__menus {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.cms-nav-preview__menu {
+  display: grid;
+  gap: 4px;
+}
+
+.cms-nav-preview__link {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.cms-nav-preview__link:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
+}
+
+.cms-nav-preview__dropdown {
+  display: grid;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.cms-nav-preview__sublink {
+  padding: 6px 10px;
+  border-radius: 5px;
+  color: var(--color-text-2);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.cms-nav-preview__sublink:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
+}
+
+.cms-footer-preview {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-fill-1);
+}
+
+.cms-footer-preview p,
+.cms-footer-preview small {
+  margin: 0;
+  color: var(--color-text-3);
+}
+
+.cms-help-text {
+  margin: 0;
+  color: var(--color-text-3);
+  line-height: 1.6;
+}
+
+.media-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.media-toolbar-main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.media-toolbar-main h3,
+.media-toolbar-main p {
+  margin: 0;
+}
+
+.media-toolbar-main p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
+.media-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.media-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.media-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.media-card__preview {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+}
+
+.media-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.media-card:hover .media-card__preview img {
+  transform: scale(1.04);
+}
+
+.media-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.media-card:hover .media-card__overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.media-card__overlay :deep([data-slot="button"]) {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: var(--color-text-1);
+}
+
+.media-card__overlay :deep([data-slot="button"]:hover) {
+  background: #fff;
+}
+
+.media-card__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.media-card__body strong,
+.media-card__body span,
+.media-card__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-card__body span,
+.media-card__body small {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.media-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.media-empty {
+  border: 1px dashed var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.home-preview {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.home-preview section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.home-preview h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.empty-state {
+  padding: 24px;
+  color: var(--color-text-3);
+  text-align: center;
+}
+
+.preset-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.preset-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.preset-toolbar h3,
+.preset-toolbar p {
+  margin: 0;
+}
+
+.preset-toolbar p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.preset-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.preset-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.preset-card__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preset-card__desc {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-3);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.preset-card__meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.preset-card__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.preset-form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.preset-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.theme-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.theme-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.theme-card.active {
+  border-color: var(--color-text-1);
+}
+
+.theme-card__preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--color-fill-2);
+}
+
+.theme-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.theme-card__preview-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--color-text-3);
+}
+
+.theme-card__current {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.theme-card__body {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  align-content: start;
+}
+
+.grapes-editor-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  overflow: hidden;
+  background: var(--color-bg-1);
+}
+
+@media (max-width: 760px) {
+  .runtime-overview__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-content-list time {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .cms-layout,
+  .home-layout,
+  .navigation-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .page-list,
+  .publish-panel,
+  .home-preview {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .media-toolbar-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .media-actions {
+    justify-content: flex-start;
+  }
+}
+</style>

@@ -21,9 +21,15 @@ public class ChatRunAppService {
     private final HarnessAgentGateway harness;
     private final ObjectMapper json;
     private final ChatWorkspaceStore workspaceStore;
+    private final online.yudream.base.application.platform.ai.service.CmsStudioClientTools studioTools;
 
     public AiRunDTO start(Long userId, ChatSendCmd cmd) {
         chat.prepare(userId, cmd);
+        if ("cms-studio".equals(agentCode(cmd))) {
+            cmd.setAgentCode("cms-studio");
+            studioTools.ensureAccess(cmd.getPermissionCodes());
+            studioTools.contextKey(userId, String.valueOf(cmd.getSessionId()));
+        }
         String sessionId = String.valueOf(cmd.getSessionId());
         if (!runs.list(userId, sessionId, true).isEmpty()) throw new BizException("当前会话正在运行，请等待结束或明确取消后重试");
         String nativeSession = (cmd.getScopeType() == ChatScopeType.CONSOLE ? "console-" : "chat-") + sessionId;
@@ -41,6 +47,10 @@ public class ChatRunAppService {
     public AiRunDTO startOnce(Long userId, ChatSendCmd cmd) { return start(userId, cmd); }
 
     private void prepareFrontend(Long userId, ChatSendCmd cmd, AiRunAppService.RunEmitter emitter) {
+        if ("cms-studio".equals(agentCode(cmd))) {
+            cmd.setScopedTools(studioTools.bind(userId, String.valueOf(cmd.getSessionId()), cmd.getPermissionCodes(), emitter::frontendRequest));
+            return;
+        }
         java.util.List<online.yudream.base.domain.platform.ai.service.AiAgentTool> scoped = new java.util.ArrayList<>();
         if (cmd.isFrontendToolsEnabled()) {
             scoped.addAll(AiFrontendTools.create(cmd.getFrontendContext(), emitter));
@@ -78,6 +88,6 @@ public class ChatRunAppService {
     }
 
     private String agentCode(ChatSendCmd cmd) {
-        return cmd == null || cmd.getAgentCode() == null ? "general" : cmd.getAgentCode();
+        return cmd == null || cmd.getAgentCode() == null ? "general" : cmd.getAgentCode().trim().toLowerCase(java.util.Locale.ROOT);
     }
 }

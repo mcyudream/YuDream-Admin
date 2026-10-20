@@ -50,6 +50,19 @@ export function parseAiFrontendToolRequest(value: unknown): AiFrontendToolReques
   if (typeof raw.toolCallId !== 'string' || !raw.toolCallId || raw.toolCallId.length > 200) {
     return undefined
   }
+  const studioNames = ['cms.studio.read', 'cms.studio.apply', 'cms.studio.validate'] as const
+  if (studioNames.includes(raw.name as typeof studioNames[number])) {
+    // Only exact AST tool names enter the registered executor. The executor validates command/model/context.
+    if (!raw.arguments || typeof raw.arguments !== 'object' || Array.isArray(raw.arguments)) {
+      return undefined
+    }
+    return {
+      toolCallId: raw.toolCallId,
+      name: raw.name as typeof studioNames[number],
+      arguments: raw.arguments as Record<string, unknown>,
+      expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : typeof raw.expiresAt === 'string' && Number.isFinite(Date.parse(raw.expiresAt)) ? Date.parse(raw.expiresAt) : undefined,
+    }
+  }
   if (raw.name !== 'ui.navigate' && raw.name !== 'ui.highlight' && raw.name !== 'ui.tour') {
     return undefined
   }
@@ -95,12 +108,14 @@ export function frontendContextForPreferences(context: AiFrontendContext, prefer
   if (preferences.tourTools && context.tours?.length) {
     result.tours = context.tours
   }
-  return Object.keys(result).length ? {
-    ...result,
-    navigationToolsEnabled: preferences.navigationTools,
-    highlightToolsEnabled: preferences.highlightTools,
-    tourToolsEnabled: preferences.tourTools,
-  } : undefined
+  return Object.keys(result).length
+    ? {
+        ...result,
+        navigationToolsEnabled: preferences.navigationTools,
+        highlightToolsEnabled: preferences.highlightTools,
+        tourToolsEnabled: preferences.tourTools,
+      }
+    : undefined
 }
 
 export function matchesAiAssistantShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey' | 'isComposing' | 'repeat'>, shortcut: AiAssistantPreferences['shortcut']): boolean {

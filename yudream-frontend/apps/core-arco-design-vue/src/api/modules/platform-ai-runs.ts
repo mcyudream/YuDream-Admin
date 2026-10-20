@@ -30,8 +30,10 @@ export interface AiFrontendContext {
 
 export interface AiFrontendToolRequest {
   toolCallId: string
-  name: 'ui.navigate' | 'ui.highlight' | 'ui.tour'
-  arguments: { routeName?: string, actionCode?: string, tourCode?: string }
+  name: 'ui.navigate' | 'ui.highlight' | 'ui.tour' | 'cms.studio.read' | 'cms.studio.apply' | 'cms.studio.validate'
+  arguments: { routeName?: string, actionCode?: string, tourCode?: string, [key: string]: unknown }
+  /** 仅由宿主运行观察器注入，模型参数不能指定。 */
+  runId?: string
   expiresAt?: number | string
 }
 

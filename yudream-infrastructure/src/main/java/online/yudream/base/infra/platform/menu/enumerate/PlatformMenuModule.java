@@ -322,8 +322,8 @@ public enum PlatformMenuModule {
             parentName = "FORM", permission = "platform:form:statistics:view")
     FORM_STATISTICS_VIEW,
 
-    @MenuNode(code = "platform:theme-center", name = "主题中心", type = MenuNodeType.MENU,
-            parentName = "CONTENT_HUB", path = "/platform/theme-center", component = "platform/theme-center/index.vue",
+    @MenuNode(code = "platform:theme-center", name = "网站工作台", type = MenuNodeType.MENU,
+            parentName = "CONTENT_HUB", path = "/platform/theme-center", component = "platform/site-studio/index.vue",
             icon = "i-ri:palette-line", sort = 60)
     THEME_CENTER,
 

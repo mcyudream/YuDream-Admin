@@ -2,6 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, isSafeAiRoute, matchesAiAssistantShortcut, parseAiAssistantPreferences, parseAiFrontendToolRequest } from './ai-assistant-context.ts'
 
+test('studio tools use an exact whitelist and never trust a model supplied run identity', () => {
+  for (const name of ['cms.studio.read', 'cms.studio.apply', 'cms.studio.validate']) {
+    const request = parseAiFrontendToolRequest({ toolCallId: 'cms-1', name, runId: 'forged', arguments: { contextKey: 'draft' } })
+    assert.equal(request?.name, name)
+    assert.equal(request?.runId, undefined)
+  }
+  for (const name of ['cms.studio.execute', 'cms.studio.read.more', 'cms.studio.save', 'cms.studio.publish', 'cms.canvas.update_html', 'cms_studio_read']) {
+    assert.equal(parseAiFrontendToolRequest({ toolCallId: 'cms-1', name, arguments: {} }), undefined)
+  }
+})
+
 test('assistant context and frontend tools require explicit preference opt-in', () => {
   assert.deepEqual(parseAiAssistantPreferences(undefined), defaultAiAssistantPreferences)
   assert.equal(frontendContextForPreferences({ route: { name: 'users', title: '用户管理', path: '/system/user' }, routes: [], actions: [] }, defaultAiAssistantPreferences), undefined)

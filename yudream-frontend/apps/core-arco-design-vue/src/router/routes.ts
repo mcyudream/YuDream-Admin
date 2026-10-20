@@ -205,6 +205,28 @@ const systemRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        // 网站工作台别名入口；/platform/theme-center 为菜单主入口（指向同组件的薄包装）
+        path: 'platform/site-studio',
+        name: 'siteStudio',
+        component: () => import('@/views/platform/site-studio/index.vue'),
+        meta: {
+          title: '网站工作台',
+          auth: 'platform:cms:view',
+          menu: false,
+        },
+      },
+      {
+        // 旧版主题中心（legacy）：从工作台「旧版与迁移」显式进入
+        path: 'platform/theme-center/legacy',
+        name: 'themeCenterLegacy',
+        component: () => import('@/views/platform/theme-center/legacy.vue'),
+        meta: {
+          title: '旧版主题中心',
+          auth: 'platform:cms:view',
+          menu: false,
+        },
+      },
+      {
         // 添加远程市场源：不进菜单，不依赖「插件市场源」能力，由插件市场按钮进入
         path: 'platform/plugin-marketplace/add-source',
         name: 'pluginMarketplaceAddSource',

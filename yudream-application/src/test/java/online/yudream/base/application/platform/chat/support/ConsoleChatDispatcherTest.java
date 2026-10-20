@@ -16,6 +16,27 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConsoleChatDispatcherTest {
     @Test
+    void studioProfileNormalizesAndOnlyAllowsAstToolsWithDraftPrompt() {
+        AtomicReference<HarnessRunRequest> seen = new AtomicReference<>();
+        HarnessAgentGateway gateway = (request, delta, reasoning, tool) -> {
+            seen.set(request); return new HarnessRunResult("", "", AiUsage.empty(), List.of());
+        };
+        CapabilityModuleRepo modules = (CapabilityModuleRepo) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{CapabilityModuleRepo.class},
+                (proxy, method, args) -> Optional.of(CapabilityModule.builder().code("ai").enabled(true).config(Map.of()).build()));
+        var dispatcher = new ConsoleChatDispatcher(gateway, modules, null);
+        dispatcher.studioTools(new online.yudream.base.application.platform.ai.service.CmsStudioClientTools(null, null, null) {
+            @Override public void ensureAccess(List<String> permissions) { assertEquals(List.of("*"), permissions); }
+            @Override public String contextKey(Long userId, String sessionId) { assertEquals("123", sessionId); return "bound"; }
+        });
+        dispatcher.dispatch(new ChatDispatchContext(7L, "123", "优化页面", null, null, " CMS-STUDIO ", "bound", List.of(), List.of(), List.of("*"), ignored -> {}, ignored -> {}, ignored -> {}));
+        assertEquals("cms-studio", seen.get().agentCode());
+        assertEquals(List.of("cms_studio_read", "cms_studio_apply", "cms_studio_validate"), seen.get().allowedToolNames());
+        assertTrue(seen.get().systemPrompt().contains("不保存、不发布"));
+        assertTrue(seen.get().systemPrompt().contains("expectedRevision"));
+        assertFalse(seen.get().allowedToolNames().contains("write_file"));
+    }
+
+    @Test
     void selectingCmsWorkspaceNeverGrantsHostToolPermission() {
         AtomicReference<HarnessRunRequest> seen = new AtomicReference<>();
         HarnessAgentGateway gateway = (request,delta,reasoning,tool) -> {

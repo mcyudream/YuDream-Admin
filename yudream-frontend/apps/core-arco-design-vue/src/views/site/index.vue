@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import type { CmsPage, CmsTemplateContext, CmsTemplateContextQuery, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
+import type { PluginRouteMeta } from '@/plugins/use-plugin-remote-component'
+import type { SiteDocument } from '@/types/site-studio'
 import apiCms from '@/api/modules/platform-cms'
+import { fetchPublishedStudio } from '@/api/modules/platform-cms-studio'
 import { useActivePluginTheme } from '@/plugins/theme-runtime'
-import { usePluginRemoteComponentByMeta, type PluginRouteMeta } from '@/plugins/use-plugin-remote-component'
+import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-component'
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
+import { compileStudioPage, validateStudioDocument } from '@/utils/site-studio'
 import SiteChrome from './site-chrome.vue'
 import { useSiteNavigation } from './site-navigation'
+import StudioFrame from './studio-frame.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,8 +22,12 @@ const appSettingsStore = useAppSettingsStore()
 const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
+// 新站点文档（网站工作台发布）：仅使用显式发布过的内容，加载失败区分于「未发布」
+const studioDocument = ref<SiteDocument | null>(null)
+const studioFailed = ref(false)
+let loadSeq = 0
 // 无感切换：路由变化时保留旧内容，仅在没有内容可显示时才出现整页加载态
-const hasContent = computed(() => !!(page.value || home.value))
+const hasContent = computed(() => !!(page.value || home.value || studioDocument.value))
 
 // 站内链接走 router 跳转，避免整页刷新；外部/锚点/新窗口等保持原生行为
 function navigate(event: MouseEvent, url?: string) {
@@ -69,6 +78,60 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 
+// ===== 新站点文档（网站工作台发布）渲染分支 =====
+
+function normalizeStudioPath(value: string) {
+  return value.replace(/^\/+|\/+$/g, '')
+}
+
+/** 首页匹配 path '/'（或空）；子页按归一化路径精确匹配 */
+const studioPage = computed(() => {
+  const document = studioDocument.value
+  if (!document) {
+    return null
+  }
+  const target = normalizeStudioPath(slug.value)
+  return document.pages.find(page => normalizeStudioPath(page.path) === target) || null
+})
+
+/** 新文档页有独立的 header/footer，渲染时不再包宿主 SiteChrome，避免两层站点壳 */
+const studioFrameHtml = computed(() => {
+  const document = studioDocument.value
+  const matched = studioPage.value
+  if (!document || !matched) {
+    return ''
+  }
+  const compiled = compileStudioPage(document, matched.id, { includeChrome: true })
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;padding:0}</style><style>${compiled.css}</style></head><body>${compiled.html}</body></html>`
+})
+
+async function loadStudioDocument(seq: number) {
+  try {
+    const published = await fetchPublishedStudio()
+    if (seq !== loadSeq) {
+      return
+    }
+    studioFailed.value = false
+    if (!published?.documentJson) {
+      studioDocument.value = null
+      return
+    }
+    const parsed = JSON.parse(published.documentJson) as SiteDocument
+    validateStudioDocument(parsed)
+    studioDocument.value = parsed
+  }
+  catch (error) {
+    if (seq !== loadSeq) {
+      return
+    }
+    // 404/未发布 = 静默降级旧版；网络或文档错误要可见，不能把失败伪装成空站点
+    if (error instanceof Error && error.message && !/404/.test(error.message)) {
+      studioFailed.value = true
+    }
+    studioDocument.value = null
+  }
+}
+
 // 激活 SITE 主题声明了 homeComponent 时，/site 首页由主题远程 Vue 组件接管；
 // meta 由 /themes/active 载荷构造，不走公开路由的 meta.plugin。
 const activeSiteTheme = useActivePluginTheme('SITE')
@@ -98,7 +161,7 @@ const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 const homeContentCss = computed(() => rewriteBackendAssetUrls(home.value?.settings?.homeCss || ''))
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 // 主题首页接管时不注入 CMS 首页脚本，避免与主题 Vue 页面互相干扰
-const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : themeHomeActive.value ? '' : homeJs.value)
+const activeCmsJs = computed(() => studioPage.value ? '' : page.value ? page.value.jsContent || '' : themeHomeActive.value ? '' : homeJs.value)
 // 站点导航 = 首页 + CMS navigationJson + 插件 siteNav 路由 + 知识库入口，与公开插件页的站点 chrome 共用同一份合并逻辑
 const { navigationItems, navigationTree } = useSiteNavigation(() => home.value?.settings?.navigationJson)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
@@ -190,8 +253,6 @@ const renderContext = computed(() => {
   }
 })
 
-let loadSeq = 0
-
 watch(() => route.fullPath, load, { immediate: true })
 watch(themeHomeError, (message) => {
   if (message) {
@@ -218,6 +279,23 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   const targetSlug = slug.value
+  // 新站点文档优先：显式发布的文档接管命中的首页/子页；未发布或失败才走旧版渲染
+  await loadStudioDocument(seq)
+  if (seq !== loadSeq) {
+    return
+  }
+  if (studioPage.value) {
+    cleanupCmsScript()
+    const matched = studioPage.value
+    loading.value = false
+    applyPublicSeo({
+      title: matched.name,
+      canonicalPath: targetSlug ? `/site/${targetSlug}` : '/site',
+      type: targetSlug ? 'article' : 'website',
+      siteName: appSettingsStore.siteName,
+    })
+    return
+  }
   try {
     if (targetSlug) {
       const res = await apiCms.publicPage(targetSlug)
@@ -301,11 +379,21 @@ function templateContextQuery(): CmsTemplateContextQuery | undefined {
       return
     }
     const max = (current?: number) => Math.max(current || 0, limit)
-    if (path === 'cms.pages.latest') query.cmsLatestLimit = max(query.cmsLatestLimit)
-    if (path === 'knowledge.spaces') query.knowledgeSpacesLimit = max(query.knowledgeSpacesLimit)
-    if (path === 'knowledge.pages') query.knowledgePagesLimit = max(query.knowledgePagesLimit)
-    if (path === 'knowledge.latest') query.knowledgeLatestLimit = max(query.knowledgeLatestLimit)
-    if (path === 'knowledge.featured') query.knowledgeFeaturedLimit = max(query.knowledgeFeaturedLimit)
+    if (path === 'cms.pages.latest') {
+      query.cmsLatestLimit = max(query.cmsLatestLimit)
+    }
+    if (path === 'knowledge.spaces') {
+      query.knowledgeSpacesLimit = max(query.knowledgeSpacesLimit)
+    }
+    if (path === 'knowledge.pages') {
+      query.knowledgePagesLimit = max(query.knowledgePagesLimit)
+    }
+    if (path === 'knowledge.latest') {
+      query.knowledgeLatestLimit = max(query.knowledgeLatestLimit)
+    }
+    if (path === 'knowledge.featured') {
+      query.knowledgeFeaturedLimit = max(query.knowledgeFeaturedLimit)
+    }
     if (blockMatch) {
       query.blockLimit = max(query.blockLimit)
     }
@@ -478,7 +566,7 @@ async function runCmsScript() {
   await nextTick()
   cleanupCmsScript()
   const code = stripScriptTags(activeCmsJs.value).trim()
-  if (!code) {
+  if (!code || studioPage.value) {
     return
   }
   ;(window as any).__YU_CMS_CONTEXT__ = renderContext.value
@@ -537,7 +625,6 @@ function stripScriptTags(value: string) {
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 10) : ''
 }
-
 </script>
 
 <template>
@@ -551,7 +638,11 @@ function dateText(value?: string) {
     </div>
 
     <template v-else>
-      <SiteChrome :settings="home?.settings" :blank="isBlankPage">
+      <div v-if="studioFailed" class="site-studio-notice" role="status">
+        网站文档加载失败，当前展示旧版内容
+      </div>
+      <StudioFrame v-if="studioFrameHtml" :srcdoc="studioFrameHtml" />
+      <SiteChrome v-else :settings="home?.settings" :blank="isBlankPage">
         <div class="site-layout-frame">
           <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">
             <strong>{{ renderContext.site.name }}</strong>
@@ -580,7 +671,7 @@ function dateText(value?: string) {
                 </div>
               </template>
               <template v-else>
-                <component :is="'style'" v-if="homeContentCss">
+                <component is="style" v-if="homeContentCss">
                   {{ homeContentCss }}
                 </component>
                 <div v-if="homeHtml" class="site-builder-home" @click="handleContentClick" v-html="renderDynamicHtml(homeHtml)" />
@@ -604,7 +695,7 @@ function dateText(value?: string) {
             </template>
 
             <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
-              <component :is="'style'" v-if="articleCss">
+              <component is="style" v-if="articleCss">
                 {{ articleCss }}
               </component>
               <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${toBackendAssetUrl(page.coverImageUrl)})` } : undefined">

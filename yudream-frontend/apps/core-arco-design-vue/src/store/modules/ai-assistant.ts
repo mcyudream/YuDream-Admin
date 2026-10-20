@@ -497,7 +497,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     }
     const id = `${runId}:${request.toolCallId}`
     if (!consumedTools.has(id)) {
-      frontendRequests.value[id] = { runId, request }
+      frontendRequests.value[id] = { runId, request: { ...request, runId } }
     }
   }
 

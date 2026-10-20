@@ -23,6 +23,49 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AiRunAppServiceTest {
     @Test
+    void studioResumeRechecksCmsGateAndWritePermissionAndRestoresScopedTools() throws Exception {
+        MemoryRepo repo = new MemoryRepo();
+        var run = repo.create(AiRun.start(7L, "123", "chat", "dead-instance"));
+        run.setNativeReference(new HarnessRunReference("cms-studio", "console-123", "turn", "native"));
+        run.setNativeProfile(new online.yudream.base.domain.platform.ai.valobj.HarnessResumeProfile("provider", "model", "AST草稿提示", true,
+                List.of("cms_studio_read", "cms_studio_apply", "cms_studio_validate"), true, 7L, true));
+        run.setNativeResumeSupported(true);
+        repo.nativeReference(run.getId(), run.getNativeReference(), true); repo.nativeProfile(run.getId(), run.getNativeProfile());
+        repo.finish(run.getId(), AiRunStatus.FAILED, null, "实例中断");
+        AtomicBoolean gate = new AtomicBoolean(false), rebound = new AtomicBoolean(false), resumed = new AtomicBoolean(false);
+        var harness = new online.yudream.base.domain.platform.ai.service.HarnessAgentGateway() {
+            public online.yudream.base.domain.platform.ai.valobj.HarnessRunResult run(online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest request,
+                    java.util.function.Consumer<String> delta, java.util.function.Consumer<String> reasoning, java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> tool) { throw new AssertionError("不应重新提交"); }
+            public online.yudream.base.domain.platform.ai.valobj.HarnessSessionSnapshot inspect(online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest request) {
+                return new online.yudream.base.domain.platform.ai.valobj.HarnessSessionSnapshot(1, "turn", "native", "RUNNING", List.of(), List.of());
+            }
+            public online.yudream.base.domain.platform.ai.valobj.HarnessRunResult resume(online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest request, String turnId,
+                    java.util.function.Consumer<String> delta, java.util.function.Consumer<String> reasoning, java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> tool,
+                    java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress> progress) {
+                assertTrue(rebound.get()); assertNotNull(online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.currentTools());
+                assertEquals("cms-studio", request.agentCode()); resumed.set(true);
+                return new online.yudream.base.domain.platform.ai.valobj.HarnessRunResult("已接续", "", online.yudream.base.domain.platform.ai.valobj.AiUsage.empty(), List.of());
+            }
+        };
+        var modules = (online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo) java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo.class}, (proxy, method, args) -> Optional.of(online.yudream.base.domain.platform.capability.aggregate.CapabilityModule.builder().code("ai").enabled(true).config(Map.of()).build()));
+        var service = new AiRunAppService(repo, enabled(), new ObjectMapper(), harness, modules, null, List.of());
+        service.studioTools(new CmsStudioClientTools(null, null, null) {
+            @Override public void ensureAccess(List<String> permissions) { if (!gate.get()) throw new BizException("CMS 项目闸门关闭"); }
+            @Override public String contextKey(Long userId, String sessionId) { assertEquals(7L, userId); assertEquals("123", sessionId); return "bound"; }
+            @Override public List<online.yudream.base.domain.platform.ai.service.AiAgentTool> bind(Long userId, String sessionId, List<String> permissions, CmsCanvasClientBridge.Outbound outbound) {
+                ensureAccess(permissions); contextKey(userId, sessionId); rebound.set(true); return List.of();
+            }
+        });
+        assertThrows(BizException.class, () -> service.resume(7L, run.getId(), List.of("platform:chat:use")));
+        gate.set(true);
+        assertThrows(BizException.class, () -> service.resume(7L, run.getId(), List.of("platform:chat:use", "platform:cms:view")));
+        assertEquals(AiRunStatus.FAILED, service.get(7L, run.getId()).status());
+        service.resume(7L, run.getId(), List.of("*")); waitTerminal(service, run.getId());
+        assertTrue(resumed.get());
+    }
+
+    @Test
     void generationContinuesWithoutSubscriberAndReplaysOnlyAfterCursor() throws Exception {
         MemoryRepo repo = new MemoryRepo();
         AiRunAppService service = service(repo);

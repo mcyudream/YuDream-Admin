@@ -20,6 +20,7 @@ declare global {
   const disposePluginAiActions: typeof import('../composables/ai-assistant-actions').disposePluginAiActions
   const effectScope: typeof import('vue').effectScope
   const ensurePublicPluginRoutes: typeof import('../store/modules/app/plugin-route-runtime').ensurePublicPluginRoutes
+  const executeStudioAgentTool: typeof import('../composables/use-site-studio-agent').executeStudioAgentTool
   const filterBackendMenuTreeByAuth: typeof import('../store/modules/app/route-auth').filterBackendMenuTreeByAuth
   const findBestMenuGroupIndex: typeof import('../store/modules/app/menu-match').findBestMenuGroupIndex
   const flattenBackendRouteGroups: typeof import('../store/modules/app/route-auth').flattenBackendRouteGroups
@@ -59,6 +60,7 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const parseStudioAgentCommand: typeof import('../composables/use-site-studio-agent').parseStudioAgentCommand
   const projectRouteMenus: typeof import('../store/modules/app/menu-projection').projectRouteMenus
   const provide: typeof import('vue').provide
   const provideYdChatConfig: typeof import('@yudream/components').provideYdChatConfig
@@ -115,6 +117,7 @@ declare global {
   const usePluginDevtoolsStore: typeof import('../store/modules/app/plugin-devtools').usePluginDevtoolsStore
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
+  const useSiteStudioStore: typeof import('../store/modules/site-studio').useSiteStudioStore
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTourStore: typeof import('../store/modules/tour').useTourStore
@@ -155,4 +158,7 @@ declare global {
   // @ts-ignore
   export type { LinkedFocusOptions } from '../composables/use-linked-focus'
   import('../composables/use-linked-focus')
+  // @ts-ignore
+  export type { StudioAgentContext } from '../composables/use-site-studio-agent'
+  import('../composables/use-site-studio-agent')
 }

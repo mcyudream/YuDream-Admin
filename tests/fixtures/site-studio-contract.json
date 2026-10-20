@@ -1,0 +1,1128 @@
+{
+  "valid": [
+    {
+      "name": "portable-media-responsive-tokens",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "css-embedded-media",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)",
+                  "background-image": "url(\"data:image/png;base64,YQ==\")"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "schema-version",
+      "document": {
+        "schemaVersion": 2,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-field",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ],
+        "html": "<p>extra projection</p>"
+      }
+    },
+    {
+      "name": "script-tag",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "script",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event-attribute",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {
+                  "onclick": "alert(1)"
+                },
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "javascript-url",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {
+                  "href": "javascript:alert(1)"
+                },
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "svg-data",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/svg+xml;base64,YQ==",
+            "mimeType": "image/svg+xml",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "noncanonical-base64",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YR==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "credential-url",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "https://user:secret@example.test/a.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "id-collision",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "site-contract",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid-id",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "unsafe:node",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "path-trailing-slash",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/about/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "casefold-path-conflict",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "page-a",
+            "name": "A",
+            "path": "/About",
+            "root": []
+          },
+          {
+            "id": "page-b",
+            "name": "B",
+            "path": "/about",
+            "root": []
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "mixed-content",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": [
+                  {
+                    "id": "child",
+                    "type": "text",
+                    "tag": "span",
+                    "text": "mixed",
+                    "attributes": {},
+                    "styles": {},
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "void-text",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "img",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "blank-type",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "  ",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "token-collision",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456",
+            "--accent": "red"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "css-injection",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "red;background:url(javascript:evil)"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "css-control",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "red\n"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    },
+    {
+      "name": "css-svg-url",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-contract",
+        "name": "契约测试",
+        "theme": {
+          "tokens": {
+            "accent": "#123456"
+          },
+          "header": [],
+          "footer": []
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-text",
+                "type": "text",
+                "tag": "p",
+                "text": "中文 <safe> & text",
+                "attributes": {},
+                "styles": {
+                  "color": "var(--accent)",
+                  "background-image": "url(\"data:image/svg+xml;base64,YQ==\")"
+                },
+                "responsive": {
+                  "tablet": {
+                    "font-size": "20px"
+                  },
+                  "mobile": {
+                    "font-size": "16px"
+                  }
+                },
+                "children": []
+              }
+            ]
+          }
+        ],
+        "assets": [
+          {
+            "id": "asset-png",
+            "name": "便携图",
+            "url": "data:image/png;base64,YQ==",
+            "mimeType": "image/png",
+            "kind": "image"
+          }
+        ]
+      }
+    }
+  ]
+}

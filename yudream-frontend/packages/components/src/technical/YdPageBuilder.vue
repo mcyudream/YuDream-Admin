@@ -3,8 +3,8 @@ import type { Editor, EditorConfig, UploadFileClb, UploadFileOptions } from 'gra
 import type { YdPageBuilderInput } from './page-builder-model'
 import type { YdPageBuilderEditorFacade, YdPageBuilderInstance, YdPageBuilderOptions, YdPageBuilderSetupHandler, YdPageBuilderSnapshot, YdPageBuilderUploadHandler } from './page-builder.types'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { createYdPageBuilderFacadeMethod, isYdPageBuilderInstanceCurrent, resolveYdPageBuilderEngineContainer, shouldYdPageBuilderEmitReady } from './page-builder-lifecycle'
 import { resolveYdPageBuilderChangeMode, resolveYdPageBuilderLoad, sameYdPageBuilderSnapshot } from './page-builder-model'
-import { createYdPageBuilderFacadeMethod, isYdPageBuilderUploadCurrent } from './page-builder-lifecycle'
 import 'grapesjs/dist/css/grapes.min.css'
 import '../theme/appearance.css'
 
@@ -41,6 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const root = ref<HTMLElement | null>(null)
+const engine = ref<HTMLElement | null>(null)
 const initialized = ref(false)
 const initializationError = ref('')
 let editor: Editor | null = null
@@ -119,7 +120,7 @@ function dispose() {
 }
 
 function maybeEmitReady() {
-  if (disposed || readyEmitted || !prepared || !canvasLoaded || !facade) {
+  if (!facade || !shouldYdPageBuilderEmitReady({ disposed, readyEmitted, prepared, canvasLoaded })) {
     return
   }
   readyEmitted = true
@@ -150,6 +151,10 @@ function applyInput(instance: Editor, input: YdPageBuilderInput, mode: 'project'
   finally {
     applyingExternalValue = false
   }
+  // 本次加载没有再出错时清除上一次的加载错误，保持状态真实；刚上报的错误不会被清除。
+  if (!(resolved.kind === 'html' && resolved.projectError)) {
+    initializationError.value = ''
+  }
   lastEmitted = snapshotOf(instance)
 }
 
@@ -157,13 +162,15 @@ function scheduleChange() {
   if (applyingExternalValue || disposed || !editor) {
     return
   }
+  const scheduled = editor
   if (changeTimer) {
     clearTimeout(changeTimer)
   }
   changeTimer = setTimeout(() => {
     changeTimer = null
     const instance = editor
-    if (!instance || disposed || applyingExternalValue) {
+    // 迟到刷新：仅当调度时的实例仍是当前存活实例才产出快照。
+    if (!instance || !isYdPageBuilderInstanceCurrent(scheduled, instance, disposed, candidate => destroyedEditors.has(candidate))) {
       return
     }
     const snapshot = snapshotOf(instance)
@@ -192,7 +199,7 @@ function filesFromUploadEvent(event: DragEvent, options?: UploadFileOptions): Fi
 
 async function uploadFiles(event: DragEvent, callback?: UploadFileClb, options?: UploadFileOptions) {
   const uploadEditor = editor
-  if (!isYdPageBuilderUploadCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
+  if (!isYdPageBuilderInstanceCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
     return
   }
   const handler = props.upload
@@ -201,20 +208,20 @@ async function uploadFiles(event: DragEvent, callback?: UploadFileClb, options?:
   }
   const files = filesFromUploadEvent(event, options)
   if (!files.length) {
-    if (isYdPageBuilderUploadCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
+    if (isYdPageBuilderInstanceCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
       callback?.({ data: [] })
     }
     return
   }
   try {
     const assets = await handler(files)
-    if (!isYdPageBuilderUploadCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
+    if (!isYdPageBuilderInstanceCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
       return
     }
     callback?.({ data: assets })
   }
   catch (cause) {
-    if (!isYdPageBuilderUploadCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
+    if (!isYdPageBuilderInstanceCurrent(uploadEditor, editor, disposed, candidate => destroyedEditors.has(candidate))) {
       return
     }
     reportError(cause)
@@ -225,7 +232,9 @@ async function uploadFiles(event: DragEvent, callback?: UploadFileClb, options?:
 async function initialize() {
   try {
     const grapes = await import('grapesjs')
-    if (disposed || !root.value) {
+    // 异步加载期间可能已卸载；引擎容器必须是专用子容器，根元素承载着 Vue 状态节点。
+    const container = resolveYdPageBuilderEngineContainer(root.value, engine.value)
+    if (disposed || !container) {
       return
     }
     const assetManager = {
@@ -234,7 +243,7 @@ async function initialize() {
     }
     const config: EditorConfig = {
       ...props.editorOptions,
-      container: root.value,
+      container,
       height: props.height,
       fromElement: false,
       storageManager: false,
@@ -319,6 +328,7 @@ defineExpose(instanceApi)
     :inert="disabled || readOnly"
     data-yd-page-builder
   >
+    <div ref="engine" class="yd-page-builder__engine" />
     <p v-if="initializationError" class="yd-page-builder__error" role="alert">
       {{ initializationError }}
     </p>
@@ -361,6 +371,8 @@ defineExpose(instanceApi)
   background: var(--color-bg-1);
 }
 .yd-page-builder--disabled { opacity: 0.68; }
+/* 引擎子容器：GrapesJS 初始化/销毁会清空该容器并追加自己的 DOM，Vue 不渲染其子节点。 */
+.yd-page-builder__engine { height: 100%; min-height: 0; }
 .yd-page-builder__status, .yd-page-builder__error { position: absolute; z-index: 1; top: 8px; left: 8px; margin: 0; padding: 4px 8px; border-radius: 4px; background: var(--color-bg-1); color: var(--color-text-3); font-size: 12px; }
 .yd-page-builder__error { color: rgb(var(--danger-6)); }
 </style>
