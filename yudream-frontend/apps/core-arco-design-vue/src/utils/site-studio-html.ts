@@ -110,7 +110,7 @@ function compare(a: number[], b: number[]) {
   }
   return 0
 }
-function extractStyles(element: Element, entries: CssEntry[], inline: string | null) {
+function extractStyles(element: Element, entries: CssEntry[], inline: string | null, matched?: Set<CssEntry>) {
   const buckets: Record<string, Record<string, {
     value: string
     rank: number[]
@@ -139,6 +139,7 @@ function extractStyles(element: Element, entries: CssEntry[], inline: string | n
     if (!best) {
       continue
     }
+    matched?.add(entry)
     const bucket = buckets[entry.breakpoint ?? 'desktop']!
     for (const decl of entry.declarations) {
       const rank = [decl.important ? 1 : 0, 0, ...best, entry.order]
@@ -167,7 +168,25 @@ function extractStyles(element: Element, entries: CssEntry[], inline: string | n
   return { styles: values('desktop'), ...(Object.keys(buckets.tablet!).length || Object.keys(buckets.mobile!).length ? { responsive: { ...(Object.keys(buckets.tablet!).length ? { tablet: values('tablet') } : {}), ...(Object.keys(buckets.mobile!).length ? { mobile: values('mobile') } : {}) } } : {}) }
 }
 /** DOMParser is intentionally required: regex is never used to sanitize HTML. */
-export function parseStudioHtml(html: string, css = '', previous: StudioNode[] = []): StudioNode[] {
+function matchesAny(document: Document, selector: string) {
+  try {
+    return document.querySelector(selector) !== null
+  }
+  catch {
+    throw new Error('不支持的 CSS 选择器')
+  }
+}
+/**
+ * What parsing could not carry into the AST. Non-zero means the source (e.g. the live
+ * canvas) shows something the document will not reproduce, so it must be re-rendered.
+ */
+export interface StudioParseReport {
+  /** Elements/text runs without a data-studio-id that received a fresh ID. */
+  mintedIds: number
+  /** CSS rules matching no element at all (e.g. left behind by a deleted component). */
+  orphanRules: number
+}
+export function parseStudioHtml(html: string, css = '', previous: StudioNode[] = [], report?: StudioParseReport): StudioNode[] {
   studioAssert(typeof DOMParser !== 'undefined', 'HTML 导入需要浏览器 DOMParser')
   studioAssert(new TextEncoder().encode(html).length <= STUDIO_LIMITS.bytes, 'HTML 超过 2 MiB 限制')
   validateStudioNodes(previous)
@@ -184,7 +203,11 @@ export function parseStudioHtml(html: string, css = '', previous: StudioNode[] =
   index(previous)
   const ids = new Set<string>()
   let count = 0
+  const matched = new Set<CssEntry>()
   const uniqueId = (value?: string | null) => {
+    if (!value && report) {
+      report.mintedIds++
+    }
     const id = value || crypto.randomUUID()
     studioAssert(!ids.has(id), 'HTML 含重复 data-studio-id')
     ids.add(id)
@@ -195,7 +218,7 @@ export function parseStudioHtml(html: string, css = '', previous: StudioNode[] =
     const id = uniqueId(element.getAttribute('data-studio-id'))
     const previousNode = previousById.get(id)
     const attributes = Object.fromEntries([...element.attributes].filter(attr => !['style', 'data-studio-id', 'data-studio-type'].includes(attr.name)).map(attr => [attr.name, attr.value]))
-    const node: StudioNode = { id, type: element.getAttribute('data-studio-type') || previousNode?.type || element.tagName.toLowerCase(), tag: element.tagName.toLowerCase(), attributes, ...extractStyles(element, entries, element.getAttribute('style')), children: [] }
+    const node: StudioNode = { id, type: element.getAttribute('data-studio-type') || previousNode?.type || element.tagName.toLowerCase(), tag: element.tagName.toLowerCase(), attributes, ...extractStyles(element, entries, element.getAttribute('style'), matched), children: [] }
     if (element.children.length === 0) {
       const text = element.textContent ?? ''
       if (!STUDIO_VOID_TAGS.has(node.tag) && (text || previousNode?.text !== undefined || !previousNode)) {
@@ -234,5 +257,9 @@ export function parseStudioHtml(html: string, css = '', previous: StudioNode[] =
     }
   }
   validateStudioNodes(nodes)
+  if (report) {
+    // Rules on the presentation shell (token scope) are regenerated from the document and still count as used.
+    report.orphanRules += entries.filter(entry => !matched.has(entry) && !entry.rule.selectors.some(item => item === ':root' || matchesAny(parsed, item))).length
+  }
   return nodes
 }

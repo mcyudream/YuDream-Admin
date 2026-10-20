@@ -6,6 +6,7 @@
 // 主文档与画布 iframe 文档上，输入框、弹窗与内联内容编辑时一律不截获。
 import type { YdPageBuilderEditorFacade, YdPageBuilderOptions, YdPageBuilderSetupHandler, YdPageBuilderSnapshot } from '@yudream/components'
 import type { StudioNode } from '@/types/site-studio'
+import type { StudioParseReport } from '@/utils/site-studio'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useAppAuth } from '@/composables/app/auth'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
@@ -138,6 +139,40 @@ const compiled = computed(() => {
   return { html: `<div data-studio-document="${document.id}">${output.html}</div>`, css: `${root}{${tokens}}\n${output.css}` }
 })
 
+/**
+ * 画布实际输入。默认是文档编译结果；画布自身的无损编辑写回文档后，改为引擎刚发出的快照，
+ * 构建器把与上次输出相同的输入识别为回声而不整体重建，选中、滚动与 iframe 状态得以保留。
+ * 回声按 editRevision 精确对应：其后任何撤销、AI、属性面板改动都会重新编译回灌。
+ */
+// 回声需带上引擎项目 JSON，构建器按三项全等判定；编译输入不带项目 JSON，始终按 HTML/CSS 载入
+interface CanvasInput { html: string, css: string, project?: string }
+const canvasInput = shallowRef<CanvasInput | null>(null)
+let canvasEcho: (Required<CanvasInput> & { revision: string }) | null = null
+watch(compiled, (value) => {
+  const echo = canvasEcho
+  canvasEcho = null
+  canvasInput.value = value && echo && echo.revision === store.editRevision ? { html: echo.html, css: echo.css, project: echo.project } : value
+}, { immediate: true })
+
+/** 画布内容被拒或未能写入文档时，按文档强制回灌，避免画布残留文档中不存在的内容 */
+function resyncCanvas() {
+  const value = compiled.value
+  canvasEcho = null
+  if (!value || disposed) {
+    return
+  }
+  const current = canvasInput.value
+  if (current?.html !== value.html || current?.css !== value.css || current?.project) {
+    canvasInput.value = value
+  }
+  else if (facade.value && ready.value) {
+    // 输入未变时构建器不会重放，直接经 facade 写回
+    facade.value.setComponents(value.html)
+    facade.value.setStyle(value.css)
+  }
+  reselectAfterRebuild()
+}
+
 const pageBuilderOptions = computed<YdPageBuilderOptions>(() => ({
   width: 'auto',
   protectedCss: '',
@@ -248,12 +283,14 @@ function onCanvasChange(snapshot: YdPageBuilderSnapshot) {
     return
   }
   const previous = targetNodes.value
+  const report: StudioParseReport = { mintedIds: 0, orphanRules: 0 }
   let nodes: StudioNode[]
   try {
-    nodes = parseStudioHtml(snapshot.htmlContent, snapshot.cssContent, previous)
+    nodes = parseStudioHtml(snapshot.htmlContent, snapshot.cssContent, previous, report)
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '画布内容解析失败，本次修改未应用')
+    resyncCanvas()
     return
   }
   if (JSON.stringify(nodes) === JSON.stringify(previous)) {
@@ -274,9 +311,14 @@ function onCanvasChange(snapshot: YdPageBuilderSnapshot) {
     else {
       store.executeFromCanvas({ type: 'set-theme', [store.editRegion]: nodes })
     }
+    // 新铸造的 ID 或孤立 CSS 只存在于画布：不登记回声，让编译结果回灌一次后收敛
+    if (report.mintedIds === 0 && report.orphanRules === 0) {
+      canvasEcho = { revision: store.editRevision, html: snapshot.htmlContent, css: snapshot.cssContent, project: snapshot.builderProjectJson }
+    }
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '命令执行失败，本次修改未应用')
+    resyncCanvas()
   }
 }
 
@@ -416,8 +458,8 @@ watch(() => store.selectedNodeId, (nodeId) => {
   syncCanvasSelection(nodeId)
 })
 
-// 命令执行后画布会整体重建（外部 HTML 回灌），重建完成再把原选中反映回去
-watch(() => store.editRevision, () => {
+// 外部改动回灌会整体重建画布，重建完成再把原选中反映回去（画布自身编辑走回声，不重建）
+function reselectAfterRebuild() {
   if (!store.selectedNodeId) {
     return
   }
@@ -428,7 +470,8 @@ watch(() => store.editRevision, () => {
       }
     }, 0)
   })
-})
+}
+watch(() => store.editRevision, reselectAfterRebuild)
 
 // ===== 选中节点面包屑（编辑目标根 → 当前节点祖先链） =====
 
@@ -565,14 +608,15 @@ function crumbLabel(node: StudioNode) {
         title="画布初始化失败"
         :description="builderError"
       />
-      <template v-else-if="compiled">
+      <template v-else-if="canvasInput">
         <div class="p-3 h-full min-h-0 overflow-auto">
           <div class="mx-auto bg-card h-full">
             <YdPageBuilder
               :key="`${store.themeCode}:${store.activePageId}:${store.editRegion}`"
               :disabled="store.busy || !canEdit"
-              :html-content="compiled.html"
-              :css-content="compiled.css"
+              :html-content="canvasInput.html"
+              :css-content="canvasInput.css"
+              :builder-project-json="canvasInput.project"
               :editor-options="pageBuilderOptions"
               :setup="setupBuilder"
               height="100%"
