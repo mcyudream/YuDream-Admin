@@ -24,6 +24,7 @@ const modal = useYdModal()
 const view = ref<'overview' | 'design' | 'theme' | 'assets' | 'releases' | 'legacy'>('overview')
 const sidebarOpen = ref(true)
 const asideOpen = ref(true)
+const pane = ref<'sidebar' | 'main' | 'aside'>('main')
 const inspectorView = ref('properties')
 const themeOptions = ref<{ label: string, value: string }[]>([])
 const themeLoading = ref(false)
@@ -53,8 +54,10 @@ watch(() => [store.themeCode, store.state?.revision, store.dirty, store.saving, 
   ]
 }, { immediate: true })
 
-// 设计视图使用侧栏与属性栏，其余视图收起以让内容占满主区
+// 设计视图使用侧栏与属性栏，其余视图收起以让内容占满主区。
+// 活动栏在这里切换的是主区视图：窄屏布局默认会切到侧栏面板，统一回到主区。
 watch(view, (value) => {
+  pane.value = 'main'
   if (value === 'design') {
     sidebarOpen.value = true
     asideOpen.value = true
@@ -200,6 +203,7 @@ void store.load()
         v-model:rail="view"
         v-model:sidebar-open="sidebarOpen"
         v-model:aside-open="asideOpen"
+        v-model:pane="pane"
         :rail-items="railItems"
         storage-key="site-studio"
         sidebar-label="结构与页面"
