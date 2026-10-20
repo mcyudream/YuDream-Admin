@@ -3,7 +3,7 @@ import type { MenuRecordRaw } from '@fantastic-admin/types'
 import type { YdAgentSendRequest, YdAgentSession, YdAgentWorkspace, YdFilePickerInstance } from '@yudream/components'
 import type { ChatWorkspaceEntry } from '@/api/modules/chat-workspace'
 import type { AiFrontendRoute, AiFrontendToolRequest } from '@/api/modules/platform-ai-runs'
-import { clearYdPersistentChatOwner, YdAgentWorkbench, YdAlert, YdButton, YdChatWindow, YdDrawer, YdFilePicker, YdFloatBall, YdForm, YdFormItem, YdIcon, YdInput, YdModal, YdNumberField, YdSelect, YdSwitch, YdTooltip } from '@yudream/components'
+import { clearYdPersistentChatOwner, YdAgentWorkbench, YdAlert, YdButton, YdChatWindow, YdFilePicker, YdFloatBall, YdForm, YdFormItem, YdIcon, YdInput, YdModal, YdNumberField, YdSelect, YdSwitch, YdTooltip } from '@yudream/components'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiChatWorkspace from '@/api/modules/chat-workspace'
 import { fetchChatQuotaConfig, updateChatQuotaConfig } from '@/api/modules/platform-chat'
@@ -26,8 +26,36 @@ const assistant = useAiAssistantStore()
 const systemRuns = useAiSystemRunsStore()
 const tours = useTourStore()
 const actions = useAiAssistantActions()
-const settingsOpen = ref(false)
-const tasksOpen = ref(false)
+/** 窗口内视图：工作区、运行任务与偏好都在助手窗口内切换，不再以抽屉弹出 */
+type AssistantPanel = 'chat' | 'workspace' | 'tasks' | 'settings'
+const panel = ref<AssistantPanel>('chat')
+const panelTitles: Record<Exclude<AssistantPanel, 'chat'>, string> = { workspace: '我的工作区', tasks: '统一 AI 运行任务', settings: 'AI 助手偏好' }
+function panelFlag(target: Exclude<AssistantPanel, 'chat'>) {
+  return computed({
+    get: () => panel.value === target,
+    set: (open: boolean) => {
+      if (open) {
+        panel.value = target
+      }
+      else if (panel.value === target) {
+        panel.value = 'chat'
+      }
+    },
+  })
+}
+const settingsOpen = panelFlag('settings')
+const tasksOpen = panelFlag('tasks')
+function togglePanel(target: Exclude<AssistantPanel, 'chat'>) {
+  if (panel.value === target) {
+    panel.value = 'chat'
+  }
+  else if (target === 'tasks') {
+    showTasks()
+  }
+  else {
+    panel.value = target
+  }
+}
 const taskRunId = ref('')
 const renameOpen = ref(false)
 const removeOpen = ref(false)
@@ -171,7 +199,7 @@ async function saveQuotaConfig() {
 }
 
 /** 工作区：每用户一个默认工作区，助手会话都在其中读写。 */
-const workspaceOpen = ref(false)
+const workspaceOpen = panelFlag('workspace')
 const workspaceLoading = ref(false)
 const workspaceUploading = ref(false)
 const workspaceError = ref('')
@@ -447,7 +475,7 @@ async function playTour(tourCode?: string) {
     </YdTooltip>
     <YdChatWindow
       v-if="show"
-      :title="'AI 助手'"
+      title="AI 助手"
       :storage-key="`yd.aiAssistant.window.${account.userId}`"
       :width="520"
       :height="680"
@@ -458,22 +486,22 @@ async function playTour(tourCode?: string) {
     >
       <template #head-actions>
         <YdTooltip v-if="canViewWorkspace" text="我的工作区">
-          <YdButton variant="ghost" size="icon-sm" :aria-label="`我的工作区（${workspaceEntries.length} 个文件）`" @click="workspaceOpen = true">
+          <YdButton variant="ghost" size="icon-sm" :aria-pressed="panel === 'workspace'" :aria-label="`我的工作区（${workspaceEntries.length} 个文件）`" @click="togglePanel('workspace')">
             <YdIcon name="morph:folder-open" />
           </YdButton>
         </YdTooltip>
         <YdTooltip text="后台任务">
-          <YdButton variant="ghost" size="icon-sm" :aria-label="`后台任务 ${assistant.activeRunCount}`" @click="showTasks">
+          <YdButton variant="ghost" size="icon-sm" :aria-pressed="panel === 'tasks'" :aria-label="`后台任务 ${assistant.activeRunCount}`" @click="togglePanel('tasks')">
             <YdIcon name="morph:loader-circle" />
           </YdButton>
         </YdTooltip>
         <YdTooltip text="助手设置">
-          <YdButton variant="ghost" size="icon-sm" aria-label="助手偏好与感知设置" @click="settingsOpen = true">
+          <YdButton variant="ghost" size="icon-sm" :aria-pressed="panel === 'settings'" aria-label="助手偏好与感知设置" @click="togglePanel('settings')">
             <YdIcon name="morph:settings" />
           </YdButton>
         </YdTooltip>
       </template>
-      <div class="yd-global-ai-body">
+      <div v-show="panel === 'chat'" class="yd-global-ai-body">
         <YdAlert v-if="assistant.error" variant="destructive" :title="assistant.error">
           <YdButton v-if="assistant.activeRun" variant="outline" size="sm" @click="perform(assistant.reconnect)">
             恢复后端进度
@@ -525,94 +553,104 @@ async function playTour(tourCode?: string) {
           <span v-else>会话与运行进度保存在后端</span>
         </div>
       </div>
-    </YdChatWindow>
-    <YdDrawer v-model="workspaceOpen" title="我的工作区" :footer="false" :z-index="2200" content-class="w-[560px] max-w-full">
-      <div class="yd-global-ai-workspace">
-        <p class="yd-global-ai-setting-note">
-          每个账号默认拥有一个工作区：所有对话都在其中，上传的文件也能被助手按你的授权读取。文件仅你自己可见。
-        </p>
-        <div class="yd-global-ai-workspace__bar">
-          <YdButton size="sm" variant="outline" :loading="workspaceLoading" @click="loadWorkspace">
-            <YdIcon name="morph:refresh-cw" /> 刷新
+      <section v-if="panel !== 'chat'" class="yd-global-ai-panel" :aria-label="panelTitles[panel]">
+        <header class="yd-global-ai-panel__head">
+          <YdButton variant="ghost" size="sm" aria-label="返回对话" @click="panel = 'chat'">
+            <YdIcon name="morph:arrow-left" /> 返回对话
           </YdButton>
-          <YdButton v-if="canEditWorkspace" size="sm" :loading="workspaceUploading" @click="pickUpload">
-            <YdIcon name="morph:upload" /> 上传文件
-          </YdButton>
+          <strong>{{ panelTitles[panel] }}</strong>
+        </header>
+        <div class="yd-global-ai-panel__body">
+          <div v-if="panel === 'workspace'" class="yd-global-ai-workspace">
+            <p class="yd-global-ai-setting-note">
+              每个账号默认拥有一个工作区：所有对话都在其中，上传的文件也能被助手按你的授权读取。文件仅你自己可见。
+            </p>
+            <div class="yd-global-ai-workspace__bar">
+              <YdButton size="sm" variant="outline" :loading="workspaceLoading" @click="loadWorkspace">
+                <YdIcon name="morph:refresh-cw" /> 刷新
+              </YdButton>
+              <YdButton v-if="canEditWorkspace" size="sm" :loading="workspaceUploading" @click="pickUpload">
+                <YdIcon name="morph:upload" /> 上传文件
+              </YdButton>
+            </div>
+            <YdAlert v-if="workspaceError" variant="destructive" :title="workspaceError" />
+            <p v-if="referencedPaths.length" class="yd-global-ai-setting-note">
+              已引用 {{ referencedPaths.length }} 个文件，将在下一条消息中一并发送。
+            </p>
+            <ul v-if="workspaceEntries.length" class="yd-global-ai-files">
+              <li v-for="entry in workspaceEntries" :key="entry.path" class="yd-global-ai-files__item">
+                <span class="yd-global-ai-files__meta">
+                  <span class="yd-global-ai-files__name">{{ entry.path }}</span>
+                  <span class="yd-global-ai-files__size">{{ formatSize(entry.size) }}</span>
+                </span>
+                <span class="yd-global-ai-files__actions">
+                  <YdButton size="sm" :variant="referencedPaths.includes(entry.path) ? 'default' : 'outline'" @click="toggleReference(entry.path, !referencedPaths.includes(entry.path))">
+                    {{ referencedPaths.includes(entry.path) ? '取消引用' : '引用' }}
+                  </YdButton>
+                  <YdButton v-if="canEditWorkspace" size="sm" variant="destructive" @click="removeWorkspaceFile(entry)">
+                    删除
+                  </YdButton>
+                </span>
+              </li>
+            </ul>
+            <p v-else-if="!workspaceLoading" class="yd-global-ai-setting-note">
+              工作区还是空的，先上传一个文件吧。
+            </p>
+          </div>
+          <div v-else-if="panel === 'tasks'">
+            <YdSelect v-model="taskRunId" :options="runOptions" allow-search aria-label="选择 AI 运行任务" class="mb-4 w-full" />
+            <AiRunProgress v-if="taskRunId" :run-id="taskRunId" />
+            <p v-else class="yd-global-ai-setting-note">
+              当前没有 AI 运行记录。
+            </p>
+          </div>
+          <div v-else-if="panel === 'settings'">
+            <YdForm :model="assistant.preferences" layout="vertical">
+              <YdFormItem label="路由感知" description="只提供当前页面的名称与固定路径，不包含查询参数或业务 ID。">
+                <YdSwitch :model-value="assistant.preferences.routeAwareness" @update:model-value="value => assistant.setPreferences({ routeAwareness: value })" />
+              </YdFormItem>
+              <YdFormItem label="页面感知" description="只提供页面显式注册的操作名称；不读取表单、列表、账号数据或页面正文。">
+                <YdSwitch :model-value="assistant.preferences.pageAwareness" @update:model-value="value => assistant.setPreferences({ pageAwareness: value })" />
+              </YdFormItem>
+              <YdFormItem label="帮助打开页面" description="启用后允许助手打开当前有权限的菜单页面。">
+                <YdSwitch :model-value="assistant.preferences.navigationTools" @update:model-value="value => assistant.setPreferences({ navigationTools: value })" />
+              </YdFormItem>
+              <YdFormItem label="定位并高亮操作" description="启用后允许助手聚焦和高亮已注册的操作，操作仍需你手动点击。">
+                <YdSwitch :model-value="assistant.preferences.highlightTools" @update:model-value="value => assistant.setPreferences({ highlightTools: value })" />
+              </YdFormItem>
+              <YdFormItem label="播放新手引导" description="启用后允许助手在当前页面播放分步引导，只做展示不会代你操作。">
+                <YdSwitch :model-value="assistant.preferences.tourTools" @update:model-value="value => assistant.setPreferences({ tourTools: value })" />
+              </YdFormItem>
+              <YdFormItem label="唤起快捷键">
+                <YdSelect :model-value="assistant.preferences.shortcut" :options="[{ label: 'Ctrl / ⌘ + Shift + Y', value: 'mod-shift-y' }, { label: 'Alt + Shift + A', value: 'alt-shift-a' }, { label: '关闭快捷键', value: 'disabled' }]" @update:model-value="value => assistant.setPreferences({ shortcut: value as typeof assistant.preferences.shortcut })" />
+              </YdFormItem>
+            </YdForm>
+            <section v-if="canConfigureQuota" aria-label="AI 每日预算管理" class="yd-global-ai-settings-section">
+              <h3>每日预算管理</h3>
+              <YdAlert v-if="quotaConfigError" variant="destructive" :title="quotaConfigError" />
+              <YdForm v-if="quotaConfigLoaded" :model="quotaConfig" layout="vertical">
+                <YdFormItem label="用户每日 token 预算" description="预算必须大于 0；已完成用量、运行预留和待核对用量共同占用可用预算。">
+                  <YdNumberField :model-value="quotaConfig.dailyTokenLimit" :min="1" :step="1000" :disabled="quotaConfigSaving" @update:model-value="value => { if (value !== undefined) quotaConfig.dailyTokenLimit = value }" />
+                </YdFormItem>
+                <YdFormItem label="系统任务每日 token 预算" description="控制无人值守的系统 AI 任务，不改变用户已登录会话的预算。">
+                  <YdNumberField :model-value="quotaConfig.systemDailyTokenLimit" :min="1" :step="1000" :disabled="quotaConfigSaving" @update:model-value="value => { if (value !== undefined) quotaConfig.systemDailyTokenLimit = value }" />
+                </YdFormItem>
+                <YdButton :loading="quotaConfigSaving" @click="saveQuotaConfig">
+                  保存每日预算
+                </YdButton>
+              </YdForm>
+            </section>
+            <QuotaReconciliation v-if="settingsOpen" />
+            <p class="yd-global-ai-setting-note">
+              偏好按当前账号保存在此浏览器。普通助手没有宿主文件系统、Shell 或编码权限。
+            </p>
+          </div>
         </div>
-        <YdAlert v-if="workspaceError" variant="destructive" :title="workspaceError" />
-        <p v-if="referencedPaths.length" class="yd-global-ai-setting-note">
-          已引用 {{ referencedPaths.length }} 个文件，将在下一条消息中一并发送。
-        </p>
-        <ul v-if="workspaceEntries.length" class="yd-global-ai-files">
-          <li v-for="entry in workspaceEntries" :key="entry.path" class="yd-global-ai-files__item">
-            <span class="yd-global-ai-files__meta">
-              <span class="yd-global-ai-files__name">{{ entry.path }}</span>
-              <span class="yd-global-ai-files__size">{{ formatSize(entry.size) }}</span>
-            </span>
-            <span class="yd-global-ai-files__actions">
-              <YdButton size="sm" :variant="referencedPaths.includes(entry.path) ? 'default' : 'outline'" @click="toggleReference(entry.path, !referencedPaths.includes(entry.path))">
-                {{ referencedPaths.includes(entry.path) ? '取消引用' : '引用' }}
-              </YdButton>
-              <YdButton v-if="canEditWorkspace" size="sm" variant="destructive" @click="removeWorkspaceFile(entry)">
-                删除
-              </YdButton>
-            </span>
-          </li>
-        </ul>
-        <p v-else-if="!workspaceLoading" class="yd-global-ai-setting-note">
-          工作区还是空的，先上传一个文件吧。
-        </p>
-      </div>
-      <YdFilePicker ref="uploadInput" label="选择工作区文件" class="hidden" @select="onUpload"><template #default /></YdFilePicker>
-    </YdDrawer>
-    <YdDrawer v-model="tasksOpen" title="统一 AI 运行任务" :footer="false" :z-index="2200" content-class="w-[760px] max-w-full">
-      <YdSelect v-model="taskRunId" :options="runOptions" allow-search aria-label="选择 AI 运行任务" class="mb-4 w-full" />
-      <AiRunProgress v-if="taskRunId" :run-id="taskRunId" />
-      <p v-else class="yd-global-ai-setting-note">
-        当前没有 AI 运行记录。
-      </p>
-    </YdDrawer>
-    <YdDrawer v-model="settingsOpen" title="AI 助手偏好" :footer="false" :z-index="2200">
-      <YdForm :model="assistant.preferences" layout="vertical">
-        <YdFormItem label="路由感知" description="只提供当前页面的名称与固定路径，不包含查询参数或业务 ID。">
-          <YdSwitch :model-value="assistant.preferences.routeAwareness" @update:model-value="value => assistant.setPreferences({ routeAwareness: value })" />
-        </YdFormItem>
-        <YdFormItem label="页面感知" description="只提供页面显式注册的操作名称；不读取表单、列表、账号数据或页面正文。">
-          <YdSwitch :model-value="assistant.preferences.pageAwareness" @update:model-value="value => assistant.setPreferences({ pageAwareness: value })" />
-        </YdFormItem>
-        <YdFormItem label="帮助打开页面" description="启用后允许助手打开当前有权限的菜单页面。">
-          <YdSwitch :model-value="assistant.preferences.navigationTools" @update:model-value="value => assistant.setPreferences({ navigationTools: value })" />
-        </YdFormItem>
-        <YdFormItem label="定位并高亮操作" description="启用后允许助手聚焦和高亮已注册的操作，操作仍需你手动点击。">
-          <YdSwitch :model-value="assistant.preferences.highlightTools" @update:model-value="value => assistant.setPreferences({ highlightTools: value })" />
-        </YdFormItem>
-        <YdFormItem label="播放新手引导" description="启用后允许助手在当前页面播放分步引导，只做展示不会代你操作。">
-          <YdSwitch :model-value="assistant.preferences.tourTools" @update:model-value="value => assistant.setPreferences({ tourTools: value })" />
-        </YdFormItem>
-        <YdFormItem label="唤起快捷键">
-          <YdSelect :model-value="assistant.preferences.shortcut" :options="[{ label: 'Ctrl / ⌘ + Shift + Y', value: 'mod-shift-y' }, { label: 'Alt + Shift + A', value: 'alt-shift-a' }, { label: '关闭快捷键', value: 'disabled' }]" @update:model-value="value => assistant.setPreferences({ shortcut: value as typeof assistant.preferences.shortcut })" />
-        </YdFormItem>
-      </YdForm>
-      <section v-if="canConfigureQuota" aria-label="AI 每日预算管理" class="yd-global-ai-settings-section">
-        <h3>每日预算管理</h3>
-        <YdAlert v-if="quotaConfigError" variant="destructive" :title="quotaConfigError" />
-        <YdForm v-if="quotaConfigLoaded" :model="quotaConfig" layout="vertical">
-          <YdFormItem label="用户每日 token 预算" description="预算必须大于 0；已完成用量、运行预留和待核对用量共同占用可用预算。">
-            <YdNumberField :model-value="quotaConfig.dailyTokenLimit" :min="1" :step="1000" :disabled="quotaConfigSaving" @update:model-value="value => { if (value !== undefined) quotaConfig.dailyTokenLimit = value }" />
-          </YdFormItem>
-          <YdFormItem label="系统任务每日 token 预算" description="控制无人值守的系统 AI 任务，不改变用户已登录会话的预算。">
-            <YdNumberField :model-value="quotaConfig.systemDailyTokenLimit" :min="1" :step="1000" :disabled="quotaConfigSaving" @update:model-value="value => { if (value !== undefined) quotaConfig.systemDailyTokenLimit = value }" />
-          </YdFormItem>
-          <YdButton :loading="quotaConfigSaving" @click="saveQuotaConfig">
-            保存每日预算
-          </YdButton>
-        </YdForm>
       </section>
-      <QuotaReconciliation v-if="settingsOpen" />
-      <p class="yd-global-ai-setting-note">
-        偏好按当前账号保存在此浏览器。普通助手没有宿主文件系统、Shell 或编码权限。
-      </p>
-    </YdDrawer>
+      <YdFilePicker ref="uploadInput" label="选择工作区文件" class="hidden" @select="onUpload">
+        <template #default />
+      </YdFilePicker>
+    </YdChatWindow>
     <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :z-index="2200" :confirm-button-disabled="!renameTitle.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: renameTitle.trim() }))">
       <YdInput v-model="renameTitle" aria-label="会话标题" :maxlength="100" />
     </YdModal>
@@ -623,6 +661,30 @@ async function playTour(tourCode?: string) {
 </template>
 
 <style scoped>
+.yd-global-ai-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.yd-global-ai-panel__head {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid oklch(var(--border));
+}
+
+.yd-global-ai-panel__body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: auto;
+}
+
 .yd-global-ai-body {
   display: flex;
   flex-direction: column;

@@ -4,7 +4,7 @@ import type { YdAgentActivity, YdAgentApproval, YdAgentChange, YdAgentContextFil
 import type { YdChatAction, YdChatAttachment, YdChatCitation, YdChatGraphNode, YdChatMessage, YdChatRetrievalHit } from './useYdChatStream'
 import { useElementSize } from '@vueuse/core'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { YdButton, YdDrawer, YdIcon, YdSelect } from '../adapters/index'
+import { YdButton, YdIcon, YdSelect } from '../adapters/index'
 import YdCode from '../extended/YdCode.vue'
 import YdCopyButton from '../extended/YdCopyButton.vue'
 import YdAgentAnswer from './YdAgentAnswer.vue'
@@ -326,28 +326,85 @@ defineExpose({ scrollToBottom })
         <YdAgentContextPanel :workspace="workspace" :files="files" :skills="skills" :mcp-servers="mcpServers" :harness="harness" :busy="busy || disabled" @file-select="emit('fileSelect', $event)" @file-toggle="(path, included) => emit('fileToggle', path, included)" @skill-toggle="(code, enabled) => emit('skillToggle', code, enabled)" />
       </aside>
     </div>
-    <YdDrawer v-model="contextDrawer" title="工作区与上下文" :footer="false" content-class="w-[360px] max-w-full">
-      <YdAgentContextPanel :workspace="workspace" :files="files" :skills="skills" :mcp-servers="mcpServers" :harness="harness" :busy="busy || disabled" @file-select="emit('fileSelect', $event)" @file-toggle="(path, included) => emit('fileToggle', path, included)" @skill-toggle="(code, enabled) => emit('skillToggle', code, enabled)" />
-    </YdDrawer>
-    <YdDrawer v-model="sessionDrawer" title="工作会话" :footer="false">
-      <YdChatSessionList :sessions="sessionItems" :active-id="sessionId" @select="selectSession" @create="emit('sessionCreate'); sessionDrawer = false" @rename="emit('sessionRename', $event)" @pin="emit('sessionPin', $event)" @remove="emit('sessionRemove', $event)" />
-    </YdDrawer>
-    <YdDrawer v-model="changesDrawer" title="检查代码变更" description="查看差异与验证结果，变更由宿主运行时提供。" :footer="false" content-class="w-[620px] max-w-full">
-      <div class="yd-agent-change-list">
-        <YdButton v-for="change in changes" :key="change.id" :variant="currentChange?.id === change.id ? 'secondary' : 'ghost'" @click="activeChange = change.id">
-          <YdIcon name="morph:file-diff" /><span>{{ change.path }}</span><small>+{{ change.additions }} / −{{ change.deletions }}</small>
+    <section v-if="contextDrawer" class="yd-agent-overlay" aria-label="工作区与上下文" @keydown.esc.stop="contextDrawer = false">
+      <header class="yd-agent-overlay__head">
+        <strong>工作区与上下文</strong>
+        <YdButton variant="ghost" size="icon-sm" aria-label="关闭工作区与上下文" @click="contextDrawer = false">
+          <YdIcon name="morph:x" />
         </YdButton>
+      </header>
+      <div class="yd-agent-overlay__body">
+        <YdAgentContextPanel :workspace="workspace" :files="files" :skills="skills" :mcp-servers="mcpServers" :harness="harness" :busy="busy || disabled" @file-select="emit('fileSelect', $event)" @file-toggle="(path, included) => emit('fileToggle', path, included)" @skill-toggle="(code, enabled) => emit('skillToggle', code, enabled)" />
       </div>
-      <YdCode v-if="currentChange" :code="currentChange.diff || '暂无差异内容'" language="diff" :title="currentChange.path" :line-numbers="false" />
-      <p v-else class="yd-agent-empty-changes">
-        当前任务没有代码变更。
-      </p><slot name="changes-footer" :changes="changes" />
-    </YdDrawer>
+    </section>
+    <section v-if="sessionDrawer" class="yd-agent-overlay" aria-label="工作会话" @keydown.esc.stop="sessionDrawer = false">
+      <header class="yd-agent-overlay__head">
+        <strong>工作会话</strong>
+        <YdButton variant="ghost" size="icon-sm" aria-label="关闭工作会话" @click="sessionDrawer = false">
+          <YdIcon name="morph:x" />
+        </YdButton>
+      </header>
+      <div class="yd-agent-overlay__body">
+        <YdChatSessionList :sessions="sessionItems" :active-id="sessionId" @select="selectSession" @create="emit('sessionCreate'); sessionDrawer = false" @rename="emit('sessionRename', $event)" @pin="emit('sessionPin', $event)" @remove="emit('sessionRemove', $event)" />
+      </div>
+    </section>
+    <section v-if="changesDrawer" class="yd-agent-overlay" aria-label="检查代码变更" @keydown.esc.stop="changesDrawer = false">
+      <header class="yd-agent-overlay__head">
+        <strong>检查代码变更</strong>
+        <YdButton variant="ghost" size="icon-sm" aria-label="关闭检查代码变更" @click="changesDrawer = false">
+          <YdIcon name="morph:x" />
+        </YdButton>
+      </header>
+      <div class="yd-agent-overlay__body">
+        <p class="yd-agent-overlay__desc">
+          查看差异与验证结果，变更由宿主运行时提供。
+        </p>
+        <div class="yd-agent-change-list">
+          <YdButton v-for="change in changes" :key="change.id" :variant="currentChange?.id === change.id ? 'secondary' : 'ghost'" @click="activeChange = change.id">
+            <YdIcon name="morph:file-diff" /><span>{{ change.path }}</span><small>+{{ change.additions }} / −{{ change.deletions }}</small>
+          </YdButton>
+        </div>
+        <YdCode v-if="currentChange" :code="currentChange.diff || '暂无差异内容'" language="diff" :title="currentChange.path" :line-numbers="false" />
+        <p v-else class="yd-agent-empty-changes">
+          当前任务没有代码变更。
+        </p><slot name="changes-footer" :changes="changes" />
+      </div>
+    </section>
   </section>
 </template>
 
 <style scoped>
+/* 窄宽度下的会话/上下文/变更：在工作台内部覆盖展示，不使用页面级抽屉（助手窗口内保持在窗口里） */
+.yd-agent-overlay {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: oklch(var(--background));
+}
+.yd-agent-overlay__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid oklch(var(--border));
+}
+.yd-agent-overlay__body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+.yd-agent-overlay__desc {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: oklch(var(--muted-foreground));
+}
 .yd-agent-workbench {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;

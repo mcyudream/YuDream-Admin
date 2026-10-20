@@ -17,7 +17,9 @@ const props = defineProps<{
 }>()
 
 defineSlots<{
-  description: () => any
+  /** 正文；未提供 #description 时默认插槽同样作为正文渲染 */
+  default?: () => any
+  description?: () => any
 }>()
 </script>
 
@@ -33,9 +35,11 @@ defineSlots<{
     <AlertTitle v-if="title">
       {{ title }}
     </AlertTitle>
-    <AlertDescription v-if="$slots.description || description">
+    <AlertDescription v-if="$slots.description || $slots.default || description">
       <slot name="description">
-        {{ description }}
+        <slot>
+          {{ description }}
+        </slot>
       </slot>
     </AlertDescription>
   </Alert>

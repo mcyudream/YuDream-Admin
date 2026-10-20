@@ -27,7 +27,7 @@ import {
 
 | 入口 | 职责 | 源码 |
 | --- | --- | --- |
-| `YdAgentWorkbench` | 会话、对话、输入、轨迹、上下文侧栏、审批与变更抽屉 | [YdAgentWorkbench.vue](../yudream-frontend/packages/components/src/ai/YdAgentWorkbench.vue) |
+| `YdAgentWorkbench` | 会话、对话、输入、轨迹、上下文侧栏、审批与变更面板 | [YdAgentWorkbench.vue](../yudream-frontend/packages/components/src/ai/YdAgentWorkbench.vue) |
 | `YdAgentContextPanel` | 工作区信息、文件、Skills、MCP 与 Harness 状态投影 | [YdAgentContextPanel.vue](../yudream-frontend/packages/components/src/ai/YdAgentContextPanel.vue) |
 | `YdAgentAnswer` | Markdown、引用和工具调用的顺序渲染 | [YdAgentAnswer.vue](../yudream-frontend/packages/components/src/ai/YdAgentAnswer.vue) |
 | 工作台类型 | 会话、工作区、模型、Harness、能力与操作请求 | [agent-workbench.ts](../yudream-frontend/packages/components/src/ai/agent-workbench.ts) |
@@ -38,7 +38,7 @@ import {
 
 ## YdAgentWorkbench
 
-工作台保留轻量的本地界面状态，例如折叠侧栏、抽屉、每个会话的输入草稿和当前展开的变更。业务数据与运行结果均由宿主控制，事件不会自动修改传入对象或持久化会话。
+工作台保留轻量的本地界面状态，例如折叠侧栏、覆盖面板、每个会话的输入草稿和当前展开的变更。业务数据与运行结果均由宿主控制，事件不会自动修改传入对象或持久化会话。
 
 ### 属性
 
@@ -100,10 +100,10 @@ import {
 | `header-actions` | 顶部扩展操作 |
 | `empty` | 空会话的扩展内容 |
 | `message-actions` | `{ message: YdChatMessage }`，回答操作区 |
-| `changes-footer` | `{ changes: YdAgentChange[] }`，变更抽屉底部 |
+| `changes-footer` | `{ changes: YdAgentChange[] }`，变更面板底部 |
 | `scrollToBottom(force?: boolean)` | 实例方法；默认尊重用户向上阅读的位置，传 `true` 可强制滚到底部 |
 
-工作台按自身可用宽度收起上下文侧栏和会话列表，通过抽屉保留访问入口。视觉使用共享 FA 主题及 `--yd-*` 令牌，支持灵动、雅致、紧凑和深浅模式；运行中图标在各外观下持续动画，减少动态效果只柔化节奏。
+工作台按自身可用宽度收起上下文侧栏和会话列表，收起后以工作台内部的覆盖面板打开（标题栏关闭按钮或 Esc 关闭），不使用页面级抽屉；嵌在浮动窗口（如全局 AI 助手）中时面板始终留在窗口内。视觉使用共享 FA 主题及 `--yd-*` 令牌，支持灵动、雅致、紧凑和深浅模式；运行中图标在各外观下持续动画，减少动态效果只柔化节奏。
 
 ## YdAgentContextPanel
 
@@ -227,7 +227,7 @@ Harness 拥有模型调用循环、工具执行、权限、技能可见范围、
 
 `skillToggle` 和 `send.skillCodes` 表示用户提交的候选选择，宿主需要过滤不可用或无权限技能。`contextPaths` 也是候选路径，必须在宿主工作区范围和文件权限内解析。普通聊天型 Agent 仍应禁用宿主文件系统和 shell 工具；选择“编码”标签不会自动开放它们，只有宿主已授权的隔离 Coding 运行时才可提供相应能力。
 
-`YdAgentWorkspace.access` 用于表达当前可用性，`YdAgentMcpServer.status` 用于表达真实连接状态。Git 分支和 diff 都由宿主提供；变更抽屉只展示文本，不自动 stage、commit、push、回滚或应用补丁。批准按钮也只发出本次决策事件，不绕过宿主权限或审批系统。
+`YdAgentWorkspace.access` 用于表达当前可用性，`YdAgentMcpServer.status` 用于表达真实连接状态。Git 分支和 diff 都由宿主提供；变更面板只展示文本，不自动 stage、commit、push、回滚或应用补丁。批准按钮也只发出本次决策事件，不绕过宿主权限或审批系统。
 
 宿主应把中止请求接入自己的取消机制，把取消、错误和断连结果回写到 `harness`、工具文档及轨迹。组件不会猜测请求是否成功，也不会把本地动画结束当作真实运行完成。
 
