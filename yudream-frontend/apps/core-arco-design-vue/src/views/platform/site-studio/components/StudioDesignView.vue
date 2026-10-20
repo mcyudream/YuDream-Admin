@@ -236,7 +236,8 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
   for (const keymap of ['core:undo', 'core:redo', 'core:component-delete', 'core:component-next', 'core:component-prev', 'core:component-enter', 'core:component-exit']) {
     editor.Keymaps.remove(keymap)
   }
-  const on = editor.on as (event: string, handler: (payload?: unknown) => void) => void
+  // 必须绑定 this：GrapesJS Editor.on 读取 this.em，解构后直接调用会使画布初始化失败
+  const on = editor.on.bind(editor) as (event: string, handler: (payload?: unknown) => void) => void
   on('component:selected', (payload) => {
     const component = payload as { getAttributes?: () => Record<string, unknown> } | undefined
     const id = component?.getAttributes?.()['data-studio-id']
