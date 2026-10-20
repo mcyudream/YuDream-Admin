@@ -65,14 +65,6 @@ watch(view, (value) => {
   }
 }, { immediate: true })
 
-watch(() => store.dirty, (dirty) => {
-  if (dirty) {
-    window.addEventListener('beforeunload', preventUnload)
-  }
-  else {
-    window.removeEventListener('beforeunload', preventUnload)
-  }
-})
 onMounted(() => window.addEventListener('beforeunload', preventUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', preventUnload))
 function preventUnload(event: BeforeUnloadEvent) {

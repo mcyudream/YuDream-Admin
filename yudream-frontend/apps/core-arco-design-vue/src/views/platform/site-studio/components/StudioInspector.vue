@@ -94,6 +94,12 @@ const quickFields = [
   { key: 'border-radius', label: '圆角', placeholder: '12px' },
 ]
 
+/** 平板/手机只显示本断点覆盖值；继承的桌面值作为占位提示，清空即移除覆盖 */
+function quickPlaceholder(field: { key: string, placeholder: string }) {
+  const inherited = breakpoint.value !== 'desktop' ? node.value?.styles[field.key] : undefined
+  return inherited ? `继承桌面：${inherited}` : field.placeholder
+}
+
 function quickStyle(key: string, value: string) {
   if (!node.value) {
     return
@@ -352,7 +358,7 @@ function removeSelected() {
       <section class="gap-2 grid grid-cols-2" aria-label="常用布局">
         <label class="text-xs flex flex-col gap-1"><span>布局</span><YdSelect :model-value="currentStyles.display || node.styles.display || 'block'" :options="[{ label: '普通流', value: 'block' }, { label: '弹性布局', value: 'flex' }, { label: '网格布局', value: 'grid' }]" aria-label="元素布局" @update:model-value="quickStyle('display', String($event))" /></label>
         <label class="text-xs flex flex-col gap-1"><span>排列方向</span><YdSelect :model-value="currentStyles['flex-direction'] || node.styles['flex-direction'] || 'row'" :options="[{ label: '水平', value: 'row' }, { label: '垂直', value: 'column' }]" aria-label="排列方向" @update:model-value="quickStyle('flex-direction', String($event))" /></label>
-        <label v-for="field in quickFields" :key="field.key" class="text-xs flex flex-col gap-1"><span>{{ field.label }}</span><YdInput :model-value="currentStyles[field.key] || node.styles[field.key] || ''" :placeholder="field.placeholder" :aria-label="field.label" @change="quickStyle(field.key, String($event.target.value))" /></label>
+        <label v-for="field in quickFields" :key="field.key" class="text-xs flex flex-col gap-1"><span>{{ field.label }}</span><YdInput :model-value="currentStyles[field.key] || ''" :placeholder="quickPlaceholder(field)" :aria-label="field.label" @change="quickStyle(field.key, String($event.target.value))" /></label>
       </section>
 
       <section class="flex flex-col gap-2" aria-label="属性">
