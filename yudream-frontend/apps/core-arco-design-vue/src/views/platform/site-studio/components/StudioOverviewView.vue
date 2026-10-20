@@ -380,7 +380,9 @@ function openPage(pageId: string) {
           </YdAction>
         </div>
         <YdAlert>
-          模板内容全部由结构化节点与站点主题变量组成，不包含外部脚本、样式表或图片；创建后可随时在「主题」里修改变量。
+          <template #description>
+            模板内容全部由结构化节点与站点主题变量组成，不包含外部脚本、样式表或图片；创建后可随时在「主题」里修改变量。
+          </template>
         </YdAlert>
       </div>
     </template>
@@ -489,18 +491,22 @@ function openPage(pageId: string) {
             发布与公开站
           </h3>
           <YdAlert v-if="published">
-            <div class="flex flex-wrap gap-2 items-center">
-              <span>该主题已有发布版本。</span>
-              <RouterLink to="/site" class="studio-inline-link">
-                打开公开站 /site
-              </RouterLink>
-            </div>
-            <p class="text-xs text-muted-foreground m-0 mt-1">
-              公开站 /site 只在「{{ store.themeCode }}」是当前激活的公开站主题时展示发布内容；主题激活请到「主题中心」操作，当前编辑的主题未激活时发布内容暂不可见。停止发布请到「发布版本」页操作。
-            </p>
+            <template #description>
+              <div class="flex flex-wrap gap-2 items-center">
+                <span>该主题已有发布版本。</span>
+                <RouterLink to="/site" class="studio-inline-link">
+                  打开公开站 /site
+                </RouterLink>
+              </div>
+              <p class="text-xs text-muted-foreground m-0 mt-1">
+                公开站 /site 只在「{{ store.themeCode }}」是当前激活的公开站主题时展示发布内容；主题激活请到「主题中心」操作，当前编辑的主题未激活时发布内容暂不可见。停止发布请到「发布版本」页操作。
+              </p>
+            </template>
           </YdAlert>
           <YdAlert v-else>
-            <span>当前草稿尚未发布。完成编辑后可在右上角「发布」，发布后公开站 /site 才会展示该主题的站点文档。</span>
+            <template #description>
+              <span>当前草稿尚未发布。完成编辑后可在右上角「发布」，发布后公开站 /site 才会展示该主题的站点文档。</span>
+            </template>
           </YdAlert>
           <p v-if="totalNodeCount === 0" class="text-xs text-muted-foreground m-0">
             站点还没有内容节点，点「进入设计」开始搭建页面。

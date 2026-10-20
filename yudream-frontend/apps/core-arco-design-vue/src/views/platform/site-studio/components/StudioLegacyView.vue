@@ -188,7 +188,9 @@ async function importPackage() {
   <div class="h-full min-h-0 overflow-auto">
     <div class="mx-auto p-4 flex flex-col gap-5 max-w-3xl sm:p-6">
       <YdAlert>
-        旧版主题中心与旧 CMS 工作台完整保留。旧版 CMS 内容支持定向复制迁移：读取当前主题的首页与文章，预检通过后一次性把所选页面副本新增到工作台（不删除旧数据、不自动保存/发布）；便携包导入导出继续可用。
+        <template #description>
+          旧版主题中心与旧 CMS 工作台完整保留。旧版 CMS 内容支持定向复制迁移：读取当前主题的首页与文章，预检通过后一次性把所选页面副本新增到工作台（不删除旧数据、不自动保存/发布）；便携包导入导出继续可用。
+        </template>
       </YdAlert>
 
       <CmsMigrationPanel />

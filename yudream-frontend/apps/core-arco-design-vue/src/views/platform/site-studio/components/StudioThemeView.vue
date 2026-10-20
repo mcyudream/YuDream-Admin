@@ -211,7 +211,9 @@ function applyThemeDraft() {
   <div class="h-full min-h-0 overflow-auto">
     <div class="mx-auto p-4 flex flex-col gap-5 max-w-3xl sm:p-6">
       <YdAlert>
-        这里的变量是站点输出变量（编译后注入公开站文档作用域，如 <code class="font-mono">--accent</code>），只影响公开站内容，可按站点需要取任意颜色；它们不会改变后台界面主题，后台主题仍在「主题中心」管理。
+        <template #description>
+          这里的变量是站点输出变量（编译后注入公开站文档作用域，如 <code class="font-mono">--accent</code>），只影响公开站内容，可按站点需要取任意颜色；它们不会改变后台界面主题，后台主题仍在「主题中心」管理。
+        </template>
       </YdAlert>
 
       <section class="flex flex-col gap-3" aria-label="站点主题变量">

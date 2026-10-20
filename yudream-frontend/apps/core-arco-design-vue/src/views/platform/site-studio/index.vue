@@ -183,8 +183,10 @@ void store.load()
 </script>
 
 <template>
-  <div class="site-studio h-full min-h-0">
-    <YdLoadingOverlay :loading="store.loading" block-interaction>
+  <!-- data-yd-fullheight：宿主布局据此把容器固定为视口高，工作台各栏自行内滚 -->
+  <div class="site-studio h-full min-h-0" data-yd-fullheight>
+    <!-- 单行 grid：内容包装层被拉伸为整高（遮罩为绝对定位，不占轨道） -->
+    <YdLoadingOverlay :loading="store.loading" block-interaction class="grid h-full">
       <YdResult
         v-if="store.loadError"
         status="error"
@@ -222,7 +224,9 @@ void store.load()
               variant="destructive"
               class="py-1 flex-1 basis-56 min-w-0"
             >
-              <span class="min-w-0 break-all">{{ store.saveError }}</span>
+              <template #description>
+                <span class="min-w-0 break-all">{{ store.saveError }}</span>
+              </template>
             </YdAlert>
             <span v-else-if="store.dirty" class="text-warning-6 text-xs whitespace-nowrap">
               <YdIcon name="morph:circle-dot" class="mr-1 align-[-1px] size-3 inline" />未保存更改

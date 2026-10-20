@@ -163,9 +163,11 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
   <section class="studio-agent-panel" aria-label="站点设计 AI 助手">
     <YdAlert v-if="status" :title="status" />
     <YdAlert v-if="localError || assistant.error || run?.error" variant="destructive" :title="localError || run?.error || assistant.error">
-      <YdButton v-if="run" size="sm" variant="outline" @click="perform(() => assistant.reconnect(run?.id))">
-        重新读取运行状态
-      </YdButton>
+      <template #description>
+        <YdButton v-if="run" size="sm" variant="outline" @click="perform(() => assistant.reconnect(run?.id))">
+          重新读取运行状态
+        </YdButton>
+      </template>
     </YdAlert>
     <YdAgentWorkbench
       :sessions="sessionItems" :session-id="currentSession?.id || ''" :models="assistant.models" :model-id="assistant.modelId"

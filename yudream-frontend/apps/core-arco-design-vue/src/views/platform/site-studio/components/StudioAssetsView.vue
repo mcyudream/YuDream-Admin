@@ -464,8 +464,10 @@ function insertAsset(asset: StudioAsset) {
         </article>
       </div>
 
-      <YdAlert variant="destructive">
-        删除资源前会检查站点内容里的引用（src/href/poster）：被引用的资源会先明确提示引用数量，不会默默造成破图。
+      <YdAlert icon="morph:info">
+        <template #description>
+          删除资源前会检查站点内容里的引用（src/href/poster）：被引用的资源会先明确提示引用数量，不会默默造成破图。
+        </template>
       </YdAlert>
     </div>
   </div>
