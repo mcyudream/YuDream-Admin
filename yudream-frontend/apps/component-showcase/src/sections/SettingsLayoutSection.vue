@@ -43,6 +43,14 @@ const notifyForm = reactive({
   announce: true,
 })
 
+const surfaceTab = ref('basic')
+const surfaceTabs = [
+  { icon: 'morph:settings', label: '基础信息', value: 'basic' },
+  { icon: 'morph:bell', label: '通知偏好', value: 'notify' },
+]
+const surfaceSiteForm = reactive({ siteName: 'YuDream Admin' })
+const surfaceNotifyForm = reactive({ announce: true })
+
 function save(title: string) {
   toast.success(`${title}已保存`)
 }
@@ -68,8 +76,30 @@ const layoutCode = `<YdSettingsLayout
   <!-- #account / #appearance 同理 -->
 </YdSettingsLayout>`
 
+// surface 模式演示：宿主设置页的真实形态（固定高度外壳 + surface + scroll）
+const surfaceCode = `<div class="settings-page-shell"><!-- 或任意固定高度外壳，供 scroll 模式独立滚动 -->
+  <YdSettingsLayout
+    v-model="active"
+    title="系统偏好"
+    description="surface 铺白底并自带水平内边距，页头与导航固定，内容区滚动。"
+    :list="[
+      { icon: 'morph:settings', label: '基础信息', value: 'basic' },
+      { icon: 'morph:bell', label: '通知偏好', value: 'notify' },
+    ]"
+    surface
+    scroll
+  >
+    <template #basic>
+      <YdSettingsSection title="基础信息"><!-- 表单 --></YdSettingsSection>
+    </template>
+    <template #notify>
+      <YdSettingsSection title="通知偏好"><!-- 表单 --></YdSettingsSection>
+    </template>
+  </YdSettingsLayout>
+</div>`
+
 // 分区选择器在窄屏使用；见组件 README 的「响应式行为」
-const mobileHint = '窄屏（lg 以下）渲染为分区选择器，而不是横向标签；title/description 不传时头部不渲染。宿主设置页用 surface 模式铺满白底替代 YdPageMain，保存类按钮统一放页头。'
+const mobileHint = '窄屏（lg 以下）渲染为分区选择器，而不是横向标签；title/description 不传时头部不渲染。宿主设置页用 surface 模式铺满白底替代 YdPageMain，surface 自带 px-5 lg:px-6 水平内边距，窄屏内容不贴边；保存类按钮统一放页头。'
 </script>
 
 <template>
@@ -162,6 +192,39 @@ const mobileHint = '窄屏（lg 以下）渲染为分区选择器，而不是横
         </YdSettingsSection>
       </template>
     </YdSettingsLayout>
+  </DemoCard>
+
+  <DemoCard title="YdSettingsLayout surface" description="页面级铺满（宿主设置页形态）：surface 铺白底并自带水平内边距，窄屏内容不再贴可视区边缘；scroll 模式页头与分区导航固定、内容区独立滚动" :code="surfaceCode">
+    <div class="border rounded-lg flex flex-col h-[400px] overflow-hidden">
+      <YdSettingsLayout
+        v-model="surfaceTab"
+        title="系统偏好"
+        description="surface + scroll 模式的页面形态。"
+        :list="surfaceTabs"
+        surface
+        scroll
+      >
+        <template #basic>
+          <YdSettingsSection title="基础信息" description="白底与水平留白都由 surface 模式自带。">
+            <YdForm :model="surfaceSiteForm" layout="vertical" class="max-w-md">
+              <YdFormItem label="站点名称">
+                <YdInput v-model="surfaceSiteForm.siteName" />
+              </YdFormItem>
+            </YdForm>
+          </YdSettingsSection>
+        </template>
+
+        <template #notify>
+          <YdSettingsSection title="通知偏好" description="选择你希望收到的系统通知。">
+            <YdForm :model="surfaceNotifyForm" layout="vertical" class="max-w-md">
+              <YdFormItem label="系统公告">
+                <YdSwitch v-model="surfaceNotifyForm.announce" />
+              </YdFormItem>
+            </YdForm>
+          </YdSettingsSection>
+        </template>
+      </YdSettingsLayout>
+    </div>
   </DemoCard>
 
   <DemoCard title="YdSettingsSection" description="分区排版可独立使用：标题 + 说明 + 分隔线 + 内容 + 底部操作栏">

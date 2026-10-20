@@ -81,7 +81,9 @@ function handleMobileChange(value: string | number | undefined) {
   <div
     :class="cn(
       'flex w-full flex-col',
-      props.surface && 'bg-card',
+      // surface 模式整面白底，页面自身不再有外层容器补内边距：
+      // 水平方向由本组件负责，窄屏内容才不会贴到可视区边缘
+      props.surface && ['bg-card', 'px-5 lg:px-6'],
       !props.scroll && props.surface && 'min-h-full py-5 lg:py-6',
       props.scroll && 'min-h-0 flex-1 overflow-hidden',
       props.class,
