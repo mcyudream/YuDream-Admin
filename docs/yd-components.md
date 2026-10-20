@@ -273,7 +273,7 @@ Mention 在光标位置识别触发词，方向键 / Home / End 选择候选，E
 | --- | --- | --- |
 | `YdCarousel<T>` | `items: T[]`、索引 `v-model`、direction、autoplay、interval(ms)、loop、arrows、indicators、label | `#item={ item, index, active }`，默认槽也接收同样对象；ref 的 prev/next/scrollTo |
 | `YdSmoothSwipe<T>` | 可选 items、索引模型、direction、itemSize(CSS 字符串)、gap(px)、snapAlign、draggable | 有 items 用 `#item`；无 items 用默认槽提供直接子项，接收 activeIndex/prev/next/scrollTo。竖直模式应由页面给定可滚动高度 |
-| `YdLayoutContainer` | panels 中 key、defaultSize/minSize/maxSize、collapsible/collapsedSize、sizeUnit('%'|'px')；direction、storageKey、keyboardResizeBy、disabled | 按 panel.key 提供具名槽，或 `#panel` 通用槽；槽含 panel/index/isCollapsed/isExpanded/collapse/expand/resize；事件 layout/resize/collapse/expand/dragging/error |
+| `YdLayoutContainer` | panels 中 key、defaultSize/minSize/maxSize、collapsible/collapsedSize、sizeUnit('%'|'px')、order（稳定排序值：面板只在挂载时排序，组成会变化时须为各面板给出不变的 order，缺省为下标）；direction、storageKey、keyboardResizeBy、disabled | 按 panel.key 提供具名槽，或 `#panel` 通用槽；槽含 panel/index/isCollapsed/isExpanded/collapse/expand/resize；事件 layout/resize/collapse/expand/dragging/error；拖拽期间面板内 iframe 不接收指针事件，光标经过 iframe 不会中断拖拽 |
 | `YdSparkline` | data:number[]、type=line/area/bar、width/height、strokeWidth、color、label | 自动忽略非有限数值；适合嵌入指标卡，复杂数据图继续使用已有图形能力 |
 | `YdTimeline<T>` | T 至少含 datetime，可含 id/title/description；data、merge、locale | 默认槽 `{ item, index }`，按传入顺序渲染 |
 

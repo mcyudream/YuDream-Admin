@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
-import { useId } from 'vue'
+import { ref, useId } from 'vue'
 import './extended.css'
 
 export interface YdLayoutPanel {
@@ -11,6 +11,11 @@ export interface YdLayoutPanel {
   collapsible?: boolean
   collapsedSize?: number
   sizeUnit?: '%' | 'px'
+  /**
+   * 稳定排序值。分栏只在面板挂载时按 order 排序且不再更新：面板组成会变化时（如侧栏开合），
+   * 必须为每个面板给出不随组成变化的 order，否则分隔条会驱动错误的面板。缺省为当前下标。
+   */
+  order?: number
 }
 withDefaults(defineProps<{
   panels: YdLayoutPanel[]
@@ -28,6 +33,12 @@ const emit = defineEmits<{
   error: [error: Error]
 }>()
 const instanceId = useId()
+// 拖拽期间屏蔽 iframe 指针事件：光标经过 iframe 时外层文档收不到 pointermove，拖拽会卡顿或丢失
+const dragging = ref(false)
+function onDragging(active: boolean) {
+  dragging.value = active
+  emit('dragging', active)
+}
 const storage = {
   getItem(name: string) {
     try {
@@ -52,14 +63,14 @@ const storage = {
 </script>
 
 <template>
-  <SplitterGroup class="yd-layout yd-surface" :direction="direction" :auto-save-id="storageKey ? `yd-layout:${storageKey}` : undefined" :storage="storage" :keyboard-resize-by="keyboardResizeBy" @layout="emit('layout', $event)">
+  <SplitterGroup class="yd-layout yd-surface" :class="{ 'yd-layout--dragging': dragging }" :direction="direction" :auto-save-id="storageKey ? `yd-layout:${storageKey}` : undefined" :storage="storage" :keyboard-resize-by="keyboardResizeBy" @layout="emit('layout', $event)">
     <template v-for="(panel, index) in panels" :key="panel.key">
-      <SplitterPanel :id="`${storageKey || instanceId}-${panel.key}`" v-slot="state" class="yd-layout-panel" :order="index" :default-size="panel.defaultSize" :min-size="panel.minSize" :max-size="panel.maxSize" :collapsible="panel.collapsible" :collapsed-size="panel.collapsedSize" :size-unit="panel.sizeUnit" @resize="emit('resize', panel.key, $event)" @collapse="emit('collapse', panel.key)" @expand="emit('expand', panel.key)">
+      <SplitterPanel :id="`${storageKey || instanceId}-${panel.key}`" v-slot="state" class="yd-layout-panel" :order="panel.order ?? index" :default-size="panel.defaultSize" :min-size="panel.minSize" :max-size="panel.maxSize" :collapsible="panel.collapsible" :collapsed-size="panel.collapsedSize" :size-unit="panel.sizeUnit" @resize="emit('resize', panel.key, $event)" @collapse="emit('collapse', panel.key)" @expand="emit('expand', panel.key)">
         <slot :name="panel.key" :panel="panel" :index="index" v-bind="state">
           <slot name="panel" :panel="panel" :index="index" v-bind="state" />
         </slot>
       </SplitterPanel>
-      <SplitterResizeHandle v-if="index < panels.length - 1" class="yd-layout-handle yd-focus" :disabled="disabled" :aria-label="`调整 ${panel.key} 面板大小`" @dragging="emit('dragging', $event)">
+      <SplitterResizeHandle v-if="index < panels.length - 1" class="yd-layout-handle yd-focus" :disabled="disabled" :aria-label="`调整 ${panel.key} 面板大小`" @dragging="onDragging">
         <span />
       </SplitterResizeHandle>
     </template>
@@ -72,6 +83,9 @@ const storage = {
   overflow: hidden;
 }
 
+.yd-layout--dragging :deep(iframe) {
+  pointer-events: none;
+}
 .yd-layout-panel {
   min-width: 0;
   min-height: 0;

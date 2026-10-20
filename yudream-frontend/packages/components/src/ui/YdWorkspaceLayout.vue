@@ -71,13 +71,14 @@ const showAside = computed(() => asideOpen.value && Boolean(slots.aside))
 const paneSignature = computed(() => [showSidebar.value ? 's' : '', 'm', showAside.value ? 'a' : ''].filter(Boolean).join(''))
 
 const panels = computed(() => {
-  const list: ({ key: WorkspacePane } & YdWorkspacePanelSize)[] = []
+  const list: ({ key: WorkspacePane, order: number } & YdWorkspacePanelSize)[] = []
   if (showSidebar.value) {
-    list.push({ key: 'sidebar', defaultSize: 20, minSize: 12, maxSize: 40, sizeUnit: '%', ...props.sidebar })
+    list.push({ key: 'sidebar', defaultSize: 20, minSize: 12, maxSize: 40, sizeUnit: '%', ...props.sidebar, order: 0 })
   }
-  list.push({ key: 'main' })
+  // 固定 order：侧栏/属性栏开合不改变各面板次序，分隔条始终驱动相邻的正确面板
+  list.push({ key: 'main', minSize: 20, order: 1 })
   if (showAside.value) {
-    list.push({ key: 'aside', defaultSize: 22, minSize: 14, maxSize: 42, sizeUnit: '%', ...props.aside })
+    list.push({ key: 'aside', defaultSize: 22, minSize: 14, maxSize: 42, sizeUnit: '%', ...props.aside, order: 2 })
   }
   return list
 })
