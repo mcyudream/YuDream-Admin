@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import type { YdAgentApproval, YdAgentHarnessState, YdAgentSendRequest } from '@yudream/components'
+// 站点设计 AI 助手（CMS 专用，不复用通用 Agent 工作台）：明确的作用目标（选中元素或整页）、
+// 按目标给出快捷操作、精简对话；AI 的每次修改先以变更清单预览，用户确认后才写入草稿（一次撤销）。
+import type { YdAgentSendRequest, YdChatAttachment } from '@yudream/components'
 import type { AiFrontendToolRequest } from '@/api/modules/platform-ai-runs'
 import type { SiteDocument, StudioCommand } from '@/types/site-studio'
-import { YdAgentWorkbench, YdAlert, YdButton } from '@yudream/components'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { executeStudioAgentTool } from '@/composables/use-site-studio-agent'
+import type { StudioChangeLine } from '@/utils/site-studio-changes'
+import { YdAlert, YdButton, YdChatMessageList, YdChatSender } from '@yudream/components'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { executeStudioAgentTool, parseStudioAgentCommand } from '@/composables/use-site-studio-agent'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { useSiteStudioStore } from '@/store/modules/site-studio'
+import { findStudioNode } from '@/utils/site-studio'
+import { describeStudioCommands, describeStudioNode } from '@/utils/site-studio-changes'
 
 const props = defineProps<{
   document: SiteDocument
@@ -31,12 +37,61 @@ const sessionItems = computed(() => assistant.sessionItems.filter(session => ses
 const currentSession = computed(() => sessions.value.find(session => session.id === selectedSessionId.value))
 const run = computed(() => Object.values(assistant.runs).filter(item => item.sessionId === currentSession.value?.id).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0])
 const messages = computed(() => currentSession.value ? assistant.taskMessages(currentSession.value.id) : [])
-const harness = computed<YdAgentHarnessState>(() => ({
-  name: 'AgentScope Harness',
-  runId: run.value?.id,
-  status: assistant.sending && assistant.sessionId === currentSession.value?.id ? 'running' : run.value?.status === 'RUNNING' ? 'running' : run.value?.status === 'WAITING' ? 'waiting' : run.value?.status === 'FAILED' ? 'error' : run.value?.status === 'CANCELLED' ? 'cancelled' : run.value?.status === 'COMPLETED' ? 'completed' : 'idle',
-}))
-const approvals = computed<YdAgentApproval[]>(() => (run.value?.pendingInteractions || []).filter(item => item.kind === 'confirmation').map(item => ({ id: item.requestId, title: `批准草稿工具：${item.toolName}`, description: JSON.stringify(item.arguments, null, 2), scope: '仅当前文档本地草稿；不保存、不发布' })))
+const busy = computed(() => (assistant.sending && assistant.sessionId === currentSession.value?.id) || run.value?.status === 'RUNNING' || run.value?.status === 'WAITING')
+const approvals = computed(() => (run.value?.pendingInteractions || []).filter(item => item.kind === 'confirmation'))
+const sessionOptions = computed(() => sessionItems.value.map(session => ({ label: session.title, value: session.id })))
+const modelOptions = computed(() => assistant.models.map(model => ({ label: model.label, value: model.id })))
+const inputDisabled = computed(() => !allowed.value || assistant.loading || !assistant.models.length || !props.contextKey || props.contextKey.length > 240 || (!currentSession.value && !canCreate.value))
+
+// ===== 作用目标与快捷操作 =====
+const studio = useSiteStudioStore()
+const target = computed(() => props.selectedNodeId ? findStudioNode(props.document, props.selectedNodeId) : undefined)
+const pageName = computed(() => props.document.pages.find(page => page.id === props.pageId)?.name ?? '当前页面')
+const targetLabel = computed(() => target.value ? describeStudioNode(target.value, props.selectedNodeId) : `整页「${pageName.value}」`)
+const quickActions = computed(() => target.value
+  ? ['改写这段文案，更简洁有力', '优化这个元素的间距与排版', '让它在手机上显示得更好', '换一种更醒目的配色']
+  : ['检查本页结构并给出改进建议', '为本页生成一个首屏封面区块', '统一本页的标题层级与间距', '补全页脚的联系信息'])
+function quickSend(text: string) {
+  void perform(() => send(composeRequest(text)))
+}
+function composeRequest(text: string, attachments: YdChatAttachment[] = []): YdAgentSendRequest {
+  const scope = target.value ? `作用目标：选中的 ${targetLabel.value}（nodeId=${props.selectedNodeId}）。` : `作用目标：${targetLabel.value}。`
+  return { text: `${scope}${text}`, attachments, mode: 'ask', skillCodes: [], contextPaths: [], model: assistant.models.find(model => model.id === assistant.modelId) }
+}
+
+// ===== 应用前预览：AI 的修改先列清单，用户确认后才写入草稿 =====
+interface PendingChange { runId: string, lines: StudioChangeLine[], settle: (approved: boolean, reason?: string) => void }
+const pending = shallowRef<PendingChange | null>(null)
+function awaitApproval(runId: string, lines: StudioChangeLine[], expiresAt?: number | string) {
+  pending.value?.settle(false, '有新的修改提议，上一条未应用')
+  return new Promise<void>((resolve, reject) => {
+    const remaining = expiresAt ? new Date(expiresAt).getTime() - Date.now() - 1000 : 0
+    let timer: number | undefined
+    const current: PendingChange = {
+      runId,
+      lines,
+      settle: (approved, reason) => {
+        window.clearTimeout(timer)
+        if (pending.value === current) {
+          pending.value = null
+        }
+        if (approved) {
+          resolve()
+        }
+        else {
+          reject(new Error(reason || '用户拒绝了这次修改，草稿未变化'))
+        }
+      },
+    }
+    pending.value = current
+    if (remaining > 0) {
+      timer = window.setTimeout(() => current.settle(false, '等待确认超时，修改未应用'), remaining)
+    }
+  })
+}
+// 等待确认期间文档被手工修改：提议基于旧版本，直接作废
+watch(() => props.revision, () => pending.value?.settle(false, '等待确认期间草稿已变化，修改未应用，请重新读取'))
+onBeforeUnmount(() => pending.value?.settle(false, '设计助手已关闭，修改未应用'))
 const status = computed(() => !allowed.value ? '站点设计助手需要启用 CMS/AI 能力，并具有 CMS 查看、AI 生成、聊天使用和会话查看权限。' : props.contextKey.length > 240 || !props.contextKey ? '设计器上下文标识无效（需要 1–240 字符），AI 已禁用。' : assistant.initialized && !assistant.models.length ? '没有已配置的聊天模型，请先配置 AI 模型端点。' : !auth('platform:cms:edit') ? '当前只读：可以分析与校验，不能修改草稿。' : '')
 async function perform(action: () => Promise<unknown>) {
   try {
@@ -103,6 +158,7 @@ async function execute(request: AiFrontendToolRequest) {
     if (reads.get(ownerRun.id) !== props.revision) {
       throw new Error('尚未读取当前修订或文档已变化，请重新 read')
     }
+    await awaitApproval(ownerRun.id, describeStudioCommands(props.document, parseStudioAgentCommand(request.arguments.command)), request.expiresAt)
   }
   const result = await executeStudioAgentTool(request.name, request.arguments, () => ({ document: props.document, selectedNodeId: props.selectedNodeId, revision: props.revision, contextKey: props.contextKey, pageId: props.pageId }), props.executeCommand)
   if (request.name === 'cms.studio.read') {
@@ -169,25 +225,99 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
         </YdButton>
       </template>
     </YdAlert>
-    <YdAgentWorkbench
-      :sessions="sessionItems" :session-id="currentSession?.id || ''" :models="assistant.models" :model-id="assistant.modelId"
-      :messages="messages" :harness="harness" :approvals="approvals" :available-modes="['ask']"
-      :disabled="!allowed || assistant.loading || !assistant.models.length || !props.contextKey || props.contextKey.length > 240 || (!currentSession && !canCreate)"
-      :suggestions="['分析当前页面并说明改进范围', '优化当前选中节点的排版', '检查站点文档结构与安全性']"
-      placeholder="描述设计目标；仅修改草稿，不保存、不发布…" class="studio-agent-panel__workbench"
-      @send="request => perform(() => send(request))" @stop="perform(() => assistant.stop(run?.id))"
-      @update:model-id="assistant.modelId = $event" @update:session-id="id => perform(() => selectSession(id))"
-      @session-create="perform(createSession)" @session-pin="session => canCreate && perform(() => assistant.updateSession(session.id, { pinned: !session.pinned }))"
-      @approval-decision="(id, approved) => run && perform(() => assistant.respondInteraction(run!.id, id, approved))"
-    >
-      <template #sender-actions>
-        <span>范围：当前站点 AST 草稿 · 原子批处理 · 一次撤销 · 不保存、不发布</span>
-      </template>
-    </YdAgentWorkbench>
+
+    <div class="studio-agent-bar">
+      <YdSelect
+        :model-value="currentSession?.id || ''"
+        :options="sessionOptions"
+        placeholder="新对话"
+        aria-label="设计会话"
+        class="flex-1 min-w-0"
+        @update:model-value="id => perform(() => selectSession(String(id)))"
+      />
+      <YdTooltip text="新建设计会话">
+        <YdButton variant="ghost" size="icon-sm" aria-label="新建设计会话" :disabled="!allowed || !canCreate" @click="perform(createSession)">
+          <YdIcon name="morph:plus" />
+        </YdButton>
+      </YdTooltip>
+    </div>
+    <YdSelect v-if="modelOptions.length > 1" v-model="assistant.modelId" :options="modelOptions" aria-label="模型" class="studio-agent-model" />
+
+    <div class="studio-agent-target" aria-label="作用目标">
+      <YdIcon :name="target ? 'morph:mouse-pointer-2' : 'morph:file'" class="shrink-0 size-4" />
+      <span class="min-w-0 truncate"><small>目标</small>{{ targetLabel }}</span>
+      <YdButton v-if="target" variant="ghost" size="sm" aria-label="改为整页" @click="studio.selectedNodeId = ''">
+        整页
+      </YdButton>
+    </div>
+    <div class="studio-agent-quick" aria-label="快捷操作">
+      <YdButton v-for="action in quickActions" :key="action" variant="outline" size="sm" :disabled="inputDisabled || busy" @click="quickSend(action)">
+        {{ action }}
+      </YdButton>
+    </div>
+
+    <div class="studio-agent-messages">
+      <YdChatMessageList v-if="messages.length" :messages="messages" compact thinking-text="正在读取页面结构…" />
+      <p v-else class="studio-agent-empty">
+        选中画布中的元素后描述想要的效果，或直接用上面的快捷操作。AI 的修改会先列出清单，确认后才写入草稿，不保存、不发布。
+      </p>
+    </div>
+
+    <div v-if="pending" class="studio-agent-preview" role="alertdialog" aria-label="确认 AI 修改">
+      <strong>AI 拟修改 {{ pending.lines.length }} 项</strong>
+      <ol>
+        <li v-for="(line, index) in pending.lines" :key="index">
+          <span>{{ line.label }}</span>
+          <small v-if="line.detail">{{ line.detail }}</small>
+        </li>
+      </ol>
+      <div class="studio-agent-preview__actions">
+        <YdButton size="sm" @click="pending.settle(true)">
+          应用到草稿
+        </YdButton>
+        <YdButton size="sm" variant="outline" @click="pending.settle(false)">
+          拒绝
+        </YdButton>
+        <small>应用后可一步撤销</small>
+      </div>
+    </div>
+    <div v-for="item in approvals" :key="item.requestId" class="studio-agent-preview" role="alertdialog" :aria-label="`批准工具 ${item.toolName}`">
+      <strong>需要你批准：{{ item.toolName }}</strong>
+      <div class="studio-agent-preview__actions">
+        <YdButton size="sm" @click="run && perform(() => assistant.respondInteraction(run!.id, item.requestId, true))">
+          批准
+        </YdButton>
+        <YdButton size="sm" variant="outline" @click="run && perform(() => assistant.respondInteraction(run!.id, item.requestId, false))">
+          拒绝
+        </YdButton>
+      </div>
+    </div>
+
+    <YdChatSender
+      :loading="busy"
+      :disabled="inputDisabled"
+      :placeholder="target ? `描述要对「${targetLabel}」做的修改…` : '描述想要的页面效果…'"
+      class="studio-agent-sender"
+      @send="(text, attachments) => perform(() => send(composeRequest(text, attachments)))"
+      @stop="perform(() => assistant.stop(run?.id))"
+    />
   </section>
 </template>
 
 <style scoped>
 .studio-agent-panel { display: flex; height: 100%; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; background: var(--color-bg-1); }
-.studio-agent-panel__workbench { flex: 1; min-height: 0; }
+.studio-agent-bar { display: flex; flex-shrink: 0; gap: 4px; align-items: center; padding: 8px 8px 0; }
+.studio-agent-model { flex-shrink: 0; margin: 6px 8px 0; }
+.studio-agent-target { display: flex; flex-shrink: 0; gap: 6px; align-items: center; margin: 8px 8px 0; padding: 6px 8px; font-size: 13px; border: 1px solid oklch(var(--border)); background: oklch(var(--muted) / 50%); }
+.studio-agent-target small { margin-right: 6px; color: oklch(var(--muted-foreground)); }
+.studio-agent-quick { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 4px; padding: 8px; }
+.studio-agent-quick :deep(button) { height: auto; padding: 4px 8px; white-space: normal; text-align: left; }
+.studio-agent-messages { flex: 1; min-height: 0; padding: 0 8px; overflow: auto; }
+.studio-agent-empty { margin: 8px 0; font-size: 12px; color: oklch(var(--muted-foreground)); }
+.studio-agent-preview { flex-shrink: 0; max-height: 40%; margin: 0 8px 8px; padding: 8px 10px; overflow: auto; font-size: 13px; border: 1px solid oklch(var(--primary) / 50%); background: oklch(var(--primary) / 6%); }
+.studio-agent-preview ol { margin: 6px 0; padding-left: 18px; }
+.studio-agent-preview li small { display: block; color: oklch(var(--muted-foreground)); word-break: break-all; }
+.studio-agent-preview__actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.studio-agent-preview__actions small { color: oklch(var(--muted-foreground)); }
+.studio-agent-sender { flex-shrink: 0; padding: 0 8px 8px; }
 </style>
