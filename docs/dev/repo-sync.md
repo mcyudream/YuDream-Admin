@@ -21,6 +21,7 @@
 | 插件系统契约细则 | `docs/plugin-system/specification.md` | 插件仓 `docs/dev/plugin-development.md` 引用并遵守 | 主仓 → 插件仓 |
 | 插件工程规范 | `docs/dev/plugin-system.md` | 插件仓 `docs/dev/plugin-development.md` | 主仓 → 插件仓（插件仓可补插件侧操作细则） |
 | 契约发布流程 | `docs/dev/contract-release.md` | 插件仓发布/同步节 | 主仓 → 插件仓 |
+| 宿主版本与发布 tag 规范 | `docs/dev/release-versioning.md` | 插件仓 `docs/dev/conventions.md` 版本节与 AGENTS.md 引用 | 主仓 → 插件仓 |
 | 后端分层硬规则 | `docs/dev/backend-architecture.md` | 插件仓后端规范节（插件内同套 DDD） | 主仓 → 插件仓 |
 | AI 基座与 SPI 契约 | `docs/platform/ai-foundation.md` + `docs/plugin-system/spi-*.md` | 插件 AI 消费方对应文档/代码 | 主仓 → 插件仓（随契约发布节奏） |
 | 硬规则与工程总纲 | `AGENTS.md` + `docs/dev/conventions.md` | 插件仓 `AGENTS.md` + `docs/dev/conventions.md` | 双向互检，冲突以主仓为准 |

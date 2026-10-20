@@ -19,7 +19,7 @@
 - Java 后端：`docs/dev/backend-architecture.md`；插件运行时再读 `docs/dev/plugin-system.md`。
 - 前端 UI：`yudream-frontend/AGENTS.md`、`docs/dev/frontend.md`、`docs/yd-ui-guidelines.md`。
 - 权限变更：`docs/dev/permission-codes.md`、`docs/system/permission-management.md`。
-- 契约版本/发布/下游同步：`docs/dev/contract-release.md`。
+- 契约版本/发布/下游同步：`docs/dev/contract-release.md`；宿主版本定级/发布 tag/latest 规则：`docs/dev/release-versioning.md`。
 - 跨仓规范变更或写入约束性记忆：先查 `docs/dev/repo-sync.md`。
 - 处理已知故障：查 `docs/exp/README.md` 的分类索引；AI 运行另读 `docs/platform/ai-foundation.md`。
 - **AGENTS.md 是硬规则唯一入口；`docs/dev/` 是规范正文；`docs/exp/` 是经验库。不得再建立 skill 作为项目规范权威。**
@@ -35,7 +35,7 @@
 7. **权限动作**：末段动作必须使用既定词表；按资源拆分查看/操作/危险权限。详见 `docs/dev/permission-codes.md`。
 8. **中文与编码**：正常 UTF-8 中文；禁止 `\uXXXX` 文案和真实乱码。PowerShell 显示乱码不作为改文件依据。
 9. **前端组件**：宿主与插件业务只用 `@yudream/components` 公开 YD 入口；缺能力先封装 YD 并同步公开面/文档/门禁，禁止 Fa/Arco 等业务直用。详见 `docs/dev/frontend.md`。
-10. **提交与外部动作**：模块完成后先验证、再按模块创建中文提交；未经明确要求不 push/tag/publish。契约只发布至 Nexus，按 `docs/dev/contract-release.md` 执行。
+10. **提交与外部动作**：模块完成后先验证、再按模块创建中文提交；未经明确要求不 push/tag/publish。契约只发布至 Nexus，按 `docs/dev/contract-release.md` 执行；宿主发版按 `docs/dev/release-versioning.md`（最高级别聚合、已 tag 不可移动、后缀 tag 禁新、d* 不得更新 latest）。
 11. **机密**：凭据、本机路径、token 只存被忽略的 `docs/local.md` 或系统凭据管理器；严禁提交或复制到规范、经验、issue、日志。计划放在被忽略的 `docs/plan/`；`docs/plans/` 为冻结历史归档。
 
 ## 4. 沟通与推进
@@ -66,6 +66,7 @@
 - SPI、插件生命周期、菜单、主题与 DevTools：`docs/dev/plugin-system.md`
 - 权限码：`docs/dev/permission-codes.md`
 - 契约发布：`docs/dev/contract-release.md`
+- 宿主版本与发布 tag：`docs/dev/release-versioning.md`
 - 前端与 YD 组件：`docs/dev/frontend.md` + `docs/yd-ui-guidelines.md`
 - 双仓同步：`docs/dev/repo-sync.md`
 - 已知坑：`docs/exp/README.md`

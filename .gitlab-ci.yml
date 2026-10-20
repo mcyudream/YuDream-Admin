@@ -10,6 +10,10 @@ default:
 
 workflow:
   rules:
+    # 默认分支与 MR 流水线只跑 validate-boundary 的轻量版本门禁（validate:host-release-history），
+    # 其余作业均有显式 tag 规则，不会在分支上触发任何构建/制品动作
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: $CI_COMMIT_TAG =~ /[pdv]/
     - if: $CI_COMMIT_TAG =~ /[wW]/
     - when: never
@@ -119,12 +123,46 @@ validate:docs:
   rules:
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
+# 宿主发版门禁（规则见 docs/dev/release-versioning.md）：
+#   默认分支/MR：只检查基线..HEAD 的变更记录覆盖与定级（轻量，不发版）
+#   v*（含 rc）：发布全量校验（tag/pom/变更记录/冻结/升版档位/干净树）
+#   d*：部署标签同样要求增量变更已覆盖
+validate:host-release-history:
+  stage: validate-boundary
+  image: *node_image
+  # 完整历史：基线祖先与 merge-base 判定禁用浅克隆
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - node ci/host-release.mjs check-changes --json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
+
+validate:host-release:
+  stage: validate-boundary
+  image: *node_image
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - |
+      case "$CI_COMMIT_TAG" in
+        v*) node ci/host-release.mjs validate --tag "$CI_COMMIT_TAG" --json ;;
+        d*) node ci/host-release.mjs check-changes --json ;;
+        *) echo "跳过宿主发版校验（$CI_COMMIT_TAG）" ;;
+      esac
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
+
 build:backend:
   stage: build-backend
   image: *maven_image
   script:
     - echo "mvn -s $MAVEN_SETTINGS_PATH clean install -pl yudream-bootstrap -am -DskipTests -B -e"
-    - mvn -s "$MAVEN_SETTINGS_PATH" clean install -pl yudream-bootstrap -am -DskipTests -B -e
+    # 运行时构建版本注入 tag 原文（vX.Y.Z / vX.Y.Z-rc.N / dX.Y.Z）；
+    # 默认（本地裸构建）回落 pom 的 <yudream.host.version>-dev.local，不冒充正式版
+    - mvn -s "$MAVEN_SETTINGS_PATH" clean install -pl yudream-bootstrap -am -DskipTests -B -e -Dyudream.host.build-version="$CI_COMMIT_TAG"
   artifacts:
     name: "core-backend-${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -171,6 +209,9 @@ publish:maven-plugin-spi:
   rules:
     - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
+    # 候选版（rc）不发布正式契约包：契约版本未变时禁止重复发布，避免 Nexus 拒绝重发导致的红流水线
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 verify:maven-plugin-spi:
@@ -180,6 +221,8 @@ verify:maven-plugin-spi:
     - sh ci/verify-plugin-spi-registry.sh
   rules:
     - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
+      when: never
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -207,6 +250,8 @@ verify:npm-contracts:
     - if: $CI_COMMIT_TAG =~ /^pdviz/
       variables:
         VERIFY_NPM_PACKAGES: "@yudream/dataviz"
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-plugin-sdk:
@@ -242,6 +287,8 @@ publish:npm-plugin-sdk:
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-components:
@@ -275,6 +322,8 @@ publish:npm-components:
       fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pdviz/
+      when: never
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -310,6 +359,8 @@ publish:npm-dataviz:
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
       when: never
+    - if: $CI_COMMIT_TAG =~ /-rc\.[1-9][0-9]*$/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 collect:artifacts:
@@ -332,92 +383,28 @@ collect:artifacts:
   rules:
     - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
-build-and-push-images:
+# 宿主镜像发布走 ci/publish-host-images.sh（行为要点见脚本头注释）：
+#   正式 v* 才晋升 latest（d* 部署标签不再触碰 latest，修复旧脚本问题；rc 同样不晋升）；
+#   不可变标签（精确版本/短 SHA）先查远端占用，同 commit 复用、不同 commit 拒绝覆盖；
+#   晋升前防倒退 fail closed；正式版必须双仓验证一致才写发布证据并晋升；
+#   rc/dev 不晋升 latest、rc 允许 ALIYUN_PUSH_ENABLED=false 单仓演进。
+publish:host-images:
   stage: build-images
   image: *docker_cli_image
-  # 串行化镜像构建推送，避免多条 tag 流水线在共享 docker daemon 上争抢 latest 可变标签
   resource_group: yudreamadmin-images
   variables:
-    CI_REGISTRY_IMAGE: "registry.yudream.online/yda"
-    BACKEND_IMAGE: "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
-    FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
-    BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
-    FRONTEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/frontend:latest"
-    # 阿里云 ACR 个人版镜像源：Harbor 仍是权威源，这里同一构建产物再同步一份供国内加速拉取。
-    # 同步开关不在此处赋默认值，以便用项目级变量 ALIYUN_PUSH_ENABLED=false 临时关闭（缺省视为开启）。
-    ALIYUN_REGISTRY: "crpi-bavv47zo78j1v6cv.cn-hangzhou.personal.cr.aliyuncs.com"
-    ALIYUN_REGISTRY_IMAGE: "$ALIYUN_REGISTRY/yudream"
-    ALIYUN_BACKEND_IMAGE: "$ALIYUN_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
-    ALIYUN_FRONTEND_IMAGE: "$ALIYUN_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
-    ALIYUN_BACKEND_IMAGE_LATEST: "$ALIYUN_REGISTRY_IMAGE/backend:latest"
-    ALIYUN_FRONTEND_IMAGE_LATEST: "$ALIYUN_REGISTRY_IMAGE/frontend:latest"
+    HOST_BUILD_VERSION: "$CI_COMMIT_TAG"
   dependencies:
     - build:backend
     - build:frontend-main
-  before_script:
-    # Harbor（registry.yudream.online）推送必须认证：robot 账号只经项目级 CI 变量注入，禁止写入仓库
-    # 应用镜像落 Harbor 的 yda 项目；转推的第三方镜像（如 kkfileview）走 library，见 docker/kkfileview/push.sh
-    # 注意：DOCKER_REGISTRY_USER 的形如 robot$push，变量必须以 raw（不展开变量引用）方式创建——
-    # 否则 GitLab 会把 $push 当变量引用展开成空值，登录用户变成 robot 并报 unauthorized
-    - |
-      REGISTRY_SERVER="${DOCKER_REGISTRY:-$(printf '%s' "$CI_REGISTRY_IMAGE" | cut -d/ -f1)}"
-      if [ -z "${DOCKER_REGISTRY_USER:-}" ] || [ -z "${DOCKER_REGISTRY_PASSWORD:-}" ]; then
-        echo "缺少 GitLab CI/CD 变量 DOCKER_REGISTRY_USER / DOCKER_REGISTRY_PASSWORD（Harbor robot 账号）"
-        exit 1
-      fi
-      printf '%s' "$DOCKER_REGISTRY_PASSWORD" | docker login "$REGISTRY_SERVER" -u "$DOCKER_REGISTRY_USER" --password-stdin
-    # 阿里云 ACR 个人版同步源：凭据同样只经项目级 CI 变量注入，禁止写入仓库
-    - |
-      if [ "${ALIYUN_PUSH_ENABLED:-true}" = "true" ]; then
-        if [ -z "${ALIYUN_REGISTRY_USER:-}" ] || [ -z "${ALIYUN_REGISTRY_PASSWORD:-}" ]; then
-          echo "缺少 GitLab CI/CD 变量 ALIYUN_REGISTRY_USER / ALIYUN_REGISTRY_PASSWORD（阿里云 ACR 账号）"
-          exit 1
-        fi
-        printf '%s' "$ALIYUN_REGISTRY_PASSWORD" | docker login "$ALIYUN_REGISTRY" -u "$ALIYUN_REGISTRY_USER" --password-stdin
-      else
-        echo "ALIYUN_PUSH_ENABLED=false，跳过阿里云镜像源登录"
-      fi
-    - docker info
   script:
-    # 先构建并推送提交 SHA 标签
-    - docker build -f Dockerfile.backend -t "$BACKEND_IMAGE" .
-    - docker build -f Dockerfile.frontend -t "$FRONTEND_IMAGE" .
-    - docker push "$BACKEND_IMAGE"
-    - docker push "$FRONTEND_IMAGE"
-    # latest 随 v* 正式标签与 d* 部署标签更新；推送前显式 re-tag，保证 latest 一定指向本次构建产物
-    - |
-      case "$CI_COMMIT_TAG" in
-        v*|d*)
-          docker tag "$BACKEND_IMAGE" "$BACKEND_IMAGE_LATEST"
-          docker tag "$FRONTEND_IMAGE" "$FRONTEND_IMAGE_LATEST"
-          docker push "$BACKEND_IMAGE_LATEST"
-          docker push "$FRONTEND_IMAGE_LATEST"
-          ;;
-        *)
-          echo "非 v*/d* 标签（$CI_COMMIT_TAG），跳过 latest 标签推送"
-          ;;
-      esac
-    # 阿里云 ACR 同步：复用本地已构建产物换标签推送，不重复构建；latest 跟随规则与 Harbor 一致
-    - |
-      if [ "${ALIYUN_PUSH_ENABLED:-true}" = "true" ]; then
-        docker tag "$BACKEND_IMAGE" "$ALIYUN_BACKEND_IMAGE"
-        docker tag "$FRONTEND_IMAGE" "$ALIYUN_FRONTEND_IMAGE"
-        docker push "$ALIYUN_BACKEND_IMAGE"
-        docker push "$ALIYUN_FRONTEND_IMAGE"
-        case "$CI_COMMIT_TAG" in
-          v*|d*)
-            docker tag "$BACKEND_IMAGE" "$ALIYUN_BACKEND_IMAGE_LATEST"
-            docker tag "$FRONTEND_IMAGE" "$ALIYUN_FRONTEND_IMAGE_LATEST"
-            docker push "$ALIYUN_BACKEND_IMAGE_LATEST"
-            docker push "$ALIYUN_FRONTEND_IMAGE_LATEST"
-            ;;
-          *)
-            echo "非 v*/d* 标签（$CI_COMMIT_TAG），跳过阿里云 latest 标签推送"
-            ;;
-        esac
-      else
-        echo "ALIYUN_PUSH_ENABLED=false，跳过阿里云镜像源推送"
-      fi
+    - apk add --no-cache jq
+    - sh ci/publish-host-images.sh
+  artifacts:
+    name: "host-images-evidence-${CI_COMMIT_TAG}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - dist/images/
+    expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG =~ /^(v|d)/
 

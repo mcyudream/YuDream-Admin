@@ -11,6 +11,7 @@
 4. 未验证已发布的版本**不得**用于下游；未明确要求时不做发布后 snapshot 升版。
 5. 契约包可分开发布：只发布版本实际变动的包。
 6. 发布前若任一仓工作区脏，只改契约发布相关文件，**不得**覆盖无关本地改动。
+7. 已发布 tag 不可移动；发布失败或源码变化**必须**发新版本。带后缀 tag（如 `v1.4.9-1`）重发仅历史有效，新发布**禁止**再建后缀 tag；版本定级与 tag 规则见 [release-versioning.md](release-versioning.md)。
 
 ## 2. 版本源文件
 
@@ -68,5 +69,5 @@ tag 触发的任务：`publish:maven-plugin-spi`、`publish:npm-plugin-sdk`、`p
 - 缺 Nexus 发布权限：确认 `NEXUS_USERNAME`/`NEXUS_PASSWORD` 与仓库权限。
 - 插件仓仍解析旧版本：确认 `pnpm-workspace.yaml` 已改且 `pnpm-lock.yaml` 已重新生成。
 - SPI 消费方仍解析旧制品：确认插件仓根 pom 属性已改、目标版本已在 Nexus Maven。
-- npm 发布幂等：重打带后缀 tag 可重跑验签；**失败 tag 不可移动**。
+- npm 发布幂等：历史上以带后缀 tag 重跑验签（historical，如 `v1.4.9-1`、`pcomp-1.4.0-1`）；新发布**禁止**后缀重打，按 [release-versioning.md](release-versioning.md) 发新版本；**失败 tag 不可移动**。
 - 历史发布细则与 Nexus 包说明见 `docs/plugin-system/gitlab-private-packages.md`、`docs/yd-contract-releases.md`。

@@ -3,7 +3,7 @@
 > **适用范围**：yudream-admim 主仓全部工作。
 > **目标**：一份总纲说清技术栈、模块布局、提交纪律、构建验证与通用工程规则；专项规则见同目录专题文件。
 
-本文件是 `docs/dev/` 的入口。修改后端先看 [backend-architecture.md](backend-architecture.md)，插件相关看 [plugin-system.md](plugin-system.md)，权限码看 [permission-codes.md](permission-codes.md)，契约发布看 [contract-release.md](contract-release.md)，前端看 [frontend.md](frontend.md)，跨仓同步看 [repo-sync.md](repo-sync.md)。踩坑记录沉淀在 `docs/exp/`。
+本文件是 `docs/dev/` 的入口。修改后端先看 [backend-architecture.md](backend-architecture.md)，插件相关看 [plugin-system.md](plugin-system.md)，权限码看 [permission-codes.md](permission-codes.md)，契约发布看 [contract-release.md](contract-release.md)，宿主版本与发布 tag 看 [release-versioning.md](release-versioning.md)，前端看 [frontend.md](frontend.md)，跨仓同步看 [repo-sync.md](repo-sync.md)。踩坑记录沉淀在 `docs/exp/`。
 
 ## 1. 技术栈与环境
 
@@ -39,8 +39,9 @@ Git Bash 环境设置：`export JAVA_HOME='/c/Users/SiberianHusky/.jdks/ms-21.0.
 1. 每个可独立使用的模块完成后，先运行对应验证，**只暂存该模块文件**并创建中文提交（如 `feat: 完成用户管理模块`、`fix: 修复菜单图标显示`），再进入下一模块。
 2. 改动或修正架构规则时，**必须在同一提交同步** `AGENTS.md` 与 `docs/dev/` / `docs/exp/` 对应文件，禁止代码与项目规则脱节。
 3. **未经用户明确要求不执行 push/tag 等外部动作**；不纳入 IDE 元数据、临时文件等与任务无关的改动。
-4. 涉及双仓同步地图（[repo-sync.md](repo-sync.md)）的修改，同一工作项内同步插件仓；暂不能同步的提交信息标 `[sync-pending]` 并记入同步地图「待同步」节。
-5. 若模块因验证失败或工作区存在冲突的用户改动而无法提交，先报告阻塞再继续。
+4. 宿主版本定级、发布 tag 与 `latest` 规则按 [release-versioning.md](release-versioning.md)：最高级别聚合、纯文档不升版、已 tag 不可移动、失败/变更走新版本而非后缀重打。
+5. 涉及双仓同步地图（[repo-sync.md](repo-sync.md)）的修改，同一工作项内同步插件仓；暂不能同步的提交信息标 `[sync-pending]` 并记入同步地图「待同步」节。
+6. 若模块因验证失败或工作区存在冲突的用户改动而无法提交，先报告阻塞再继续。
 
 ## 4. 构建与验证
 

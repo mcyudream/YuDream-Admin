@@ -23,8 +23,8 @@
 
 - **现象**：同一 tag 对应的发布流程失败，修复后不能再次触发或 evidence 校验异常。
 - **根因**：Git tag 不可移动，CI 对 tag 的发布事实需要可审计；一次性授权令牌也可能已过期。
-- **规避**：失败 tag 不移动；修复后按已验证流程使用新的后缀 tag 重跑；确认 `authorize-main` 等短时授权仍有效。
-- **来源**：`plugin-ci-release-tags`、`CI tag-only pipeline and push guard`。
+- **规避**：失败 tag 不移动；历史上按带后缀 tag 重跑（historical，已沉淀进规范）；现规则为源码变化**必须**发新版本，**禁止**再新建后缀 tag；确认 `authorize-main` 等短时授权仍有效。
+- **来源**：`plugin-ci-release-tags`、`CI tag-only pipeline and push guard`；`docs/dev/release-versioning.md` 第 4 节。
 
 ## 2. GitLab CI 行为
 
@@ -37,10 +37,17 @@
 
 ### 推分支没有流水线
 
-- **现象**：master push 后看不到 CI run。
-- **根因**：主仓 CI 只对 tag 触发，分支推送不运行流水线；插件仓可能也使用 tag-only 规则。
-- **规避**：不要把无流水线误判为推送失败；本地按仓库验证清单执行等价检查；确认 tag 规则后再触发发布流程。
-- **来源**：`ci-tag-only-pipeline-and-push-guard`。
+- **现象**：master push 后看不到 CI run（或反之看到一条极轻量流水线）。
+- **根因**：workflow 规则控制哪些事件建流水线；任务建立后默认分支/MR 会跑一条只含 `validate:host-release-history` 的轻量流水线，其余作业仍按各自的 tag 规则触发。
+- **规避**：不要把轻量流水线误判为全量构建在跑；作业级 rules 决定各作业是否执行；本地按仓库验证清单执行等价检查。
+- **来源**：`ci-workflow-rules-vs-job-rules`；`docs/dev/release-versioning.md` 第 5 节。
+
+### POM 注释里写了 --write 导致整棵 Maven 树解析失败
+
+- **现象**：`mvn` 直接报 `Non-parseable POM: in comment after two dashes`，并连带 reactor 全模块构建失败。
+- **根因**：XML 注释内部不允许出现 `--`（如把 CLI 用法 `prepare --write` 写进 pom 注释），这是 XML 语法硬约束。
+- **规避**：pom/任何 XML 的注释中禁止出现连续两个连字符；描述 CLI 用法时写「prepare 落盘」「D 参数覆盖」等无 `--` 的表述。
+- **来源**：`xml-comment-double-dash`；`pom.xml` / `yudream-bootstrap/pom.xml`（宿主版本注释）。
 
 ### 发布产物版本和源码属性不一致
 

@@ -77,6 +77,21 @@ require_pattern 'NEXUS_PASSWORD' "core CI must use the shared Nexus password"
 echo "[verify-core-contract-publish-pipeline] checking publish rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\[pv\]/' "contract publish/verify jobs must use p/v tag rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\^(v\|d)/' "build and Docker jobs must use anchored v*/d* tag rules"
+grep -qF -- '-rc\.[1-9][0-9]*$' .gitlab-ci.yml \
+  || fail "rc tags must not publish or verify contract packages"
+
+echo "[verify-core-contract-publish-pipeline] checking host release gate (docs/dev/release-versioning.md)"
+require_file "ci/publish-host-images.sh"
+require_pattern '^publish:host-images:$' "core CI must publish host images via ci/publish-host-images.sh"
+require_pattern 'sh ci/publish-host-images.sh' "core CI must invoke ci/publish-host-images.sh for image release"
+require_pattern 'resource_group: yudreamadmin-images' "host image publish must stay serialized across tag pipelines"
+require_pattern 'HOST_BUILD_VERSION: "\$CI_COMMIT_TAG"' "host image publish must take the release tag as HOST_BUILD_VERSION"
+require_pattern 'node ci/host-release.mjs validate' "core CI must gate v* release tags with host-release validate"
+require_pattern 'node ci/host-release.mjs check-changes' "core CI must gate branch/MR/d* pipelines with host-release change coverage"
+require_pattern 'yudream.host.build-version=' "backend build must inject the exact runtime build version"
+if grep -Eq 'CI_REGISTRY_IMAGE|_IMAGE_LATEST' .gitlab-ci.yml; then
+  fail "host image publishing must be delegated to ci/publish-host-images.sh (stable-only latest, no inline tag pushes)"
+fi
 
 if grep -Eq 'packages/(maven|npm)|publish:npmjs-|verify:(gitlab-npm|npmjs)|GITLAB_NPM_PUBLISH_ENABLED|NPMJS_PUBLISH_ENABLED|NPM_TOKEN' .gitlab-ci.yml; then
   fail "core CI must not publish contracts to GitLab Package Registry or npmjs"
