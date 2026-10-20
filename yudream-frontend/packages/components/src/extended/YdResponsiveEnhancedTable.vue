@@ -269,7 +269,8 @@ interface CardField {
   id: string
   label: string
   cell?: Cell<TData, any>
-  row?: Row<TData>
+  /** 卡片降级字段只保证 original，插槽按 row.original 读取业务行 */
+  row?: { original: TData }
   value: unknown
   hasCustomCell: boolean
 }
@@ -362,6 +363,8 @@ function buildCardFields(row: TData): CardField[] {
     label: columnLabel(column),
     value: rowValue(row, column),
     hasCustomCell: false,
+    // 桌面表格尚未挂载（窄屏只渲染卡片）时，cell-* 插槽仍需拿到业务行
+    row: { original: row },
   }))
 }
 
@@ -381,13 +384,14 @@ const cardItems = computed(() => (props.tree
 
 function fieldSlotProps(field: CardField, index: number): TableCellSlotProps<TData, any> {
   return {
-    cell: field.cell!,
-    column: field.cell!.column,
+    // 卡片降级字段（没有 TanStack cell）只带行数据；调用方插槽按需读取 value/row。
+    cell: field.cell,
+    column: field.cell?.column,
     index,
     row: field.row!,
     table: tableInstance.value!,
     value: field.value,
-  }
+  } as TableCellSlotProps<TData, any>
 }
 </script>
 

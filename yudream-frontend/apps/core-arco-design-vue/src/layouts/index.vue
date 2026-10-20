@@ -278,6 +278,18 @@ async function resendVerificationEmail() {
     > * {
       height: 100%;
     }
+
+    /* 远程插件页在路由根与页面之间多一层 data-yudream-plugin 包装，高度继续贯通 */
+    > * > :deep([data-yudream-plugin]) {
+      height: 100%;
+      min-height: 0;
+    }
+
+    /* 插件页根节点（通常是页面组件根元素）继续承接整高，整高布局才能铺满 */
+    > * > :deep([data-yudream-plugin]) > * {
+      height: 100%;
+      min-height: 0;
+    }
   }
 }
 

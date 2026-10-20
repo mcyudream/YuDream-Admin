@@ -114,3 +114,50 @@ textarea {
   overflow: hidden;
   background-color: oklch(var(--card));
 }
+
+/*
+ * 壳内的加载遮罩必须吃掉页头之外的剩余高度，YdSettingsLayout 的
+ * scroll 内容区才拿得到确定高度并成为滚动容器；否则遮罩按内容高度
+ * 撑开，壳 overflow:hidden 会把下方内容直接裁掉。
+ */
+.settings-page-shell > .yd-loading-overlay {
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-page-shell > .yd-loading-overlay > .yd-loading-overlay__content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/*
+ * 业务筛选行：小屏单列、sm 两列，xl 按 --yd-filter-columns 指定筛选项列数，
+ * 最后一个 auto 轨道留给行尾操作组。使用未分层的宿主工具类，避免插件
+ * @layer yudream-plugin 里的 xl 断点被宿主 sm 工具类按层序压掉。
+ */
+.yd-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.yd-filter-grid > * {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .yd-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .yd-filter-grid {
+    grid-template-columns: repeat(var(--yd-filter-columns, 2), minmax(0, 1fr)) auto;
+  }
+}
