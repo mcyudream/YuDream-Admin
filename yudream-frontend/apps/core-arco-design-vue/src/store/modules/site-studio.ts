@@ -1,11 +1,11 @@
 import type { StudioRelease, StudioState } from '@/api/modules/platform-cms-studio'
 import type { SiteDocument, StudioCommand } from '@/types/site-studio'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 import apiStudio from '@/api/modules/platform-cms-studio'
 import { applyStudioCommand, findStudioNode, validateStudioDocument } from '@/utils/site-studio'
+import { cloneStudioJson } from '@/utils/site-studio-validation'
 
-const plainDocument = (document: SiteDocument) => JSON.parse(JSON.stringify(document)) as SiteDocument
 function stableJson(value: unknown): string {
   const normalize = (item: unknown): unknown => {
     if (Array.isArray(item)) {
@@ -19,11 +19,15 @@ function stableJson(value: unknown): string {
   return JSON.stringify(normalize(value))
 }
 
+const MERGE_WINDOW_MS = 1000
+
 export const useSiteStudioStore = defineStore('site-studio', () => {
   const themeCode = ref('default')
   const state = ref<StudioState | null>(null)
   const doc = ref<SiteDocument | null>(null)
   const savedJson = ref<string | null>(null)
+  /** Key-order-insensitive JSON of `doc` for dirty/no-op checks only, maintained by setDoc. */
+  const docJson = ref<string | null>(null)
   const history = ref<string[]>([])
   const future = ref<string[]>([])
   const loading = ref(false)
@@ -42,9 +46,11 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
   const releasesError = ref('')
   const localEditRevision = ref(0)
   let contextEpoch = 0
+  /** Consecutive edits with the same mergeKey share one undo entry while nothing else changed the document. */
+  let lastMerge: { key: string, at: number, revision: number } | null = null
   let releasesEpoch = 0
 
-  const dirty = computed(() => doc.value !== null && stableJson(doc.value) !== savedJson.value)
+  const dirty = computed(() => doc.value !== null && docJson.value !== savedJson.value)
   const busy = computed(() => loading.value || saving.value || publishing.value)
   const canUndo = computed(() => history.value.length > 0 && !busy.value)
   const canRedo = computed(() => future.value.length > 0 && !busy.value)
@@ -70,6 +76,20 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     }
   }
 
+  /**
+   * Every document replacement goes through here so docJson never goes stale.
+   * History keeps insertion-order JSON: key order is CSS declaration order.
+   */
+  function setDoc(document: SiteDocument | null, json = document ? stableJson(document) : null) {
+    doc.value = document
+    docJson.value = json
+    localEditRevision.value++
+  }
+
+  function snapshot() {
+    return JSON.stringify(toRaw(doc.value))
+  }
+
   function syncSelection() {
     if (doc.value && !doc.value.pages.some(page => page.id === activePageId.value)) {
       activePageId.value = doc.value.pages[0]?.id || ''
@@ -91,12 +111,11 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
   function applyState(next: StudioState) {
     const document = decode(next)
     state.value = next
-    doc.value = document
-    savedJson.value = document ? stableJson(document) : null
+    setDoc(document)
+    savedJson.value = docJson.value
     history.value = []
     future.value = []
     selectedNodeId.value = ''
-    localEditRevision.value++
     syncSelection()
   }
 
@@ -110,7 +129,7 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     loadError.value = ''
     saveError.value = ''
     state.value = null
-    doc.value = null
+    setDoc(null)
     savedJson.value = null
     history.value = []
     future.value = []
@@ -118,7 +137,6 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     releases.value = []
     releasesTotal.value = 0
     releasesLoading.value = false
-    localEditRevision.value++
     try {
       const response = await apiStudio.get(code)
       if (epoch !== contextEpoch || code !== themeCode.value) {
@@ -138,22 +156,29 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     }
   }
 
-  function execute(command: StudioCommand | StudioCommand[]) {
+  function execute(command: StudioCommand | StudioCommand[], options: { mergeKey?: string } = {}) {
     assertEditable()
     if (!doc.value) {
       throw new Error('尚未创建站点文档')
     }
-    const previous = JSON.stringify(doc.value)
     const normalized: StudioCommand = Array.isArray(command) ? { type: 'batch', commands: command } : command
-    const result = applyStudioCommand(plainDocument(doc.value), normalized)
-    if (stableJson(result) === stableJson(doc.value)) {
+    // The store only ever holds validated documents; apply clones its input itself.
+    const result = applyStudioCommand(toRaw(doc.value), normalized, { trustedInput: true })
+    const resultJson = stableJson(result)
+    if (resultJson === docJson.value) {
       return result
     }
-    history.value.push(previous)
-    trimHistory()
+    const now = Date.now()
+    const chain = lastMerge
+    const merging = chain !== null && Boolean(options.mergeKey) && chain.key === options.mergeKey
+      && chain.revision === localEditRevision.value && now - chain.at < MERGE_WINDOW_MS && history.value.length > 0
+    if (!merging) {
+      history.value.push(snapshot())
+      trimHistory()
+    }
     future.value = []
-    doc.value = result
-    localEditRevision.value++
+    setDoc(result, resultJson)
+    lastMerge = options.mergeKey ? { key: options.mergeKey, at: now, revision: localEditRevision.value } : null
     syncSelection()
     return result
   }
@@ -171,9 +196,8 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     if (!previous) {
       return
     }
-    future.value.push(JSON.stringify(doc.value))
-    doc.value = JSON.parse(previous) as SiteDocument
-    localEditRevision.value++
+    future.value.push(snapshot())
+    setDoc(JSON.parse(previous) as SiteDocument)
     syncSelection()
   }
 
@@ -186,10 +210,9 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     if (!next) {
       return
     }
-    history.value.push(JSON.stringify(doc.value))
+    history.value.push(snapshot())
     trimHistory()
-    doc.value = JSON.parse(next) as SiteDocument
-    localEditRevision.value++
+    setDoc(JSON.parse(next) as SiteDocument)
     syncSelection()
   }
 
@@ -215,6 +238,7 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
       const document = decode(response.data)
       state.value = response.data
       savedJson.value = document ? stableJson(document) : null
+      // Edits made while the request was in flight stay dirty against the new baseline.
       localEditRevision.value++
     }
     catch (error) {
@@ -329,14 +353,13 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     assertEditable()
     validateStudioDocument(document)
     if (doc.value) {
-      history.value.push(JSON.stringify(doc.value))
+      history.value.push(snapshot())
       trimHistory()
     }
-    doc.value = plainDocument(document)
+    setDoc(cloneStudioJson(document))
     future.value = []
     activePageId.value = document.pages[0]?.id || ''
     selectedNodeId.value = ''
-    localEditRevision.value++
   }
 
   function reset() {
@@ -344,7 +367,7 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     releasesEpoch++
     themeCode.value = 'default'
     state.value = null
-    doc.value = null
+    setDoc(null)
     savedJson.value = null
     history.value = []
     future.value = []
@@ -360,7 +383,6 @@ export const useSiteStudioStore = defineStore('site-studio', () => {
     releasesTotal.value = 0
     releasesLoading.value = false
     releasesError.value = ''
-    localEditRevision.value++
   }
 
   return {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { StudioNode } from '@/types/site-studio'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { findStudioNode } from '@/utils/site-studio'
 import { uploadStudioAsset } from './studio-upload'
@@ -137,17 +137,42 @@ function commitStyles() {
   }
 }
 
-function commitText(value: string) {
+// ===== 文本：输入防抖提交、失焦立即提交；连续输入合并为一条撤销 =====
+
+const TEXT_COMMIT_DELAY = 300
+const textDraft = ref<{ nodeId: string, value: string } | null>(null)
+let textTimer: ReturnType<typeof setTimeout> | undefined
+
+const textValue = computed(() => textDraft.value && textDraft.value.nodeId === node.value?.id ? textDraft.value.value : node.value?.text ?? '')
+
+function onTextInput(value: string) {
   if (!node.value) {
     return
   }
+  textDraft.value = { nodeId: node.value.id, value }
+  clearTimeout(textTimer)
+  textTimer = setTimeout(flushText, TEXT_COMMIT_DELAY)
+}
+
+/** 提交到输入时的节点；切换选中或卸载前也会先落盘，不会写到新选中的元素上 */
+function flushText() {
+  clearTimeout(textTimer)
+  textTimer = undefined
+  const draft = textDraft.value
+  textDraft.value = null
+  if (!draft) {
+    return
+  }
   try {
-    store.execute({ type: 'set-text', nodeId: node.value.id, text: value })
+    store.execute({ type: 'set-text', nodeId: draft.nodeId, text: draft.value }, { mergeKey: `text:${draft.nodeId}` })
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '文本保存失败')
   }
 }
+
+watch(() => node.value?.id, flushText)
+onBeforeUnmount(flushText)
 
 // ===== 资源引用（src/href/poster 属性快速取自资源库） =====
 
@@ -316,10 +341,11 @@ function removeSelected() {
       <label v-if="node.text !== undefined" class="text-sm flex flex-col gap-1">
         <span>文本</span>
         <YdTextarea
-          :model-value="node.text"
+          :model-value="textValue"
           :rows="3"
           placeholder="元素文本"
-          @update:model-value="commitText(String($event))"
+          @update:model-value="onTextInput(String($event))"
+          @blur="flushText"
         />
       </label>
 
