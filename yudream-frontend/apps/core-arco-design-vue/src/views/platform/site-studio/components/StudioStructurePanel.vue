@@ -3,8 +3,8 @@ import type { YdTreeNode } from '@yudream/components'
 import type { StudioNode } from '@/types/site-studio'
 import { computed, ref } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
-import { createStudioNode, findStudioNode } from '@/utils/site-studio'
-import StudioSnippetPanel from './StudioSnippetPanel.vue'
+import { findStudioNode } from '@/utils/site-studio'
+import StudioBlockInserter from './StudioBlockInserter.vue'
 
 defineOptions({ name: 'StudioStructurePanel' })
 
@@ -48,18 +48,6 @@ const selectedLayerLabel = computed(() => {
   const node = store.doc && store.selectedNodeId ? findStudioNode(store.doc, store.selectedNodeId) : undefined
   return node ? `${node.type} · ${node.tag}` : ''
 })
-
-const insertPalette: { type: string, label: string, icon: string }[] = [
-  { type: 'section', label: '区块', icon: 'morph:layout-template' },
-  { type: 'container', label: '容器', icon: 'morph:box' },
-  { type: 'heading', label: '标题', icon: 'morph:heading' },
-  { type: 'text', label: '文本', icon: 'morph:text' },
-  { type: 'image', label: '图片', icon: 'morph:image' },
-  { type: 'video', label: '视频', icon: 'morph:video' },
-  { type: 'audio', label: '音频', icon: 'morph:music' },
-  { type: 'link', label: '链接', icon: 'morph:link' },
-  { type: 'button', label: '按钮', icon: 'morph:square-mouse-pointer' },
-]
 
 function selectPage(pageId: string) {
   store.activePageId = pageId
@@ -123,35 +111,6 @@ function confirmRemovePage(pageId: string) {
     },
   })
 }
-
-function insertNode(type: string) {
-  try {
-    const node = createStudioNode(type)
-    if (type === 'video' || type === 'audio') {
-      node.attributes.controls = ''
-    }
-    if (type === 'image' || type === 'video') {
-      node.styles = { 'max-width': '100%', 'height': 'auto' }
-    }
-    if (type === 'section' || type === 'container') {
-      node.styles = { 'display': 'flex', 'flex-direction': 'column', 'gap': '16px', 'padding': '24px', 'min-height': '80px', 'min-width': '0' }
-    }
-    if (type === 'link') {
-      node.attributes.href = '#'
-    }
-    // 文本/void 节点不能有子级，回落到当前容器根
-    const selected = store.doc && store.selectedNodeId ? findStudioNode(store.doc, store.selectedNodeId) : undefined
-    const parentUsable = selected && !VOID_TAGS.has(selected.tag) && selected.text === undefined
-    const target = store.editRegion === 'page'
-      ? (parentUsable && store.selectedNodeId ? { parentId: store.selectedNodeId } : { pageId: store.activePageId })
-      : { region: store.editRegion }
-    store.execute({ type: 'insert', target, node })
-    store.selectedNodeId = node.id
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '插入失败')
-  }
-}
 </script>
 
 <template>
@@ -213,27 +172,7 @@ function insertNode(type: string) {
       />
     </section>
 
-    <section class="flex flex-col gap-2" aria-label="插入元素">
-      <h3 class="text-xs text-muted-foreground font-medium">
-        插入元素
-      </h3>
-      <div class="gap-1.5 grid grid-cols-3">
-        <YdAction
-          v-for="item in insertPalette"
-          :key="item.type"
-          v-auth="'platform:cms:edit'"
-          type="button"
-          class="studio-insert-item"
-          :aria-label="`插入${item.label}`"
-          @click="insertNode(item.type)"
-        >
-          <YdIcon :name="item.icon" />
-          <span>{{ item.label }}</span>
-        </YdAction>
-      </div>
-    </section>
-
-    <StudioSnippetPanel />
+    <StudioBlockInserter />
 
     <YdModal
       v-model="pageFormOpen"
@@ -265,15 +204,5 @@ function insertNode(type: string) {
 }
 .studio-page-row[aria-pressed='true'] {
   background: oklch(var(--muted));
-}
-.studio-insert-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px;
-  border: 1px solid oklch(var(--border));
-  border-radius: var(--yd-control-radius);
-  font-size: 0.75rem;
 }
 </style>
