@@ -127,12 +127,21 @@ async function uploadAssets() {
       return
     }
     const uploaded: StudioAsset[] = []
+    const failed: string[] = []
     for (const { file, mimeType } of accepted) {
       const data = new FormData()
       data.append('file', file)
       data.append('module', 'cms')
       data.append('publicAccess', 'true')
-      const response = await apiFiles.upload(data)
+      // 逐个上传：单个失败（原因已由全局请求提示说明）不丢弃其余已上传的文件
+      let response: Awaited<ReturnType<typeof apiFiles.upload>>
+      try {
+        response = await apiFiles.upload(data)
+      }
+      catch {
+        failed.push(file.name)
+        continue
+      }
       const result = response.data
       const url = result.url || ''
       if (!url) {
@@ -146,6 +155,9 @@ async function uploadAssets() {
         mimeType: result.contentType || mimeType,
         kind: strictKindOf(result.contentType || mimeType),
       })
+    }
+    if (failed.length) {
+      toast.error(`${failed.map(name => `「${name}」`).join('、')}上传失败${uploaded.length ? `，其余 ${uploaded.length} 项已登记` : ''}`)
     }
     if (!uploaded.length) {
       return

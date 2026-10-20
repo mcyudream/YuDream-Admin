@@ -35,7 +35,14 @@ export async function uploadStudioAsset(accept: string): Promise<StudioAsset | n
   data.append('file', file)
   data.append('module', 'cms')
   data.append('publicAccess', 'true')
-  const response = await apiFiles.upload(data)
+  let response: Awaited<ReturnType<typeof apiFiles.upload>>
+  try {
+    response = await apiFiles.upload(data)
+  }
+  catch {
+    // 失败原因已由全局请求提示说明，这里只给出可读的文件级结论
+    throw new Error(`上传「${file.name}」失败`)
+  }
   const uploaded = response.data
   const url = uploaded.url || ''
   if (!url) {
