@@ -1,4 +1,5 @@
 import type { SiteDocument, StudioContainer, StudioNode } from '../types/site-studio'
+import { freshStudioNodeTree } from './site-studio-snippets'
 import { validateStudioNodes } from './site-studio-validation'
 
 /**
@@ -31,6 +32,7 @@ export const STUDIO_BLOCK_CATEGORIES: StudioBlockCategory[] = [
   { key: 'design', label: '设计' },
   { key: 'layout', label: '布局' },
   { key: 'widgets', label: '小组件' },
+  { key: 'custom', label: '我的模板' },
 ]
 
 interface NodeOptions {
@@ -184,6 +186,42 @@ export function resolveStudioInsertTarget(
 const LEAF_TAGS = new Set(['img', 'video', 'audio', 'hr', 'br', 'source', 'track', 'col', 'wbr'])
 export function canContainStudioBlocks(node: StudioNode) {
   return node.text === undefined && !LEAF_TAGS.has(node.tag)
+}
+
+/** 服务端用户区块模板的最小形状（与 API 返回一致）。 */
+export interface StudioBlockTemplateLike {
+  id: string
+  name: string
+  category: string
+  description?: string
+  keywords?: string[]
+  nodesJson: string
+}
+
+/** 用户模板 → 区块定义：名称为 template/<id>，每次插入解析内容并重建全部节点 ID。 */
+export function templateToStudioBlock(template: StudioBlockTemplateLike): StudioBlockDefinition {
+  return {
+    name: `template/${template.id}`,
+    title: template.name,
+    category: STUDIO_BLOCK_CATEGORIES.some(category => category.key === template.category) ? template.category : 'custom',
+    icon: 'morph:layout-template',
+    description: template.description || '用户区块模板',
+    keywords: template.keywords ?? [],
+    source: 'template',
+    create: () => {
+      const parsed: unknown = JSON.parse(template.nodesJson)
+      if (!Array.isArray(parsed)) {
+        throw new TypeError(`模板「${template.name}」内容无效`)
+      }
+      return (parsed as StudioNode[]).map(freshStudioNodeTree)
+    },
+  }
+}
+
+/** 用最新模板列表替换注册表中的全部模板区块（删除的模板随之注销）。 */
+export function syncStudioTemplateBlocks(registry: ReturnType<typeof createStudioBlockRegistry>, templates: StudioBlockTemplateLike[]) {
+  registry.list().filter(block => block.source === 'template').forEach(block => registry.unregister(block.name))
+  templates.forEach(template => registry.register(templateToStudioBlock(template)))
 }
 
 /** 宿主默认注册表（单例）：工作台插入器、用户模板与后续插件区块共用。 */

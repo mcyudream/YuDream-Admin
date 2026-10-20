@@ -29,6 +29,35 @@ public class StudioDocumentValidator {
             .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(256).maxStringLength(MAX_DOCUMENT_BYTES).build())
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
 
+    public static final int MAX_TEMPLATE_BYTES = 256 * 1024;
+
+    /**
+     * 校验区块模板节点数组：包装为仅含该节点集合的最小站点文档后，按与站点文档完全相同的规则校验
+     * （标签/属性/样式/URL/ID 唯一/层级与数量上限），与前端 validateStudioNodes 语义一致。
+     */
+    public void validateNodes(String nodesJson) {
+        if (nodesJson == null || nodesJson.getBytes(StandardCharsets.UTF_8).length > MAX_TEMPLATE_BYTES) fail("区块模板内容不得超过256KiB");
+        final JsonNode nodes;
+        try { nodes = mapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(nodesJson); }
+        catch (Exception ex) { throw new BizException("区块模板内容不是有效JSON"); }
+        if (nodes == null || !nodes.isArray() || nodes.isEmpty()) fail("区块模板至少包含一个节点");
+        var document = mapper.createObjectNode();
+        document.put("schemaVersion", 1);
+        document.put("id", "template-validation-document");
+        document.put("name", "");
+        var theme = document.putObject("theme");
+        theme.putObject("tokens");
+        theme.putArray("header");
+        theme.putArray("footer");
+        var page = document.putArray("pages").addObject();
+        page.put("id", "template-validation-page");
+        page.put("name", "");
+        page.put("path", "/");
+        page.set("root", nodes);
+        document.putArray("assets");
+        validate(document.toString());
+    }
+
     public void validate(String documentJson) {
         if (documentJson == null || documentJson.getBytes(StandardCharsets.UTF_8).length > MAX_DOCUMENT_BYTES) fail("文档不得超过2MiB");
         final JsonNode document;

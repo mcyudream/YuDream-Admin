@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as lucide from 'lucide'
 import { applyStudioCommand, createStudioDocument, createStudioNode, validateStudioDocument } from './site-studio'
-import { createStudioBlockRegistry, instantiateStudioBlock, resolveStudioInsertTarget, searchStudioBlocks, STUDIO_BLOCK_CATEGORIES, studioBlockRegistry } from './site-studio-blocks'
+import { createStudioBlockRegistry, instantiateStudioBlock, resolveStudioInsertTarget, searchStudioBlocks, STUDIO_BLOCK_CATEGORIES, studioBlockRegistry, syncStudioTemplateBlocks, templateToStudioBlock } from './site-studio-blocks'
 
 test('every core block instantiates valid nodes with fresh IDs in a known category and catalogued icon', () => {
   // morph: 图标来自 lucide 全集（kebab 名 ↔ 导出的 PascalCase 名）
@@ -53,4 +53,26 @@ test('insert target follows WordPress semantics: after selection, inside when al
   const placed = resolveStudioInsertTarget(doc, { region: 'page', pageId, selectedId: section.id })
   const next = applyStudioCommand(doc, { type: 'batch', commands: block.map((node, offset) => ({ type: 'insert' as const, target: placed.target, node, index: (placed.index ?? 0) + offset })) })
   assert.equal(next.pages[0]!.root[1]!.type, 'columns')
+})
+
+test('user templates become blocks: fresh IDs per insert, sync replaces removed templates, unknown category falls back', () => {
+  const registry = createStudioBlockRegistry([])
+  const heading = createStudioNode('heading')
+  heading.attributes = { 'id': 'dom-id', 'data-studio-id': heading.id }
+  const nodesJson = JSON.stringify([heading])
+  const template = { id: '7f3d1c2a-0000-4000-8000-000000000001', name: '我的标题', category: 'nope', keywords: ['hero'], nodesJson }
+  syncStudioTemplateBlocks(registry, [template])
+  const block = registry.get(`template/${template.id}`)!
+  assert.equal(block.category, 'custom')
+  assert.equal(block.source, 'template')
+  const first = instantiateStudioBlock(block)
+  const second = instantiateStudioBlock(block)
+  assert.notEqual(first[0]!.id, heading.id)
+  assert.notEqual(first[0]!.id, second[0]!.id)
+  assert.equal(first[0]!.attributes.id, undefined, 'DOM id 不随模板复制')
+  assert.ok(searchStudioBlocks(registry.list(), 'hero').some(item => item.name === block.name))
+  syncStudioTemplateBlocks(registry, [])
+  assert.equal(registry.get(`template/${template.id}`), undefined)
+  assert.equal(templateToStudioBlock({ ...template, category: 'layout' }).category, 'layout')
+  assert.throws(() => instantiateStudioBlock(templateToStudioBlock({ ...template, nodesJson: '{"x":1}' })))
 })

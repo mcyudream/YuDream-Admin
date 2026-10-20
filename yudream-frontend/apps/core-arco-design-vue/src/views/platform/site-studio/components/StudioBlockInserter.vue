@@ -14,7 +14,7 @@ import {
   STUDIO_BLOCK_CATEGORIES,
   studioBlockRegistry,
 } from '@/utils/site-studio-blocks'
-import StudioSnippetPanel from './StudioSnippetPanel.vue'
+import StudioTemplatePanel from './StudioTemplatePanel.vue'
 
 defineOptions({ name: 'StudioBlockInserter' })
 
@@ -35,7 +35,9 @@ watch(canInsertInside, (allowed) => {
   }
 })
 
-const blocks = computed(() => studioBlockRegistry.list())
+// 注册表是普通模块对象，模板同步后靠版本号触发重新读取
+const registryVersion = ref(0)
+const blocks = computed(() => registryVersion.value >= 0 ? studioBlockRegistry.list() : [])
 const results = computed(() => searchStudioBlocks(blocks.value, query.value))
 
 // ===== 最近使用：按账号保存在本机，最多 6 个 =====
@@ -50,7 +52,7 @@ watch(recentKey, (key) => {
     recentNames.value = []
   }
 }, { immediate: true })
-const recentBlocks = computed(() => recentNames.value.map(name => studioBlockRegistry.get(name)).filter((block): block is StudioBlockDefinition => Boolean(block)))
+const recentBlocks = computed(() => recentNames.value.map(name => registryVersion.value >= 0 ? studioBlockRegistry.get(name) : undefined).filter((block): block is StudioBlockDefinition => Boolean(block)))
 function remember(name: string) {
   recentNames.value = [name, ...recentNames.value.filter(item => item !== name)].slice(0, RECENT_LIMIT)
   try {
@@ -103,8 +105,8 @@ function insertBlock(block: StudioBlockDefinition) {
       <YdSegmented v-model="tab" size="sm" :options="[{ label: '区块', value: 'blocks' }, { label: '模板', value: 'templates' }]" aria-label="插入器视图" />
     </div>
 
+    <YdInput v-model="query" :placeholder="tab === 'blocks' ? '搜索区块与模板' : '搜索模板'" aria-label="搜索区块" clearable />
     <template v-if="tab === 'blocks'">
-      <YdInput v-model="query" placeholder="搜索区块" aria-label="搜索区块" clearable />
       <div class="text-xs text-muted-foreground flex flex-wrap gap-2 items-center">
         <span>{{ placementHint }}</span>
         <YdSegmented
@@ -158,7 +160,8 @@ function insertBlock(block: StudioBlockDefinition) {
       </template>
     </template>
 
-    <StudioSnippetPanel v-else />
+    <!-- 保持挂载：模板在插入器打开时即加载，并注册进区块搜索 -->
+    <StudioTemplatePanel v-show="tab === 'templates'" :query="query" :insert-block="insertBlock" @synced="registryVersion++" />
   </section>
 </template>
 
