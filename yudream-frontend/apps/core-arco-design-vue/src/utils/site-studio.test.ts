@@ -166,3 +166,50 @@ export function runStudioDomTests() {
   const html = `<section data-studio-id="fixed-section">before <strong data-studio-id="fixed-bold">中文 &amp; text</strong> after</section>`
   return { previous, html }
 }
+
+test('batch steps keep IDs unique and the node budget at every step, final check stays authoritative', () => {
+  const { doc, parent, text } = sample()
+  const before = JSON.stringify(doc)
+  const clash = { ...createStudioNode('text'), id: text.id }
+  assert.throws(() => applyStudioCommand(doc, { type: 'batch', commands: [{ type: 'insert', target: { pageId: doc.pages[0]!.id }, node: clash }] }), /重复 ID/)
+  // A structural patch that renames a node is checked immediately, before later steps address it by ID.
+  assert.throws(() => applyStudioCommand(doc, { type: 'batch', commands: [
+    { type: 'update-node', nodeId: text.id, patch: { id: parent.id } as never },
+    { type: 'remove', nodeId: parent.id },
+  ] }), /重复 ID|字段/)
+  // Removing frees IDs for later inserts in the same batch.
+  const reinserted = applyStudioCommand(doc, { type: 'batch', commands: [
+    { type: 'remove', nodeId: text.id },
+    { type: 'insert', target: { parentId: parent.id }, node: { ...createStudioNode('text'), id: text.id, text: '回来了' } },
+  ] })
+  assert.equal(findStudioNode(reinserted, text.id)?.text, '回来了')
+  // Field-only steps may pass through an invalid state; only the final document must be valid.
+  const fixed = applyStudioCommand(doc, { type: 'batch', commands: [
+    { type: 'set-style', nodeId: parent.id, styles: { color: 'expression(alert(1))' } },
+    { type: 'set-style', nodeId: parent.id, styles: { color: 'red' } },
+  ] })
+  assert.equal(findStudioNode(fixed, parent.id)?.styles.color, 'red')
+  assert.throws(() => applyStudioCommand(doc, { type: 'batch', commands: [
+    { type: 'set-style', nodeId: parent.id, styles: { color: 'red' } },
+    { type: 'set-style', nodeId: parent.id, styles: { color: 'expression(alert(1))' } },
+  ] }))
+  assert.equal(JSON.stringify(doc), before)
+})
+
+test('batch node budget applies mid-batch and duplicate cannot amplify past the size limit', () => {
+  const doc = createStudioDocument('预算')
+  for (let index = 0; index < 1999; index++) {
+    doc.pages[0]!.root.push(createStudioNode('text'))
+  }
+  const extra = createStudioNode('section')
+  extra.children = [createStudioNode('text')]
+  assert.throws(() => applyStudioCommand(doc, { type: 'batch', commands: [
+    { type: 'insert', target: { pageId: doc.pages[0]!.id }, node: extra },
+    { type: 'remove', nodeId: extra.id },
+  ] }), /节点数超过 2000/)
+  const big = createStudioDocument('体积')
+  const heavy = createStudioNode('text')
+  heavy.text = '长'.repeat(400_000)
+  big.pages[0]!.root = [heavy]
+  assert.throws(() => applyStudioCommand(big, { type: 'batch', commands: Array.from({ length: 5 }, () => ({ type: 'duplicate' as const, nodeId: heavy.id })) }), /2 MiB/)
+})

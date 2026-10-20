@@ -1,5 +1,5 @@
 import type { SiteDocument, StudioCommand, StudioContainer, StudioNode } from '../types/site-studio'
-import { cloneStudioJson, studioAssert, validateStudioDocument } from './site-studio-validation'
+import { cloneStudioJson, STUDIO_LIMITS, studioAssert, validateStudioDocument, validateStudioNodes } from './site-studio-validation'
 
 export function createStudioNode(type: string): StudioNode {
   const tag: Record<string, string> = { text: 'p', heading: 'h2', section: 'section', container: 'div', image: 'img', video: 'video', audio: 'audio', link: 'a', header: 'header', footer: 'footer', button: 'button' }
@@ -157,15 +157,82 @@ function mutate(document: SiteDocument, command: StudioCommand) {
     default: throw new Error('未知编辑命令')
   }
 }
-/** The caller stores document snapshots for undo/redo. No command mutates its input. */
-export function applyStudioCommand(document: SiteDocument, command: StudioCommand): SiteDocument {
+interface BatchGuard {
+  ids: Set<string>
+  count: number
+}
+function collectGuard(document: SiteDocument): BatchGuard {
+  const ids = new Set([document.id, ...document.pages.map(page => page.id), ...document.assets.map(asset => asset.id)])
+  let count = 0
+  const visit = (nodes: StudioNode[]) => nodes.forEach((node) => {
+    ids.add(node.id)
+    count++
+    visit(node.children)
+  })
+  collections(document).forEach(visit)
+  return { ids, count }
+}
+function subtreeIds(node: StudioNode, into: string[] = []) {
+  into.push(node.id)
+  node.children.forEach(child => subtreeIds(child, into))
+  return into
+}
+const LOCAL_PATCH_KEYS = new Set(['type', 'tag', 'text', 'attributes', 'styles', 'responsive'])
+/**
+ * One batch step. Field-only commands defer validation to the final full check; they
+ * cannot change IDs or amplify size. ID uniqueness and the node budget are enforced at
+ * every step because later commands address nodes by ID. Anything else (structural
+ * patches, duplicate, theme/page/asset commands) still gets a full intermediate check.
+ */
+function applyBatchItem(document: SiteDocument, item: StudioCommand, guard: BatchGuard): BatchGuard {
+  switch (item.type) {
+    case 'set-text':
+    case 'set-style':
+    case 'move':
+      mutate(document, item)
+      return guard
+    case 'update-node':
+      if (Object.keys(item.patch ?? {}).every(key => LOCAL_PATCH_KEYS.has(key))) {
+        mutate(document, item)
+        return guard
+      }
+      break
+    case 'remove': {
+      const ids = subtreeIds(requireLocation(document, item.nodeId).node)
+      mutate(document, item)
+      ids.forEach(id => guard.ids.delete(id))
+      guard.count -= ids.length
+      return guard
+    }
+    case 'insert': {
+      validateStudioNodes([item.node])
+      const ids = subtreeIds(item.node)
+      studioAssert(guard.count + ids.length <= STUDIO_LIMITS.nodes, '节点数超过 2000')
+      ids.forEach(id => studioAssert(!guard.ids.has(id), `重复 ID：${id}`))
+      mutate(document, item)
+      ids.forEach(id => guard.ids.add(id))
+      guard.count += ids.length
+      return guard
+    }
+  }
+  mutate(document, item)
   validateStudioDocument(document)
+  return collectGuard(document)
+}
+/**
+ * The caller stores document snapshots for undo/redo. No command mutates its input.
+ * `trustedInput` skips re-validating a document the caller already holds validated.
+ */
+export function applyStudioCommand(document: SiteDocument, command: StudioCommand, options: { trustedInput?: boolean } = {}): SiteDocument {
+  if (!options.trustedInput) {
+    validateStudioDocument(document)
+  }
   const copy = cloneStudioJson(document)
   if (command.type === 'batch') {
     studioAssert(Array.isArray(command.commands) && command.commands.length <= 2000, '批命令数量无效')
+    let guard = collectGuard(copy)
     for (const item of command.commands) {
-      mutate(copy, item)
-      validateStudioDocument(copy)
+      guard = applyBatchItem(copy, item, guard)
     }
   }
   else {
