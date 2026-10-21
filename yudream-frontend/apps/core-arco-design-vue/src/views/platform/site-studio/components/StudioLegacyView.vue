@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 旧版与迁移视图：旧主题中心/旧 CMS 工作台的真实入口（旧版数据全部保留）；
 // 站点便携包与当前页面静态 HTML 导出；便携包导入先预览再显式确认——站点包整体
-// 替换工作台文档（不自动保存），主题包仅替换主题（tokens/页头/页脚），节点 id
+// 替换工作台文档（不自动保存），主题包仅替换主题（tokens/页头/页脚/样式类/字体/关键帧/站点功能），节点 id
 // 整树重生成、资产全部换新 UUID 后按地址去重合并，避免与现有文档任何 id 冲突。
 // 旧版 CMS 内容的定向复制迁移由 CmsMigrationPanel 承载：读取当前主题首页/文章，
 // 预检后一次 batch 只新增页面副本，不删除旧数据、不保存不发布。
@@ -10,6 +10,7 @@ import { computed, ref } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { exportStudioStaticHtml, importStudioPackage, serializeStudioPackage } from '@/utils/site-studio'
 import CmsMigrationPanel from './CmsMigrationPanel.vue'
+import StudioWebImport from './StudioWebImport.vue'
 
 defineOptions({ name: 'StudioLegacyView' })
 
@@ -115,13 +116,52 @@ function importThemeCommands(source: SiteDocument): { commands: StudioCommand[],
   collectThemeUrls(header, used)
   collectThemeUrls(footer, used)
   const current = store.doc?.assets || []
-  const urls = new Set(current.map(item => item.url))
-  const merged = source.assets
-    .filter(asset => !urls.has(asset.url))
-    .map(asset => ({ ...asset, id: crypto.randomUUID() }))
-  const commands: StudioCommand[] = [{ type: 'set-theme', tokens: source.theme.tokens, header, footer }]
+  const byUrl = new Map(current.map(item => [item.url, item.id]))
+  // 旧资产 id → 当前文档中的 id（同地址复用既有条目，其余换新 UUID）
+  const idMap = new Map<string, string>()
+  const merged = source.assets.flatMap((asset) => {
+    const existing = byUrl.get(asset.url)
+    if (existing) {
+      idMap.set(asset.id, existing)
+      return []
+    }
+    const id = crypto.randomUUID()
+    idMap.set(asset.id, id)
+    return [{ ...asset, id }]
+  })
+  const remap = (id?: string) => (id ? idMap.get(id) : undefined)
+  const commands: StudioCommand[] = []
   if (merged.length) {
     commands.push({ type: 'set-assets', assets: [...current, ...merged] })
+  }
+  commands.push({
+    type: 'set-theme',
+    tokens: source.theme.tokens,
+    header,
+    footer,
+    classes: source.theme.classes ?? [],
+    keyframes: source.theme.keyframes ?? [],
+    fonts: (source.theme.fonts ?? []).flatMap(font => remap(font.assetId) ? [{ ...font, assetId: remap(font.assetId)! }] : []),
+  })
+  const audio = source.features?.audio
+  if (source.features) {
+    commands.push({
+      type: 'set-features',
+      features: {
+        ...(source.features.particles ? { particles: source.features.particles } : {}),
+        ...(audio
+          ? {
+              audio: {
+                ...audio,
+                tracks: audio.tracks.flatMap(track => remap(track.assetId) ? [{ ...track, assetId: remap(track.assetId)! }] : []),
+                clickSoundAssetId: remap(audio.clickSoundAssetId),
+                buttonSoundAssetId: remap(audio.buttonSoundAssetId),
+                toastSoundAssetId: remap(audio.toastSoundAssetId),
+              },
+            }
+          : {}),
+      },
+    })
   }
   return { commands, mergedCount: merged.length }
 }
@@ -240,6 +280,8 @@ async function importPackage() {
           </YdButton>
         </div>
       </section>
+
+      <StudioWebImport />
 
       <section class="flex flex-col gap-2" aria-label="站点包导入">
         <h2 class="text-sm font-semibold m-0">
