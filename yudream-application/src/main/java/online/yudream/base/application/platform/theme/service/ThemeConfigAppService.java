@@ -51,7 +51,7 @@ public class ThemeConfigAppService {
     private static final int MAX_LIST_ITEMS = 100;
     private static final Pattern FIELD_KEY = Pattern.compile("[a-zA-Z][a-zA-Z0-9_-]{0,49}");
     private static final Set<String> FIELD_TYPES =
-            Set.of("text", "textarea", "number", "switch", "select", "color", "image", "list");
+            Set.of("text", "textarea", "number", "switch", "select", "color", "image", "audio", "list");
 
     private final SettingRepo settingRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
@@ -245,7 +245,8 @@ public class ThemeConfigAppService {
             case "switch" -> coerceSwitch(value);
             case "list" -> coerceList(field, value);
             case "select" -> coerceSelect(field, value);
-            case "image" -> coerceImage(value);
+            // audio 与 image 同语义：站内文件 URL 或主题资产路径，清空落空串（主题自行决定空值含义）
+            case "image", "audio" -> coerceImage(value);
             default -> value == null ? null : String.valueOf(value);
         };
     }

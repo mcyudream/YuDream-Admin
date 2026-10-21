@@ -106,6 +106,38 @@ function stripDisplayPrefix(url: string) {
   return url
 }
 
+// ===== audio：上传或填写音频地址（站内文件 URL / 主题资产路径），可试听；清空存空串 =====
+const audioUploading = ref(false)
+const audioSrc = computed(() => typeof props.modelValue === 'string' && props.modelValue ? toBackendAssetUrl(props.modelValue) : '')
+async function uploadThemeAudio() {
+  const [file] = await useYdFilePicker().open({ accept: 'audio/mpeg,audio/ogg,audio/wav,audio/webm', multiple: false })
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('audio/')) {
+    toast.error('请选择 MP3/OGG/WAV/WebM 音频文件')
+    return
+  }
+  audioUploading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    data.append('module', props.pluginCode ? `theme-${props.pluginCode}` : 'theme-config')
+    data.append('publicAccess', 'true')
+    const url = (await apiFiles.upload(data)).data.url
+    if (!url) {
+      throw new Error('音频上传后未返回访问地址')
+    }
+    update(url)
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '音频上传失败')
+  }
+  finally {
+    audioUploading.value = false
+  }
+}
+
 async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: (percent: number) => void }) {
   if (!file.type.startsWith('image/')) {
     toast.error('请选择图片文件')
@@ -203,6 +235,26 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         点击上传或删除图片后记得保存；删除会去掉该图，不再自动填回主题自带图。
       </p>
     </template>
+    <template v-else-if="field.type === 'audio'">
+      <div class="theme-config-field__audio">
+        <YdInput
+          :model-value="modelValue ?? ''"
+          :placeholder="field.placeholder || '留空使用主题默认音频'"
+          class="flex-1 min-w-0"
+          @update:model-value="update"
+        />
+        <YdButton variant="outline" :loading="audioUploading" @click="uploadThemeAudio">
+          <YdIcon name="morph:upload" /> 上传
+        </YdButton>
+        <YdButton v-if="modelValue" variant="ghost" aria-label="清空音频" @click="update('')">
+          <YdIcon name="morph:x" />
+        </YdButton>
+      </div>
+      <audio v-if="audioSrc" :src="audioSrc" controls preload="none" class="theme-config-field__audio-player" />
+      <p class="theme-config-field__hint">
+        支持 MP3/OGG/WAV/WebM；清空后保存即恢复主题定义的默认行为。
+      </p>
+    </template>
     <YdInput
       v-else-if="field.secret"
       :model-value="modelValue ?? ''"
@@ -273,6 +325,18 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
 }
 
 .theme-config-field__desc,
+.theme-config-field__audio {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.theme-config-field__audio-player {
+  width: 100%;
+  height: 36px;
+  margin-top: 6px;
+}
+
 .theme-config-field__hint {
   margin: 0;
   font-size: 12px;

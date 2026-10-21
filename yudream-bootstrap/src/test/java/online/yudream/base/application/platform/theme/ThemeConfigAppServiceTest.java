@@ -42,6 +42,7 @@ class ThemeConfigAppServiceTest {
                 {"key":"accent","label":"强调色","type":"select","default":"green",
                  "options":[{"label":"绿","value":"green"},{"label":"蓝","value":"blue"}]},
                 {"key":"heroImage","label":"背景图","type":"image","default":"/api/plugins/bg.webp"},
+                {"key":"bgm","label":"背景音乐","type":"audio","default":""},
                 {"key":"apiToken","label":"API 令牌","type":"text","secret":true}
               ]},
               {"code":"about","title":"关于","fields":[
@@ -132,6 +133,21 @@ class ThemeConfigAppServiceTest {
         service.save(cmd("neco", Map.of("apiToken", "")));
         assertThat(settingRepo.findByKey("pluginTheme.config.neco").orElseThrow().getValue())
                 .contains("enc:apiToken:s3cret");
+    }
+
+    @Test
+    void audioFieldIsAcceptedTrimmedAndClearedToEmptyString() {
+        stubTheme();
+        assertThat(service.config("neco").getValues()).containsEntry("bgm", "");
+
+        service.save(cmd("neco", Map.of("bgm", "  /api/files/9/content  ")));
+        assertThat(service.config("neco").getValues()).containsEntry("bgm", "/api/files/9/content");
+        assertThat(service.publicConfig("neco")).containsEntry("bgm", "/api/files/9/content");
+
+        java.util.Map<String, Object> cleared = new java.util.HashMap<>();
+        cleared.put("bgm", null);
+        service.save(cmd("neco", cleared));
+        assertThat(service.config("neco").getValues()).containsEntry("bgm", "");
     }
 
     @Test
