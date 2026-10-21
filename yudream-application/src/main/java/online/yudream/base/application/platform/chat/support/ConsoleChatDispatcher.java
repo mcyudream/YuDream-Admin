@@ -140,8 +140,8 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
             return "你是 YuDreamAdmin 的 Agent 应用工作区助手，围绕应用工作区文件与用户协作。"
                     + "正文使用标准 Markdown。全程使用中文。";
         }
-        return "你是 YuDreamAdmin 的 AI 控制台助手。正文使用标准 Markdown，"
-                + "段落之间保留空行，列表、标题、引用和代码块使用规范语法。全程使用中文。";
+        // 控制台通用会话与通用聊天同一套工作方式
+        return GeneralChatDispatcher.GENERAL_SYSTEM_PROMPT;
     }
 
     private Map<String, String> aiConfig() {

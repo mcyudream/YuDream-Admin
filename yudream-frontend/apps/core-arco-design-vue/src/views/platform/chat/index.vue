@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { YdAgentSession, YdAgentSendRequest, YdChatAttachment, YdChatCitation, YdChatRetrievalHit } from '@yudream/components'
+import type { YdAgentSession, YdAgentSendRequest, YdChatAttachment, YdChatCitation, YdChatMessage, YdChatRetrievalHit } from '@yudream/components'
 import { YdAgentWorkbench } from '@yudream/components'
 import type { AgentApplication, AgentCatalog } from '@/api/modules/platform-agent'
 import type { ChatScopeType } from '@/api/modules/platform-chat'
@@ -24,6 +24,11 @@ const renameOpen = ref(false)
 const removeOpen = ref(false)
 const targetSession = ref<YdAgentSession>()
 const title = ref('')
+const scopeOptions = computed(() => [
+  { label: '通用助手', value: 'GENERAL' },
+  ...(agents.value.length ? [{ label: 'Agent 应用', value: 'AGENT' }] : []),
+  ...(auth('platform:wiki:view') ? [{ label: '知识库问答', value: 'WIKI' }] : []),
+])
 const suggestions = ['帮我写一份项目周报', '梳理一下知识库内容', '分析当前数据并给出建议', '帮我审查这段代码']
 
 async function perform(action: () => Promise<unknown>) {
@@ -56,6 +61,13 @@ async function send(request: YdAgentSendRequest) {
     contextRefs: wikiSlug.value ? [{ type: 'wiki', target: wikiSlug.value === '__all__' ? 'all' : wikiSlug.value }] : [],
   })
   if (!assistant.error) attachments.value = []
+}
+
+function retry(message: YdChatMessage) {
+  const text = assistant.retryText(message)
+  if (text) {
+    void perform(() => send({ text, attachments: [], mode: 'ask', skillCodes: [], contextPaths: [] }))
+  }
 }
 
 async function attach(files: File[]) {
@@ -97,9 +109,10 @@ function openSource(source: YdChatCitation | YdChatRetrievalHit) {
 onMounted(() => perform(async () => {
   if (!account.isLogin || !account.userId) return
   await assistant.initialize(String(account.userId))
-  const [catalogResult, agentResult] = await Promise.all([apiAgent.catalog(), apiAgent.available()])
-  catalog.value = catalogResult.data
-  agents.value = agentResult.data
+  // Agent 应用与知识库目录是可选增强：能力未启用或无权限时静默降级，不影响通用问答
+  const [catalogResult, agentResult] = await Promise.allSettled([apiAgent.catalog({ skipGlobalToast: true }), apiAgent.available({ skipGlobalToast: true })])
+  catalog.value = catalogResult.status === 'fulfilled' ? catalogResult.value.data : undefined
+  agents.value = agentResult.status === 'fulfilled' ? agentResult.value.data : []
   if ((route.query.scopeType === 'AGENT' || route.query.scopeType === 'WIKI') && canEdit.value) {
     await assistant.createSession({
       scopeType: route.query.scopeType,
@@ -116,14 +129,14 @@ onMounted(() => perform(async () => {
       <YdButton v-if="assistant.activeRun" variant="outline" size="sm" @click="perform(assistant.reconnect)">恢复后端进度</YdButton>
     </YdAlert>
     <YdAgentWorkbench
-      :sessions="assistant.sessionItems"
-      :session-id="assistant.sessionId"
+      :sessions="assistant.conversationItems"
+      :session-id="assistant.conversationSessionId"
       :models="assistant.models"
       :model-id="assistant.modelId"
       :available-modes="['ask']"
-      :messages="assistant.messages"
-      :harness="assistant.harness"
-      :activities="assistant.activities"
+      :messages="assistant.conversationMessages"
+      :harness="assistant.conversationHarness"
+      :activities="assistant.conversationActivities"
       :attachments="attachments"
       :attachments-enabled="true"
       :disabled="assistant.loading || uploading || !auth('platform:chat:use')"
@@ -131,6 +144,7 @@ onMounted(() => perform(async () => {
       class="chat-page__workbench"
       @send="request => perform(() => send(request))"
       @stop="perform(assistant.stop)"
+      @retry="message => retry(message)"
       @attach="attach"
       @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
       @update:session-id="id => perform(() => assistant.selectSession(id))"
@@ -143,7 +157,7 @@ onMounted(() => perform(async () => {
       @retrieval-select="openSource"
     >
       <template #sender-actions>
-        <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="[{ label: '通用助手', value: 'GENERAL' }, { label: 'Agent 应用', value: 'AGENT' }, { label: '知识库问答', value: 'WIKI' }]" />
+        <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="scopeOptions" />
         <YdSelect v-if="scope === 'AGENT'" v-model="selectedAgent" :disabled="assistant.busy" aria-label="Agent 应用" :options="agents.map(item => ({ label: item.name, value: item.code }))" />
         <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
       </template>

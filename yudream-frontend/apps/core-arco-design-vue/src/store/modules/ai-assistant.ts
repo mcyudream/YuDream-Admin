@@ -9,6 +9,8 @@ import apiAi from '@/api/modules/platform-ai'
 import { cancelAiRun, getAiRun, listAiRuns, replyAiFrontendTool, respondAiInteraction, resumeAiRun, startAiAssistantRun, subscribeAiRun } from '@/api/modules/platform-ai-runs'
 import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession } from '@/api/modules/platform-chat'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, parseAiAssistantPreferences, parseAiFrontendToolRequest } from '@/utils/ai-assistant-context'
+import { aiRunErrorContent } from '@/utils/ai-run-error'
+import { upsertAiRunInput } from '@/utils/ai-run-input'
 import { aiRunPhaseLabel, projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { canReconnectAiRun, isActiveAiRun, isNewAiCursor } from '@/utils/ai-run-stream'
 import { hintForMessage } from '@/utils/api-error'
@@ -24,10 +26,11 @@ function messageProjection(item: ChatMessage): YdChatMessage | undefined {
   return {
     id: item.id,
     role: item.role === 'USER' ? 'user' : 'assistant',
-    content: item.content || '',
+    // 失败的回答没有正文时，展示可读的失败说明与原始信息（同实时运行的失败气泡）
+    content: item.content || (item.status === 'FAILED' ? aiRunErrorContent(item.errorMessage) : ''),
     reasoning: item.reasoning,
     tools: item.tools,
-    activities: item.activities?.filter(activity => !!activity.activityType).map(activity => ({ ...activity, activityType: activity.activityType! })),
+    activities: projectAiRunActivities(item.activities, item.id),
     citations: item.citations,
     attachments: item.attachments,
     pending: item.status === 'PENDING' || item.status === 'STREAMING',
@@ -47,6 +50,12 @@ function statusProjection(status?: string): YdAgentHarnessState['status'] {
 }
 
 /** Root-owned subscriptions outlive every view/panel. Backend snapshots/events are the conversation authority. */
+/** 嵌入在业务界面里的助手（网站工作台设计器、旧版画布）：会话只在各自面板中出现 */
+export const EMBEDDED_AI_AGENT_CODES = ['cms-studio', 'cms-canvas']
+export function isEmbeddedAiSession(session?: { scopeType?: string, agentCode?: string }) {
+  return !!session && session.scopeType === 'CONSOLE' && EMBEDDED_AI_AGENT_CODES.includes(session.agentCode || '')
+}
+
 export const useAiAssistantStore = defineStore('aiAssistant', () => {
   const open = ref(false)
   const initialized = ref(false)
@@ -79,6 +88,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
   const activeRun = computed(() => Object.values(runs.value).filter(run => run.sessionId === sessionId.value).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0])
   const messages = computed(() => messagesBySession.value[sessionId.value] || [])
   const activeSession = computed(() => sessions.value.find(session => session.id === sessionId.value))
+  // 嵌入式助手（网站工作台、旧画布）的会话归属各自面板：通用聊天与全局助手不列出、不显示、也不往里发送
+  const conversationActive = computed(() => !isEmbeddedAiSession(activeSession.value))
   const busy = computed(() => sending.value || (!!activeRun.value && isActiveAiRun(activeRun.value.status)))
   const activeRunCount = computed(() => Object.values(runs.value).filter(run => isActiveAiRun(run.status)).length)
   const harness = computed<YdAgentHarnessState>(() => ({
@@ -97,6 +108,9 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     scopeType: session.scopeType,
     agentCode: session.agentCode,
   })))
+  const conversationItems = computed(() => sessionItems.value.filter(item => !isEmbeddedAiSession(item)))
+  const conversationSessionId = computed(() => conversationActive.value ? sessionId.value : '')
+  const conversationMessages = computed(() => conversationActive.value ? messages.value : [])
   const activities = computed<YdAgentActivity[]>(() => (messages.value.at(-1)?.activities || []).map((activity, index) => ({
     id: `${activity.messageId || activeRun.value?.id || 'activity'}:${activity.phase || index}`,
     title: activity.title || aiRunPhaseLabel(activity.phase) || activity.phase || '执行进度',
@@ -104,6 +118,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     status: activity.status === 'complete' || activity.status === 'completed' ? 'complete' : activity.status === 'error' ? 'error' : activity.status === 'waiting' ? 'waiting' : activity.status === 'cancelled' ? 'complete' : 'running',
     detail: activity.content,
   })))
+  const conversationActivities = computed(() => conversationActive.value ? activities.value : [])
+  const conversationHarness = computed<YdAgentHarnessState>(() => conversationActive.value ? harness.value : { name: harness.value.name, status: 'idle' })
   const approvals = computed<YdAgentApproval[]>(() => Object.entries(frontendRequests.value).filter(([, item]) => item.runId === activeRun.value?.id).map(([id, item]) => ({
     id,
     title: item.request.name === 'ui.navigate' ? '助手请求打开页面' : '助手请求定位页面操作',
@@ -117,6 +133,17 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     if (owner) {
       localStorage.setItem(preferenceKey(), JSON.stringify(preferences.value))
     }
+  }
+  /** 失败回答对应的用户输入：用于「重试」重新发送同一问题 */
+  function retryText(message: YdChatMessage) {
+    const list = conversationMessages.value
+    const index = list.indexOf(message)
+    for (let cursor = (index < 0 ? list.length : index) - 1; cursor >= 0; cursor--) {
+      if (list[cursor]!.role === 'user') {
+        return list[cursor]!.content
+      }
+    }
+    return ''
   }
   function setError(value: unknown) {
     if (value instanceof Error) {
@@ -203,14 +230,15 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     return pending
   }
 
-  async function initialize(userId: string) {
-    if (!userId || (owner === userId && (initialized.value || loading.value))) {
+  async function initialize(userId: string, force = false) {
+    if (!userId || (owner === userId && (loading.value || (initialized.value && !force)))) {
       return
     }
     if (owner !== userId) {
       reset(userId)
     }
     const started = epoch
+    error.value = ''
     loading.value = true
     const results = await Promise.allSettled([listChatSessions(), initializeObserver(userId), apiAi.availableModels(), fetchMyChatQuota()])
     if (started !== epoch) {
@@ -230,6 +258,9 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
         modelCode: model.modelCode,
       }))
       modelId.value = models.value[0]?.id || ''
+    }
+    else {
+      setError(results[2].reason)
     }
     if (results[3].status === 'fulfilled') {
       quota.value = results[3].value.data
@@ -289,7 +320,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     }
     if (businessChat || isActiveAiRun(run.status) || taskMessages(run.sessionId).some(message => message.id === `run:${run.id}`)) {
       const answer = answerFor(run)
-      answer.content = run.content || (typeof run.result?.answer === 'string' ? run.result.answer : '')
+      answer.content = run.content || (typeof run.result?.answer === 'string' ? run.result.answer : '') || (run.status === 'FAILED' ? aiRunErrorContent(run.error) : '')
       answer.reasoning = run.reasoning
       answer.pending = isActiveAiRun(run.status)
       answer.error = run.status === 'FAILED'
@@ -435,6 +466,11 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     error.value = ''
     const started = epoch
     let id = sessionId.value
+    // 当前选中的是嵌入式助手会话、而本次不是发给同一助手时，另开会话，绝不把通用消息送进设计器会话
+    const selected = sessions.value.find(session => session.id === id)
+    if (isEmbeddedAiSession(selected) && scope.agentCode !== selected?.agentCode) {
+      id = ''
+    }
     const model = request.model || models.value.find(item => item.id === modelId.value)
     sending.value = true
     try {
@@ -547,15 +583,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     switch (event.event) {
       case 'ai.input':
         if (typeof payload.content === 'string') {
-          const list = taskMessages(run.sessionId)
-          const optimistic = list.findLast(message => message.role === 'user' && message.context?.pendingRunInput && message.content === payload.content)
-          if (optimistic) {
-            optimistic.id = `input:${run.id}`
-            optimistic.context = undefined
-          }
-          else if (!list.some(message => message.id === `input:${run.id}`)) {
-            list.splice(Math.max(0, list.indexOf(answer)), 0, { id: `input:${run.id}`, role: 'user', content: payload.content })
-          }
+          upsertAiRunInput(taskMessages(run.sessionId), run.id, payload.content, run.module === 'chat', typeof payload.messageId === 'string' ? payload.messageId : undefined)
         }
         break
       case 'ai.message':
@@ -649,8 +677,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
         run.status = event.action === 'cancelled' ? 'CANCELLED' : 'FAILED'
         run.error = typeof payload.message === 'string' ? payload.message : 'AI 运行失败'
         answer.error = run.status === 'FAILED'
-        if (!answer.content) {
-          answer.content = run.error
+        if (!answer.content && run.status === 'FAILED') {
+          answer.content = aiRunErrorContent(run.error)
         }
         finishRun(run)
         break
@@ -662,11 +690,9 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     answer.pending = false
     run.pendingInteractions = []
     answer.error = run.status === 'FAILED'
-    if (!answer.content && run.error) {
-      answer.content = run.error
-    }
-    if (run.status === 'FAILED' && run.error) {
-      error.value = run.error
+    // 运行失败展示在回答气泡里（可读说明 + 原始信息 + 重试），不再占用页面横幅
+    if (!answer.content && run.status === 'FAILED') {
+      answer.content = aiRunErrorContent(run.error)
     }
     for (const activity of answer.activities || []) {
       if (activity.status === 'running') {
@@ -931,6 +957,12 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     busy,
     harness,
     sessionItems,
+    conversationActive,
+    conversationItems,
+    conversationSessionId,
+    conversationMessages,
+    conversationActivities,
+    conversationHarness,
     activities,
     approvals,
     frontendRequests,
@@ -948,6 +980,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     refreshQuota,
     setPreferences,
     setError,
+    retryText,
     decideFrontendTool,
     registerFrontendToolHandler,
     frontendToolHandler,

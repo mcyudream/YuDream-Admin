@@ -69,6 +69,8 @@ const emit = defineEmits<{
   'update:mode': [mode: YdAgentMode]
   'send': [request: YdAgentSendRequest]
   'stop': []
+  /** 失败回答的「重试」：父组件按该消息之前的用户输入重新发送 */
+  'retry': [message: YdChatMessage]
   'attach': [files: File[]]
   'removeAttachment': [attachment: YdChatAttachment]
   'sessionCreate': []
@@ -92,7 +94,12 @@ const thread = ref<HTMLElement>()
 const { width } = useElementSize(root)
 const wide = computed(() => width.value >= 900)
 const mobile = computed(() => width.value > 0 && width.value <= 768)
-const contextVisible = ref(true)
+// 侧栏只在确有上下文（工作区、文件、技能、MCP）时默认展开；普通问答保持对话区宽敞
+const hasContext = computed(() => props.workspaces.length > 0 || props.files.length > 0 || props.skills.length > 0 || props.mcpServers.length > 0)
+const contextVisible = ref(false)
+watch(hasContext, (value) => {
+  contextVisible.value = value
+}, { immediate: true })
 const contextDrawer = ref(false)
 const sessionDrawer = ref(false)
 const changesDrawer = ref(false)
@@ -123,10 +130,12 @@ const runState = computed(() => ({
 const elapsed = computed(() => props.harness.elapsedMs === undefined ? '' : `${Math.max(0, props.harness.elapsedMs / 1000).toFixed(1)} 秒`)
 const traceTitle = computed(() => `执行轨迹${elapsed.value ? ` · ${elapsed.value}` : ''}`)
 const currentChange = computed(() => props.changes.find(item => item.id === activeChange.value) || props.changes[0])
+// 最后一条消息已在气泡内展示过程时，不再重复显示运行轨迹
+const showTrace = computed(() => props.activities.length > 0 && !props.messages.at(-1)?.activities?.length)
 const traceItems = computed(() => props.activities.map(item => ({
   key: item.id,
   title: item.title,
-  description: item.detail,
+  description: item.detail && item.detail.replace(/[。.]+$/, '') !== item.title.replace(/[。.]+$/, '') ? item.detail : undefined,
   status: item.status === 'complete' ? 'success' as const : item.status === 'waiting' ? 'pending' as const : item.status,
   icon: item.status === 'waiting' ? 'morph:shield-question' : undefined,
 })))
@@ -238,7 +247,7 @@ defineExpose({ scrollToBottom })
             <span v-if="wide">YU DREAM / AGENT</span><h2>{{ session?.title || '开始一个新任务' }}</h2>
           </div>
           <div class="yd-agent-heading-actions">
-            <YdButton variant="outline" size="sm" :aria-expanded="changesDrawer" @click="changesDrawer = true">
+            <YdButton v-if="changes.length" variant="outline" size="sm" :aria-expanded="changesDrawer" @click="changesDrawer = true">
               <YdIcon name="morph:git-compare-arrows" />变更 <span>{{ changes.length }}</span>
             </YdButton>
             <YdButton variant="ghost" size="icon-sm" aria-label="工作区与上下文" :aria-expanded="wide ? contextVisible : contextDrawer" @click="toggleContext">
@@ -277,7 +286,12 @@ defineExpose({ scrollToBottom })
                 <YdAgentAnswer :document="messageDocument(message)" :retry-disabled="busy || disabled" @reference-select="emit('referenceSelect', $event)" @tool-select="emit('toolSelect', $event)" @tool-retry="emit('toolRetry', $event)" />
               </template>
               <template #footer>
-                <div v-if="message.role === 'assistant' && message.content.trim() && !message.pending" class="yd-agent-message-actions">
+                <div v-if="message.role === 'assistant' && message.error && !message.pending" class="yd-agent-message-actions">
+                  <YdButton variant="outline" size="sm" :disabled="busy || disabled" @click="emit('retry', message)">
+                    <YdIcon name="morph:rotate-ccw" />重试
+                  </YdButton>
+                </div>
+                <div v-else-if="message.role === 'assistant' && message.content.trim() && !message.pending" class="yd-agent-message-actions">
                   <YdCopyButton :text="message.content" label="复制回答" /><slot name="message-actions" :message="message" />
                   <YdButton v-for="action in message.actions" :key="`${action.action}:${action.value}`" variant="outline" size="sm" @click="emit('actionSelect', action)">
                     {{ action.label }}
@@ -288,7 +302,7 @@ defineExpose({ scrollToBottom })
             <slot name="message-extra" :message="message" :index="index" />
           </div>
         </div>
-        <div v-if="activities.length" class="yd-agent-trace">
+        <div v-if="showTrace" class="yd-agent-trace">
           <YdThoughtChain :items="traceItems" :title="traceTitle" :default-expanded="false" />
         </div>
         <div v-if="approvals.length" class="yd-agent-approvals" aria-label="待批准操作">

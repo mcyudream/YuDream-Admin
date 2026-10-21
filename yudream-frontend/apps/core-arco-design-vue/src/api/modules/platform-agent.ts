@@ -193,7 +193,7 @@ export interface AgentDebugStreamEvent {
 
 export default {
   startDebugRun: (id: string, data: { input: string, providerCode?: string, modelCode?: string, imageDataUrl?: string, attachments?: AgentRunAttachment[] }) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`api/platform/agents/${id}/debug/runs`, data),
-  available: () => systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/agents/available'),
+  available: (config: { skipGlobalToast?: boolean } = {}) => systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/agents/available', config),
   runtimeDetail: (code: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}`),
   importRuntime: (code: string) => systemClient.post<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}/import`),
   page: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentApplication>>>('api/platform/agents', { params }),
@@ -222,7 +222,7 @@ export default {
   },
   pageTools: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentTool>>>('api/platform/agents/tools', { params }),
   pageToolCandidates: (params: AgentToolCandidateParams) => systemClient.get<unknown, ApiResponse<PageResult<AgentToolCandidate>>>('api/platform/agents/tools/available', { params }),
-  catalog: () => systemClient.get<unknown, ApiResponse<AgentCatalog>>('api/platform/agents/catalog'),
+  catalog: (config: { skipGlobalToast?: boolean } = {}) => systemClient.get<unknown, ApiResponse<AgentCatalog>>('api/platform/agents/catalog', config),
   models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
   toolModules: () => systemClient.get<unknown, ApiResponse<AiToolModuleCatalog>>('api/platform/agents/tools/modules'),

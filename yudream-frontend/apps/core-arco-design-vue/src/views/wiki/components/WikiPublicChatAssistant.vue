@@ -7,6 +7,7 @@ import { startPublicWikiChatRun } from '@/api/modules/platform-wiki'
 import { useAiRunTask } from '@/composables/use-ai-run-task'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { useAppAccountStore } from '@/store/modules/app/account'
+import { describeAiRunError } from '@/utils/ai-run-error'
 import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 
 const props = defineProps<{
@@ -104,7 +105,7 @@ function goLogin() {
         @close="toggle"
         @expand="openInChatPage"
       >
-        <YdAlert v-if="task.failure.value" variant="destructive" :title="task.failure.value" />
+        <YdAlert v-if="task.failure.value" variant="destructive" :title="describeAiRunError(task.failure.value).message" :description="task.failure.value" />
         <YdAgentWorkbench
           :messages="messages"
           :render-documents="renderDocuments"

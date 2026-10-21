@@ -20,6 +20,22 @@ const expandedRetrievals = ref<Record<number, boolean>>({})
 const expandedGraphs = ref<Record<number, boolean>>({})
 
 const visibleActivities = computed(() => props.activities.filter(activity => activity.activityType))
+// 普通步骤（请求、模型、工具）折叠成一行摘要，展开才列出；知识库命中与图谱等富内容始终展示
+const RICH_TYPES = ['wiki-retrieval', 'wiki-graph']
+const steps = computed(() => visibleActivities.value.filter(activity => !RICH_TYPES.includes(activity.activityType || '')))
+const rich = computed(() => visibleActivities.value.map((activity, index) => ({ activity, index })).filter(item => RICH_TYPES.includes(item.activity.activityType || '')))
+const stepsExpanded = ref(false)
+const runningStep = computed(() => [...steps.value].reverse().find(activity => activityStatus(activity) === 'running'))
+const failedSteps = computed(() => steps.value.filter(activity => activityStatus(activity) === 'error').length)
+const summary = computed(() => {
+  if (runningStep.value) {
+    return { status: 'running', icon: 'morph:loader-circle', text: `${activityLabel(runningStep.value)}${steps.value.length > 1 ? ` · 第 ${steps.value.length} 步` : ''}` }
+  }
+  if (failedSteps.value) {
+    return { status: 'error', icon: 'morph:triangle-alert', text: `${steps.value.length} 步，${failedSteps.value} 步失败` }
+  }
+  return { status: 'complete', icon: 'morph:circle-check', text: `已完成 ${steps.value.length} 步` }
+})
 
 function activityStatus(activity: YdChatActivity): string {
   const status = activity.status?.trim().toLowerCase().replaceAll('_', '-')
@@ -41,6 +57,13 @@ function activityLabel(activity: YdChatActivity): string {
   if (activity.activityType === 'wiki-retrieval') return '检索知识库'
   if (activity.activityType === 'wiki-graph') return '分析关联图谱'
   return ydActivityPhaseLabel(activity.phase) || activity.phase || '处理任务'
+}
+
+/** 说明与标题重复（仅差句末标点）时不再显示 */
+function activityDetail(activity: YdChatActivity): string {
+  const detail = (activity.content || (activity.activityType !== 'wiki-retrieval' ? activity.query : '') || '').trim()
+  const plain = (value: string) => value.replace(/[。.!！…]+$/, '')
+  return detail && plain(detail) !== plain(activityLabel(activity)) ? detail : ''
 }
 
 function scoreText(score?: number): string {
@@ -67,16 +90,36 @@ watch(() => props.activities, (activities) => {
 <template>
   <section v-if="visibleActivities.length" class="yd-chat-process" aria-label="回答过程">
     <div class="yd-chat-process__timeline">
-      <template v-for="(activity, index) in visibleActivities" :key="`${activity.messageId}-${activity.activityType}-${index}`">
+      <template v-if="steps.length">
+        <button v-if="steps.length > 1" type="button" class="yd-chat-process__summary" :class="`is-${summary.status}`" :aria-expanded="stepsExpanded" @click="stepsExpanded = !stepsExpanded">
+          <FaIcon :name="summary.icon" class="yd-chat-process__status" :class="{ 'is-spinning': summary.status === 'running' }" />
+          <span>{{ summary.text }}</span>
+          <FaIcon :name="stepsExpanded ? 'morph:chevron-up' : 'morph:chevron-down'" class="yd-chat-process__chevron" />
+        </button>
+        <template v-for="(activity, index) in (steps.length > 1 && !stepsExpanded ? [] : steps)" :key="`${activity.messageId}-${activity.activityType}-step-${index}`">
+          <div class="yd-chat-process__step" :class="[`is-${activityStatus(activity)}`, { 'is-nested': steps.length > 1 }]">
+            <FaIcon :name="activityIcon(activity)" class="yd-chat-process__status" :class="{ 'is-spinning': activityStatus(activity) === 'running' }" />
+            <div class="yd-chat-process__main">
+              <div class="yd-chat-process__head" :title="activity.phase">
+                <span>{{ activityLabel(activity) }}</span>
+              </div>
+              <p v-if="activityDetail(activity)" class="yd-chat-process__description">
+                {{ activityDetail(activity) }}
+              </p>
+            </div>
+          </div>
+        </template>
+      </template>
+      <template v-for="{ activity, index } in rich" :key="`${activity.messageId}-${activity.activityType}-${index}`">
         <div class="yd-chat-process__step" :class="`is-${activityStatus(activity)}`">
           <FaIcon :name="activityIcon(activity)" class="yd-chat-process__status" :class="{ 'is-spinning': activityStatus(activity) === 'running' }" />
           <div class="yd-chat-process__main">
-            <div class="yd-chat-process__head">
+            <div class="yd-chat-process__head" :title="activity.phase">
               <span>{{ activityLabel(activity) }}</span>
-              <span v-if="activity.phase && activity.phase !== activityLabel(activity)" class="yd-chat-process__phase">{{ activity.phase }}</span>
             </div>
-            <p v-if="activity.content" class="yd-chat-process__description">{{ activity.content }}</p>
-            <p v-else-if="activity.query && activity.activityType !== 'wiki-retrieval'" class="yd-chat-process__description">{{ activity.query }}</p>
+            <p v-if="activityDetail(activity)" class="yd-chat-process__description">
+              {{ activityDetail(activity) }}
+            </p>
           </div>
         </div>
 
@@ -154,7 +197,13 @@ watch(() => props.activities, (activities) => {
 
 .yd-chat-process__main { min-width: 0; }
 .yd-chat-process__head { display: flex; align-items: center; gap: 6px; min-height: 18px; color: var(--color-text-2); font-weight: 500; }
-.yd-chat-process__phase { padding: 1px 5px; border-radius: 4px; background: var(--color-fill-2); color: var(--color-text-3); font-size: 11px; font-weight: 400; }
+.yd-chat-process__summary { display: inline-flex; align-items: center; gap: 8px; justify-self: start; max-width: 100%; padding: 2px 0; border: 0; background: transparent; color: var(--color-text-2); cursor: pointer; font: inherit; font-weight: 500; text-align: left; }
+.yd-chat-process__summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yd-chat-process__summary.is-running .yd-chat-process__status { color: rgb(var(--primary-6)); }
+.yd-chat-process__summary.is-complete .yd-chat-process__status { color: rgb(var(--success-6)); }
+.yd-chat-process__summary.is-error .yd-chat-process__status { color: rgb(var(--danger-6)); }
+.yd-chat-process__chevron { color: var(--color-text-3); font-size: 12px; }
+.yd-chat-process__step.is-nested { margin-left: 8px; padding-left: 14px; border-left: 1px solid var(--color-border-2); }
 .yd-chat-process__description { margin: 2px 0 0; color: var(--color-text-3); line-height: 1.55; }
 .yd-chat-process__detail { margin: -3px 0 2px 24px; }
 .yd-chat-process__toggle { display: inline-flex; align-items: center; gap: 3px; padding: 3px 0; border: 0; background: transparent; color: rgb(var(--primary-6)); cursor: pointer; font: inherit; font-size: 11px; }

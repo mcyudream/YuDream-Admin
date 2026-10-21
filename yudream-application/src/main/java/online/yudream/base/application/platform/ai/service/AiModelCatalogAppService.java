@@ -1,6 +1,8 @@
 package online.yudream.base.application.platform.ai.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.agent.assembler.AgentModelCatalogParser;
+import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.application.platform.ai.cmd.AiModelDiscoveryCmd;
 import online.yudream.base.application.platform.ai.dto.AiDiscoveredModelDTO;
 import online.yudream.base.application.platform.ai.dto.AiModelDiscoveryDTO;
@@ -29,6 +31,19 @@ public class AiModelCatalogAppService {
 
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ObjectProvider<AiModelDiscoveryGateway> discoveryGateway;
+    private final AgentModelCatalogParser modelCatalogParser;
+
+    /** AI/CMS 的模型选择只依赖 AI 能力，不要求开启 Agent 应用编排或 Wiki。 */
+    @Transactional(readOnly = true)
+    public List<AgentModelDTO> availableModels() {
+        Map<String, String> config = capabilityModuleRepo.findByCode(AI_CAPABILITY)
+                .filter(module -> module.enabled())
+                .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
+                .orElseThrow(() -> new BizException("AI 能力未启用，请先在平台能力中启用 AI 助手"));
+        return modelCatalogParser.parse(config).stream()
+                .filter(model -> "chat".equals(model.kind()))
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public AiModelDiscoveryDTO discoverModels(AiModelDiscoveryCmd cmd) {

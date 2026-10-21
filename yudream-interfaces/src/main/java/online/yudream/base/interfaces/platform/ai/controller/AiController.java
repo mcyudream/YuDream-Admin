@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.platform.ai.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.agent.service.AgentAppService;
+import online.yudream.base.application.platform.ai.service.AiModelCatalogAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.agent.assembler.AgentWebAssembler;
@@ -27,6 +28,7 @@ import java.util.List;
 public class AiController {
 
     private final AgentAppService agentAppService;
+    private final AiModelCatalogAppService modelCatalogAppService;
 
     /**
      * CMS 构建器等 AI 场景的 Agent 列表。与 Agent 管理台的 platform:agent:view 分离：
@@ -45,6 +47,6 @@ public class AiController {
     @GetMapping("/models/available")
     @PermissionRegister(code = "platform:ai:generate", name = "AI 生成页面", module = "平台能力", desc = "使用 AI 为 CMS 生成页面草稿")
     public Result<List<AgentModelRes>> availableModels() {
-        return Result.ok(agentAppService.catalog().models().stream().map(AgentWebAssembler::toRes).toList());
+        return Result.ok(modelCatalogAppService.availableModels().stream().map(AgentWebAssembler::toRes).toList());
     }
 }

@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
 })
 
 async function send(request: YdAgentSendRequest) {
-  if (!allowed.value || (!canEdit.value && !assistant.sessionId)) {
+  if (!allowed.value || (!canEdit.value && !assistant.conversationSessionId)) {
     return
   }
   const text = await composeWithReferences(request.text.trim() || request.text)
@@ -508,23 +508,24 @@ async function playTour(tourCode?: string) {
           </YdButton>
         </YdAlert>
         <YdAgentWorkbench
-          :sessions="assistant.sessionItems"
-          :session-id="assistant.sessionId"
+          :sessions="assistant.conversationItems"
+          :session-id="assistant.conversationSessionId"
           :models="assistant.models"
           :model-id="assistant.modelId"
-          :messages="assistant.messages"
-          :harness="assistant.harness"
-          :activities="assistant.activities"
+          :messages="assistant.conversationMessages"
+          :harness="assistant.conversationHarness"
+          :activities="assistant.conversationActivities"
           :approvals="nativeApprovals"
           :available-modes="['ask']"
           :files="canViewWorkspace ? workspaceFiles : []"
           :workspaces="workspaceDescriptor"
           workspace-id="default"
-          :disabled="assistant.loading || !canEdit && !assistant.sessionId"
+          :disabled="assistant.loading || !canEdit && !assistant.conversationSessionId"
           :suggestions="['帮我找到用户管理页面', '解释当前页面有哪些操作', '帮我规划下一步工作']"
           class="yd-global-ai-workbench"
           @send="send"
           @stop="perform(assistant.stop)"
+          @retry="message => { const text = assistant.retryText(message); if (text) send({ text, attachments: [], mode: 'ask', skillCodes: [], contextPaths: [] }) }"
           @file-toggle="(path, included) => toggleReference(path, included)"
           @file-select="() => { workspaceOpen = true }"
           @update:session-id="id => perform(() => assistant.selectSession(id))"

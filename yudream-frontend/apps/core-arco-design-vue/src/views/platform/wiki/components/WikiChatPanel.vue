@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { startWikiChatRun } from '@/api/modules/platform-wiki'
 import { useAiRunTask } from '@/composables/use-ai-run-task'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
+import { describeAiRunError } from '@/utils/ai-run-error'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
@@ -98,7 +99,7 @@ function openInChatPage() {
       </div>
     </header>
 
-    <YdAlert v-if="task.failure.value" variant="destructive" :title="task.failure.value" />
+    <YdAlert v-if="task.failure.value" variant="destructive" :title="describeAiRunError(task.failure.value).message" :description="task.failure.value" />
     <YdAgentWorkbench
       :messages="messages"
       :render-documents="renderDocuments"

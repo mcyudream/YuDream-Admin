@@ -297,9 +297,17 @@ defineExpose({
 </template>
 
 <style scoped>
+/* 浮窗内的工作台与窗口融为一体：去掉卡片边框与圆角，避免「卡片套卡片」 */
+.yd-chat-window :deep(.yd-agent-workbench) {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 浮窗在页面框架（顶栏/侧栏约 1010）与悬浮球（1500）之上，低于其内部弹出的下拉、对话框与提示（约 2000+） */
 .yd-chat-window {
   position: fixed;
-  z-index: 1000;
+  z-index: 1600;
   display: flex;
   min-width: 360px;
   min-height: 420px;
