@@ -83,17 +83,20 @@ const slug = computed(() => {
 // ===== 新站点文档（网站工作台发布）渲染分支 =====
 
 /** 首页匹配 path '/'（或空）；子页精确匹配优先，其次动态页面（:参数 段，参数传给数据绑定） */
-const studioMatch = computed(() => studioDocument.value ? matchStudioPage(studioDocument.value, slug.value) : null)
+// 依赖未满足（插件未启用、能力关闭）的页面不注册：匹配时直接排除，按普通不存在处理
+const studioCapabilities = shallowRef<Set<string> | null>(null)
+const studioMatch = computed(() => {
+  const document = studioDocument.value
+  const available = studioCapabilities.value
+  if (!document || !available) {
+    return null
+  }
+  const open = document.pages.filter(page => studioRequirementsMet(page.settings?.requires, available))
+  return matchStudioPage({ ...document, pages: open }, slug.value)
+})
 const studioPage = computed(() => studioMatch.value?.page ?? null)
 // 公开站持久外壳存在时页面只渲染正文，否则连同文档页头/页脚一起渲染
 const studioShell = useStudioPublicShell()
-// 页面依赖（插件/能力）未满足时关闭页面
-const studioCapabilities = shallowRef<Set<string> | null>(null)
-void loadSiteCapabilities().then(value => studioCapabilities.value = value)
-const studioPageClosed = computed(() => {
-  const requires = studioPage.value?.settings?.requires
-  return Boolean(requires?.length) && (!studioCapabilities.value || !studioRequirementsMet(requires, studioCapabilities.value))
-})
 
 async function loadStudioDocument(seq: number) {
   try {
@@ -108,6 +111,11 @@ async function loadStudioDocument(seq: number) {
     }
     const parsed = JSON.parse(published.documentJson) as SiteDocument
     validateStudioDocument(parsed)
+    // 先取启用状态再定页面是否存在：依赖未满足的页面不注册，回落为普通「页面不存在」
+    studioCapabilities.value ??= await loadSiteCapabilities()
+    if (seq !== loadSeq) {
+      return
+    }
     studioDocument.value = parsed
   }
   catch (error) {
@@ -631,10 +639,7 @@ function dateText(value?: string) {
       <div v-if="studioFailed" class="site-studio-notice" role="status">
         网站文档加载失败，当前展示旧版内容
       </div>
-      <div v-if="studioDocument && studioPage && studioPageClosed" class="site-state">
-        {{ studioCapabilities ? '页面未开放：相关功能尚未启用' : '加载中...' }}
-      </div>
-      <StudioShadowLayout v-else-if="studioDocument && studioPage" :document="studioDocument" :page="studioPage" :params="studioMatch?.params" :chrome="!studioShell" />
+      <StudioShadowLayout v-if="studioDocument && studioPage" :document="studioDocument" :page="studioPage" :params="studioMatch?.params" :chrome="!studioShell" />
       <SiteChrome v-else :settings="home?.settings" :blank="isBlankPage">
         <div class="site-layout-frame">
           <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">

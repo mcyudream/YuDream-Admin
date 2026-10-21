@@ -217,8 +217,8 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
 
 <template>
   <section class="studio-agent-panel" aria-label="站点设计 AI 助手">
-    <YdAlert v-if="status" :title="status" />
-    <YdAlert v-if="localError || assistant.error || run?.error" variant="destructive" :title="localError || run?.error || assistant.error">
+    <YdAlert v-if="status" class="studio-agent-alert" icon="morph:info" :description="status" />
+    <YdAlert v-if="localError || assistant.error || run?.error" class="studio-agent-alert" variant="destructive" :title="localError || run?.error || assistant.error">
       <template #description>
         <YdButton v-if="run" size="sm" variant="outline" @click="perform(() => assistant.reconnect(run?.id))">
           重新读取运行状态
@@ -297,6 +297,7 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
       :loading="busy"
       :disabled="inputDisabled"
       :placeholder="target ? `描述要对「${targetLabel}」做的修改…` : '描述想要的页面效果…'"
+      :large="false"
       class="studio-agent-sender"
       @send="(text, attachments) => perform(() => send(composeRequest(text, attachments)))"
       @stop="perform(() => assistant.stop(run?.id))"
@@ -306,6 +307,7 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
 
 <style scoped>
 .studio-agent-panel { display: flex; height: 100%; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; background: var(--color-bg-1); }
+.studio-agent-alert { flex-shrink: 0; width: auto; margin: 8px 8px 0; }
 .studio-agent-bar { display: flex; flex-shrink: 0; gap: 4px; align-items: center; padding: 8px 8px 0; }
 .studio-agent-model { flex-shrink: 0; margin: 6px 8px 0; }
 .studio-agent-target { display: flex; flex-shrink: 0; gap: 6px; align-items: center; margin: 8px 8px 0; padding: 6px 8px; font-size: 13px; border: 1px solid oklch(var(--border)); background: oklch(var(--muted) / 50%); }
@@ -319,5 +321,6 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
 .studio-agent-preview li small { display: block; color: oklch(var(--muted-foreground)); word-break: break-all; }
 .studio-agent-preview__actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .studio-agent-preview__actions small { color: oklch(var(--muted-foreground)); }
-.studio-agent-sender { flex-shrink: 0; padding: 0 8px 8px; }
+/* 发送框默认按视口留白（面向整页聊天）；窄栏内改为贴栏内边距，单轨道不被内容撑宽 */
+.studio-agent-sender { flex-shrink: 0; min-width: 0; grid-template-columns: minmax(0, 1fr); padding: 0 8px 8px; }
 </style>

@@ -108,6 +108,8 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
   }
   const roots = `html :is(${STUDIO_PUBLIC_ROOTS.join(',')})`
   const variables = Object.entries(skinVariables(skin)).map(([key, value]) => `${key}:${value} !important`).join(';')
+  // 弹层（对话框、弹出框、下拉、选择器）挂在 body 上，不在页面根内：在嵌入主题页时同样换肤并自适应视口
+  const overlays = 'html:has(.studio-shadow-layout) :is([role="dialog"],[data-slot="dialog-content"],[data-slot="popover-content"],[data-slot="select-content"],[data-slot="dropdown-menu-content"])'
   const image = skin.backgroundImageAssetId ? assets.get(skin.backgroundImageAssetId)?.url : ''
   const background = image
     ? `background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)),url("${image}") center/cover fixed,${skin.background} !important`
@@ -116,6 +118,9 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
   return [
     ...fonts,
     `${roots}{${variables}}`,
+    `${overlays}{${variables};color:${skin.text}}`,
+    `html:has(.studio-shadow-layout) :is([role="dialog"],[data-slot="dialog-content"]){max-width:min(880px,calc(100vw - 24px)) !important;max-height:calc(100svh - 48px) !important;overflow:auto !important}`,
+    skin.pixel ? `${overlays}{border-radius:0 !important;border:2px solid #000 !important;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),6px 6px 0 rgba(0,0,0,.5) !important}` : '',
     // 页面根：背景、文字与字体；登录页内表单控件同样继承字体
     `html :is(.site-chrome,.login-page,.wiki-public,.wiki-home,.wiki-search-page,.discover,.plugin,.public-form-page,.tl-page,.ev-page){${background};color:${skin.text} !important;${font}}`,
     skin.fontFamily ? `html .login-page :is(input,textarea,select,button,label,h1,h2,h3,h4,p,span,a){font-family:inherit !important}` : '',
@@ -130,7 +135,9 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
 /** 像素风：只作用于嵌入主题页（.studio-shadow-layout 插槽内）的宿主页面，用通用选择器而非插件专属类名 */
 function pixelRules(skin: StudioPublicSkin) {
   const scope = 'html .studio-shadow-layout'
-  const panels = `${scope} :is([data-slot="card"],[data-slot="popover-content"],[data-slot="dropdown-menu-content"],[class*="card"]:not([class*="__"]),aside,.login-box)`
+  // 只给最外层卡片加像素框：卡片内部的「-card-body / -card-title」等子元素不再各自成框
+  const card = ':is([data-slot="card"],[class*="card"])'
+  const panels = `${scope} :is(${card}:not(${card} *),aside,.login-box)`
   const controls = `${scope} :is([data-slot="input-group"],[data-slot="select-trigger"],[data-slot="popover-trigger"],[data-slot="form-control"],textarea,input:not([type="checkbox"]):not([type="radio"]))`
   const buttons = `${scope} :is([data-slot="button"],button.yd-action,[data-slot="tabs-trigger"])`
   return [

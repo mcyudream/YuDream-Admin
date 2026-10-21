@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { findStudioNode } from '@/utils/site-studio'
 import { uploadStudioAsset } from './studio-upload'
+import StudioInspectorSection from './StudioInspectorSection.vue'
 import StudioNodeBindings from './StudioNodeBindings.vue'
 
 defineOptions({ name: 'StudioInspector' })
@@ -305,18 +306,18 @@ function removeSelected() {
 </script>
 
 <template>
-  <div class="p-3 flex flex-col gap-3">
+  <div class="p-3 flex flex-col gap-2">
     <YdEmpty
       v-if="!node"
       description="在画布或图层树选中元素后，这里编辑它的文本、属性与样式"
     />
     <template v-else>
-      <div class="flex gap-2 items-center justify-between">
-        <div class="min-w-0">
-          <strong class="truncate">{{ node.type }}</strong>
+      <div class="studio-inspector-head">
+        <div class="studio-inspector-head__title" :title="`${node.type} <${node.tag}>`">
+          <strong>{{ node.type }}</strong>
           <span class="text-xs text-muted-foreground">&lt;{{ node.tag }}&gt;</span>
         </div>
-        <div class="flex gap-0.5 items-center">
+        <div class="studio-inspector-head__actions">
           <YdTooltip content="选中父级">
             <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="选中父级" :disabled="!locateSibling(node.id)?.parentId" @click="selectParent">
               <YdIcon name="morph:corner-left-up" />
@@ -345,8 +346,7 @@ function removeSelected() {
         </div>
       </div>
 
-      <label v-if="node.text !== undefined" class="text-sm flex flex-col gap-1">
-        <span>文本</span>
+      <StudioInspectorSection v-if="node.text !== undefined" id="content" title="内容" :summary="textValue.slice(0, 24)">
         <YdTextarea
           :model-value="textValue"
           :rows="3"
@@ -354,29 +354,26 @@ function removeSelected() {
           @update:model-value="onTextInput(String($event))"
           @blur="flushText"
         />
-      </label>
+      </StudioInspectorSection>
 
-      <section class="gap-2 grid grid-cols-2" aria-label="常用布局">
-        <label class="text-xs flex flex-col gap-1 min-w-0"><span>布局</span><YdSelect class="min-w-0 w-full" :model-value="currentStyles.display || node.styles.display || 'block'" :options="[{ label: '普通流', value: 'block' }, { label: '弹性布局', value: 'flex' }, { label: '网格布局', value: 'grid' }]" aria-label="元素布局" @update:model-value="quickStyle('display', String($event))" /></label>
-        <label class="text-xs flex flex-col gap-1 min-w-0"><span>排列方向</span><YdSelect class="min-w-0 w-full" :model-value="currentStyles['flex-direction'] || node.styles['flex-direction'] || 'row'" :options="[{ label: '水平', value: 'row' }, { label: '垂直', value: 'column' }]" aria-label="排列方向" @update:model-value="quickStyle('flex-direction', String($event))" /></label>
-        <label v-for="field in quickFields" :key="field.key" class="text-xs flex flex-col gap-1"><span>{{ field.label }}</span><YdInput :model-value="currentStyles[field.key] || ''" :placeholder="quickPlaceholder(field)" :aria-label="field.label" @change="quickStyle(field.key, String($event.target.value))" /></label>
-      </section>
+      <StudioInspectorSection id="layout" title="布局" :summary="currentStyles.display || node.styles.display || ''">
+        <div class="gap-2 grid grid-cols-2">
+          <label class="text-xs flex flex-col gap-1 min-w-0"><span>布局</span><YdSelect class="min-w-0 w-full" :model-value="currentStyles.display || node.styles.display || 'block'" :options="[{ label: '普通流', value: 'block' }, { label: '弹性布局', value: 'flex' }, { label: '网格布局', value: 'grid' }]" aria-label="元素布局" @update:model-value="quickStyle('display', String($event))" /></label>
+          <label class="text-xs flex flex-col gap-1 min-w-0"><span>排列方向</span><YdSelect class="min-w-0 w-full" :model-value="currentStyles['flex-direction'] || node.styles['flex-direction'] || 'row'" :options="[{ label: '水平', value: 'row' }, { label: '垂直', value: 'column' }]" aria-label="排列方向" @update:model-value="quickStyle('flex-direction', String($event))" /></label>
+          <label v-for="field in quickFields" :key="field.key" class="text-xs flex flex-col gap-1 min-w-0"><span>{{ field.label }}</span><YdInput :model-value="currentStyles[field.key] || ''" :placeholder="quickPlaceholder(field)" :aria-label="field.label" @change="quickStyle(field.key, String($event.target.value))" /></label>
+        </div>
+      </StudioInspectorSection>
 
       <StudioNodeBindings :node="node" />
 
-      <section class="flex flex-col gap-2" aria-label="属性">
-        <div class="flex items-center justify-between">
-          <h3 class="text-xs text-muted-foreground font-medium">
-            属性
-          </h3>
-          <div class="flex gap-1">
-            <YdButton v-if="isMediaAttribute" v-auth="'platform:cms:edit'" variant="ghost" size="sm" @click="uploadForAttribute">
-              <YdIcon name="morph:cloud-upload" /> 上传资源填入
-            </YdButton>
-            <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="添加属性" @click="attributeRows.push({ key: '', value: '' }); commitAttributes()">
-              <YdIcon name="morph:plus" />
-            </YdButton>
-          </div>
+      <StudioInspectorSection id="attrs" title="属性" :summary="`${attributeRows.length} 项`">
+        <div class="flex gap-1 justify-end">
+          <YdButton v-if="isMediaAttribute" v-auth="'platform:cms:edit'" variant="ghost" size="sm" @click="uploadForAttribute">
+            <YdIcon name="morph:cloud-upload" /> 上传资源填入
+          </YdButton>
+          <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="添加属性" @click="attributeRows.push({ key: '', value: '' }); commitAttributes()">
+            <YdIcon name="morph:plus" /> 添加
+          </YdButton>
         </div>
         <div v-for="(row, index) in attributeRows" :key="`attr-${index}`" class="flex gap-1 items-center">
           <YdInput v-model="row.key" class="w-28" placeholder="属性名" aria-label="属性名" @change="commitAttributes" />
@@ -395,13 +392,10 @@ function removeSelected() {
             <YdIcon name="morph:x" />
           </YdButton>
         </div>
-      </section>
+      </StudioInspectorSection>
 
-      <section class="flex flex-col gap-2" aria-label="样式">
-        <div class="flex items-center justify-between">
-          <h3 class="text-xs text-muted-foreground font-medium">
-            样式
-          </h3>
+      <StudioInspectorSection id="styles" title="样式" :summary="`${styleRows.length} 项 · ${breakpointOptions.find(option => option.value === breakpoint)?.label}`">
+        <div class="flex justify-end">
           <YdSegmented v-model="breakpoint" :options="breakpointOptions" size="sm" aria-label="样式断点" />
         </div>
         <p class="text-xs text-muted-foreground">
@@ -426,7 +420,39 @@ function removeSelected() {
         <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="添加样式" @click="styleRows.push({ key: '', value: '' })">
           <YdIcon name="morph:plus" /> 添加样式
         </YdButton>
-      </section>
+      </StudioInspectorSection>
     </template>
   </div>
 </template>
+
+<style scoped>
+/* 标题独占一行（最少 120px 才与操作同行），窄栏时操作按钮换到下一行，不挤压标题 */
+.studio-inspector-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  min-width: 0;
+}
+.studio-inspector-head__title {
+  display: flex;
+  flex: 1 1 120px;
+  gap: 4px;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.studio-inspector-head__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-inspector-head__actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 2px;
+  align-items: center;
+}
+</style>

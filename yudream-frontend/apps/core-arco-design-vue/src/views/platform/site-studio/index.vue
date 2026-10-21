@@ -231,7 +231,8 @@ void store.load()
 
 <template>
   <!-- data-yd-fullheight：宿主布局据此把容器固定为视口高，工作台各栏自行内滚 -->
-  <div class="site-studio h-full min-h-0" data-yd-fullheight>
+  <!-- data-yd-own-ai：工作台自带 AI 面板，全局 AI 悬浮球让位，避免压住属性栏与输入框 -->
+  <div class="site-studio h-full min-h-0" data-yd-fullheight data-yd-own-ai>
     <!-- 单行 grid（minmax(0,1fr)）：内容包装层固定为整高、不被内容撑高，各栏自行内滚；遮罩为绝对定位，不占轨道 -->
     <YdLoadingOverlay :loading="store.loading" block-interaction class="grid grid-rows-[minmax(0,1fr)] h-full">
       <YdResult
@@ -255,6 +256,7 @@ void store.load()
         v-model:pane="pane"
         :rail-items="railItems"
         storage-key="site-studio"
+        :aside="{ defaultSize: 26, minSize: 20, maxSize: 45 }"
         sidebar-label="结构与页面"
         main-label="站点内容"
         aside-label="属性"

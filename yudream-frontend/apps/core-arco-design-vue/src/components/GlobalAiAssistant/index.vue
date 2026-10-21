@@ -814,8 +814,9 @@ async function playTour(tourCode?: string) {
   outline-offset: 5px;
 }
 
-/* 全屏接管页（放映大屏等）让位 */
-html[data-fullscreen-stage="true"] .yd-float-ball {
+/* 全屏接管页（放映大屏等）与自带 AI 面板的工作台让位 */
+html[data-fullscreen-stage="true"] .yd-float-ball,
+html:has([data-yd-own-ai]) .yd-float-ball {
   display: none;
 }
 </style>

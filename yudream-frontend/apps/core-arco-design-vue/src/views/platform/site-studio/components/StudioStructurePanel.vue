@@ -157,7 +157,7 @@ function confirmRemovePage(pageId: string) {
       <YdSegmented v-model="store.editRegion" :options="regionOptions" class="w-full" aria-label="选择页头页脚或页面" />
     </section>
 
-    <section class="flex flex-col gap-2 min-h-0" aria-label="页面列表">
+    <section class="flex flex-shrink-0 flex-col gap-2" aria-label="页面列表">
       <div class="flex items-center justify-between">
         <h3 class="text-xs text-muted-foreground font-medium">
           页面
@@ -169,13 +169,13 @@ function confirmRemovePage(pageId: string) {
       <YdList dense class="max-h-56 overflow-auto">
         <YdListRow v-for="page in store.doc?.pages || []" :key="page.id">
           <div class="studio-page-row w-full">
-            <YdAction type="button" class="text-left flex-1 min-w-0" :aria-pressed="store.editRegion === 'page' && store.activePageId === page.id" @click="selectPage(page.id)">
-              <span class="min-w-0 truncate">
+            <YdAction type="button" class="text-left flex-1 min-w-24 overflow-hidden" :aria-pressed="store.editRegion === 'page' && store.activePageId === page.id" @click="selectPage(page.id)">
+              <span class="min-w-0 block truncate">
                 {{ page.name }}
                 <span class="text-xs text-muted-foreground">{{ page.path }}</span>
               </span>
             </YdAction>
-            <span v-if="store.editRegion === 'page' && store.activePageId === page.id" class="flex gap-0.5 items-center">
+            <span v-if="store.editRegion === 'page' && store.activePageId === page.id" class="flex flex-none gap-0.5 items-center">
               <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="页面设置" @click="openPageForm(page.id)">
                 <YdIcon name="morph:pencil" />
               </YdButton>
@@ -189,11 +189,11 @@ function confirmRemovePage(pageId: string) {
     </section>
 
     <section class="flex flex-shrink-0 flex-col gap-2 min-h-40" aria-label="图层">
-      <div class="flex items-center justify-between">
-        <h3 class="text-xs text-muted-foreground font-medium">
+      <div class="flex gap-2 min-w-0 items-center justify-between">
+        <h3 class="text-xs text-muted-foreground font-medium flex-none">
           图层
         </h3>
-        <span v-if="selectedLayerLabel" class="text-xs text-muted-foreground truncate">{{ selectedLayerLabel }}</span>
+        <span v-if="selectedLayerLabel" class="text-xs text-muted-foreground min-w-0 truncate">{{ selectedLayerLabel }}</span>
       </div>
       <YdTree
         v-model:selected-keys="layerSelection"
@@ -255,8 +255,10 @@ function confirmRemovePage(pageId: string) {
 </template>
 
 <style scoped>
+/* 窄栏时页面操作换到下一行，不压住页面名 */
 .studio-page-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 4px 6px;

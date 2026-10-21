@@ -1,6 +1,6 @@
 import type { MaybeRefOrGetter } from 'vue'
-import { hasPublicPluginMarket } from '@/api/modules/plugin-market-public'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
+import { hasPublicPluginMarket } from '@/api/modules/plugin-market-public'
 
 export interface SiteNavigationItem {
   id?: string
@@ -122,7 +122,8 @@ function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
       const items: SiteNavigationItem[] = []
       for (const module of res.data.modules || []) {
         for (const route of module.routes || []) {
-          if (!route.siteNav || !route.publicAccess || !route.path || !route.component) {
+          // 带参数的动态路由（如 /activities/:id）套站点外壳但不能作为导航条目
+          if (!route.siteNav || !route.publicAccess || !route.path || !route.component || route.path.includes(':')) {
             continue
           }
           items.push({
