@@ -1,4 +1,4 @@
-import type { SiteDocument, StudioFeatures, StudioPage, StudioParticlePreset } from '../types/site-studio'
+import type { SiteDocument, StudioAsset, StudioContentEffect, StudioPage, StudioParticlePreset } from '../types/site-studio'
 import { reactive } from 'vue'
 import apiCms from '@/api/modules/platform-cms'
 import apiPublicTheme from '@/api/modules/public-theme'
@@ -6,6 +6,7 @@ import systemClient from '@/api/modules/system-client'
 import { useAppAccountStore } from '@/store/modules/app/account'
 import { useAppSettingsStore } from '@/store/modules/app/settings'
 import { buildNavigationTree, loadSiteCapabilities, loadSiteNavigation, studioRequirementsMet } from '@/views/site/site-navigation'
+import { STUDIO_PARTICLE_PRESETS } from '../types/site-studio'
 import { toBackendAssetUrl } from './backend-url'
 import { resolveStudioHref } from './site-studio-links'
 import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-validation'
@@ -15,8 +16,8 @@ import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-valida
  * 文档只声明意图（features / page.settings / data-yd-* 属性），行为全部是宿主内置、可审计的代码：
  * - 背景音乐与点击音效（音频状态在宿主侧，跨页面保持；按钮 data-yd-action="toggle-music|toggle-sound"）
  * - 当前页链接 aria-current="page"（配合样式类 current 状态做导航高亮）
- * - 氛围粒子（features.particles，页面 settings.particles 覆盖）
- * - 页面首次进入提示（settings.toast，同一会话每页一次）
+ * - 站点功能由站点内容中声明 effect 的字段驱动（resolveStudioEffects）：氛围粒子、背景音乐与音效、页面粒子与首次进入提示
+ *   （同一会话每页一次）；未声明的效果回落旧版 features.particles / features.audio / 页面 settings
  * - 站点信息：data-yd-site="name|description|logo|copyright|year"（宿主「系统设置」中的站点名称、Logo 等，随设置变化，不写死在文档里）
  * - 账号：data-yd-auth="guest|user" 按登录状态显示；data-yd-account="name|avatar|initial"（头像缺省时显示首字）
  * - 菜单：[data-yd-menu] 内的 [data-yd-menu-trigger] 在触屏/按钮上切换 aria-expanded（二级菜单配合样式类 parent-* 状态展开），
@@ -41,34 +42,98 @@ type EffectName = 'click' | 'button' | 'toast'
 const EFFECTS_KEY = 'yd.site.audio.effects'
 
 export const studioAudio = reactive({ musicOn: false, effectsOn: true, hasMusic: false, hasEffects: false })
-let audioConfig: NonNullable<StudioFeatures['audio']> | null = null
 let audioUrls: { tracks: string[], effects: Partial<Record<EffectName, string>> } = { tracks: [], effects: {} }
 let audioKey = ''
 let music: HTMLAudioElement | null = null
 let trackIndex = 0
 
+// ===== 站点功能解析：站点内容中声明 effect 的字段优先，未声明的效果回落旧版 features / 页面设置 =====
+
+interface StudioPageEffect { path: string, particles?: StudioParticlePreset, toast?: { title: string, body: string, icon: string } }
+export interface StudioResolvedEffects {
+  particles: StudioParticlePreset
+  tracks: string[]
+  musicVolume: number
+  effectVolume: number
+  effectsDefaultOn: boolean
+  sounds: Partial<Record<EffectName, string>>
+  pages: StudioPageEffect[]
+}
+
+function preset(value: unknown): StudioParticlePreset | undefined {
+  return STUDIO_PARTICLE_PRESETS.includes(value as StudioParticlePreset) ? value as StudioParticlePreset : undefined
+}
+
+export function resolveStudioEffects(document: SiteDocument): StudioResolvedEffects {
+  const fields = (document.features?.content?.sections ?? []).flatMap(section => section.fields)
+  const effect = (name: StudioContentEffect) => {
+    const field = fields.find(item => item.effect === name)
+    return field ? { value: studioContentValue(document, field.key) } : undefined
+  }
+  const legacy = document.features?.audio
+  const assetUrl = (id: string | undefined, kind: StudioAsset['kind']) => document.assets.find(item => item.id === id && item.kind === kind)?.url ?? ''
+  const url = (value: unknown) => typeof value === 'string' && value && !value.startsWith('#') ? toBackendAssetUrl(value) : ''
+  const sound = (name: StudioContentEffect, legacyId?: string) => {
+    const bound = effect(name)
+    return bound ? url(bound.value) : (legacyId ? toBackendAssetUrl(assetUrl(legacyId, 'audio')) : '')
+  }
+  const number = (name: StudioContentEffect, fallback: number) => {
+    const bound = effect(name)
+    return bound ? (typeof bound.value === 'number' ? bound.value : fallback) : fallback
+  }
+  const music = effect('music')
+  const switchValue = effect('effectsDefaultOn')
+  const pageList = effect('pageEffects')
+  const legacyPages: StudioPageEffect[] = document.pages.flatMap(page => page.settings?.particles || page.settings?.toast
+    ? [{ path: page.path, particles: page.settings.particles, toast: page.settings.toast ? { title: page.settings.toast.title, body: page.settings.toast.body, icon: assetUrl(page.settings.toast.iconAssetId, 'image') } : undefined }]
+    : [])
+  const configuredPages: StudioPageEffect[] = pageList
+    ? asRecords(pageList.value).flatMap((item) => {
+        const path = typeof item.path === 'string' ? item.path.trim() : ''
+        if (!path.startsWith('/')) {
+          return []
+        }
+        const title = typeof item.toastTitle === 'string' ? item.toastTitle.trim() : ''
+        return [{ path, particles: preset(item.particles), toast: title ? { title, body: typeof item.toastBody === 'string' ? item.toastBody : '', icon: url(item.toastIcon) } : undefined }]
+      })
+    : []
+  const configuredPaths = new Set(configuredPages.map(item => normalizePath(item.path)))
+  return {
+    particles: preset(effect('particles')?.value) ?? (effect('particles') ? 'none' : document.features?.particles ?? 'none'),
+    tracks: music
+      ? asRecords(music.value).map(item => url(item.src)).filter(Boolean)
+      : (legacy?.tracks ?? []).map(track => toBackendAssetUrl(assetUrl(track.assetId, 'audio'))).filter(Boolean),
+    musicVolume: number('musicVolume', legacy?.musicVolume ?? 18),
+    effectVolume: number('effectVolume', legacy?.effectVolume ?? 30),
+    effectsDefaultOn: switchValue ? switchValue.value !== false : legacy?.effectsDefaultOn !== false,
+    sounds: { click: sound('clickSound', legacy?.clickSoundAssetId), button: sound('buttonSound', legacy?.buttonSoundAssetId), toast: sound('toastSound', legacy?.toastSoundAssetId) },
+    pages: [...configuredPages, ...legacyPages.filter(item => !configuredPaths.has(normalizePath(item.path)))],
+  }
+}
+
+/** 当前页面对应的页面效果：按文档页面路径或承载的宿主路由匹配 */
+function pageEffectFor(effects: StudioResolvedEffects, candidates: string[]) {
+  const wanted = new Set(candidates.map(normalizePath))
+  return effects.pages.find(item => wanted.has(normalizePath(item.path)))
+}
+
+let audioEffects: StudioResolvedEffects | null = null
+
 function configureAudio(document: SiteDocument) {
-  const config = document.features?.audio ?? null
-  const key = JSON.stringify([document.id, config, document.assets])
+  const effects = resolveStudioEffects(document)
+  const key = JSON.stringify([document.id, effects.tracks, effects.sounds, effects.musicVolume, effects.effectVolume, effects.effectsDefaultOn])
   if (key === audioKey) {
     return
   }
   audioKey = key
-  const url = (id?: string) => {
-    const asset = id ? document.assets.find(item => item.id === id && item.kind === 'audio') : undefined
-    return asset ? toBackendAssetUrl(asset.url) : ''
-  }
-  audioConfig = config
-  audioUrls = {
-    tracks: (config?.tracks ?? []).map(track => url(track.assetId)).filter(Boolean),
-    effects: { click: url(config?.clickSoundAssetId), button: url(config?.buttonSoundAssetId), toast: url(config?.toastSoundAssetId) },
-  }
+  audioEffects = effects
+  audioUrls = { tracks: effects.tracks, effects: effects.sounds }
   studioAudio.hasMusic = audioUrls.tracks.length > 0
   studioAudio.hasEffects = Object.values(audioUrls.effects).some(Boolean)
   const stored = localStorage.getItem(EFFECTS_KEY)
-  studioAudio.effectsOn = stored === null ? config?.effectsDefaultOn !== false : stored === '1'
+  studioAudio.effectsOn = stored === null ? effects.effectsDefaultOn : stored === '1'
   if (music) {
-    music.volume = (config?.musicVolume ?? 0) / 100
+    music.volume = effects.musicVolume / 100
   }
   if (!studioAudio.hasMusic) {
     stopStudioAudio()
@@ -77,11 +142,11 @@ function configureAudio(document: SiteDocument) {
 
 function playEffect(name: EffectName) {
   const src = audioUrls.effects[name] || (name === 'button' ? audioUrls.effects.click : '')
-  if (!studioAudio.effectsOn || !src || !audioConfig) {
+  if (!studioAudio.effectsOn || !src || !audioEffects) {
     return
   }
   const sound = new Audio(src)
-  sound.volume = audioConfig.effectVolume / 100
+  sound.volume = audioEffects.effectVolume / 100
   void sound.play().catch(() => undefined)
 }
 
@@ -91,7 +156,7 @@ function playTrack() {
   }
   music ??= new Audio()
   music.src = audioUrls.tracks[trackIndex % audioUrls.tracks.length]!
-  music.volume = (audioConfig?.musicVolume ?? 0) / 100
+  music.volume = (audioEffects?.musicVolume ?? 0) / 100
   music.onended = () => {
     trackIndex = (trackIndex + 1) % audioUrls.tracks.length
     playTrack()
@@ -232,12 +297,12 @@ function startParticles(frameWindow: Window, host: Element, name: StudioParticle
 
 const TOAST_KEY = 'yd.site.toasts'
 
-function showPageToast(document: SiteDocument, page: StudioPage, host: Element) {
-  const toast = page.settings?.toast
+function showPageToast(document: SiteDocument, effect: StudioPageEffect | undefined, host: Element) {
+  const toast = effect?.toast
   if (!toast) {
     return () => undefined
   }
-  const seenKey = `${document.id}:${page.id}`
+  const seenKey = `${document.id}:${normalizePath(effect.path)}`
   let seen: string[] = []
   try {
     seen = JSON.parse(sessionStorage.getItem(TOAST_KEY) || '[]') as string[]
@@ -248,19 +313,17 @@ function showPageToast(document: SiteDocument, page: StudioPage, host: Element) 
   if (seen.includes(seenKey)) {
     return () => undefined
   }
-  sessionStorage.setItem(TOAST_KEY, JSON.stringify([...seen, seenKey].slice(-200)))
   const doc = host.ownerDocument
   const layer = host.querySelector(':scope > .yd-site-toast-layer') ?? host.appendChild(Object.assign(doc.createElement('div'), { className: 'yd-site-toast-layer' }))
   layer.setAttribute('role', 'status')
   layer.setAttribute('aria-live', 'polite')
   const item = doc.createElement('div')
   item.className = 'yd-site-toast'
-  const icon = document.assets.find(asset => asset.id === toast.iconAssetId && asset.kind === 'image')
-  if (icon) {
+  if (toast.icon) {
     const img = doc.createElement('img')
     img.className = 'yd-site-toast-icon'
     img.alt = ''
-    img.src = icon.url
+    img.src = toast.icon
     item.appendChild(img)
   }
   const copy = doc.createElement('div')
@@ -278,6 +341,17 @@ function showPageToast(document: SiteDocument, page: StudioPage, host: Element) 
   item.appendChild(copy)
   const timers: number[] = []
   timers.push(window.setTimeout(() => {
+    let current: string[] = []
+    try {
+      current = JSON.parse(sessionStorage.getItem(TOAST_KEY) || '[]') as string[]
+    }
+    catch {
+      current = []
+    }
+    if (current.includes(seenKey)) {
+      return
+    }
+    sessionStorage.setItem(TOAST_KEY, JSON.stringify([...current, seenKey].slice(-200)))
     layer.appendChild(item)
     playEffect('toast')
   }, 440))
@@ -675,7 +749,7 @@ export function studioContentValue(document: SiteDocument, key: string): unknown
     return undefined
   }
   const value = content.values[key]
-  if (value !== undefined && value !== '') {
+  if (value !== undefined) {
     return value
   }
   for (const section of content.sections) {
@@ -956,8 +1030,13 @@ export function attachStudioRuntime(options: {
   }
   doc.addEventListener('keydown', onKeydown as EventListener)
 
-  const stopParticles = page ? startParticles(frameWindow, host, page.settings?.particles ?? document.features?.particles ?? 'none') : () => undefined
-  const stopToast = page ? showPageToast(document, page, host) : () => undefined
+  // 站点功能（粒子、进入提示）：页面效果按文档页面路径或当前宿主路由匹配
+  const effects = resolveStudioEffects(document)
+  const routePath = options.currentPath ?? ''
+  const routeCandidates = routePath ? [routePath, routePath.replace(/^\/site(?=\/|$)/, '') || '/'] : []
+  const pageEffect = page ? pageEffectFor(effects, [...routeCandidates, page.path]) : undefined
+  const stopParticles = page ? startParticles(frameWindow, host, pageEffect?.particles ?? effects.particles) : () => undefined
+  const stopToast = page ? showPageToast(document, pageEffect, host) : () => undefined
   host.querySelectorAll(options.hostMode ? '[data-yd-host-hide]' : '[data-yd-outlet]').forEach(element => element.setAttribute('hidden', ''))
   bindSiteInfo(host, { pageTitle: options.pageTitle || page?.name || '' })
   bindAccount(host)

@@ -12,6 +12,8 @@ const props = defineProps<{
   secretConfigured?: boolean
   /** 主题归属插件编码，用于 image 字段提示主题资产路径 */
   pluginCode?: string
+  /** CMS 内容值允许显式留空以关闭效果；主题插件配置沿用清空后回默认值的提示。 */
+  emptyMeansDefault?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -37,7 +39,9 @@ function updateNumber(raw: any) {
 }
 
 function updateColor(value: string | number | undefined) {
-  if (value === undefined) return
+  if (value === undefined) {
+    return
+  }
   update(String(value))
 }
 
@@ -232,7 +236,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         :after-upload="response => response.url"
       />
       <p class="theme-config-field__hint">
-        点击上传或删除图片后记得保存；删除会去掉该图，不再自动填回主题自带图。
+        {{ emptyMeansDefault === false ? '留空会隐藏该图片；可用“恢复默认”撤销覆盖。' : '点击上传或删除图片后记得保存；删除会去掉该图，不再自动填回主题自带图。' }}
       </p>
     </template>
     <template v-else-if="field.type === 'audio'">
@@ -252,7 +256,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
       </div>
       <audio v-if="audioSrc" :src="audioSrc" controls preload="none" class="theme-config-field__audio-player" />
       <p class="theme-config-field__hint">
-        支持 MP3/OGG/WAV/WebM；清空后保存即恢复主题定义的默认行为。
+        {{ emptyMeansDefault === false ? '支持 MP3/OGG/WAV/WebM；留空会关闭这项音效，可用“恢复默认”撤销覆盖。' : '支持 MP3/OGG/WAV/WebM；清空后保存即恢复主题定义的默认行为。' }}
       </p>
     </template>
     <YdInput
@@ -286,6 +290,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
             :field="sub"
             :model-value="item[sub.key]"
             :plugin-code="pluginCode"
+            :empty-means-default="emptyMeansDefault"
             @update:model-value="updateItemField(index, sub.key, $event)"
           />
         </div>

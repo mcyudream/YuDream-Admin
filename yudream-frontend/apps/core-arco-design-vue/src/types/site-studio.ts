@@ -144,8 +144,19 @@ export type StudioSkinRole = 'panel' | 'button' | 'control' | 'heading'
 export const STUDIO_SKIN_ROLES: StudioSkinRole[] = ['panel', 'button', 'control', 'heading']
 
 /** 站点内容字段类型（与主题配置 schema 同形）：list 为可增删的条目列表，条目字段由 itemFields 声明（不嵌套 list） */
-export type StudioContentFieldType = 'text' | 'textarea' | 'number' | 'switch' | 'select' | 'color' | 'image' | 'link' | 'list'
-export const STUDIO_CONTENT_FIELD_TYPES: StudioContentFieldType[] = ['text', 'textarea', 'number', 'switch', 'select', 'color', 'image', 'link', 'list']
+export type StudioContentFieldType = 'text' | 'textarea' | 'number' | 'switch' | 'select' | 'color' | 'image' | 'link' | 'list' | 'particles' | 'audio'
+export const STUDIO_CONTENT_FIELD_TYPES: StudioContentFieldType[] = ['text', 'textarea', 'number', 'switch', 'select', 'color', 'image', 'link', 'list', 'particles', 'audio']
+
+/**
+ * 站点功能（平台实现的受控效果）由内容字段驱动：字段声明 effect 即把它的值交给对应效果，每种效果最多一个字段。
+ * particles=站点默认粒子（particles 字段）；music=背景音乐（list，条目含 audio 字段 src 与可选 text 字段 title）；
+ * musicVolume / effectVolume=音量（number，0–100）；effectsDefaultOn=默认开启音效（switch）；
+ * clickSound / buttonSound / toastSound=链接点击、按钮点击、进入提示音效（audio）；
+ * pageEffects=页面氛围与进入提示（list，条目 path 必填，可选 particles、toastTitle、toastBody、toastIcon）。
+ * path 可写文档页面路径（/servers）或承载的宿主路由（/timeline）。
+ */
+export type StudioContentEffect = 'particles' | 'music' | 'musicVolume' | 'effectsDefaultOn' | 'effectVolume' | 'clickSound' | 'buttonSound' | 'toastSound' | 'pageEffects'
+export const STUDIO_CONTENT_EFFECTS: StudioContentEffect[] = ['particles', 'music', 'musicVolume', 'effectsDefaultOn', 'effectVolume', 'clickSound', 'buttonSound', 'toastSound', 'pageEffects']
 
 export interface StudioContentField {
   key: string
@@ -156,6 +167,8 @@ export interface StudioContentField {
   defaultValue?: unknown
   options?: { label: string, value: string }[]
   itemFields?: StudioContentField[]
+  /** 驱动的平台效果（仅顶层字段） */
+  effect?: StudioContentEffect
 }
 
 export interface StudioContentSection {

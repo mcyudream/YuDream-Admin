@@ -303,8 +303,12 @@ public class StudioDocumentValidator {
         }
     }
 
-    private static final Set<String> CONTENT_TYPES = Set.of("text", "textarea", "number", "switch", "select", "color", "image", "link", "list");
+    private static final Set<String> CONTENT_TYPES = Set.of("text", "textarea", "number", "switch", "select", "color", "image", "link", "list", "particles", "audio");
+    private static final Map<String, String> CONTENT_EFFECT_TYPES = Map.of(
+            "particles", "particles", "music", "list", "musicVolume", "number", "effectsDefaultOn", "switch",
+            "effectVolume", "number", "clickSound", "audio", "buttonSound", "audio", "toastSound", "audio", "pageEffects", "list");
     private static final Pattern CONTENT_KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,47}");
+    private static final Pattern PAGE_EFFECT_PATH = Pattern.compile("/(?:[A-Za-z0-9_-]+|:[A-Za-z][A-Za-z0-9_]*)(?:/(?:[A-Za-z0-9_-]+|:[A-Za-z][A-Za-z0-9_]*))*|/");
 
     /** 站点内容：内容模型（分区 → 字段，list 带条目字段且不嵌套）与按类型校验的值；与前端 validateContent 同规则 */
     private void content(JsonNode content) {
@@ -312,6 +316,7 @@ public class StudioDocumentValidator {
         JsonNode sections = content.get("sections"); array(sections);
         if (sections.size() > 20) fail("内容分区最多20个");
         Set<String> codes = new HashSet<>();
+        Set<String> effects = new HashSet<>();
         Map<String, JsonNode> fields = new HashMap<>();
         for (JsonNode section : sections) {
             object(section); keys(section, "code", "title", "description", "fields");
@@ -321,7 +326,7 @@ public class StudioDocumentValidator {
             if (section.has("description")) boundedText(section, "description", 200, true);
             JsonNode list = section.get("fields"); array(list);
             if (list.size() > 40) fail("每个分区最多40个字段");
-            for (JsonNode field : list) contentField(field, fields, false);
+            for (JsonNode field : list) contentField(field, fields, false, effects);
         }
         JsonNode values = content.get("values"); object(values);
         values.fields().forEachRemaining(entry -> {
@@ -331,8 +336,8 @@ public class StudioDocumentValidator {
         });
     }
 
-    private void contentField(JsonNode field, Map<String, JsonNode> fields, boolean nested) {
-        object(field); keys(field, "key", "label", "type", "description", "placeholder", "defaultValue", "options", "itemFields");
+    private void contentField(JsonNode field, Map<String, JsonNode> fields, boolean nested, Set<String> effects) {
+        object(field); keys(field, "key", "label", "type", "description", "placeholder", "defaultValue", "options", "itemFields", "effect");
         String key = text(field, "key");
         if (!CONTENT_KEY.matcher(key).matches() || fields.containsKey(key)) fail("字段键须为字母开头的唯一名称：" + key);
         fields.put(key, field);
@@ -355,9 +360,29 @@ public class StudioDocumentValidator {
             JsonNode items = field.get("itemFields"); array(items);
             if (items.isEmpty() || items.size() > 12) fail("列表须声明1至12个条目字段");
             Map<String, JsonNode> itemFields = new HashMap<>();
-            for (JsonNode item : items) contentField(item, itemFields, true);
+            for (JsonNode item : items) contentField(item, itemFields, true, effects);
         } else if (field.has("itemFields")) fail("只有列表字段可声明条目字段");
+        if (field.has("effect")) {
+            if (nested) fail("只有顶层字段可驱动站点功能");
+            String effect = text(field, "effect");
+            if (!CONTENT_EFFECT_TYPES.containsKey(effect) || !effects.add(effect)) fail("站点功能字段无效或重复：" + effect);
+            if (!type.equals(CONTENT_EFFECT_TYPES.get(effect))) fail("站点功能" + effect + "字段类型不符");
+            if ("music".equals(effect)) effectItemFields(field, Map.of("src", Set.of("audio"), "title", Set.of("text")), "src");
+            if ("pageEffects".equals(effect)) effectItemFields(field, Map.of(
+                    "path", Set.of("text"), "particles", Set.of("particles"), "toastTitle", Set.of("text"),
+                    "toastBody", Set.of("text", "textarea"), "toastIcon", Set.of("image")), "path");
+        }
         if (field.has("defaultValue")) contentValue(field, field.get("defaultValue"));
+    }
+
+    private void effectItemFields(JsonNode field, Map<String, Set<String>> allowed, String required) {
+        boolean found = false;
+        for (JsonNode item : field.get("itemFields")) {
+            String key = item.get("key").asText();
+            found |= required.equals(key);
+            if (!allowed.getOrDefault(key, Set.of()).contains(item.get("type").asText())) fail("站点功能条目字段不受支持或类型不符：" + key);
+        }
+        if (!found) fail("站点功能条目须包含" + required + "字段");
     }
 
     /** 按字段类型校验内容值；空串表示未填写 */
@@ -365,11 +390,19 @@ public class StudioDocumentValidator {
         String type = field.get("type").asText();
         String name = field.get("label").asText();
         switch (type) {
-            case "number" -> { if (value == null || !value.isNumber() || !Double.isFinite(value.doubleValue())) fail(name + "须为数字"); }
+            case "number" -> {
+                if (value == null || !value.isNumber() || !Double.isFinite(value.doubleValue())) fail(name + "须为数字");
+                String effect = field.path("effect").asText();
+                if (("musicVolume".equals(effect) || "effectVolume".equals(effect))
+                        && (!value.isIntegralNumber() || value.longValue() < 0 || value.longValue() > 100)) fail(name + "须为0至100的整数");
+            }
             case "switch" -> { if (value == null || !value.isBoolean()) fail(name + "须为开关值"); }
             case "list" -> {
                 array(value);
                 if (value.size() > 50) fail(name + "最多50条");
+                String effect = field.path("effect").asText();
+                if ("music".equals(effect) && value.size() > 20) fail("背景音乐最多20首");
+                Set<String> paths = new HashSet<>();
                 for (JsonNode item : value) {
                     object(item);
                     item.fields().forEachRemaining(entry -> {
@@ -380,6 +413,13 @@ public class StudioDocumentValidator {
                         if (itemField == null) fail(name + "含未声明的字段：" + entry.getKey());
                         contentValue(itemField, entry.getValue());
                     });
+                    if ("music".equals(effect) && !item.path("src").isTextual()) fail("背景音乐条目须填写音频");
+                    if ("music".equals(effect) && item.path("src").asText().isEmpty()) fail("背景音乐条目须填写音频");
+                    if ("pageEffects".equals(effect)) {
+                        String path = text(item, "path");
+                        if (!PAGE_EFFECT_PATH.matcher(path).matches()) fail("页面氛围须填写不含查询参数的站内页面地址");
+                        if (!paths.add(path.toLowerCase(Locale.ROOT))) fail("页面氛围地址重复：" + path);
+                    }
                 }
             }
             default -> {
@@ -391,7 +431,9 @@ public class StudioDocumentValidator {
                 switch (type) {
                     case "color" -> { if (!text.matches("#[0-9a-fA-F]{6}")) fail(name + "须为#rrggbb"); }
                     case "image" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为图片地址"); safeUrl(text, false); }
+                    case "audio" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为音频地址"); safeUrl(text, false); }
                     case "link" -> { if (text.startsWith("data:")) fail(name + "须为链接地址"); safeUrl(text, false); }
+                    case "particles" -> { if (!PARTICLE_PRESETS.contains(text)) fail(name + "不是可用的粒子效果"); }
                     case "select" -> {
                         boolean found = false;
                         for (JsonNode option : field.get("options")) found |= text.equals(option.get("value").asText());

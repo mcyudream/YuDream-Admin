@@ -1,6 +1,6 @@
 import type { SiteDocument, StudioAsset, StudioContentField, StudioNode } from '../types/site-studio'
 import { parse } from 'postcss'
-import { STUDIO_CONTENT_FIELD_TYPES, STUDIO_PARTICLE_PRESETS, STUDIO_SKIN_ROLES, STUDIO_STYLE_STATES } from '../types/site-studio'
+import { STUDIO_CONTENT_EFFECTS, STUDIO_CONTENT_FIELD_TYPES, STUDIO_PARTICLE_PRESETS, STUDIO_SKIN_ROLES, STUDIO_STYLE_STATES } from '../types/site-studio'
 
 export const STUDIO_LIMITS = { bytes: 2 * 1024 * 1024, nodes: 6000, depth: 32, classes: 500, fonts: 32, keyframes: 64, tracks: 20 } as const
 /** 样式类与关键帧名：小写字母开头，可含数字与连字符 */
@@ -447,9 +447,31 @@ function contentText(value: unknown, name: string, max: number) {
   string(value, name)
   studioAssert(value.length <= max && ![...value].some(char => (char.charCodeAt(0) < 32 && char !== '\n' && char !== '\t') || char.charCodeAt(0) === 127), `${name}须为 ${max} 字以内的文本`)
 }
-function contentFieldSchema(value: unknown, keys: Set<string>, nested: boolean) {
+/** 效果 → 字段类型；music / pageEffects 另约束条目字段 */
+const EFFECT_TYPES: Record<string, string> = { particles: 'particles', music: 'list', musicVolume: 'number', effectsDefaultOn: 'switch', effectVolume: 'number', clickSound: 'audio', buttonSound: 'audio', toastSound: 'audio', pageEffects: 'list' }
+const EFFECT_ITEMS: Record<string, { required: string[], types: Record<string, string[]> }> = {
+  music: { required: ['src'], types: { src: ['audio'], title: ['text'] } },
+  pageEffects: { required: ['path'], types: { path: ['text'], particles: ['particles'], toastTitle: ['text'], toastBody: ['text', 'textarea'], toastIcon: ['image'] } },
+}
+function contentEffect(value: Record<string, unknown>, effects: Set<string>) {
+  const effect = value.effect as string
+  studioAssert(STUDIO_CONTENT_EFFECTS.includes(effect as never) && !effects.has(effect), `站点功能字段无效或重复：${String(effect)}`)
+  effects.add(effect)
+  studioAssert(value.type === EFFECT_TYPES[effect], `站点功能 ${effect} 须为 ${EFFECT_TYPES[effect]} 字段`)
+  const items = EFFECT_ITEMS[effect]
+  if (items) {
+    const fields = value.itemFields as { key: string, type: string }[]
+    for (const key of items.required) {
+      studioAssert(fields.some(field => field.key === key), `站点功能 ${effect} 的条目须包含 ${key} 字段`)
+    }
+    for (const field of fields) {
+      studioAssert(items.types[field.key]?.includes(field.type), `站点功能 ${effect} 的条目字段 ${field.key} 不受支持或类型不符`)
+    }
+  }
+}
+function contentFieldSchema(value: unknown, keys: Set<string>, nested: boolean, effects = new Set<string>()) {
   studioRecord(value)
-  studioKeys(value, ['key', 'label', 'type', 'description', 'placeholder', 'defaultValue', 'options', 'itemFields'])
+  studioKeys(value, ['key', 'label', 'type', 'description', 'placeholder', 'defaultValue', 'options', 'itemFields', 'effect'])
   string(value.key, '字段键')
   studioAssert(STUDIO_CONTENT_KEY.test(value.key) && !keys.has(value.key), `字段键须为字母开头的唯一名称：${value.key}`)
   keys.add(value.key)
@@ -482,6 +504,10 @@ function contentFieldSchema(value: unknown, keys: Set<string>, nested: boolean) 
   else {
     studioAssert(value.itemFields === undefined, '只有列表字段可声明条目字段')
   }
+  if (value.effect !== undefined) {
+    studioAssert(!nested, '只有顶层字段可驱动站点功能')
+    contentEffect(value, effects)
+  }
   if (value.defaultValue !== undefined) {
     validateContentValue(value as unknown as StudioContentField, value.defaultValue)
   }
@@ -492,18 +518,34 @@ export function validateContentValue(field: StudioContentField, value: unknown) 
   switch (field.type) {
     case 'number':
       studioAssert(typeof value === 'number' && Number.isFinite(value), `${name}须为数字`)
+      if (field.effect === 'musicVolume' || field.effect === 'effectVolume') {
+        studioAssert(Number.isInteger(value) && value >= 0 && value <= 100, `${name}须为 0–100 的整数`)
+      }
       return
     case 'switch':
       studioAssert(typeof value === 'boolean', `${name}须为开关值`)
       return
     case 'list': {
       studioAssert(Array.isArray(value) && value.length <= STUDIO_CONTENT_LIMITS.items, `${name}最多 ${STUDIO_CONTENT_LIMITS.items} 条`)
+      if (field.effect === 'music') {
+        studioAssert(value.length <= STUDIO_LIMITS.tracks, `背景音乐最多 ${STUDIO_LIMITS.tracks} 首`)
+      }
+      const paths = new Set<string>()
       for (const item of value) {
         studioRecord(item)
         for (const [key, itemValue] of Object.entries(item)) {
           const itemField = field.itemFields?.find(candidate => candidate.key === key)
           studioAssert(itemField, `${name}含未声明的字段：${key}`)
           validateContentValue(itemField, itemValue)
+        }
+        if (field.effect === 'music') {
+          studioAssert(typeof item.src === 'string' && item.src.length > 0, '背景音乐条目须填写音频')
+        }
+        if (field.effect === 'pageEffects') {
+          studioAssert(typeof item.path === 'string' && /^\/(?:[\w-]+|:[a-z]\w*)(?:\/(?:[\w-]+|:[a-z]\w*))*$|^\/$/i.test(item.path), '页面氛围须填写不含查询参数的站内页面地址')
+          const path = item.path.toLowerCase()
+          studioAssert(!paths.has(path), `页面氛围地址重复：${item.path}`)
+          paths.add(path)
         }
       }
       return
@@ -523,6 +565,13 @@ export function validateContentValue(field: StudioContentField, value: unknown) 
       else if (field.type === 'link') {
         validateStudioUrl(value as string)
       }
+      else if (field.type === 'audio') {
+        validateStudioUrl(value as string)
+        studioAssert(!(value as string).startsWith('#'), `${name}须为音频地址`)
+      }
+      else if (field.type === 'particles') {
+        studioAssert(STUDIO_PARTICLE_PRESETS.includes(value as never), `${name}不是可用的粒子效果`)
+      }
       else if (field.type === 'select') {
         studioAssert(field.options?.some(option => option.value === value), `${name}不是可选值`)
       }
@@ -535,6 +584,7 @@ function validateContent(value: unknown) {
   const codes = new Set<string>()
   const keys = new Set<string>()
   const fields = new Map<string, StudioContentField>()
+  const effects = new Set<string>()
   for (const section of value.sections) {
     studioRecord(section)
     studioKeys(section, ['code', 'title', 'description', 'fields'])
@@ -547,7 +597,7 @@ function validateContent(value: unknown) {
     }
     studioAssert(Array.isArray(section.fields) && section.fields.length <= STUDIO_CONTENT_LIMITS.fields, `每个分区最多 ${STUDIO_CONTENT_LIMITS.fields} 个字段`)
     for (const field of section.fields) {
-      contentFieldSchema(field, keys, false)
+      contentFieldSchema(field, keys, false, effects)
       fields.set((field as { key: string }).key, field as StudioContentField)
     }
   }

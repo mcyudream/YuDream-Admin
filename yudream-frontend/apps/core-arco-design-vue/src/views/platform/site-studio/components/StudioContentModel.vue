@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // 站点内容模型：主题作者用 JSON 声明分区与字段（与主题配置 schema 同形），运营在「站点内容」页可视化填写。
 // 修改模型时保留已填写且仍有对应字段的值；校验与保存走 set-features 命令管道。
-import type { StudioContent, StudioContentSection } from '@/types/site-studio'
+import type { StudioContent, StudioContentEffect, StudioContentSection } from '@/types/site-studio'
 import { computed, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
+import { STUDIO_CONTENT_EFFECTS } from '@/types/site-studio'
+import { STUDIO_EFFECT_LABELS, studioEffectField, studioEffectSection } from '@/utils/site-studio-effects'
 import { cloneStudioJson, validateStudioDocument } from '@/utils/site-studio-validation'
 
 defineOptions({ name: 'StudioContentModel' })
@@ -15,35 +17,15 @@ const router = useRouter()
 const content = computed(() => store.doc?.features?.content)
 const fieldCount = computed(() => (content.value?.sections ?? []).reduce((sum, section) => sum + section.fields.length, 0))
 
-const EXAMPLE: StudioContentSection[] = [
-  {
-    code: 'home-hero',
-    title: '首页首屏',
-    description: '首屏标题、介绍与背景图',
-    fields: [
-      { key: 'heroTitle', label: '主标题', type: 'text', defaultValue: '' },
-      { key: 'heroText', label: '介绍', type: 'textarea' },
-      { key: 'heroBackground', label: '背景图', type: 'image' },
-    ],
-  },
-  {
-    code: 'home-cards',
-    title: '首页卡片',
-    fields: [
-      { key: 'cards', label: '卡片', type: 'list', itemFields: [
-        { key: 'title', label: '标题', type: 'text' },
-        { key: 'text', label: '说明', type: 'textarea' },
-        { key: 'image', label: '配图', type: 'image' },
-        { key: 'url', label: '链接', type: 'link' },
-      ] },
-    ],
-  },
-]
-
 const draft = ref('')
 const draftError = ref('')
+const selectedEffect = ref<StudioContentEffect | ''>('')
+const availableEffects = computed(() => {
+  const declared = new Set((content.value?.sections ?? []).flatMap(section => section.fields.map(field => field.effect)))
+  return STUDIO_CONTENT_EFFECTS.filter(effect => !declared.has(effect)).map(effect => ({ label: STUDIO_EFFECT_LABELS[effect], value: effect }))
+})
 watch(content, (value) => {
-  draft.value = JSON.stringify(value?.sections ?? EXAMPLE, null, 2)
+  draft.value = JSON.stringify(value?.sections ?? [], null, 2)
   draftError.value = ''
 }, { immediate: true })
 
@@ -76,14 +58,53 @@ function onInput(value: string) {
   }
 }
 
-function applyModel() {
+function applyModel(): boolean {
   try {
     const sections = parse(draft.value)
     store.execute({ type: 'set-features', features: { ...store.doc?.features, content: nextContent(sections) } })
     toast.success('内容模型已应用到草稿')
+    return true
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '内容模型保存失败')
+    return false
+  }
+}
+
+function addEffect() {
+  if (!selectedEffect.value) {
+    return
+  }
+  try {
+    const sections = parse(draft.value)
+    const effect = selectedEffect.value
+    if (sections.some(section => section.fields.some(field => field.effect === effect))) {
+      throw new Error('该功能已经在内容模型中声明')
+    }
+    const group = studioEffectSection(effect)
+    const usedKeys = new Set(sections.flatMap(section => section.fields.map(field => field.key)))
+    const usedCodes = new Set(sections.map(section => section.code))
+    const field = studioEffectField(effect)
+    for (let index = 2; usedKeys.has(field.key); index++) {
+      field.key = `${field.key.replace(/\d+$/, '')}${index}`
+    }
+    let section = sections.find(item => item.code === group.code && item.title === group.title)
+    if (!section) {
+      let code = group.code
+      for (let index = 2; usedCodes.has(code); index++) {
+        code = `${group.code}-${index}`
+      }
+      section = { ...group, code, fields: [] }
+      sections.push(section)
+    }
+    section.fields.push(field)
+    draft.value = JSON.stringify(sections, null, 2)
+    if (applyModel()) {
+      selectedEffect.value = ''
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '添加功能字段失败')
   }
 }
 
@@ -105,12 +126,22 @@ function removeModel() {
       站点内容模型
     </h2>
     <p class="text-xs text-muted-foreground m-0">
-      声明运营可以修改的内容（分区 → 字段，类型：text / textarea / number / switch / select / color / image / link / list，list 用 itemFields 声明条目字段）。
+      声明运营可以修改的内容（分区 → 字段，支持图片、音频、粒子与列表）。下方可直接添加站点功能字段；高级字段可编辑 JSON。
       页面元素在检查器「站点内容」中绑定单值字段，列表字段在「数据绑定」中作为「站点内容」数据源；运营在「站点内容」页可视化填写，随草稿保存与发布。
     </p>
     <p class="text-xs m-0">
-      当前：{{ content ? `${content.sections.length} 个分区 · ${fieldCount} 个字段` : '未启用（下方为示例模型）' }}
+      当前：{{ content ? `${content.sections.length} 个分区 · ${fieldCount} 个字段` : '未启用' }}
     </p>
+    <div class="flex flex-wrap gap-2 items-end">
+      <label class="text-xs flex flex-col gap-1">
+        添加主题功能
+        <YdSelect v-model="selectedEffect" :options="availableEffects" placeholder="选择功能" class="min-w-[200px]" />
+      </label>
+      <YdButton v-auth="'platform:cms:edit'" variant="outline" :disabled="!selectedEffect || Boolean(draftError) || !store.doc" @click="addEffect">
+        <YdIcon name="morph:plus" /> 添加到内容模型
+      </YdButton>
+      <span class="text-xs text-muted-foreground">添加后在「站点内容」页直接编辑值。</span>
+    </div>
     <YdCodeEditor
       v-auth="'platform:cms:edit'"
       :model-value="draft"

@@ -1,6 +1,10 @@
 {
   "valid": [
     {
+      "name": "content-declared-site-effects",
+      "document": {"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"atmosphere","title":"氛围","fields":[{"key":"particles","label":"粒子","type":"particles","effect":"particles","defaultValue":"dust"},{"key":"music","label":"背景音乐","type":"list","effect":"music","itemFields":[{"key":"src","label":"音频","type":"audio"},{"key":"title","label":"曲名","type":"text"}]},{"key":"volume","label":"音量","type":"number","effect":"musicVolume","defaultValue":18},{"key":"pages","label":"页面","type":"list","effect":"pageEffects","itemFields":[{"key":"path","label":"地址","type":"text"},{"key":"particles","label":"粒子","type":"particles"},{"key":"toastTitle","label":"标题","type":"text"}]}]}],"values":{"music":[{"src":"/api/files/song.ogg","title":"主题曲"}],"pages":[{"path":"/timeline","particles":"snow","toastTitle":"欢迎"}]}}}}
+    },
+    {
       "name": "portable-media-responsive-tokens",
       "document": {
         "schemaVersion": 1,
@@ -609,6 +613,11 @@
     }
   ],
   "invalid": [
+    {"name":"content-effect-duplicate","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"a","label":"甲","type":"particles","effect":"particles"},{"key":"b","label":"乙","type":"particles","effect":"particles"}]}],"values":{}}}}},
+    {"name":"content-effect-wrong-type","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"volume","label":"音量","type":"text","effect":"musicVolume"}]}],"values":{}}}}},
+    {"name":"content-effect-volume-range","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"volume","label":"音量","type":"number","effect":"musicVolume","defaultValue":101}]}],"values":{}}}}},
+    {"name":"content-effect-audio-script","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"click","label":"点击","type":"audio","effect":"clickSound"}]}],"values":{"click":"javascript:alert(1)"}}}}},
+    {"name":"content-effect-page-path","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"pages","label":"页面","type":"list","effect":"pageEffects","itemFields":[{"key":"path","label":"地址","type":"text"}]}]}],"values":{"pages":[{"path":"//evil.test"}]}}}}},
     {
       "name": "schema-version",
       "document": {

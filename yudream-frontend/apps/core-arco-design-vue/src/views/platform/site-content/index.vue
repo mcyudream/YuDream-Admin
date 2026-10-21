@@ -7,6 +7,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import apiTheme from '@/api/modules/platform-theme'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
+import { STUDIO_PARTICLE_PRESETS } from '@/types/site-studio'
+import { STUDIO_PARTICLE_LABELS } from '@/utils/site-studio-effects'
 import { openStudioPreviewChannel, studioPagePathToSlug } from '@/utils/site-studio-preview'
 import StudioNavigationEditor from '@/views/platform/site-studio/components/StudioNavigationEditor.vue'
 import StudioPublicSkin from '@/views/platform/site-studio/components/StudioPublicSkin.vue'
@@ -40,11 +42,12 @@ function toThemeField(field: StudioContentField): ThemeField {
   return {
     key: field.key,
     label: field.label,
-    type: field.type === 'link' ? 'text' : field.type,
+    type: field.type === 'link' ? 'text' : field.type === 'particles' ? 'select' : field.type,
     description: field.description,
     placeholder: field.placeholder ?? (field.type === 'link' ? '站点页 /site/...、宿主页 /wiki 或 https://…' : undefined),
     defaultValue: field.defaultValue,
-    options: field.options,
+    // 粒子字段：平台预设（列表条目里留空表示沿用站点默认）
+    options: field.type === 'particles' ? STUDIO_PARTICLE_PRESETS.map(value => ({ label: STUDIO_PARTICLE_LABELS[value], value })) : field.options,
     itemFields: field.itemFields?.map(toThemeField),
   }
 }
@@ -61,16 +64,16 @@ function setValue(key: string, value: unknown) {
   clearTimeout(timer)
   timer = setTimeout(flush, 400)
 }
-function flush() {
+function flush(): boolean {
   clearTimeout(timer)
   const changes = pending.value
   if (!content.value || !Object.keys(changes).length) {
-    return
+    return true
   }
   pending.value = {}
   const values = { ...content.value.values }
   for (const [key, value] of Object.entries(changes)) {
-    if (value === undefined || value === '') {
+    if (value === undefined) {
       delete values[key]
     }
     else {
@@ -80,11 +83,13 @@ function flush() {
   try {
     store.execute({ type: 'set-features', features: { ...store.doc?.features, content: { ...content.value, values } } })
     errors.value = Object.fromEntries(Object.entries(errors.value).filter(([key]) => !(key in changes)))
+    return true
   }
   catch (error) {
     const message = error instanceof Error ? error.message : '内容保存失败'
     errors.value = { ...errors.value, ...Object.fromEntries(Object.keys(changes).map(key => [key, message])) }
     pending.value = { ...changes, ...pending.value }
+    return false
   }
 }
 
@@ -105,7 +110,10 @@ async function load() {
 void load()
 
 async function saveDraft() {
-  flush()
+  if (!flush()) {
+    toast.error('请先修正站点内容中的输入错误')
+    return
+  }
   try {
     await store.saveDraft()
     toast.success('草稿已保存')
@@ -116,7 +124,10 @@ async function saveDraft() {
 }
 
 function publish() {
-  flush()
+  if (!flush()) {
+    toast.error('请先修正站点内容中的输入错误')
+    return
+  }
   modal.confirm({
     title: '发布站点内容',
     content: '确认把当前草稿（含站点内容、导航与外观）发布到公开站吗？发布后可在网站工作台的发布版本页恢复。',
@@ -162,20 +173,23 @@ onBeforeUnmount(() => {
   previewChannel?.close()
 })
 function openPreview() {
-  flush()
+  if (!flush()) {
+    toast.error('请先修正站点内容中的输入错误')
+    return
+  }
   const home = store.doc?.pages.find(page => page.path === '/') ?? store.doc?.pages[0]
   window.open(router.resolve({ name: 'siteStudioPreview', params: { themeCode: store.themeCode, slug: studioPagePathToSlug(home?.path ?? '/') } }).href, '_blank')
 }
 
 onBeforeRouteLeave(() => {
   flush()
-  if (!store.dirty) {
+  if (!store.dirty && !Object.keys(pending.value).length) {
     return true
   }
   return new Promise<boolean>((resolve) => {
     modal.confirm({
       title: '离开站点内容？',
-      content: '有未保存的修改，离开后会丢失。可先保存草稿再离开。',
+      content: Object.keys(pending.value).length ? '有未通过校验的输入，离开后会丢失。请先修正，或确认放弃。' : '有未保存的修改，离开后会丢失。可先保存草稿再离开。',
       confirmButtonText: '不保存并离开',
       cancelButtonText: '留在本页',
       onConfirm: () => resolve(true),
@@ -215,7 +229,10 @@ onBeforeRouteLeave(() => {
           <YdSettingsSection :title="section.title" :description="section.description">
             <div class="flex flex-col gap-5">
               <div v-for="field in section.fields" :key="field.key" class="flex flex-col gap-1">
-                <ThemeConfigField :field="toThemeField(field)" :model-value="valueOf(field)" @update:model-value="setValue(field.key, $event)" />
+                <ThemeConfigField :field="toThemeField(field)" :model-value="valueOf(field)" :plugin-code="store.themeCode" :empty-means-default="false" @update:model-value="setValue(field.key, $event)" />
+                <YdButton v-if="content?.values[field.key] !== undefined" variant="ghost" size="sm" class="self-start" @click="setValue(field.key, undefined)">
+                  恢复主题默认
+                </YdButton>
                 <p v-if="errors[field.key]" class="text-xs text-destructive m-0" role="alert">
                   {{ errors[field.key] }}
                 </p>

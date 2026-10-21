@@ -40,14 +40,15 @@
 
 公开站与草稿预览的 iframe 仍禁止脚本；以下行为由宿主在同源文档上实现，文档只声明意图：
 
-- `features.audio`：背景音乐曲目（音频资产，按序循环）、音乐/音效音量、默认是否开启音效、链接/按钮/进入提示音效。访客经 `data-yd-action="toggle-music|toggle-sound"` 按钮开关，状态写入 `aria-pressed`；音乐状态在宿主侧，切换页面不中断，离开站点停止。浏览器不允许无操作自动播放。
-- `features.particles` 与页面 `settings.particles`：氛围粒子预设（dust/snow/petals/spores/embers/stars），系统“减少动态效果”时关闭。
+- 主题在 `features.content.sections[].fields[]` 声明 `effect`，相应的值在「站点内容」页可视化修改。可在「主题 → 站点内容模型」直接添加功能字段：`particles`（粒子预设）、`music`（曲目列表，条目含 `src:audio`）、`musicVolume` / `effectVolume`（0–100 整数）、`effectsDefaultOn`（开关）、`clickSound` / `buttonSound` / `toastSound`（音频）、`pageEffects`（按页面地址设置粒子和首次进入提示）。音乐按序循环；默认音量建议 18 / 30。曲目、音效与图标 URL 仅允许站内绝对路径或 HTTP(S)，不能把内嵌 data URL 写入内容值。
+- 访客经 `data-yd-action="toggle-music|toggle-sound"` 按钮开关，状态写入 `aria-pressed`；音乐状态在宿主侧，切换页面不中断，离开站点停止。浏览器不允许无操作自动播放。系统“减少动态效果”时关闭装饰粒子。文档不执行自定义脚本。
+- 旧文档的 `features.audio` / `features.particles` 与页面 `settings.particles` / `settings.toast` 继续可读。工作台「站点功能」可将它们作为一次可撤销的草稿命令迁入内容模型；内嵌资源无法转为内容 URL 时保留旧设置并提示上传，成功迁移的旧字段才移除。
 - 页面 `settings.iconAssetId`：页面图标，站点导航数据中指向该页的条目带上 `icon`。
 - `features.navigation`：站点导航（最多两级、每级 30 项，名称/地址/图标），随草稿发布；数据源 `site:navigation` 以它为准，`appendAuto` 时按 URL 去重追加插件 siteNav 页面与插件市场/知识库入口。未设置时回落「主题中心 → 导航」与站点页面。工作台「主题 → 站点导航」编辑。
 - `features.dataSources`（插件数据适配器）：把插件匿名公开接口 `/api/plugins/{插件}/public/...`（仅 GET、不带凭据；校验禁止其他前缀、`..` 与外部地址）声明为数据源 `adapter:{编码}`；路径 `{参数}` 取页面地址查询参数，`single` 表示单条（详情），`recordsPath` 指向列表，`fields` 做字段改名。用于插件主题块之外的数据与详情页（列表条目以链接模板 `data-yd-link="/site/activity?id={id}"` 跳转；同一页面只换查询参数时重载框架文档按新参数取数）。工作台「主题 → 插件数据适配器」可试取接口查看字段。
 - `features.publicSkin`（公开页适配）：登录/注册、知识库、插件市场、插件公开页沿用站点外观。颜色限 `#rrggbb`，宿主换算为站点变量 `--yb-site-*`、组件库中性变量 `--color-*` 与 OKLCH 设计令牌，只在公开路由注入（后台不受影响）；组件库编号主色 `--primary-N` 受品牌令牌门禁约束不覆写。字体须为主题字体族（主题字体以 `@font-face` 注册到文档，Shadow DOM 内依赖它）。`chrome` 为 true 时所有公开页使用站点页头/页脚作为持久外壳，`bottomOffset` 为固定底栏留白；`pixel` 为 true 时嵌入主题页的宿主页面统一直角、硬边框、斜面与投影（按卡片/按钮/输入框等通用选择器，不写插件专属类名）。
 - 页面 `settings.hostRoutes`（承载宿主公开页）：访问 `/wiki`、`/market`、插件公开页（如 `/timeline`）或 `/login` 等路由时（最长前缀匹配，需开启站点外壳），宿主页面嵌入该站点页面渲染：整页（背景、页头页脚、物品栏）在 Shadow DOM 中，`data-yd-outlet` 节点内放 `<slot>`，宿主 Vue 页面作为插槽内容投影进来，与菜单页同属一个主题；`data-yd-host-hide` 节点在承载时隐藏、普通访问时 outlet 隐藏；`data-yd-site="pageTitle"` 显示宿主页面标题。嵌入时宿主页面根背景透明。
-- 页面 `settings.toast`：首次进入该页时的提示（同一会话每页一次），元素类名 `yd-site-toast-layer / yd-site-toast / -icon / -copy / -title / -body / --out`，主题可定义同名样式类覆盖默认外观。
+- 页面进入提示由 `pageEffects` 内容列表配置（同一会话每页一次），元素类名 `yd-site-toast-layer / yd-site-toast / -icon / -copy / -title / -body / --out`，主题可定义同名样式类覆盖默认外观。未迁移的旧版页面设置仍作为兼容回落。
 - 当前页链接自动带 `aria-current="page"`，配合样式类 `current` 状态做导航高亮。
 - 账号：`data-yd-auth="guest|user"` 按登录状态显隐，`data-yd-account="name|avatar|initial"` 显示账号名、头像（无头像时首字）；账号菜单链接（控制台 `/`、个人资料 `/profile`、退出 `/logout`）用 `data-yd-host-link` 指向宿主路由。
 - 经验条与格式化：`data-yd-progress="scroll"` 宽度跟随页面滚动、`="visited"` 显示本次访问去过的页面数；`data-yd-format="datetime|date|time"` 把时间戳/ISO 时间格式化为本地时间。
@@ -58,7 +59,7 @@
 - 公开站统一渲染：站点页面与承载的宿主公开页都以 Shadow DOM 渲染到主文档（`StudioShadowLayout`，同一视口滚动、同一入场过渡），文档内 `position: fixed`（背景层、底栏）按访客视口生效；文档经 schema 校验不含脚本、事件属性与危险 URL/CSS。开启站点外壳时页头/页脚由应用级持久外壳渲染（`App.vue`），跨路由不重建，只更新当前链接、账号、经验条，导航位置与数据在所有公开页一致。草稿预览仍用 iframe 以模拟桌面/平板/手机宽度。
 - 动态页面：页面路径段可写 `:参数`（如 `/activities/:id`），精确路径优先匹配，参数值与查询参数一起传给数据绑定（插件数据适配器 `{id}`、链接模板 `/site/activities/{id}`）。
 - 页面与导航依赖 `requires`（`plugin:插件编码`、`capability:wiki`、`capability:plugin-market`）：任一未启用时页面不注册（匹配时排除，访问落到未找到页），导航条目（含指向该页的条目）隐藏；启用状态取公开前端清单与知识库/市场公开能力。站点主题只承载数据与外观：业务页（如活动列表/详情）由插件以 siteNav 公开路由注册，CMS 页面经 `hostRoutes` 包裹，不在主题里复制业务数据。带 `:param` 的插件路由不进入导航。
-- `features.content`（站点内容，数据驱动）：主题作者在「主题 → 站点内容模型」用 JSON 声明分区与字段（`text/textarea/number/switch/select/color/image/link/list`，`list` 以 `itemFields` 声明条目字段、不嵌套），运营在后台「内容站点 → 站点内容」页（`YdSettingsLayout`，同页还管理站点导航与公开页外观）可视化填写，写入同一草稿、保存/发布与工作台一致。页面绑定：`data-yd-content`（文本，图片元素写 `src`）、`data-yd-content-href`（链接，按宿主路由解析，站点页写 `/site/...`）、`data-yd-content-title`（提示，复制按钮复制该值）、`data-yd-content-bg`（背景图）、`data-yd-content-show`（开关为 false 时隐藏）；列表字段作为数据源 `content:{字段}`。未填写时用字段 `defaultValue`，再缺省保留作者内容。值按字段类型校验（链接/图片走文档 URL 规则），前后端同规则。
+- `features.content`（站点内容，数据驱动）：主题作者在「主题 → 站点内容模型」声明分区与字段（`text/textarea/number/switch/select/color/image/link/list/particles/audio`，`list` 以 `itemFields` 声明条目字段、不嵌套），内置效果可点选添加，复杂模型仍可编辑 JSON。运营在后台「内容站点 → 站点内容」页（`YdSettingsLayout`，同页还管理站点导航与公开页外观）可视化填写，写入同一草稿、保存/发布与工作台一致。页面绑定：`data-yd-content`（文本，图片元素写 `src`）、`data-yd-content-href`（链接，按宿主路由解析，站点页写 `/site/...`）、`data-yd-content-title`（提示，复制按钮复制该值）、`data-yd-content-bg`（背景图）、`data-yd-content-show`（开关为 false 时隐藏）；列表字段作为数据源 `content:{字段}`。未填写时用字段 `defaultValue`，再缺省保留作者内容；显式留空可关闭音效，单字段「恢复主题默认」撤销覆盖。值按字段类型校验，前后端同规则。
 - 示例与空状态：示例条目只在草稿预览中显示；公开站取数前隐藏条目，无数据（含接口不可用）时移除示例并显示 `data-yd-empty` 元素，不向访客展示假数据。
 - 页面 `settings.shell`（承载外壳页）：须同时声明 `hostRoutes`；页面只为这些宿主/插件页面提供主题外壳（背景、页头页脚），自身地址不注册、不进自动导航。业务数据页一律由插件注册（如 `/servers`、`/activities`、`/timeline`），主题不再自建一份数据页。
 - `publicSkin.classes`（沿用主题样式类）：`panel / button / control / heading` 各指向一个主题样式类，嵌入主题页的宿主/插件页面中最外层卡片、按钮（仅 `data-slot="button"` 与标签页触发器，不含作为点击区域的 `YdAction`）、输入框、`h1/h2` 套用该类的视觉属性（背景、边框/边框图、阴影、文字色、字距等）与 hover/active/focus 状态，不改尺寸布局；类中引用的主题变量只写到嵌入区域。

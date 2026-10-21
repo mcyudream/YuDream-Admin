@@ -1,85 +1,38 @@
 <script setup lang="ts">
-// 站点功能：背景音乐、点击音效与氛围粒子。行为由宿主运行时实现（文档不含脚本），这里只编辑声明，
-// 每次修改经 set-features 命令整体替换。音频只能选文档里已有的音频资产（在「资源」页上传）。
-import type { StudioFeatures, StudioParticlePreset } from '@/types/site-studio'
+// 站点功能：平台在公开站实现的受控效果（粒子、背景音乐与音效、页面进入提示），文档不含脚本。
+// 是否使用、取什么值由主题在「站点内容模型」中声明 effect 字段决定，运营在「站点内容」页修改；
+// 这里只说明机制、列出已声明的效果，并把旧版写在框架字段里的设置一键迁移进内容模型。
 import { computed } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
-import { STUDIO_PARTICLE_PRESETS } from '@/types/site-studio'
+import { declaredStudioEffects, hasLegacyStudioEffects, migrateStudioEffects, STUDIO_EFFECT_LABELS } from '@/utils/site-studio-effects'
 
 defineOptions({ name: 'StudioSiteFeatures' })
 
 const store = useSiteStudioStore()
 const toast = useYdToast()
+const router = useRouter()
 
-type StudioAudioFeature = NonNullable<StudioFeatures['audio']>
+const declared = computed(() => store.doc ? declaredStudioEffects(store.doc) : [])
+const legacy = computed(() => Boolean(store.doc && hasLegacyStudioEffects(store.doc)))
 
-const PARTICLE_LABELS: Record<StudioParticlePreset, string> = {
-  none: '无',
-  dust: '金色微光',
-  snow: '飘雪',
-  petals: '花瓣',
-  spores: '幽光孢子',
-  embers: '余烬',
-  stars: '星屑',
-}
-const particleOptions = STUDIO_PARTICLE_PRESETS.map(value => ({ label: PARTICLE_LABELS[value], value }))
-
-const features = computed<StudioFeatures>(() => store.doc?.features ?? {})
-const audio = computed<StudioAudioFeature>(() => features.value.audio ?? { tracks: [], musicVolume: 20, effectVolume: 30, effectsDefaultOn: true })
-const audioOptions = computed(() => (store.doc?.assets ?? []).filter(asset => asset.kind === 'audio').map(asset => ({ label: asset.name, value: asset.id })))
-const soundOptions = computed(() => [{ label: '无', value: '' }, ...audioOptions.value])
-
-function apply(next: StudioFeatures) {
-  try {
-    store.execute({ type: 'set-features', features: next })
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '站点功能保存失败')
-  }
-}
-
-function setParticles(value: unknown) {
-  apply({ ...features.value, particles: value as StudioParticlePreset })
-}
-
-function setAudio(patch: Partial<StudioAudioFeature>) {
-  const next = { ...audio.value, ...patch }
-  for (const key of ['clickSoundAssetId', 'buttonSoundAssetId', 'toastSoundAssetId'] as const) {
-    if (!next[key]) {
-      delete next[key]
-    }
-  }
-  apply({ ...features.value, audio: next })
-}
-
-function addTrack() {
-  const first = audioOptions.value[0]
-  if (!first) {
-    toast.error('先在「资源」页上传音频文件')
+function migrate() {
+  if (!store.doc) {
     return
   }
-  setAudio({ tracks: [...audio.value.tracks, { title: first.label, assetId: first.value }] })
-}
-
-function updateTrack(index: number, patch: Partial<StudioAudioFeature['tracks'][number]>) {
-  setAudio({ tracks: audio.value.tracks.map((track, position) => position === index ? { ...track, ...patch } : track) })
-}
-
-function removeTrack(index: number) {
-  setAudio({ tracks: audio.value.tracks.filter((_, position) => position !== index) })
-}
-
-function onTitleChange(index: number, event: Event) {
-  const value = (event.target as HTMLInputElement | null)?.value.trim()
-  if (value) {
-    updateTrack(index, { title: value })
+  const { commands, skipped } = migrateStudioEffects(store.doc)
+  try {
+    if (commands.length) {
+      store.execute(commands)
+      toast.success(skipped.length ? '已迁移可转换的设置，其余保留旧配置' : '已迁移到站点内容模型，可在「站点内容」页修改')
+    }
+    else if (!skipped.length) {
+      toast.info('没有可迁移的设置')
+    }
+    skipped.forEach(message => toast.warning(message))
   }
-}
-
-function removeAudio() {
-  const next = { ...features.value }
-  delete next.audio
-  apply(next)
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '迁移失败')
+  }
 }
 </script>
 
@@ -90,76 +43,37 @@ function removeAudio() {
     </h2>
     <p class="text-xs text-muted-foreground m-0">
       由平台在公开站实现的受控效果，不需要也不允许写脚本。音乐开关：给按钮加属性 <code class="font-mono">data-yd-action="toggle-music"</code>，
-      音效开关为 <code class="font-mono">toggle-sound</code>；开启状态会写入 <code class="font-mono">aria-pressed</code>，可用样式类的 pressed 状态做高亮。
-      页面级粒子与进入提示在「页面」设置中配置。
+      音效开关为 <code class="font-mono">toggle-sound</code>；开启状态写入 <code class="font-mono">aria-pressed</code>，可用样式类的 pressed 状态做高亮。
     </p>
-
-    <div class="flex flex-wrap gap-2 items-center">
-      <span class="text-sm w-28">站点默认粒子</span>
-      <YdSelect
-        v-auth="'platform:cms:edit'"
-        class="w-48"
-        :model-value="features.particles ?? 'none'"
-        :options="particleOptions"
-        aria-label="站点默认粒子"
-        @update:model-value="setParticles"
-      />
+    <p class="text-xs text-muted-foreground m-0">
+      是否使用这些效果、取什么值由主题决定：在「站点内容模型」中给字段声明 <code class="font-mono">effect</code>
+      （可在「站点内容模型」中直接添加），运营在「站点内容」页修改。
+      没有声明的效果不会出现。
+    </p>
+    <div v-if="declared.length" class="flex flex-wrap gap-1">
+      <YdTag v-for="item in declared" :key="item.field.key" variant="secondary">
+        {{ STUDIO_EFFECT_LABELS[item.field.effect!] }} · {{ item.section }} / {{ item.field.label }}
+      </YdTag>
     </div>
-
-    <div class="pt-3 border-t flex flex-col gap-2">
-      <div class="flex flex-wrap gap-2 items-center">
-        <span class="text-sm font-medium flex-1">背景音乐（按顺序循环）</span>
-        <YdButton v-auth="'platform:cms:edit'" variant="outline" size="sm" @click="addTrack">
-          <YdIcon name="morph:plus" /> 添加曲目
-        </YdButton>
-        <YdButton v-if="features.audio" v-auth="'platform:cms:edit'" variant="ghost" size="sm" @click="removeAudio">
-          关闭音频功能
-        </YdButton>
-      </div>
-      <p v-if="!audioOptions.length" class="text-xs text-muted-foreground m-0">
-        文档中还没有音频资产。到「资源」页上传 mp3 / ogg / wav 后再回来选择。
-      </p>
-      <div v-for="(track, index) in audio.tracks" :key="index" class="flex flex-wrap gap-2 items-center">
-        <YdInput :model-value="track.title" class="w-48" :aria-label="`第 ${index + 1} 首曲名`" @change="onTitleChange(index, $event)" />
-        <YdSelect
-          class="flex-1 min-w-40"
-          :model-value="track.assetId"
-          :options="audioOptions"
-          :aria-label="`第 ${index + 1} 首音频`"
-          @update:model-value="(value: unknown) => updateTrack(index, { assetId: String(value) })"
-        />
-        <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="移除曲目" @click="removeTrack(index)">
-          <YdIcon name="morph:trash-2" />
-        </YdButton>
-      </div>
-      <div class="flex flex-wrap gap-2 items-center">
-        <span class="text-sm w-28">音乐音量</span>
-        <YdSlider class="flex-1 min-w-40" :model-value="[audio.musicVolume]" :min="0" :max="100" aria-label="音乐音量" @update:model-value="(value: unknown) => setAudio({ musicVolume: Math.round(Number((value as number[])[0])) })" />
-        <span class="text-xs font-mono w-10">{{ audio.musicVolume }}</span>
-      </div>
-    </div>
-
-    <div class="pt-3 border-t flex flex-col gap-2">
-      <span class="text-sm font-medium">音效</span>
-      <div class="flex flex-wrap gap-2 items-center">
-        <span class="text-sm w-28">默认开启音效</span>
-        <YdSwitch :model-value="audio.effectsDefaultOn" aria-label="默认开启音效" @update:model-value="(value: unknown) => setAudio({ effectsDefaultOn: Boolean(value) })" />
-      </div>
-      <div class="flex flex-wrap gap-2 items-center">
-        <span class="text-sm w-28">音效音量</span>
-        <YdSlider class="flex-1 min-w-40" :model-value="[audio.effectVolume]" :min="0" :max="100" aria-label="音效音量" @update:model-value="(value: unknown) => setAudio({ effectVolume: Math.round(Number((value as number[])[0])) })" />
-        <span class="text-xs font-mono w-10">{{ audio.effectVolume }}</span>
-      </div>
-      <div v-for="[key, label] in ([['clickSoundAssetId', '链接点击'], ['buttonSoundAssetId', '按钮点击'], ['toastSoundAssetId', '进入提示']] as const)" :key="key" class="flex flex-wrap gap-2 items-center">
-        <span class="text-sm w-28">{{ label }}</span>
-        <YdSelect
-          class="flex-1 min-w-40"
-          :model-value="audio[key] ?? ''"
-          :options="soundOptions"
-          :aria-label="`${label}音效`"
-          @update:model-value="(value: unknown) => setAudio({ [key]: String(value || '') })"
-        />
-      </div>
+    <p v-else class="text-xs m-0">
+      当前主题未声明站点功能。
+    </p>
+    <YdAlert v-if="legacy" title="还有旧版站点功能设置">
+      <template #description>
+        <div class="flex flex-col gap-2">
+          <span>旧版设置可以迁入内容模型；无法转换的内嵌资源会保留，上传公开文件后再处理。迁移仅修改草稿，可撤销，不会自动发布。</span>
+          <div>
+            <YdButton v-auth="'platform:cms:edit'" size="sm" @click="migrate">
+              迁移到站点内容模型
+            </YdButton>
+          </div>
+        </div>
+      </template>
+    </YdAlert>
+    <div>
+      <YdButton variant="outline" size="sm" :disabled="!declared.length" @click="router.push('/platform/site-content')">
+        <YdIcon name="morph:file-pen" /> 去站点内容修改
+      </YdButton>
     </div>
   </section>
 </template>

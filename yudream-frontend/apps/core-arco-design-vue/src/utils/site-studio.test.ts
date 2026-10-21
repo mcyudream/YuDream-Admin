@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { applyStudioCommand, compileStudioPage, compileStudioThemeCss, createStudioDocument, createStudioGrapesAdapter, createStudioNode, createStudioPackage, exportStudioStaticHtml, findStudioNode, importStudioPackage, STUDIO_LIMITS, studioNodesToGrapesModel, validateStudioDocument, validateStudioStyle, validateStudioUrl } from './site-studio'
+import { migrateStudioEffects } from './site-studio-effects'
 
 function sample() {
   const doc = createStudioDocument('测试')
@@ -159,6 +160,46 @@ test('shared JSON contract fixtures are accepted and rejected identically by bot
   for (const item of fixture.invalid) {
     assert.throws(() => validateStudioDocument(item.document), item.name)
   }
+})
+test('legacy site effects migrate as one undoable batch and retain unrelated content', () => {
+  const doc = createStudioDocument('效果')
+  doc.assets = [
+    { id: 'music', name: '音乐', url: '/api/files/music.ogg', mimeType: 'audio/ogg', kind: 'audio' },
+    { id: 'icon', name: '图标', url: '/api/files/icon.png', mimeType: 'image/png', kind: 'image' },
+  ]
+  doc.features = {
+    particles: 'snow',
+    audio: { tracks: [{ title: '音乐', assetId: 'music' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true, clickSoundAssetId: 'music' },
+    content: { sections: [{ code: 'home', title: '首页', fields: [{ key: 'heroTitle', label: '标题', type: 'text' }] }], values: { heroTitle: '真实内容' } },
+  }
+  doc.pages[0]!.settings = { particles: 'dust', toast: { title: '欢迎', body: '来到站点', iconAssetId: 'icon' } }
+  const { commands, skipped } = migrateStudioEffects(doc)
+  assert.equal(skipped.length, 0)
+  const migrated = applyStudioCommand(doc, { type: 'batch', commands })
+  assert.equal(migrated.features?.audio, undefined)
+  assert.equal(migrated.features?.particles, undefined)
+  assert.equal(migrated.pages[0]?.settings?.toast, undefined)
+  assert.equal(migrated.features?.content?.values.heroTitle, '真实内容')
+  const fields = migrated.features!.content!.sections.flatMap(section => section.fields)
+  assert.equal(fields.find(field => field.effect === 'music')?.defaultValue?.[0]?.src, '/api/files/music.ogg')
+  assert.equal(fields.find(field => field.effect === 'pageEffects')?.defaultValue?.[0]?.toastTitle, '欢迎')
+  assert.deepEqual(migrateStudioEffects(migrated).commands, [])
+  assert.ok(doc.features?.audio, '原文档保持不变，支持撤销')
+})
+test('unconvertible embedded audio and icons retain legacy settings', () => {
+  const doc = createStudioDocument('内嵌资源')
+  doc.assets = [
+    { id: 'music', name: '音乐', url: 'data:audio/ogg;base64,YQ==', mimeType: 'audio/ogg', kind: 'audio' },
+    { id: 'icon', name: '图标', url: 'data:image/png;base64,YQ==', mimeType: 'image/png', kind: 'image' },
+  ]
+  doc.features = { audio: { tracks: [{ title: '音乐', assetId: 'music' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true } }
+  doc.pages[0]!.settings = { toast: { title: '欢迎', body: '', iconAssetId: 'icon' } }
+  const { commands, skipped } = migrateStudioEffects(doc)
+  const migrated = applyStudioCommand(doc, { type: 'batch', commands })
+  assert.ok(skipped.length >= 2)
+  assert.ok(migrated.features?.audio)
+  assert.equal(migrated.pages[0]?.settings?.toast?.iconAssetId, 'icon')
+  assert.equal(migrated.features?.content?.sections.flatMap(section => section.fields).find(field => field.effect === 'music'), undefined)
 })
 // These tests also run under a real browser's DOMParser in the integration harness.
 export function runStudioDomTests() {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { YdTreeNode } from '@yudream/components'
-import type { StudioNode, StudioPageSettings, StudioParticlePreset } from '@/types/site-studio'
+import type { StudioNode, StudioPageSettings } from '@/types/site-studio'
 import { computed, ref } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { findStudioNode } from '@/utils/site-studio'
@@ -20,17 +20,7 @@ const regionOptions = [
 
 const pageFormOpen = ref(false)
 const pageFormEditing = ref('')
-const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '', requires: '', shell: false })
-const particleOptions = [
-  { label: '沿用站点默认', value: '' },
-  { label: '无', value: 'none' },
-  { label: '金色微光', value: 'dust' },
-  { label: '飘雪', value: 'snow' },
-  { label: '花瓣', value: 'petals' },
-  { label: '幽光孢子', value: 'spores' },
-  { label: '余烬', value: 'embers' },
-  { label: '星屑', value: 'stars' },
-]
+const pageForm = ref({ name: '', path: '/', icon: '', hostRoutes: '', requires: '', shell: false })
 const imageOptions = computed(() => [{ label: '无图标', value: '' }, ...(store.doc?.assets ?? []).filter(asset => asset.kind === 'image').map(asset => ({ label: asset.name, value: asset.id }))])
 
 const VOID_TAGS = new Set(['br', 'col', 'hr', 'img', 'source', 'track', 'wbr'])
@@ -72,10 +62,6 @@ function openPageForm(pageId?: string) {
   pageForm.value = {
     name: page ? page.name : `页面 ${store.doc ? store.doc.pages.length + 1 : 1}`,
     path: page ? page.path : '/',
-    particles: page?.settings?.particles ?? '',
-    toastTitle: page?.settings?.toast?.title ?? '',
-    toastBody: page?.settings?.toast?.body ?? '',
-    toastIcon: page?.settings?.toast?.iconAssetId ?? '',
     icon: page?.settings?.iconAssetId ?? '',
     hostRoutes: (page?.settings?.hostRoutes ?? []).join(', '),
     requires: (page?.settings?.requires ?? []).join(', '),
@@ -105,13 +91,15 @@ function submitPageForm() {
     toast.error('承载外壳页须填写承载的宿主公开页')
     return
   }
+  // 旧版页面粒子/进入提示不再在此编辑，迁移到站点内容模型之前原样保留
+  const previous = pageFormEditing.value ? store.doc?.pages.find(item => item.id === pageFormEditing.value)?.settings : undefined
   const settings: StudioPageSettings = {
-    ...(form.particles ? { particles: form.particles } : {}),
+    ...(previous?.particles ? { particles: previous.particles } : {}),
+    ...(previous?.toast ? { toast: previous.toast } : {}),
     ...(form.icon ? { iconAssetId: form.icon } : {}),
     ...(form.hostRoutes.trim() ? { hostRoutes: form.hostRoutes.split(/[\s,，]+/).filter(Boolean) } : {}),
     ...(form.requires.trim() ? { requires: form.requires.split(/[\s,，]+/).filter(Boolean) } : {}),
     ...(form.shell ? { shell: true } : {}),
-    ...(form.toastTitle.trim() ? { toast: { title: form.toastTitle.trim(), body: form.toastBody.trim(), ...(form.toastIcon ? { iconAssetId: form.toastIcon } : {}) } } : {}),
   }
   const settingsPatch = Object.keys(settings).length ? { settings } : {}
   try {
@@ -251,18 +239,9 @@ function confirmRemovePage(pageId: string) {
           <span class="text-xs text-muted-foreground">本页只为上面的宿主/插件页面提供主题外观，自身地址不开放、不进导航；业务数据由插件页面提供</span>
         </span>
       </label>
-      <label class="text-sm mt-2 flex flex-col gap-1">
-        <span>氛围粒子</span>
-        <YdSelect v-model="pageForm.particles" :options="particleOptions" aria-label="页面氛围粒子" />
-      </label>
-      <fieldset class="mt-2 p-0 border-0 flex flex-col gap-1">
-        <legend class="text-sm">
-          首次进入提示（同一次访问每页只弹一次）
-        </legend>
-        <YdInput v-model="pageForm.toastTitle" placeholder="标题，如：进度已达成！（留空不提示）" aria-label="提示标题" />
-        <YdInput v-model="pageForm.toastBody" placeholder="内容，如：多人游戏 · 找到服务器入口" aria-label="提示内容" />
-        <YdSelect v-model="pageForm.toastIcon" :options="imageOptions" aria-label="提示图标" />
-      </fieldset>
+      <p class="text-xs text-muted-foreground mb-0 mt-2">
+        页面粒子与首次进入提示由主题在站点内容模型中声明（站点功能 pageEffects），在「站点内容」页按页面地址配置。
+      </p>
     </YdModal>
   </div>
 </template>
