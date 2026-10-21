@@ -29,16 +29,30 @@ const STATE_PATTERNS: [RegExp, StudioStyleState][] = [
   [/^\[aria-current=(?:"page"|'page'|page)\]$/, 'current'],
   [/^\[aria-pressed=(?:"true"|'true'|true)\]$/, 'pressed'],
 ]
-const STATE_SUFFIX: Record<StudioStyleState, string> = {
-  hover: ':hover',
-  focus: ':focus-visible',
-  active: ':active',
-  current: '[aria-current="page"]',
-  pressed: '[aria-pressed="true"]',
+const STATE_SELECTOR: Record<StudioStyleState, (name: string) => string> = {
+  'hover': name => `.${name}:hover`,
+  'focus': name => `.${name}:focus-visible`,
+  'active': name => `.${name}:active`,
+  'current': name => `.${name}[aria-current="page"]`,
+  'pressed': name => `.${name}[aria-pressed="true"]`,
+  'parent-hover': name => `:hover > .${name}`,
+  'parent-focus': name => `:focus-within > .${name}`,
+  'parent-expanded': name => `[aria-expanded="true"] > .${name}`,
 }
+const PARENT_PATTERNS: [RegExp, StudioStyleState][] = [
+  [/^:hover\s*>\s*\.([a-z][a-z0-9-]{0,63})$/, 'parent-hover'],
+  [/^:focus-within\s*>\s*\.([a-z][a-z0-9-]{0,63})$/, 'parent-focus'],
+  [/^\[aria-expanded=(?:"true"|'true'|true)\]\s*>\s*\.([a-z][a-z0-9-]{0,63})$/, 'parent-expanded'],
+]
 
 /** `.name` 或 `.name<状态>` → [类名, 状态]；其余选择器返回 null */
 export function parseStudioClassSelector(selector: string): [string, StudioStyleState | null] | null {
+  for (const [pattern, state] of PARENT_PATTERNS) {
+    const parent = pattern.exec(selector.trim())
+    if (parent) {
+      return [parent[1]!, state]
+    }
+  }
   const match = /^\.([a-z][a-z0-9-]{0,63})(.*)$/.exec(selector.trim())
   if (!match) {
     return null
@@ -79,7 +93,7 @@ export function parseStudioStylesheet(css: string, assets: StudioAsset[], option
     studioAssert(!strict, message)
     skipped.push(message)
   }
-  studioAssert(!/[<>\\]/.test(css), '样式表不能包含 HTML 或 CSS 转义')
+  studioAssert(!/[<\\]/.test(css), '样式表不能包含 HTML 或 CSS 转义')
   const root = parse(css)
   const classes = new Map<string, StudioStyleClass>()
   const keyframes: StudioKeyframes[] = []
@@ -203,7 +217,7 @@ export function formatStudioStylesheet(document: Pick<SiteDocument, 'theme' | 'a
     for (const state of STUDIO_STYLE_STATES) {
       const styles = item.states?.[state]
       if (styles) {
-        parts.push(`.${item.name}${STATE_SUFFIX[state]} {\n${block(styles)}\n}`)
+        parts.push(`${STATE_SELECTOR[state](item.name)} {\n${block(styles)}\n}`)
       }
     }
     if (item.responsive?.tablet) {

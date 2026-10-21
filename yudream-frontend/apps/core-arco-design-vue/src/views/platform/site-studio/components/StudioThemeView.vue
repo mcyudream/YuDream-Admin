@@ -8,6 +8,8 @@ import { computed, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { serializeStudioPackage } from '@/utils/site-studio'
 import { isStudioEmbeddedAsset, validateStudioDocument } from '@/utils/site-studio-validation'
+import StudioDataSources from './StudioDataSources.vue'
+import StudioNavigationEditor from './StudioNavigationEditor.vue'
 import StudioSiteFeatures from './StudioSiteFeatures.vue'
 import StudioThemeStylesheet from './StudioThemeStylesheet.vue'
 
@@ -303,6 +305,10 @@ function applyThemeDraft() {
       <StudioThemeStylesheet />
 
       <StudioSiteFeatures />
+
+      <StudioNavigationEditor />
+
+      <StudioDataSources />
 
       <section class="flex flex-col gap-2" aria-label="页头页脚">
         <h2 class="text-sm font-semibold m-0">

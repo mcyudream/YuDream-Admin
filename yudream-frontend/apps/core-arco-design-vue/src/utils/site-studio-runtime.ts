@@ -3,10 +3,11 @@ import { reactive } from 'vue'
 import apiCms from '@/api/modules/platform-cms'
 import apiPublicTheme from '@/api/modules/public-theme'
 import systemClient from '@/api/modules/system-client'
+import { useAppAccountStore } from '@/store/modules/app/account'
 import { useAppSettingsStore } from '@/store/modules/app/settings'
-import { loadSiteNavigation } from '@/views/site/site-navigation'
+import { buildNavigationTree, loadSiteNavigation } from '@/views/site/site-navigation'
 import { toBackendAssetUrl } from './backend-url'
-import { validateStudioUrl } from './site-studio-validation'
+import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-validation'
 
 /**
  * 站点文档运行时：公开站与草稿预览的 iframe 不执行任何脚本，站点功能由宿主在同源文档上实现。
@@ -16,8 +17,14 @@ import { validateStudioUrl } from './site-studio-validation'
  * - 氛围粒子（features.particles，页面 settings.particles 覆盖）
  * - 页面首次进入提示（settings.toast，同一会话每页一次）
  * - 站点信息：data-yd-site="name|description|logo|copyright|year"（宿主「系统设置」中的站点名称、Logo 等，随设置变化，不写死在文档里）
+ * - 账号：data-yd-auth="guest|user" 按登录状态显示；data-yd-account="name|avatar|initial"（头像缺省时显示首字）
+ * - 菜单：[data-yd-menu] 内的 [data-yd-menu-trigger] 在触屏/按钮上切换 aria-expanded（二级菜单配合样式类 parent-* 状态展开），
+ *   点外部或 Esc 收起；桌面悬停由 parent-hover 状态直接展开，链接点击照常跳转
+ * - 插件数据适配器：features.dataSources 声明的插件公开接口作为数据源 adapter:{id}（仅 GET、不带凭据，{参数} 取页面查询参数）；
+ *   条目链接可用 data-yd-link="/site/activity?id={id}" 由字段拼出（字段值逐个 URL 编码）
  * - 复制：按钮 data-yd-action="copy" 复制自身 title（可经 data-yd-title 绑定字段，如服务器地址）
- * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段；
+ * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段（$index 为序号）；
+ *   条目内 data-yd-each="children" 为嵌套列表（如二级菜单），无子项时隐藏并给条目写 data-yd-has-children；
  *   无数据时保留作者写的示例条目（data-yd-sample 元素仅在示例状态显示，data-yd-live 仅在真实数据时显示；
  *   容器外的标记用 data-yd-for="数据源" 关联，如列表上方的“示例/实时”状态条）
  */
@@ -304,14 +311,79 @@ function asRecords(value: unknown): DataRecord[] {
 
 /** 站点导航：首页 + CMS 导航 + 站点文档页面 + 插件 siteNav 页面 + 插件市场/知识库（与宿主公开站同一合并规则） */
 async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
-  const navigationJson = await apiCms.publicHome({ skipGlobalToast: true }).then(res => res.data?.settings?.navigationJson as string | undefined, () => undefined)
-  const pages = document.pages.filter(page => page.path !== '/').map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
-  const tree = await loadSiteNavigation(navigationJson, pages)
-  return tree.map(item => ({ label: item.label, url: item.url, external: /^https?:/i.test(item.url) }))
+  const assetUrl = (id?: string) => document.assets.find(item => item.id === id && item.kind === 'image')?.url ?? ''
+  const own = document.features?.navigation
+  let tree: { label: string, url: string, icon?: string, children?: unknown[] }[]
+  if (own) {
+    // 站点文档自带导航（工作台「站点导航」）：为准；可选按 URL 去重追加插件页面与市场/知识库入口
+    const flat = own.items.flatMap((item, index) => [
+      { id: item.id, label: item.label, url: item.url, icon: assetUrl(item.iconAssetId), visible: true, sort: index },
+      ...(item.children ?? []).map((child, childIndex) => ({ id: child.id, parentId: item.id, label: child.label, url: child.url, icon: assetUrl(child.iconAssetId), visible: true, sort: childIndex })),
+    ])
+    tree = own.appendAuto ? await loadSiteNavigation(JSON.stringify(flat)) : buildNavigationTree(flat)
+    // 合并后保留条目自带图标
+    const iconByUrl = new Map(flat.filter(item => item.icon).map(item => [item.url, item.icon]))
+    const withIcons = (items: typeof tree): typeof tree => items.map(item => ({ ...item, icon: iconByUrl.get(item.url) ?? '', children: withIcons((item.children ?? []) as typeof tree) }))
+    tree = withIcons(tree)
+  }
+  else {
+    const navigationJson = await apiCms.publicHome({ skipGlobalToast: true }).then(res => res.data?.settings?.navigationJson as string | undefined, () => undefined)
+    const pages = document.pages.filter(page => page.path !== '/').map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
+    tree = await loadSiteNavigation(navigationJson, pages)
+  }
+  // 指向站点文档页面的条目带上该页图标（页面设置 iconAssetId）
+  const icons = new Map(document.pages.flatMap((page) => {
+    const asset = document.assets.find(item => item.id === page.settings?.iconAssetId && item.kind === 'image')
+    return asset ? [[page.path === '/' ? '/site' : `/site${page.path}`, asset.url] as const] : []
+  }))
+  const toRecord = (item: { label: string, url: string, icon?: string, children?: unknown[] }): DataRecord => ({
+    label: item.label,
+    url: item.url,
+    icon: item.icon || (icons.get(item.url.replace(/\/+$/, '') || '/site') ?? ''),
+    external: /^https?:/i.test(item.url),
+    children: (item.children ?? []).map(child => toRecord(child as typeof item)),
+  })
+  return tree.map(item => toRecord(item))
 }
 
-async function loadSource(source: string, limit: number, document: SiteDocument): Promise<DataRecord[]> {
+/** 插件数据适配器：读取插件匿名公开接口并按声明映射为记录；缺参数、非 2xx 或业务错误时无数据 */
+async function loadAdapter(document: SiteDocument, id: string, query: Record<string, string>): Promise<DataRecord[]> {
+  const adapter = document.features?.dataSources?.find(item => item.id === id)
+  if (!adapter || !STUDIO_ADAPTER_ENDPOINT.test(adapter.endpoint)) {
+    return []
+  }
+  let missing = false
+  const path = adapter.endpoint.replace(/\{(\w+)\}/g, (_whole, name: string) => {
+    const value = query[name]
+    if (!value) {
+      missing = true
+    }
+    return encodeURIComponent(value ?? '')
+  })
+  if (missing) {
+    return []
+  }
+  const response = await fetch(toBackendAssetUrl(path), { credentials: 'omit', headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    return []
+  }
+  let body: unknown = await response.json()
+  if (body && typeof body === 'object' && 'code' in body) {
+    const envelope = body as { code: unknown, data?: unknown }
+    if (Number(envelope.code) !== 200) {
+      return []
+    }
+    body = envelope.data
+  }
+  const raw = adapter.single ? (body && typeof body === 'object' ? [body as DataRecord] : []) : asRecords(adapter.recordsPath ? field(body as DataRecord, adapter.recordsPath) : body)
+  return raw.map(record => ({ ...record, ...Object.fromEntries(Object.entries(adapter.fields ?? {}).map(([target, source]) => [target, field(record, source)])) }))
+}
+
+async function loadSource(source: string, limit: number, document: SiteDocument, query: Record<string, string> = {}): Promise<DataRecord[]> {
   const quiet = { skipGlobalToast: true }
+  if (source.startsWith('adapter:')) {
+    return (await loadAdapter(document, source.slice('adapter:'.length), query)).slice(0, limit)
+  }
   if (source === 'site:navigation') {
     return loadNavigation(document)
   }
@@ -340,7 +412,7 @@ async function loadSource(source: string, limit: number, document: SiteDocument)
 
 /** 已知数据源，供工作台检查器提示可选值与字段 */
 export const STUDIO_DATA_SOURCES = [
-  { value: 'site:navigation', label: '站点导航（CMS 导航 + 站点页面 + 插件页面）', fields: ['label', 'url'] },
+  { value: 'site:navigation', label: '站点导航（CMS 导航 + 站点页面 + 插件页面）', fields: ['label', 'url', 'icon', '$index', 'children'] },
   { value: 'block:server-list', label: '服务器列表（Minecraft 服务器插件）', fields: ['name', 'address', 'motd', 'statusText', 'playersText', 'latencyText', 'icon'] },
   { value: 'block:activity-square', label: '活动广场（活动证明插件）', fields: ['title', 'summary', 'statusText', 'meta', 'cover', 'url'] },
   { value: 'block:timeline', label: '大事记（大事记插件）', fields: ['title', 'time', 'summary', 'url'] },
@@ -349,13 +421,13 @@ export const STUDIO_DATA_SOURCES = [
   { value: 'market:plugins', label: '插件市场', fields: ['name', 'description', 'category', 'latestVersion', 'url'] },
 ] as const
 
-function fetchSource(source: string, limit: number, document: SiteDocument) {
-  const key = `${document.id}|${source}|${limit}`
+function fetchSource(source: string, limit: number, document: SiteDocument, query: Record<string, string>) {
+  const key = `${document.id}|${source}|${limit}|${source.startsWith('adapter:') ? JSON.stringify(query) : ''}`
   const cached = dataCache.get(key)
   if (cached && Date.now() - cached.at < DATA_TTL) {
     return cached.promise
   }
-  const promise = loadSource(source, limit, document).catch(() => [] as DataRecord[])
+  const promise = loadSource(source, limit, document, query).catch(() => [] as DataRecord[])
   dataCache.set(key, { at: Date.now(), promise })
   return promise
 }
@@ -379,16 +451,62 @@ function safeUrl(value: string, allowAnchor: boolean) {
   }
 }
 
-function fillItem(item: Element, record: DataRecord) {
-  const targets = [item, ...item.querySelectorAll('[data-yd-text],[data-yd-href],[data-yd-src],[data-yd-title]')]
+/** 元素归属的最近条目（含自身）：嵌套列表的条目由各自的 fillItem 处理 */
+function ownerItem(element: Element) {
+  return element.closest('[data-yd-item]')
+}
+
+/**
+ * 用记录展开模板：容器内（不含更深层列表）的首个 data-yd-item 为模板，其余同标记项为示例，一并替换。
+ * 返回是否展开（无模板时为 false）。
+ */
+function expandItems(container: Element, records: DataRecord[], limit: number) {
+  const owner = container.hasAttribute('data-yd-each') ? '[data-yd-each],[data-yd-source]' : '[data-yd-source]'
+  const items = [...container.querySelectorAll('[data-yd-item]')].filter(item => item.parentElement?.closest(owner) === container)
+  const template = items[0]
+  if (!template) {
+    return false
+  }
+  const parent = template.parentElement!
+  const anchor = template.nextSibling
+  const fragment = container.ownerDocument.createDocumentFragment()
+  records.slice(0, limit).forEach((record, index) => {
+    const clone = template.cloneNode(true) as Element
+    clone.removeAttribute('data-studio-id')
+    clone.querySelectorAll('[data-studio-id]').forEach(element => element.removeAttribute('data-studio-id'))
+    fillItem(clone, record, index)
+    // 绑定数据的站内链接指向宿主路由（插件页、/market 等），不再映射到站点前缀
+    for (const link of [clone, ...clone.querySelectorAll('a[data-yd-href]')]) {
+      if (link.tagName === 'A' && link.hasAttribute('data-yd-href')) {
+        link.setAttribute('data-yd-host-link', '')
+      }
+    }
+    fragment.appendChild(clone)
+  })
+  parent.insertBefore(fragment, anchor)
+  items.forEach(item => item.remove())
+  return true
+}
+
+function fillItem(item: Element, record: DataRecord, index: number) {
+  // 先展开本条目直属的嵌套列表（如二级菜单），无子项时隐藏容器
+  const nested = [...item.querySelectorAll('[data-yd-each]')].filter(element => element.parentElement && ownerItem(element.parentElement) === item)
+  for (const container of nested) {
+    const children = asRecords(field(record, container.getAttribute('data-yd-each') || ''))
+    const expanded = children.length > 0 && expandItems(container, children, 50)
+    container.toggleAttribute('hidden', !expanded)
+    item.setAttribute('data-yd-has-children', String(expanded))
+  }
+  const targets = [item, ...item.querySelectorAll('[data-yd-text],[data-yd-href],[data-yd-src],[data-yd-title],[data-yd-link]')].filter(element => ownerItem(element) === item)
+  const value = (path: string) => path === '$index' ? String(index + 1) : text(field(record, path))
   for (const element of targets) {
     const textPath = element.getAttribute('data-yd-text')
     if (textPath) {
-      element.textContent = text(field(record, textPath))
+      element.textContent = value(textPath)
     }
     const hrefPath = element.getAttribute('data-yd-href')
     if (hrefPath) {
-      const href = safeUrl(text(field(record, hrefPath)), false)
+      const href = safeUrl(value(hrefPath), false)
       if (href) {
         element.setAttribute('href', href)
       }
@@ -396,22 +514,57 @@ function fillItem(item: Element, record: DataRecord) {
         element.removeAttribute('href')
       }
     }
+    const linkTemplate = element.getAttribute('data-yd-link')
+    if (linkTemplate) {
+      const href = safeUrl(linkTemplate.replace(/\{([\w.]+)\}/g, (_whole, path: string) => encodeURIComponent(value(path))), false)
+      if (href) {
+        element.setAttribute('href', href)
+      }
+    }
     const titlePath = element.getAttribute('data-yd-title')
     if (titlePath) {
-      element.setAttribute('title', text(field(record, titlePath)))
+      element.setAttribute('title', value(titlePath))
     }
     const srcPath = element.getAttribute('data-yd-src')
     if (srcPath) {
-      const src = safeUrl(text(field(record, srcPath)), false)
+      const src = safeUrl(value(srcPath), false)
       if (src) {
         element.setAttribute('src', src)
         element.removeAttribute('hidden')
       }
-      else {
+      else if (!element.getAttribute('src')) {
+        // 无数据且作者未提供默认图时隐藏；有默认图（如导航默认图标）则保留
         element.setAttribute('hidden', '')
       }
     }
   }
+}
+
+/** 账号绑定：登录状态显隐、账号名/头像/首字 */
+function bindAccount(host: Element) {
+  const account = useAppAccountStore()
+  const loggedIn = account.isLogin
+  host.querySelectorAll('[data-yd-auth]').forEach((element) => {
+    const want = element.getAttribute('data-yd-auth')
+    element.toggleAttribute('hidden', want === 'user' ? !loggedIn : want === 'guest' ? loggedIn : false)
+  })
+  const avatar = loggedIn ? safeUrl(account.avatar || '', false) : ''
+  host.querySelectorAll('[data-yd-account]').forEach((element) => {
+    const kind = element.getAttribute('data-yd-account')
+    if (kind === 'name') {
+      element.textContent = loggedIn ? account.account : element.textContent
+    }
+    else if (kind === 'avatar') {
+      if (avatar) {
+        element.setAttribute('src', avatar)
+      }
+      element.toggleAttribute('hidden', !avatar)
+    }
+    else if (kind === 'initial') {
+      element.textContent = (account.account || '?').slice(0, 1).toUpperCase()
+      element.toggleAttribute('hidden', Boolean(avatar))
+    }
+  })
 }
 
 /** 站点信息绑定：宿主公开设置（站点名称/简介/Logo/版权），无值时保留作者内容 */
@@ -442,39 +595,19 @@ function bindSiteInfo(host: Element) {
   }
 }
 
-function bindSources(host: Element, isAlive: () => boolean, document: SiteDocument, onFilled: () => void) {
+function bindSources(host: Element, isAlive: () => boolean, document: SiteDocument, onFilled: () => void, query: Record<string, string>) {
   host.querySelectorAll('[data-yd-live]').forEach(element => element.setAttribute('hidden', ''))
   const containers = [...host.querySelectorAll('[data-yd-source]')]
   for (const container of containers) {
     const source = container.getAttribute('data-yd-source') || ''
     const limit = Math.min(Math.max(Number.parseInt(container.getAttribute('data-yd-limit') || '12', 10) || 12, 1), 50)
-    void fetchSource(source, limit, document).then((records) => {
+    void fetchSource(source, limit, document, query).then((records) => {
       if (!isAlive() || !records.length) {
         return
       }
-      const items = [...container.querySelectorAll('[data-yd-item]')].filter(item => item.closest('[data-yd-source]') === container)
-      const template = items[0]
-      if (!template) {
+      if (!expandItems(container, records, limit)) {
         return
       }
-      const parent = template.parentElement!
-      const anchor = template.nextSibling
-      const fragment = host.ownerDocument.createDocumentFragment()
-      for (const record of records.slice(0, limit)) {
-        const clone = template.cloneNode(true) as Element
-        clone.removeAttribute('data-studio-id')
-        clone.querySelectorAll('[data-studio-id]').forEach(element => element.removeAttribute('data-studio-id'))
-        fillItem(clone, record)
-        // 绑定数据的站内链接指向宿主路由（插件页、/market 等），不再映射到站点前缀
-        for (const anchor of [clone, ...clone.querySelectorAll('a[data-yd-href]')]) {
-          if (anchor.tagName === 'A' && anchor.hasAttribute('data-yd-href')) {
-            anchor.setAttribute('data-yd-host-link', '')
-          }
-        }
-        fragment.appendChild(clone)
-      }
-      parent.insertBefore(fragment, anchor)
-      items.forEach(item => item.remove())
       const linked = [...host.querySelectorAll('[data-yd-for]')].filter(element => element.getAttribute('data-yd-for') === source)
       for (const element of [...container.querySelectorAll('[data-yd-sample],[data-yd-live]'), ...linked]) {
         if (element.hasAttribute('data-yd-sample')) {
@@ -501,7 +634,7 @@ function normalizePath(value: string) {
  * 在一次页面加载上挂载运行时；返回卸载函数（页面切换或容器卸载时调用）。
  * pagePath 为文档内页面路径（/、/servers）；链接 href 按文档路径或带前缀的站点路径比较。
  */
-export function attachStudioRuntime(options: { document: SiteDocument, page: StudioPage, frameWindow: Window, basePath: string }) {
+export function attachStudioRuntime(options: { document: SiteDocument, page: StudioPage, frameWindow: Window, basePath: string, query?: Record<string, string> }) {
   const { document, page, frameWindow, basePath } = options
   const doc = frameWindow.document
   const host = doc.querySelector('[data-studio-document]')
@@ -535,6 +668,14 @@ export function attachStudioRuntime(options: { document: SiteDocument, page: Stu
     }
   }
   markCurrent()
+
+  const closeMenus = (except?: Element) => {
+    host.querySelectorAll('[data-yd-menu][aria-expanded="true"]').forEach((element) => {
+      if (element !== except) {
+        element.setAttribute('aria-expanded', 'false')
+      }
+    })
+  }
 
   // 音频按钮状态
   const actionButtons = () => [...host.querySelectorAll('[data-yd-action]')]
@@ -577,21 +718,52 @@ export function attachStudioRuntime(options: { document: SiteDocument, page: Stu
       syncActions()
       return
     }
+    // 二级菜单：触屏或按钮触发时先展开，再次点击（链接）才跳转；桌面悬停已由 parent-hover 展开
+    const trigger = target?.closest?.('[data-yd-menu-trigger]')
+    const menu = trigger?.closest('[data-yd-menu]')
+    const submenu = menu ? [...menu.querySelectorAll('[data-yd-submenu],[data-yd-each]')].find(element => !element.hasAttribute('hidden')) : undefined
+    if (trigger && menu && submenu) {
+      const expanded = menu.getAttribute('aria-expanded') === 'true'
+      const coarse = frameWindow.matchMedia('(hover: none)').matches
+      if (!expanded && (trigger.tagName === 'BUTTON' || coarse)) {
+        event.preventDefault()
+        closeMenus(menu)
+        menu.setAttribute('aria-expanded', 'true')
+        playEffect('button')
+        return
+      }
+      if (expanded && trigger.tagName === 'BUTTON') {
+        event.preventDefault()
+        menu.setAttribute('aria-expanded', 'false')
+        return
+      }
+    }
+    if (!target?.closest?.('[data-yd-menu]')) {
+      closeMenus()
+    }
     const control = target?.closest?.('a,button')
     if (control) {
       playEffect(control.tagName === 'BUTTON' ? 'button' : 'click')
     }
   }
   doc.addEventListener('click', onClick, true)
+  const onKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      closeMenus()
+    }
+  }
+  doc.addEventListener('keydown', onKeydown)
 
   const stopParticles = startParticles(frameWindow, host, page.settings?.particles ?? document.features?.particles ?? 'none')
   const stopToast = showPageToast(document, page, host)
   bindSiteInfo(host)
-  bindSources(host, () => alive, document, markCurrent)
+  bindAccount(host)
+  bindSources(host, () => alive, document, markCurrent, options.query ?? {})
 
   return () => {
     alive = false
     doc.removeEventListener('click', onClick, true)
+    doc.removeEventListener('keydown', onKeydown)
     stopParticles()
     stopToast()
   }

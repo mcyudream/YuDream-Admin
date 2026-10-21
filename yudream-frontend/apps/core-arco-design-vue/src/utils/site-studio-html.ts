@@ -23,12 +23,15 @@ function renderNode(node: StudioNode): string {
   }
   return `<${node.tag}${attrs}>${node.text !== undefined ? escapeStudioHtml(node.text) : node.children.map(renderNode).join('')}</${node.tag}>`
 }
-const STATE_SELECTORS: Record<StudioStyleState, string> = {
-  hover: ':hover',
-  focus: ':focus-visible',
-  active: ':active',
-  current: '[aria-current="page"]',
-  pressed: '[aria-pressed="true"]',
+const STATE_SELECTORS: Record<StudioStyleState, (scope: string, name: string) => string> = {
+  'hover': (scope, name) => `${scope}.${name}:hover`,
+  'focus': (scope, name) => `${scope}.${name}:focus-visible`,
+  'active': (scope, name) => `${scope}.${name}:active`,
+  'current': (scope, name) => `${scope}.${name}[aria-current="page"]`,
+  'pressed': (scope, name) => `${scope}.${name}[aria-pressed="true"]`,
+  'parent-hover': (scope, name) => `${scope}:hover>.${name}`,
+  'parent-focus': (scope, name) => `${scope}:focus-within>.${name}`,
+  'parent-expanded': (scope, name) => `${scope}[aria-expanded="true"]>.${name}`,
 }
 const FONT_FORMATS: Record<string, string> = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'truetype', 'font/otf': 'opentype' }
 
@@ -57,7 +60,7 @@ function renderThemeCss(document: SiteDocument, scope: string) {
     }
     for (const [state, styles] of Object.entries(item.states ?? {})) {
       if (styles && Object.keys(styles).length) {
-        states.push(`${selector}${STATE_SELECTORS[state as StudioStyleState]}{${declarations(styles)}}`)
+        states.push(`${STATE_SELECTORS[state as StudioStyleState](scope, item.name)}{${declarations(styles)}}`)
       }
     }
     if (item.responsive?.tablet && Object.keys(item.responsive.tablet).length) {

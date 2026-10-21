@@ -30,7 +30,7 @@
 
 ### 3.1 主题样式（schemaVersion 1 的可选扩展）
 
-- `theme.classes`：共享样式类。节点经 `class` 属性引用；编译为文档作用域内的 `.名称` 规则，先于节点规则输出（节点自身样式同特异度后写覆盖）。状态 `hover / focus / active / current / pressed` 分别编译为 `:hover`、`:focus-visible`、`:active`、`[aria-current="page"]`、`[aria-pressed="true"]`；断点同节点（992/768）。类名 `[a-z][a-z0-9-]{0,63}`，最多 500 个。
+- `theme.classes`：共享样式类。节点经 `class` 属性引用；编译为文档作用域内的 `.名称` 规则，先于节点规则输出（节点自身样式同特异度后写覆盖）。状态 `hover / focus / active / current / pressed` 分别编译为 `:hover`、`:focus-visible`、`:active`、`[aria-current="page"]`、`[aria-pressed="true"]`；父级状态 `parent-hover / parent-focus / parent-expanded` 编译为 `:hover>.名称`、`:focus-within>.名称`、`[aria-expanded="true"]>.名称`，用于无脚本展开二级菜单（样式表写法 `:hover > .名称 {}`）；断点同节点（992/768）。类名 `[a-z][a-z0-9-]{0,63}`，最多 500 个。
 - `theme.fonts`：引用 `kind=font` 资产的 `@font-face`（族名限字母数字空格下划线连字符，最多 32 个）。
 - `theme.keyframes`：关键帧动画，帧键 `from/to/0%–100%`，帧内声明与节点样式同一校验，最多 64 个。
 - 工作台「主题 → 主题样式表」以受限 CSS 文本编辑以上三项（只接受能无损映射的写法），「高级：完整主题 JSON」同样可编辑。编辑画布把主题级 CSS 以独立 `<style>` 注入，不进入引擎 CSS，因此不会回流为逐节点样式。
@@ -42,10 +42,15 @@
 
 - `features.audio`：背景音乐曲目（音频资产，按序循环）、音乐/音效音量、默认是否开启音效、链接/按钮/进入提示音效。访客经 `data-yd-action="toggle-music|toggle-sound"` 按钮开关，状态写入 `aria-pressed`；音乐状态在宿主侧，切换页面不中断，离开站点停止。浏览器不允许无操作自动播放。
 - `features.particles` 与页面 `settings.particles`：氛围粒子预设（dust/snow/petals/spores/embers/stars），系统“减少动态效果”时关闭。
+- 页面 `settings.iconAssetId`：页面图标，站点导航数据中指向该页的条目带上 `icon`。
+- `features.navigation`：站点导航（最多两级、每级 30 项，名称/地址/图标），随草稿发布；数据源 `site:navigation` 以它为准，`appendAuto` 时按 URL 去重追加插件 siteNav 页面与插件市场/知识库入口。未设置时回落「主题中心 → 导航」与站点页面。工作台「主题 → 站点导航」编辑。
+- `features.dataSources`（插件数据适配器）：把插件匿名公开接口 `/api/plugins/{插件}/public/...`（仅 GET、不带凭据；校验禁止其他前缀、`..` 与外部地址）声明为数据源 `adapter:{编码}`；路径 `{参数}` 取页面地址查询参数，`single` 表示单条（详情），`recordsPath` 指向列表，`fields` 做字段改名。用于插件主题块之外的数据与详情页（列表条目以链接模板 `data-yd-link="/site/activity?id={id}"` 跳转；同一页面只换查询参数时重载框架文档按新参数取数）。工作台「主题 → 插件数据适配器」可试取接口查看字段。
 - 页面 `settings.toast`：首次进入该页时的提示（同一会话每页一次），元素类名 `yd-site-toast-layer / yd-site-toast / -icon / -copy / -title / -body / --out`，主题可定义同名样式类覆盖默认外观。
 - 当前页链接自动带 `aria-current="page"`，配合样式类 `current` 状态做导航高亮。
+- 账号：`data-yd-auth="guest|user"` 按登录状态显隐，`data-yd-account="name|avatar|initial"` 显示账号名、头像（无头像时首字）；账号菜单链接（控制台 `/`、个人资料 `/profile`、退出 `/logout`）用 `data-yd-host-link` 指向宿主路由。
+- 菜单：`[data-yd-menu]` 内 `[data-yd-menu-trigger]` 在按钮或触屏上切换 `aria-expanded`（子菜单为 `[data-yd-submenu]` 或嵌套列表），点外部/Esc 收起；桌面悬停由 `parent-hover` 直接展开、链接照常跳转。
 - 站点信息：`data-yd-site="name|description|logo|copyright|year"` 取宿主「系统设置」的公开站点信息（Logo 写入图片 `src`），未设置时保留作者内容。
-- 数据绑定：容器 `data-yd-source`（`site:navigation`、`block:<主题块编码>`、`cms:latest`、`wiki:spaces`、`market:plugins`）与 `data-yd-limit`；容器内首个 `data-yd-item` 为条目模板，其余同标记项是示例；字段经 `data-yd-text / -href / -src / -title` 绑定（链接、图片地址按文档 URL 规则过滤）。无数据或接口未启用时原样显示作者写的示例条目；`data-yd-sample` 仅在示例状态可见、`data-yd-live` 仅在真实数据时可见，容器外的标记用 `data-yd-for="数据源"` 关联。`site:navigation` 与公开站导航同一合并规则（CMS 导航 + 站点文档页面 + 插件 siteNav 页面 + 插件市场/知识库），其链接与绑定条目链接指向宿主路由（`data-yd-host-link`），不映射到 `/site` 前缀。检查器「样式类与数据」可视化编辑以上属性。
+- 数据绑定：容器 `data-yd-source`（`site:navigation`、`block:<主题块编码>`、`cms:latest`、`wiki:spaces`、`market:plugins`）与 `data-yd-limit`；容器内首个 `data-yd-item` 为条目模板，其余同标记项是示例；字段经 `data-yd-text / -href / -src / -title` 绑定（链接、图片地址按文档 URL 规则过滤；`$index` 为序号；图片无值时保留作者默认图），条目内 `data-yd-each="children"` 为嵌套列表（如二级菜单，无子项时隐藏并标记 `data-yd-has-children`），`data-yd-link` 为由字段拼出的链接模板。无数据或接口未启用时原样显示作者写的示例条目；`data-yd-sample` 仅在示例状态可见、`data-yd-live` 仅在真实数据时可见，容器外的标记用 `data-yd-for="数据源"` 关联。`site:navigation` 与公开站导航同一合并规则（CMS 导航 + 站点文档页面 + 插件 siteNav 页面 + 插件市场/知识库），其链接与绑定条目链接指向宿主路由（`data-yd-host-link`），不映射到 `/site` 前缀。检查器「样式类与数据」可视化编辑以上属性。
 - 公开站与草稿预览的渲染容器为视口模式：iframe 占满视口并在内部滚动，文档内 `position: fixed`（固定顶栏、底栏、背景层）按访客视口生效。
 - 主题变量可承载图片（`--bg-xxx: url(...)`），主题面板对这类变量直接提供图片资产选择，用于“默认内置、可替换”的背景。
 

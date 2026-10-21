@@ -304,9 +304,12 @@ function particles(value: unknown) {
 }
 function validatePageSettings(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
-  studioKeys(value, ['particles', 'toast'])
+  studioKeys(value, ['particles', 'toast', 'iconAssetId'])
   if (value.particles !== undefined) {
     particles(value.particles)
+  }
+  if (value.iconAssetId !== undefined) {
+    assetRef(value.iconAssetId, 'image', '页面图标')
   }
   if (value.toast !== undefined) {
     studioRecord(value.toast)
@@ -318,14 +321,82 @@ function validatePageSettings(value: unknown, assetRef: AssetRef) {
     }
   }
 }
+/** 插件公开接口路径：只允许 /api/plugins/{插件}/public/ 下的路径段与 {参数} 占位 */
+export const STUDIO_ADAPTER_ENDPOINT = /^\/api\/plugins\/[a-z0-9][a-z0-9-]{0,63}\/public(?:\/(?:[\w.-]+|\{[a-z]\w{0,31}\}))+$/i
+const FIELD_PATH = /^[a-z_]\w{0,31}(?:\.[a-z_]\w{0,31}){0,4}$/i
+function validateDataSources(value: unknown) {
+  studioAssert(Array.isArray(value) && value.length <= 20, '插件数据适配器最多 20 个')
+  const ids = new Set<string>()
+  for (const item of value) {
+    studioRecord(item)
+    studioKeys(item, ['id', 'label', 'endpoint', 'recordsPath', 'single', 'fields'])
+    string(item.id, '适配器编码')
+    studioAssert(/^[a-z][a-z0-9-]{0,31}$/.test(item.id) && !ids.has(item.id), '适配器编码须为小写字母开头的唯一名称')
+    ids.add(item.id)
+    boundedText(item.label, '适配器名称', 40)
+    string(item.endpoint, '接口路径')
+    studioAssert(STUDIO_ADAPTER_ENDPOINT.test(item.endpoint) && !item.endpoint.includes('..'), '接口路径须为插件公开接口 /api/plugins/{插件}/public/...')
+    if (item.recordsPath !== undefined) {
+      string(item.recordsPath, '列表路径')
+      studioAssert(item.recordsPath === '' || FIELD_PATH.test(item.recordsPath), '列表路径须为点分字段名')
+    }
+    if (item.single !== undefined) {
+      studioAssert(typeof item.single === 'boolean', 'single 须为布尔值')
+    }
+    if (item.fields !== undefined) {
+      studioRecord(item.fields)
+      const entries = Object.entries(item.fields)
+      studioAssert(entries.length <= 30, '字段映射最多 30 项')
+      for (const [target, source] of entries) {
+        studioAssert(/^[a-z_]\w{0,31}$/i.test(target), '映射目标字段名无效')
+        string(source, '映射源字段')
+        studioAssert(FIELD_PATH.test(source), '映射源字段须为点分字段名')
+      }
+    }
+  }
+}
+function validateNavigation(value: unknown, assetRef: AssetRef) {
+  studioRecord(value)
+  studioKeys(value, ['items', 'appendAuto'])
+  studioAssert(typeof value.appendAuto === 'boolean', 'appendAuto 须为布尔值')
+  const ids = new Set<string>()
+  const items = (list: unknown, depth: number) => {
+    studioAssert(Array.isArray(list) && list.length <= 30, '每级导航最多 30 项')
+    for (const item of list) {
+      studioRecord(item)
+      studioKeys(item, ['id', 'label', 'url', 'iconAssetId', 'children'])
+      string(item.id, '导航 ID')
+      studioAssert(/^[a-z0-9][\w-]{0,63}$/i.test(item.id) && !ids.has(item.id), '导航 ID 须唯一且安全')
+      ids.add(item.id)
+      boundedText(item.label, '导航名称', 40)
+      string(item.url, '导航地址')
+      validateStudioUrl(item.url)
+      studioAssert(!item.url.startsWith('#'), '导航地址须为站内路径或 http(s) 链接')
+      if (item.iconAssetId !== undefined) {
+        assetRef(item.iconAssetId, 'image', '导航图标')
+      }
+      if (item.children !== undefined) {
+        studioAssert(depth === 1, '导航最多两级')
+        items(item.children, depth + 1)
+      }
+    }
+  }
+  items(value.items, 1)
+}
 function volume(value: unknown, name: string) {
   studioAssert(Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100, `${name}须为 0–100 的整数`)
 }
 function validateFeatures(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
-  studioKeys(value, ['audio', 'particles'])
+  studioKeys(value, ['audio', 'particles', 'navigation', 'dataSources'])
+  if (value.dataSources !== undefined) {
+    validateDataSources(value.dataSources)
+  }
   if (value.particles !== undefined) {
     particles(value.particles)
+  }
+  if (value.navigation !== undefined) {
+    validateNavigation(value.navigation, assetRef)
   }
   if (value.audio !== undefined) {
     const audio = value.audio

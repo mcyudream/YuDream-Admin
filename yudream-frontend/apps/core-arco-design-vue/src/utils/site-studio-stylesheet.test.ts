@@ -9,6 +9,8 @@ const CSS = `
 .mc-btn, .mc-link { color: #fff; border-image: url(/api/files/b.png) 3 fill !important; }
 .mc-btn:hover { color: #ff5; }
 .mc-link[aria-current="page"] { color: #5f5; }
+:hover > .mc-sub { display: flex; }
+[aria-expanded="true"] > .mc-sub { display: flex; }
 @media (max-width: 768px) { .mc-btn { padding: 4px; } }
 @keyframes splash { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 `
@@ -20,6 +22,7 @@ test('stylesheet parses classes, states, breakpoints, keyframes and fonts and ro
   assert.deepEqual(btn.states, { hover: { color: '#ff5' } })
   assert.deepEqual(btn.responsive, { mobile: { padding: '4px' } })
   assert.deepEqual(parsed.classes.find(item => item.name === 'mc-link')!.states, { current: { color: '#5f5' } })
+  assert.deepEqual(parsed.classes.find(item => item.name === 'mc-sub')!.states, { 'parent-hover': { display: 'flex' }, 'parent-expanded': { display: 'flex' } })
   assert.deepEqual(parsed.keyframes[0]!.frames, { '0%': { transform: 'scale(1)' }, '100%': { transform: 'scale(1)' }, '50%': { transform: 'scale(1.08)' } })
   assert.deepEqual(parsed.fonts, [{ family: 'Minecraft', assetId: 'font1' }])
   const text = formatStudioStylesheet({ theme: { tokens: {}, header: [], footer: [], ...parsed }, assets })

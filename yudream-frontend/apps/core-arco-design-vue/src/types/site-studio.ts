@@ -16,6 +16,8 @@ export const STUDIO_PARTICLE_PRESETS: StudioParticlePreset[] = ['none', 'snow', 
 export interface StudioPageSettings {
   particles?: StudioParticlePreset
   toast?: { title: string, body: string, iconAssetId?: string }
+  /** 页面图标（图片资产）：站点导航数据中该页条目的 icon 字段 */
+  iconAssetId?: string
 }
 
 export interface StudioPage {
@@ -26,9 +28,13 @@ export interface StudioPage {
   settings?: StudioPageSettings
 }
 
-/** 样式状态 → 编译选择器：hover=:hover、focus=:focus-visible、active=:active、current=[aria-current="page"]、pressed=[aria-pressed="true"] */
-export type StudioStyleState = 'hover' | 'focus' | 'active' | 'current' | 'pressed'
-export const STUDIO_STYLE_STATES: StudioStyleState[] = ['hover', 'focus', 'active', 'current', 'pressed']
+/**
+ * 样式状态 → 编译选择器：hover=:hover、focus=:focus-visible、active=:active、current=[aria-current="page"]、pressed=[aria-pressed="true"]；
+ * 父级状态作用于“直接父元素处于该状态时的本元素”，用于二级菜单等无脚本展开：
+ * parent-hover=:hover>.名称、parent-focus=:focus-within>.名称、parent-expanded=[aria-expanded="true"]>.名称
+ */
+export type StudioStyleState = 'hover' | 'focus' | 'active' | 'current' | 'pressed' | 'parent-hover' | 'parent-focus' | 'parent-expanded'
+export const STUDIO_STYLE_STATES: StudioStyleState[] = ['hover', 'focus', 'active', 'current', 'pressed', 'parent-hover', 'parent-focus', 'parent-expanded']
 
 /** 共享样式类：节点经 class 属性引用，编译为文档作用域内的 .name 规则（先于节点样式输出，节点样式可覆盖）。 */
 export interface StudioStyleClass {
@@ -57,6 +63,38 @@ export interface StudioKeyframes {
  * audio：背景音乐曲目与点击音效，访客经 data-yd-action="toggle-music|toggle-sound" 按钮开关；
  * particles：站点默认氛围粒子，页面可覆盖。
  */
+/** 站点导航条目：url 为站内路径（/site/...、/wiki、插件页等）或 http(s) 外链；最多两级 */
+export interface StudioNavItem {
+  id: string
+  label: string
+  url: string
+  iconAssetId?: string
+  children?: StudioNavItem[]
+}
+
+/**
+ * 站点导航（随草稿/发布版本化）：数据源 site:navigation 以此为准；
+ * appendAuto 为 true 时在其后按 URL 去重追加插件 siteNav 页面与插件市场/知识库入口。
+ */
+export interface StudioNavigation {
+  items: StudioNavItem[]
+  appendAuto: boolean
+}
+
+/**
+ * 插件数据适配器：把插件的匿名公开接口（/api/plugins/{插件}/public/**，GET）映射为站点数据源 adapter:{id}。
+ * endpoint 中的 {参数} 取自当前页面地址的查询参数（如详情页 ?id=）；recordsPath 指向结果里的列表
+ * （single 为 true 时整个结果即一条记录）；fields 把源字段（点路径）改名为模板使用的字段。
+ */
+export interface StudioDataSource {
+  id: string
+  label: string
+  endpoint: string
+  recordsPath?: string
+  single?: boolean
+  fields?: Record<string, string>
+}
+
 export interface StudioFeatures {
   audio?: {
     tracks: { title: string, assetId: string }[]
@@ -68,6 +106,8 @@ export interface StudioFeatures {
     toastSoundAssetId?: string
   }
   particles?: StudioParticlePreset
+  navigation?: StudioNavigation
+  dataSources?: StudioDataSource[]
 }
 
 export interface StudioAsset {

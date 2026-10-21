@@ -11,6 +11,8 @@ export interface SiteNavigationItem {
   sort?: number
   /** 外链在公开站内容区 iframe 嵌入，而不是新窗口打开 */
   embed?: boolean
+  /** 图标地址（站点文档导航带入；CMS 旧导航无此字段） */
+  icon?: string
   children?: SiteNavigationItem[]
 }
 

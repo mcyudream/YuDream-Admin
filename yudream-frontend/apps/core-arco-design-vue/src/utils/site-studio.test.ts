@@ -220,11 +220,11 @@ function extendedDocument(): SiteDocument {
     { id: 'img1', name: 'icon', url: '/api/files/i.png', mimeType: 'image/png', kind: 'image' },
     { id: 'ogg1', name: 'bgm', url: '/api/files/m.ogg', mimeType: 'audio/ogg', kind: 'audio' },
   ]
-  doc.theme.classes = [{ name: 'mc-btn', styles: { color: '#fff', animation: 'bob 2s steps(4) infinite' }, responsive: { mobile: { padding: '4px' } }, states: { hover: { color: '#ff5' }, current: { color: '#5f5' } } }]
+  doc.theme.classes = [{ name: 'mc-btn', styles: { color: '#fff', animation: 'bob 2s steps(4) infinite' }, responsive: { mobile: { padding: '4px' } }, states: { 'hover': { color: '#ff5' }, 'current': { color: '#5f5' }, 'parent-hover': { display: 'flex' } } }]
   doc.theme.fonts = [{ family: 'Minecraft', assetId: 'font1' }]
   doc.theme.keyframes = [{ name: 'bob', frames: { 'from': { transform: 'translateY(0)' }, '50.5%': { transform: 'translateY(-4px)' } } }]
-  doc.pages[0]!.settings = { particles: 'snow', toast: { title: '进度已达成！', body: '多人游戏', iconAssetId: 'img1' } }
-  doc.features = { particles: 'stars', audio: { tracks: [{ title: 'Sweden', assetId: 'ogg1' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true, clickSoundAssetId: 'ogg1' } }
+  doc.pages[0]!.settings = { particles: 'snow', iconAssetId: 'img1', toast: { title: '进度已达成！', body: '多人游戏', iconAssetId: 'img1' } }
+  doc.features = { particles: 'stars', dataSources: [{ id: 'activity', label: '活动详情', endpoint: '/api/plugins/minecraft-activity-proof/public/activities/{id}', single: true, fields: { time: 'meta' } }], navigation: { appendAuto: true, items: [{ id: 'nav-home', label: '首页', url: '/site', iconAssetId: 'img1', children: [{ id: 'nav-wiki', label: '知识库', url: '/wiki' }] }] }, audio: { tracks: [{ title: 'Sweden', assetId: 'ogg1' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true, clickSoundAssetId: 'ogg1' } }
   const button = createStudioNode('link')
   button.attributes = { class: 'mc-btn', href: '/servers' }
   button.styles = { margin: '0' }
@@ -240,6 +240,7 @@ test('theme classes, fonts, keyframes and features validate and compile in order
   assert.ok(css.includes('@keyframes bob{from{transform:translateY(0)}50.5%{transform:translateY(-4px)}}'))
   assert.ok(css.includes(`${scope} .mc-btn:hover{color:#ff5}`))
   assert.ok(css.includes(`${scope} .mc-btn[aria-current="page"]{color:#5f5}`))
+  assert.ok(css.includes(`${scope} :hover>.mc-btn{display:flex}`))
   // 样式类先于节点规则：节点自身样式同特异度后写覆盖
   assert.ok(css.indexOf(`${scope} .mc-btn{`) < css.indexOf(`${scope} [data-studio-id=`))
   assert.ok(/@media \(max-width: 768px\)\{[^}]*\.mc-btn\{padding:4px\}/.test(css))
@@ -256,9 +257,19 @@ test('extension references and names fail closed', () => {
     doc => (doc.theme.keyframes![0]!.frames = { '150%': {} }),
     doc => (doc.pages[0]!.settings = { particles: 'fire' as never }),
     doc => (doc.pages[0]!.settings!.toast!.iconAssetId = 'ogg1'),
+    doc => (doc.pages[0]!.settings!.iconAssetId = 'font1'),
     doc => (doc.features!.audio!.musicVolume = 180),
     doc => (doc.features!.audio!.clickSoundAssetId = 'missing'),
     doc => ((doc.features as Record<string, unknown>).script = 'x'),
+    doc => (doc.features!.navigation!.items[0]!.url = 'javascript:alert(1)'),
+    doc => (doc.features!.navigation!.items[0]!.children![0]!.children = [{ id: 'deep', label: '三级', url: '/site' }]),
+    doc => (doc.features!.navigation!.items[0]!.children![0]!.id = 'nav-home'),
+    doc => (doc.features!.navigation!.items[0]!.iconAssetId = 'ogg1'),
+    doc => (doc.features!.dataSources![0]!.endpoint = '/api/platform/users'),
+    doc => (doc.features!.dataSources![0]!.endpoint = '/api/plugins/x/admin/users'),
+    doc => (doc.features!.dataSources![0]!.endpoint = '/api/plugins/x/public/../admin'),
+    doc => (doc.features!.dataSources![0]!.endpoint = 'https://evil.test/api/plugins/x/public/a'),
+    doc => (doc.features!.dataSources![0]!.fields = { time: 'a;b' }),
   ]
   for (const mutate of cases) {
     const doc = extendedDocument()

@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 public class StudioDocumentValidator {
     public static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
     public static final int MAX_NODES = 6000;
-    private static final List<String> STYLE_STATES = List.of("hover", "focus", "active", "current", "pressed");
+    private static final List<String> STYLE_STATES = List.of("hover", "focus", "active", "current", "pressed", "parent-hover", "parent-focus", "parent-expanded");
     private static final Set<String> PARTICLE_PRESETS = Set.of("none", "snow", "petals", "embers", "spores", "stars", "dust");
     private static final Pattern CLASS_NAME = Pattern.compile("[a-z][a-z0-9-]{0,63}");
     private static final Pattern FONT_FAMILY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_ -]{0,63}");
@@ -170,8 +170,9 @@ public class StudioDocumentValidator {
     }
 
     private void pageSettings(JsonNode settings, Map<String, String> assetKinds) {
-        object(settings); keys(settings, "particles", "toast");
+        object(settings); keys(settings, "particles", "toast", "iconAssetId");
         if (settings.has("particles")) particles(settings.get("particles"));
+        if (settings.has("iconAssetId")) assetRef(settings, "iconAssetId", "image", assetKinds);
         if (settings.has("toast")) {
             JsonNode toast = settings.get("toast"); object(toast); keys(toast, "title", "body", "iconAssetId");
             boundedText(toast, "title", 80, false);
@@ -181,8 +182,10 @@ public class StudioDocumentValidator {
     }
 
     private void features(JsonNode features, Map<String, String> assetKinds) {
-        object(features); keys(features, "audio", "particles");
+        object(features); keys(features, "audio", "particles", "navigation", "dataSources");
+        if (features.has("dataSources")) dataSources(features.get("dataSources"));
         if (features.has("particles")) particles(features.get("particles"));
+        if (features.has("navigation")) navigation(features.get("navigation"), assetKinds);
         if (!features.has("audio")) return;
         JsonNode audio = features.get("audio"); object(audio);
         keys(audio, "tracks", "musicVolume", "effectVolume", "effectsDefaultOn", "clickSoundAssetId", "buttonSoundAssetId", "toastSoundAssetId");
@@ -197,6 +200,63 @@ public class StudioDocumentValidator {
         if (audio.get("effectsDefaultOn") == null || !audio.get("effectsDefaultOn").isBoolean()) fail("effectsDefaultOn须为布尔值");
         for (String key : List.of("clickSoundAssetId", "buttonSoundAssetId", "toastSoundAssetId")) {
             if (audio.has(key)) assetRef(audio, key, "audio", assetKinds);
+        }
+    }
+
+    private static final Pattern ADAPTER_ENDPOINT = Pattern.compile("/api/plugins/[a-z0-9][a-z0-9-]{0,63}/public(?:/(?:[A-Za-z0-9_.-]+|\\{[a-zA-Z][A-Za-z0-9_]{0,31}\\}))+");
+    private static final Pattern FIELD_PATH = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,31}(?:\\.[A-Za-z_][A-Za-z0-9_]{0,31}){0,4}");
+
+    /** 插件数据适配器：只允许读取插件匿名公开接口 /api/plugins/{插件}/public/**，与前端 validateDataSources 同规则 */
+    private void dataSources(JsonNode sources) {
+        array(sources);
+        if (sources.size() > 20) fail("插件数据适配器最多20个");
+        Set<String> ids = new HashSet<>();
+        for (JsonNode item : sources) {
+            object(item); keys(item, "id", "label", "endpoint", "recordsPath", "single", "fields");
+            String id = text(item, "id");
+            if (!id.matches("[a-z][a-z0-9-]{0,31}") || !ids.add(id)) fail("适配器编码须为小写字母开头的唯一名称");
+            boundedText(item, "label", 40, false);
+            String endpoint = text(item, "endpoint");
+            if (!ADAPTER_ENDPOINT.matcher(endpoint).matches() || endpoint.contains("..")) fail("接口路径须为插件公开接口/api/plugins/{插件}/public/...");
+            if (item.has("recordsPath")) {
+                JsonNode path = item.get("recordsPath");
+                if (!path.isTextual() || (!path.asText().isEmpty() && !FIELD_PATH.matcher(path.asText()).matches())) fail("列表路径须为点分字段名");
+            }
+            if (item.has("single") && !item.get("single").isBoolean()) fail("single须为布尔值");
+            if (item.has("fields")) {
+                JsonNode fields = item.get("fields"); object(fields);
+                if (fields.size() > 30) fail("字段映射最多30项");
+                fields.fields().forEachRemaining(entry -> {
+                    if (!entry.getKey().matches("[A-Za-z_][A-Za-z0-9_]{0,31}")) fail("映射目标字段名无效");
+                    if (!entry.getValue().isTextual() || !FIELD_PATH.matcher(entry.getValue().asText()).matches()) fail("映射源字段须为点分字段名");
+                });
+            }
+        }
+    }
+
+    /** 站点导航：最多两级、每级 30 项，ID 唯一，地址为站内路径或 http(s)，图标引用图片资源 */
+    private void navigation(JsonNode navigation, Map<String, String> assetKinds) {
+        object(navigation); keys(navigation, "items", "appendAuto");
+        if (navigation.get("appendAuto") == null || !navigation.get("appendAuto").isBoolean()) fail("appendAuto须为布尔值");
+        navItems(navigation.get("items"), 1, new HashSet<>(), assetKinds);
+    }
+
+    private void navItems(JsonNode items, int depth, Set<String> ids, Map<String, String> assetKinds) {
+        array(items);
+        if (items.size() > 30) fail("每级导航最多30项");
+        for (JsonNode item : items) {
+            object(item); keys(item, "id", "label", "url", "iconAssetId", "children");
+            String id = text(item, "id");
+            if (!id.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}") || !ids.add(id)) fail("导航ID须唯一且安全");
+            boundedText(item, "label", 40, false);
+            String url = text(item, "url");
+            if (url.startsWith("#") || url.startsWith("data:")) fail("导航地址须为站内路径或http(s)链接");
+            safeUrl(url, false);
+            if (item.has("iconAssetId")) assetRef(item, "iconAssetId", "image", assetKinds);
+            if (item.has("children")) {
+                if (depth != 1) fail("导航最多两级");
+                navItems(item.get("children"), depth + 1, ids, assetKinds);
+            }
         }
     }
 

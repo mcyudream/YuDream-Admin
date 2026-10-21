@@ -20,7 +20,7 @@ const regionOptions = [
 
 const pageFormOpen = ref(false)
 const pageFormEditing = ref('')
-const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '' })
+const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '' })
 const particleOptions = [
   { label: '沿用站点默认', value: '' },
   { label: '无', value: 'none' },
@@ -76,6 +76,7 @@ function openPageForm(pageId?: string) {
     toastTitle: page?.settings?.toast?.title ?? '',
     toastBody: page?.settings?.toast?.body ?? '',
     toastIcon: page?.settings?.toast?.iconAssetId ?? '',
+    icon: page?.settings?.iconAssetId ?? '',
   }
   pageFormOpen.value = true
 }
@@ -99,6 +100,7 @@ function submitPageForm() {
   const form = pageForm.value
   const settings: StudioPageSettings = {
     ...(form.particles ? { particles: form.particles } : {}),
+    ...(form.icon ? { iconAssetId: form.icon } : {}),
     ...(form.toastTitle.trim() ? { toast: { title: form.toastTitle.trim(), body: form.toastBody.trim(), ...(form.toastIcon ? { iconAssetId: form.toastIcon } : {}) } } : {}),
   }
   const settingsPatch = Object.keys(settings).length ? { settings } : {}
@@ -218,6 +220,10 @@ function confirmRemovePage(pageId: string) {
         <span>访问路径</span>
         <YdInput v-model="pageForm.path" placeholder="/ 或 /about" />
         <span class="text-xs text-muted-foreground">根路径 / 表示站点首页；子页对应公开站 /site/路径</span>
+      </label>
+      <label class="text-sm mt-2 flex flex-col gap-1">
+        <span>页面图标（站点导航中显示，如快捷栏物品图标）</span>
+        <YdSelect v-model="pageForm.icon" :options="imageOptions" aria-label="页面图标" />
       </label>
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>氛围粒子</span>

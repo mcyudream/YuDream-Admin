@@ -24,7 +24,32 @@ const siteOptions = [
   { label: '版权信息', value: 'copyright' },
   { label: '当前年份', value: 'year' },
 ]
-const sourceOptions = [{ label: '不绑定', value: '' }, ...STUDIO_DATA_SOURCES.map(item => ({ label: item.label, value: item.value }))]
+const accountOptions = [
+  { label: '不绑定', value: '' },
+  { label: '账号名', value: 'name' },
+  { label: '头像（图片元素）', value: 'avatar' },
+  { label: '账号首字（无头像时显示）', value: 'initial' },
+]
+const authOptions = [
+  { label: '始终显示', value: '' },
+  { label: '仅未登录时', value: 'guest' },
+  { label: '仅登录后', value: 'user' },
+]
+const menuOptions = [
+  { label: '无', value: '' },
+  { label: '菜单容器（含触发项与子菜单）', value: 'data-yd-menu' },
+  { label: '菜单触发项（链接或按钮）', value: 'data-yd-menu-trigger' },
+  { label: '子菜单（非数据列表时）', value: 'data-yd-submenu' },
+]
+const menuRole = computed(() => menuOptions.find(option => option.value && option.value in attrs.value)?.value ?? '')
+function setMenuRole(value: unknown) {
+  setAttributes({ 'data-yd-menu': null, 'data-yd-menu-trigger': null, 'data-yd-submenu': null, ...(value ? { [String(value)]: 'true' } : {}) })
+}
+const sourceOptions = computed(() => [
+  { label: '不绑定', value: '' },
+  ...STUDIO_DATA_SOURCES.map(item => ({ label: item.label, value: item.value as string })),
+  ...(store.doc?.features?.dataSources ?? []).map(item => ({ label: `插件适配器：${item.label}`, value: `adapter:${item.id}` })),
+])
 
 /** 当前节点所在（或自身）的数据源容器，决定字段提示 */
 const ancestorSource = computed(() => {
@@ -50,11 +75,13 @@ const ancestorSource = computed(() => {
 })
 const fieldOptions = computed(() => {
   const source = STUDIO_DATA_SOURCES.find(item => item.value === ancestorSource.value)
-  return [{ label: '不绑定', value: '' }, ...(source?.fields ?? []).map(field => ({ label: field, value: field }))]
+  return [{ label: '不绑定', value: '' }, ...(source?.fields ?? []).map(field => ({ label: field, value: field as string }))]
 })
+/** 插件适配器等未知字段的数据源：字段以文本输入（可用适配器「测试」查看字段） */
+const freeFields = computed(() => fieldOptions.value.length <= 1)
 const customSource = computed(() => {
   const value = attrs.value['data-yd-source'] || ''
-  return value && !STUDIO_DATA_SOURCES.some(item => item.value === value) ? value : ''
+  return value.startsWith('block:') && !STUDIO_DATA_SOURCES.some(item => item.value === value) ? value : ''
 })
 
 function setAttributes(patch: Record<string, string | null>) {
@@ -131,6 +158,29 @@ function onLimit(event: Event) {
       />
     </label>
 
+    <label v-if="ancestorSource" class="text-xs flex flex-col gap-1">
+      <span>链接模板（由字段拼出地址，如 /site/activity?id={id}）</span>
+      <YdInput :model-value="attrs['data-yd-link'] || ''" placeholder="/site/详情页?id={id}" aria-label="链接模板" @change="(event: Event) => setAttributes({ 'data-yd-link': ((event.target as HTMLInputElement | null)?.value || '').trim() || null })" />
+    </label>
+
+    <h3 class="text-xs text-muted-foreground font-medium mt-1">
+      账号与菜单
+    </h3>
+    <div class="gap-2 grid grid-cols-2">
+      <label class="text-xs flex flex-col gap-1 min-w-0">
+        <span>显示条件</span>
+        <YdSelect v-auth="'platform:cms:edit'" class="min-w-0 w-full" :model-value="attrs['data-yd-auth'] || ''" :options="authOptions" aria-label="登录状态显示条件" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-auth': String(value || '') || null })" />
+      </label>
+      <label class="text-xs flex flex-col gap-1 min-w-0">
+        <span>账号信息</span>
+        <YdSelect v-auth="'platform:cms:edit'" class="min-w-0 w-full" :model-value="attrs['data-yd-account'] || ''" :options="accountOptions" aria-label="账号信息绑定" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-account': String(value || '') || null })" />
+      </label>
+      <label class="text-xs flex flex-col gap-1 col-span-2 min-w-0">
+        <span>菜单角色（子菜单配合样式类 parent-hover / parent-expanded 状态展开）</span>
+        <YdSelect v-auth="'platform:cms:edit'" class="min-w-0 w-full" :model-value="menuRole" :options="menuOptions" aria-label="菜单角色" @update:model-value="setMenuRole" />
+      </label>
+    </div>
+
     <h3 class="text-xs text-muted-foreground font-medium mt-1">
       数据绑定
     </h3>
@@ -175,10 +225,22 @@ function onLimit(event: Event) {
         <YdSwitch :model-value="'data-yd-item' in attrs" aria-label="作为条目模板" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-item': value ? 'true' : null })" />
         <span>作为条目模板（第一项为模板，其余同标记项是示例，有数据时一并替换）</span>
       </label>
+      <label class="text-xs flex flex-col gap-1">
+        <span>嵌套列表字段（如二级菜单 children；容器内再放条目模板）</span>
+        <YdInput :model-value="attrs['data-yd-each'] || ''" placeholder="children" aria-label="嵌套列表字段" @change="(event: Event) => setAttributes({ 'data-yd-each': ((event.target as HTMLInputElement | null)?.value || '').trim() || null })" />
+      </label>
       <div class="gap-2 grid grid-cols-2">
         <label v-for="[key, label] in ([['data-yd-text', '文本'], ['data-yd-href', '链接'], ['data-yd-src', '图片'], ['data-yd-title', '提示/复制']] as const)" :key="key" class="text-xs flex flex-col gap-1 min-w-0">
           <span>{{ label }}字段</span>
+          <YdInput
+            v-if="freeFields"
+            :model-value="attrs[key] || ''"
+            placeholder="字段名"
+            :aria-label="`${label}绑定字段`"
+            @change="(event: Event) => setAttributes({ [key]: ((event.target as HTMLInputElement | null)?.value || '').trim() || null })"
+          />
           <YdSelect
+            v-else
             v-auth="'platform:cms:edit'"
             class="min-w-0 w-full"
             :model-value="attrs[key] || ''"

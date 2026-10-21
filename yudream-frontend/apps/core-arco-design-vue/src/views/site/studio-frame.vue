@@ -4,8 +4,8 @@
 // 视口模式：iframe 占满容器高度、内部滚动，文档内 position:fixed（固定顶栏/底栏/背景）按访客视口生效。
 // 站点功能（音频、粒子、进入提示、当前链接、数据绑定）由宿主运行时在同源文档上实现，文档本身不执行脚本。
 import type { SiteDocument, StudioPage } from '@/types/site-studio'
-import { onBeforeUnmount, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { attachStudioRuntime, stopStudioAudio } from '@/utils/site-studio-runtime'
 
 // basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
@@ -14,6 +14,11 @@ const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string, heig
 
 const frame = ref<HTMLIFrameElement | null>(null)
 const router = useRouter()
+const route = useRoute()
+/** 页面查询参数（如详情页 ?id=），供插件数据适配器 {参数} 取值 */
+function currentQuery() {
+  return Object.fromEntries(Object.entries(route.query).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : []))
+}
 let cleanupDocument: (() => void) | undefined
 
 function resolveUrl(href: string) {
@@ -81,12 +86,19 @@ function bindDocument() {
     return
   }
   document.addEventListener('click', handleClick)
-  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath }) : undefined
+  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath, query: currentQuery() }) : undefined
   cleanupDocument = () => {
     document.removeEventListener('click', handleClick)
     detachRuntime?.()
   }
 }
+
+// 同一页面只换查询参数（如切换详情 ?id=）时 srcdoc 不变：重载框架文档，运行时按新参数取数
+watch(() => route.query, (next, previous) => {
+  if (JSON.stringify(next) !== JSON.stringify(previous) && frame.value) {
+    frame.value.srcdoc = props.srcdoc
+  }
+})
 
 onBeforeUnmount(() => {
   cleanupDocument?.()
