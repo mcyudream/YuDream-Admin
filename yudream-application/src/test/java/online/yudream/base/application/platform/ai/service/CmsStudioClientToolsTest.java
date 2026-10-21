@@ -39,19 +39,35 @@ class CmsStudioClientToolsTest {
         var tools = tools();
         try {
             var read = tools.bind(7L, "123", READ, (id, name, args) -> {});
-            assertEquals(List.of("cms.studio.read", "cms.studio.validate"), read.stream().map(tool -> tool.descriptor().name()).toList());
-            assertTrue(read.stream().allMatch(tool -> tool.risk() == AgentToolRisk.READ && !tool.requiresConfirmation()));
+            assertEquals(CmsStudioClientTools.NAMES.stream().filter(name -> !name.equals("cms.studio.apply")).toList(), read.stream().map(tool -> tool.descriptor().name()).toList());
+            assertTrue(read.stream().allMatch(tool -> tool.risk() == AgentToolRisk.READ && !tool.requiresConfirmation()
+                    && "platform:cms:view".equals(tool.descriptor().permissionCode())));
             var write = tools.bind(7L, "123", List.of("*"), (id, name, args) -> {});
             assertEquals(CmsStudioClientTools.NAMES, write.stream().map(tool -> tool.descriptor().name()).toList());
-            assertTrue(write.get(1).requiresConfirmation());
-            assertEquals("platform:cms:edit", write.get(1).descriptor().permissionCode());
+            var apply = write.stream().filter(tool -> tool.descriptor().name().equals("cms.studio.apply")).findFirst().orElseThrow();
+            assertTrue(apply.requiresConfirmation());
+            assertEquals("platform:cms:edit", apply.descriptor().permissionCode());
+        } finally { environment.getSystemProperties().remove("yudream.platform.capabilities.cms.enabled"); }
+    }
+    @Test void observationToolsRequireTheirOwnArgumentsAndRejectUnknownOnes() {
+        var tools = tools();
+        try {
+            var find = (AiExternalAgentTool) tools.bind(7L, "123", READ, (id, name, args) -> {})
+                    .stream().filter(tool -> tool.descriptor().name().equals("cms.studio.find")).findFirst().orElseThrow();
+            assertThrows(BizException.class, () -> find.prepare("request", new AiAgentToolCall("cms.studio.find", args())));
+            var withQuery = new java.util.HashMap<>(args());
+            withQuery.put("query", "横幅");
+            assertEquals("pending", find.prepare("request", new AiAgentToolCall("cms.studio.find", withQuery)).action());
+            withQuery.put("command", Map.of("type", "remove"));
+            assertThrows(BizException.class, () -> find.prepare("request", new AiAgentToolCall("cms.studio.find", withQuery)));
         } finally { environment.getSystemProperties().remove("yudream.platform.capabilities.cms.enabled"); }
     }
     @Test void externalPreparationSendsRealRequestAndRejectsForeignContextOrUnexpectedPayload() {
         var tools = tools();
         try {
             AtomicReference<Map<String, Object>> outbound = new AtomicReference<>();
-            var read = (AiExternalAgentTool) tools.bind(7L, "123", READ, (id, name, args) -> { assertEquals("request", id); assertEquals("cms.studio.read", name); outbound.set(args); }).getFirst();
+            var read = (AiExternalAgentTool) tools.bind(7L, "123", READ, (id, name, args) -> { assertEquals("request", id); assertEquals("cms.studio.read", name); outbound.set(args); })
+                    .stream().filter(tool -> tool.descriptor().name().equals("cms.studio.read")).findFirst().orElseThrow();
             assertEquals("pending", read.prepare("request", new AiAgentToolCall("cms.studio.read", args())).action());
             assertEquals(args(), outbound.get());
             assertThrows(BizException.class, () -> read.prepare("request", new AiAgentToolCall("cms.studio.read", Map.of("contextKey", "other", "documentId", "document", "pageId", "page"))));

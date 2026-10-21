@@ -243,6 +243,10 @@ export type StudioCommand
     | { type: 'duplicate', nodeId: string }
     | { type: 'set-theme', tokens?: Record<string, string>, header?: StudioNode[], footer?: StudioNode[], classes?: StudioStyleClass[], fonts?: StudioFontFace[], keyframes?: StudioKeyframes[] }
     | { type: 'set-features', features: StudioFeatures }
+    /** 只改站点内容值（与「站点内容」页同一份数据）：values 按字段键合并，remove 中的键恢复为字段默认值 */
+    | { type: 'set-content', values: Record<string, unknown>, remove?: string[] }
+    /** 新增/更新或删除单个主题样式类，不需重发整个 classes 列表 */
+    | { type: 'set-class', name: string, styles?: Record<string, string>, responsive?: StudioStyleClass['responsive'], states?: StudioStyleClass['states'], remove?: boolean }
     | { type: 'add-page', page: StudioPage }
     | { type: 'update-page', pageId: string, patch: Partial<Pick<StudioPage, 'name' | 'path' | 'root' | 'settings'>> }
     | { type: 'remove-page', pageId: string }

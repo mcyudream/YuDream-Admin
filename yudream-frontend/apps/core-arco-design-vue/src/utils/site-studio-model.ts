@@ -139,6 +139,41 @@ function mutate(document: SiteDocument, command: StudioCommand) {
     case 'set-features':
       document.features = cloneStudioJson(command.features)
       break
+    case 'set-content': {
+      const content = document.features?.content
+      studioAssert(content, '当前主题未声明站点内容模型')
+      const values = { ...content.values, ...cloneStudioJson(command.values) }
+      for (const key of command.remove ?? []) {
+        delete values[key]
+      }
+      content.values = values
+      break
+    }
+    case 'set-class': {
+      const classes = document.theme.classes ?? []
+      const index = classes.findIndex(item => item.name === command.name)
+      if (command.remove) {
+        studioAssert(index >= 0, `样式类不存在：${command.name}`)
+        classes.splice(index, 1)
+      }
+      else {
+        const previous = index >= 0 ? classes[index]! : { name: command.name, styles: {} }
+        const next = {
+          ...previous,
+          ...(command.styles ? { styles: cloneStudioJson(command.styles) } : {}),
+          ...(command.responsive ? { responsive: cloneStudioJson(command.responsive) } : {}),
+          ...(command.states ? { states: cloneStudioJson(command.states) } : {}),
+        }
+        if (index >= 0) {
+          classes[index] = next
+        }
+        else {
+          classes.push(next)
+        }
+      }
+      document.theme.classes = classes
+      break
+    }
     case 'add-page':
       document.pages.push(cloneStudioJson(command.page))
       break

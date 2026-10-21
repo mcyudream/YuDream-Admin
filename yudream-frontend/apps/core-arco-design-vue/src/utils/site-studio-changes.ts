@@ -69,6 +69,18 @@ export function describeStudioCommands(document: SiteDocument, command: StudioCo
         const parts = [item.tokens ? `主题变量 ${Object.keys(item.tokens).length} 项` : '', item.header ? '页头' : '', item.footer ? '页脚' : ''].filter(Boolean)
         return { kind: 'theme', label: '修改主题', detail: parts.join('、') }
       }
+      case 'set-features':
+        return { kind: 'theme', label: '修改站点功能', detail: Object.keys(item.features).join('、') }
+      case 'set-content': {
+        const labels = new Map((document.features?.content?.sections ?? []).flatMap(section => section.fields.map(field => [field.key, `${section.title} · ${field.label}`] as const)))
+        const changed = [...Object.keys(item.values), ...(item.remove ?? [])].map(key => labels.get(key) ?? key)
+        return { kind: 'text', label: '修改站点内容', detail: changed.join('、') }
+      }
+      case 'set-class': {
+        const exists = (document.theme.classes ?? []).some(entry => entry.name === item.name)
+        const detail = item.styles ? Object.entries(item.styles).map(([key, value]) => `${key}: ${value}`).join('；') : undefined
+        return { kind: 'style', label: `${item.remove ? '删除' : exists ? '修改' : '新增'}样式类 .${item.name}`, detail }
+      }
       case 'add-page':
         return { kind: 'page', label: `新增页面「${item.page.name}」`, detail: item.page.path }
       case 'update-page':

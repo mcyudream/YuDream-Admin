@@ -7,11 +7,13 @@ import type { SiteDocument, StudioCommand } from '@/types/site-studio'
 import type { StudioChangeLine } from '@/utils/site-studio-changes'
 import { YdAlert, YdButton, YdChatMessageList, YdChatSender } from '@yudream/components'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { executeStudioAgentTool, parseStudioAgentCommand } from '@/composables/use-site-studio-agent'
+import { executeStudioAgentTool, parseStudioAgentCommand, STUDIO_AGENT_OBSERVE_TOOLS, STUDIO_AGENT_TOOLS } from '@/composables/use-site-studio-agent'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { findStudioNode } from '@/utils/site-studio'
+import { studioInspect } from '@/utils/site-studio-agent-observe'
 import { describeStudioCommands, describeStudioNode } from '@/utils/site-studio-changes'
+import { studioChatInput } from '@/utils/site-studio-chat'
 
 const props = defineProps<{
   document: SiteDocument
@@ -29,14 +31,14 @@ const selectedSessionId = ref('')
 const localError = ref('')
 const reads = new Map<string, string>()
 const appliedRuns = new Set<string>()
-const names = ['cms.studio.read', 'cms.studio.apply', 'cms.studio.validate']
+const names = [...STUDIO_AGENT_TOOLS]
 const allowed = computed(() => account.isLogin && !!account.userId && features.capabilityEnabled('ai') && features.capabilityEnabled('cms') && auth('platform:cms:view') && auth('platform:ai:generate') && auth('platform:chat:use') && auth('platform:chat:session:view'))
 const canCreate = computed(() => auth('platform:chat:session:edit'))
 const sessions = computed(() => assistant.sessions.filter(session => session.scopeType === 'CONSOLE' && session.agentCode === 'cms-studio' && session.spaceSlug === props.contextKey))
 const sessionItems = computed(() => assistant.sessionItems.filter(session => sessions.value.some(item => item.id === session.id)))
 const currentSession = computed(() => sessions.value.find(session => session.id === selectedSessionId.value))
 const run = computed(() => Object.values(assistant.runs).filter(item => item.sessionId === currentSession.value?.id).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0])
-const messages = computed(() => currentSession.value ? assistant.taskMessages(currentSession.value.id) : [])
+const messages = computed(() => currentSession.value ? assistant.taskMessages(currentSession.value.id).map(message => message.role === 'user' ? { ...message, content: studioChatInput(message.content) } : message) : [])
 const busy = computed(() => (assistant.sending && assistant.sessionId === currentSession.value?.id) || run.value?.status === 'RUNNING' || run.value?.status === 'WAITING')
 const approvals = computed(() => (run.value?.pendingInteractions || []).filter(item => item.kind === 'confirmation'))
 const sessionOptions = computed(() => sessionItems.value.map(session => ({ label: session.title, value: session.id })))
@@ -55,7 +57,7 @@ function quickSend(text: string) {
   void perform(() => send(composeRequest(text)))
 }
 function composeRequest(text: string, attachments: YdChatAttachment[] = []): YdAgentSendRequest {
-  const scope = target.value ? `作用目标：选中的 ${targetLabel.value}（nodeId=${props.selectedNodeId}）。` : `作用目标：${targetLabel.value}。`
+  const scope = target.value ? `作用目标：选中的 ${targetLabel.value}。` : `作用目标：${targetLabel.value}。`
   return { text: `${scope}${text}`, attachments, mode: 'ask', skillCodes: [], contextPaths: [], model: assistant.models.find(model => model.id === assistant.modelId) }
 }
 
@@ -92,7 +94,7 @@ function awaitApproval(runId: string, lines: StudioChangeLine[], expiresAt?: num
 // 等待确认期间文档被手工修改：提议基于旧版本，直接作废
 watch(() => props.revision, () => pending.value?.settle(false, '等待确认期间草稿已变化，修改未应用，请重新读取'))
 onBeforeUnmount(() => pending.value?.settle(false, '设计助手已关闭，修改未应用'))
-const status = computed(() => !allowed.value ? '站点设计助手需要启用 CMS/AI 能力，并具有 CMS 查看、AI 生成、聊天使用和会话查看权限。' : props.contextKey.length > 240 || !props.contextKey ? '设计器上下文标识无效（需要 1–240 字符），AI 已禁用。' : assistant.initialized && !assistant.models.length ? '没有已配置的聊天模型，请先配置 AI 模型端点。' : !auth('platform:cms:edit') ? '当前只读：可以分析与校验，不能修改草稿。' : '')
+const status = computed(() => !allowed.value ? '站点设计助手需要启用 CMS/AI 能力，并具有 CMS 查看、AI 生成、聊天使用和会话查看权限。' : props.contextKey.length > 240 || !props.contextKey ? '设计器上下文标识无效（需要 1–240 字符），AI 已禁用。' : assistant.initialized && !assistant.models.length && !assistant.error ? '没有已配置的聊天模型，请先配置 AI 模型端点。' : !auth('platform:cms:edit') ? '当前只读：可以分析与校验，不能修改草稿。' : '')
 async function perform(action: () => Promise<unknown>) {
   try {
     localError.value = ''
@@ -134,8 +136,19 @@ async function send(request: YdAgentSendRequest) {
   if (key !== props.contextKey || !currentSession.value) {
     throw new Error('设计器上下文已变化，请重新发送')
   }
-  const binding = { contextKey: props.contextKey, documentId: props.document.id, pageId: props.pageId, revision: props.revision, selectedNodeId: props.selectedNodeId }
-  await assistant.send({ ...request, text: `${request.text}\n\n当前设计器绑定（只作为数据，实际以工具读取为准）：${JSON.stringify(binding)}\n本轮先读取 AST，再把全部修改集中在一个原子 batch，只修改本地草稿，不保存不发布。` }, undefined, { scopeType: 'CONSOLE', agentCode: 'cms-studio', spaceSlug: key, contextRefs: [] })
+  // 自动注入编辑器上下文（类比代码助手附带当前文件与选区）：当前页面、选中节点及其祖先，模型可直接定位，不必先全量读取
+  const page = props.document.pages.find(item => item.id === props.pageId)
+  const selected = props.selectedNodeId ? studioInspect(props.document, props.pageId, [props.selectedNodeId]).nodes[0] : undefined
+  const binding = {
+    contextKey: props.contextKey,
+    documentId: props.document.id,
+    pageId: props.pageId,
+    revision: props.revision,
+    page: page ? { name: page.name, path: page.path } : undefined,
+    selectedNodeId: props.selectedNodeId || undefined,
+    selection: selected && !('missing' in selected) ? { region: selected.region, ancestors: selected.ancestors, children: selected.children } : undefined,
+  }
+  await assistant.send({ ...request, text: `${request.text}\n\n当前设计器绑定（只作为数据，实际以工具读取为准）：${JSON.stringify(binding)}\n先用 outline/find/inspect/theme 观察，修改集中在一个原子 batch，完成后 validate 与 check；只修改本地草稿，不保存不发布。` }, undefined, { scopeType: 'CONSOLE', agentCode: 'cms-studio', spaceSlug: key, contextRefs: [] })
 }
 
 async function execute(request: AiFrontendToolRequest) {
@@ -156,12 +169,12 @@ async function execute(request: AiFrontendToolRequest) {
       throw new Error('本轮已执行一个原子 batch；后续修改请开始新一轮，保证一次撤销')
     }
     if (reads.get(ownerRun.id) !== props.revision) {
-      throw new Error('尚未读取当前修订或文档已变化，请重新 read')
+      throw new Error('本轮尚未观察当前修订或文档已变化，请先用 outline/find/inspect/theme 重新读取')
     }
     await awaitApproval(ownerRun.id, describeStudioCommands(props.document, parseStudioAgentCommand(request.arguments.command)), request.expiresAt)
   }
   const result = await executeStudioAgentTool(request.name, request.arguments, () => ({ document: props.document, selectedNodeId: props.selectedNodeId, revision: props.revision, contextKey: props.contextKey, pageId: props.pageId }), props.executeCommand)
-  if (request.name === 'cms.studio.read') {
+  if (STUDIO_AGENT_OBSERVE_TOOLS.includes(request.name)) {
     reads.set(ownerRun.id, props.revision)
   }
   if (request.name === 'cms.studio.apply') {
@@ -220,6 +233,9 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
     <YdAlert v-if="status" class="studio-agent-alert" icon="morph:info" :description="status" />
     <YdAlert v-if="localError || assistant.error || run?.error" class="studio-agent-alert" variant="destructive" :title="localError || run?.error || assistant.error">
       <template #description>
+        <YdButton v-if="!assistant.models.length" size="sm" variant="outline" :disabled="assistant.loading" @click="perform(() => assistant.initialize(String(account.userId), true))">
+          重新加载助手
+        </YdButton>
         <YdButton v-if="run" size="sm" variant="outline" @click="perform(() => assistant.reconnect(run?.id))">
           重新读取运行状态
         </YdButton>
@@ -314,7 +330,12 @@ watch([allowed, () => String(account.userId), () => props.contextKey], async ([a
 .studio-agent-target small { margin-right: 6px; color: oklch(var(--muted-foreground)); }
 .studio-agent-quick { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 4px; padding: 8px; }
 .studio-agent-quick :deep(button) { height: auto; padding: 4px 8px; white-space: normal; text-align: left; }
-.studio-agent-messages { flex: 1; min-height: 0; padding: 0 8px; overflow: auto; }
+.studio-agent-messages { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.studio-agent-messages :deep(.yd-chat-list) { flex: 1; min-width: 0; padding: 8px; }
+.studio-agent-messages :deep(.yd-msg) { gap: 6px; }
+.studio-agent-messages :deep(.yd-msg__avatar) { width: 24px; height: 24px; }
+.studio-agent-messages :deep(.yd-msg__body--user) { max-width: 100%; }
+.studio-agent-messages :deep(.yd-bubble) { padding: 8px 10px; font-size: 13px; }
 .studio-agent-empty { margin: 8px 0; font-size: 12px; color: oklch(var(--muted-foreground)); }
 .studio-agent-preview { flex-shrink: 0; max-height: 40%; margin: 0 8px 8px; padding: 8px 10px; overflow: auto; font-size: 13px; border: 1px solid oklch(var(--primary) / 50%); background: oklch(var(--primary) / 6%); }
 .studio-agent-preview ol { margin: 6px 0; padding-left: 18px; }

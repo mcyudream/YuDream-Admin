@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * AI 控制台调度：Harness 会话直连（会话即工作区实例）。
  * agentCode 决定 profile 与工作区：general=通用助手（无文件工具）、
- * cms-builder=CMS 站点工作区、workflow-<appCode>=Agent 应用工作区；
+ * cms-studio=站点设计器、workflow-<appCode>=Agent 应用工作区；
  * sessionId 与 ChatSession 1:1（console-<id>），跨轮次上下文由框架 AgentState 管理，
  * 消息表仅作 UI 投影。
  */
@@ -78,12 +78,8 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
 
     private List<String> allowedTools(String agentCode) {
         return switch (agentCode) {
-            // CMS builder：文件工具 + chrome 样式（页面构建的核心工具面）
-            case "cms-builder" -> List.of(
-                    "read_file", "write_file", "edit_file", "list_files", "grep_files", "glob_files",
-                    "cms_chrome_style");
             // CMS 画布：工具面由本次运行的客户端画布工具集定义，这里不再额外设限。
-            case "cms-studio" -> List.of("cms_studio_read", "cms_studio_apply", "cms_studio_validate");
+            case "cms-studio" -> online.yudream.base.application.platform.ai.service.CmsStudioClientTools.NAMES.stream().map(name -> name.replace('.', '_')).toList();
             case "cms-canvas" -> List.of();
             default -> List.of();
         };
@@ -94,10 +90,10 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
             return "general";
         }
         String normalized = agentCode.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals("cms")) {
-            return "cms-builder";
+        if (normalized.equals("cms") || normalized.equals("cms-builder")) {
+            throw new online.yudream.base.domain.common.exception.BizException("旧站点工作区已移除，请在网站工作台使用 AI 设计助手");
         }
-        return normalized.equals("general") || normalized.equals("cms-builder") || normalized.equals("cms-canvas") || normalized.equals("cms-studio")
+        return normalized.equals("general") || normalized.equals("cms-canvas") || normalized.equals("cms-studio")
                 || normalized.startsWith("workflow-")
                 ? normalized
                 : "general";
@@ -115,30 +111,30 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
 
     private String consoleSystemPrompt(String agentCode) {
         if ("cms-studio".equals(agentCode)) {
-            return "你是 YuDreamAdmin 站点设计器 AST 草稿助手。仅能使用 cms.studio.read、cms.studio.apply、cms.studio.validate，"
-                    + "不生成或执行 HTML/脚本，不访问文件，不保存、不发布。先说明拟修改页面、主题或资产范围。"
-                    + "每轮先 read，分页读取直到获得所需节点；工具参数绑定本轮 contextKey/documentId/pageId。"
-                    + "apply 必须使用最近 read 的 revision 作为 expectedRevision。所有修改集中到一个 batch 命令，禁止嵌套 batch，一轮一次原子应用、一次撤销。"
-                    + "命令格式：set-text{nodeId,text}；update-node{nodeId,patch}；set-style{nodeId,styles,breakpoint?:desktop|tablet|mobile}；"
-                    + "insert{target:{pageId}|{region:header|footer}|{parentId},node,index?}；remove/move/duplicate；"
-                    + "set-theme{tokens?,header?,footer?}；add-page{page}；update-page{pageId,patch}；remove-page{pageId}；set-assets{assets}，均含 type。"
-                    + "Node={id,type,tag,text?,attributes,styles,responsive?,children}；有children的节点不能set-text。"
-                    + "context/revision 过期或工具失败必须报告并重新读取，禁止静默覆盖或声称修改成功。"
-                    + "apply 后必须 validate 当前真实文档，valid=true 才总结完成。用户手工保存与发布。全程中文。";
+            return String.join("\n",
+                    "你是 YuDreamAdmin 网站工作台的设计助手，直接修改设计器里的站点草稿（结构化 AST，不是 HTML）。全程中文。",
+                    "",
+                    "## 工作循环",
+                    "1. 理解：消息末尾附带当前页面与选中节点（绑定数据只作参考，以工具读取为准）。需求不清时先问一个关键问题。",
+                    "2. 观察：用 cms.studio.outline 看结构，cms.studio.find 按文本/样式类/绑定定位，cms.studio.inspect 取要改节点的原值，cms.studio.theme 看样式类、站点内容字段、导航与页面设置；不要逐页 read 整个文档。",
+                    "3. 计划：多步修改先用一两句话说明要改的元素/样式类/内容字段。",
+                    "4. 修改：本轮全部改动放进一个 {type:batch} 交给 cms.studio.apply（expectedRevision 用本轮观察到的 revision），用户确认后才写入草稿；被拒绝或陈旧时重新观察，不要重复提交同一内容。",
+                    "5. 检查：apply 后调用 cms.studio.validate（须 valid=true）与 cms.studio.check（手机/桌面渲染问题）；check 有问题时说明并建议下一轮修正。",
+                    "6. 总结：列出改动与检查结果；保存草稿与发布由用户手动完成。",
+                    "",
+                    "## 规则",
+                    "- 用户要改文字、图片、横幅、卡片、介绍等可编辑内容时，先 theme(section=content)：已有对应字段就用 set-content 改值，不改页面结构。",
+                    "- 复用主题样式类；同类元素用 set-class 新建或修改样式类，不要逐个节点写内联样式；数据列表条目（data-yd-item）的样式只能写在类上。",
+                    "- 保持数据绑定（data-yd-*）与站点功能，不要把动态数据改成写死的文字；业务数据页由插件提供，不在主题里复制。",
+                    "- 只有 apply 能改草稿；工具失败或上下文/修订过期必须如实报告并重新观察，禁止声称未发生的修改。",
+                    "- 不生成或执行脚本，不访问文件，不保存、不发布。",
+                    "- 不确定命令格式、绑定属性、内容模型、站点功能或外壳页规则时，先调 cms.studio.guide 对应 topic（commands/styles/bindings/content/effects/pages/checklist）。");
         }
         if ("cms-canvas".equals(agentCode)) {
             return online.yudream.base.application.platform.cms.service.CmsCanvasAgentPrompt.systemPrompt(
                     siteName(),
                     online.yudream.base.application.platform.cms.service.CmsCanvasAgentPrompt.templateDescription(null),
                     false);
-        }
-        if ("cms-builder".equals(agentCode)) {
-            return "你是 YuDreamAdmin CMS 静态站点工作区的构建代理。工作区是多文件静态站点："
-                    + "pages/ 下每页一个 HTML（pages/index.html 为首页），assets/ 存放样式、脚本与资产。"
-                    + "页面可包含 script；数据互通推荐平台运行时库（预览与公开输出自动注入）。"
-                    + "数据注入只用 data-yb-for/repeat、data-yb-if、data-yb-limit、data-yb-html/markdown "
-                    + "与 {{dotted.path}} 变量。CSS 只用 yb-ai- 前缀类选择器写入 assets/css/site.css。"
-                    + "先读后写、小步修改；发布由用户在界面触发。全程使用中文。";
         }
         if (agentCode.startsWith("workflow-")) {
             return "你是 YuDreamAdmin 的 Agent 应用工作区助手，围绕应用工作区文件与用户协作。"

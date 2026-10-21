@@ -30,14 +30,15 @@ class ConsoleChatDispatcherTest {
         });
         dispatcher.dispatch(new ChatDispatchContext(7L, "123", "优化页面", null, null, " CMS-STUDIO ", "bound", List.of(), List.of(), List.of("*"), ignored -> {}, ignored -> {}, ignored -> {}));
         assertEquals("cms-studio", seen.get().agentCode());
-        assertEquals(List.of("cms_studio_read", "cms_studio_apply", "cms_studio_validate"), seen.get().allowedToolNames());
+        assertEquals(online.yudream.base.application.platform.ai.service.CmsStudioClientTools.NAMES.stream().map(name -> name.replace('.', '_')).toList(), seen.get().allowedToolNames());
+        assertTrue(seen.get().allowedToolNames().containsAll(List.of("cms_studio_outline", "cms_studio_check", "cms_studio_apply")));
         assertTrue(seen.get().systemPrompt().contains("不保存、不发布"));
         assertTrue(seen.get().systemPrompt().contains("expectedRevision"));
         assertFalse(seen.get().allowedToolNames().contains("write_file"));
     }
 
     @Test
-    void selectingCmsWorkspaceNeverGrantsHostToolPermission() {
+    void retiredWorkspaceProfilesAreRejectedBeforeInvokingTheModel() {
         AtomicReference<HarnessRunRequest> seen = new AtomicReference<>();
         HarnessAgentGateway gateway = (request,delta,reasoning,tool) -> {
             seen.set(request); return new HarnessRunResult("", "", AiUsage.empty(), List.of());
@@ -48,10 +49,12 @@ class ConsoleChatDispatcherTest {
         List<String> actualPermissions = List.of("platform:chat:use");
         // 站点设置服务在本用例中不参与断言；dispatcher 的 siteName() 对空依赖有回落保护。
         var dispatcher = new ConsoleChatDispatcher(gateway, modules, null);
-        dispatcher.dispatch(new ChatDispatchContext(7L,"session","帮助编辑",null,null,"cms-builder",null,List.of(),List.of(),
-                actualPermissions,ignored->{},ignored->{},ignored->{}));
-        assertEquals("cms-builder",seen.get().agentCode());
-        assertEquals(actualPermissions,seen.get().permissionCodes());
-        assertFalse(seen.get().permissionCodes().contains("platform:ai:tool:cms-chrome-style"));
+        for (String code : List.of("cms-builder", "cms", " CMS-BUILDER ")) {
+            var error = assertThrows(online.yudream.base.domain.common.exception.BizException.class,
+                    () -> dispatcher.dispatch(new ChatDispatchContext(7L,"session","帮助编辑",null,null,code,null,List.of(),List.of(),
+                            actualPermissions,ignored->{},ignored->{},ignored->{})));
+            assertTrue(error.getMessage().contains("旧站点工作区已移除"));
+        }
+        assertNull(seen.get());
     }
 }
