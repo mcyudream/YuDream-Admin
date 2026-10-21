@@ -141,6 +141,36 @@ class ChatQuotaAppServiceTest {
         assertEquals(45,service.me(7L).usedTokens()); assertEquals(0,service.me(7L).uncertainTokens());
         assertEquals(55,service.me(7L).remainingTokens());
     }
+    @Test
+    void administratorsAreUnlimitedButStillAccountedWhileUsersAndSystemKeepLimits() {
+        var repo=new MemoryQuota(); var service=service(repo);
+        var admin=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.aggregate.User.class);
+        var member=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.aggregate.User.class);
+        org.mockito.Mockito.when(admin.getRoles()).thenReturn(List.of(online.yudream.base.domain.system.user.valobj.RoleID.of(1L)));
+        org.mockito.Mockito.when(member.getRoles()).thenReturn(List.of(online.yudream.base.domain.system.user.valobj.RoleID.of(2L)));
+        var adminRole=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.aggregate.Role.class);
+        var userRole=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.aggregate.Role.class);
+        org.mockito.Mockito.when(adminRole.getLevel()).thenReturn(online.yudream.base.domain.system.user.enumerate.RoleLevel.ADMIN);
+        org.mockito.Mockito.when(userRole.getLevel()).thenReturn(online.yudream.base.domain.system.user.enumerate.RoleLevel.USER);
+        var users=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.repo.UserRepo.class);
+        var roles=org.mockito.Mockito.mock(online.yudream.base.domain.system.user.repo.RoleRepo.class);
+        org.mockito.Mockito.when(users.findById(8L)).thenReturn(Optional.of(admin));
+        org.mockito.Mockito.when(users.findById(7L)).thenReturn(Optional.of(member));
+        org.mockito.Mockito.when(roles.findByIds(List.of(1L))).thenReturn(List.of(adminRole));
+        org.mockito.Mockito.when(roles.findByIds(List.of(2L))).thenReturn(List.of(userRole));
+        service.administrators(users, roles);
+        // 管理员：远超每日上限（100）仍可预占，用量照常结算记账
+        var big=service.reserve(8L,5000);
+        assertEquals(5000,big.reservedTokens());
+        service.settle(big,new AiUsage(2000,1000,3000));
+        assertEquals(3000,service.me(8L).usedTokens());
+        assertTrue(service.me(8L).unlimited());
+        // 普通用户与 SYSTEM 账户保持各自上限
+        assertEquals(100,service.reserve(7L,5000).reservedTokens());
+        assertThrows(BizException.class, ()->service.reserve(7L,1));
+        assertFalse(service.me(7L).unlimited());
+        assertEquals(40,service.reserve(null,5000).reservedTokens());
+    }
     private static ChatQuotaAppService service(MemoryQuota repo){
         CapabilityAppService gate=new CapabilityAppService(null,List.of()){@Override public void ensureEnabled(String code,String name){}};
         CapabilityModule module=CapabilityModule.builder().code("ai").config(Map.of("dailyTokenLimit","100","systemDailyTokenLimit","40")).build();

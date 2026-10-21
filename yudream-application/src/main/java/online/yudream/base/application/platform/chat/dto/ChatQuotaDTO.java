@@ -9,9 +9,11 @@ public record ChatQuotaDTO(
         long limitTokens,
         long remainingTokens,
         long reservedTokens,
-        long uncertainTokens
+        long uncertainTokens,
+        /** 管理员不限额：limit/remaining 不具展示意义，界面只显示已用量 */
+        boolean unlimited
 ) {
     public ChatQuotaDTO(String userId, LocalDate date, long used, long limit, long remaining) {
-        this(userId, date, used, limit, remaining, 0, 0);
+        this(userId, date, used, limit, remaining, 0, 0, false);
     }
 }

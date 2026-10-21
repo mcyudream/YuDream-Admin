@@ -549,7 +549,7 @@ async function playTour(tourCode?: string) {
           </template>
         </YdAgentWorkbench>
         <div class="yd-global-ai-status" role="status">
-          <span v-if="assistant.quota">今日额度：已用 {{ assistant.quota.usedTokens.toLocaleString() }} / {{ assistant.quota.limitTokens.toLocaleString() }} tokens</span>
+          <span v-if="assistant.quota">今日额度：已用 {{ assistant.quota.usedTokens.toLocaleString() }}{{ assistant.quota.unlimited ? ' tokens · 管理员不限额' : ` / ${assistant.quota.limitTokens.toLocaleString()} tokens` }}</span>
           <span v-if="assistant.activeRun && assistant.connections[assistant.activeRun.id] === 'reconnecting'">正在重连后端进度…</span>
           <span v-else>会话与运行进度保存在后端</span>
         </div>

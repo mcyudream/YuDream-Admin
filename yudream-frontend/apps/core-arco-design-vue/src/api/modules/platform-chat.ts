@@ -101,6 +101,8 @@ export interface ChatQuota {
   uncertainTokens?: number
   limitTokens: number
   remainingTokens: number
+  /** 管理员不限额 */
+  unlimited?: boolean
 }
 
 export interface ChatSendPayload {

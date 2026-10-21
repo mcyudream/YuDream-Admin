@@ -12,6 +12,8 @@ public record ChatQuotaRes(
         long limitTokens,
         long remainingTokens,
         long reservedTokens,
-        long uncertainTokens
+        long uncertainTokens,
+        /** 管理员不限额：界面只显示已用量 */
+        boolean unlimited
 ) {
 }

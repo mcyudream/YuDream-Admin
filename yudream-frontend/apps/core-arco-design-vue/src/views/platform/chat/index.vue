@@ -162,7 +162,7 @@ onMounted(() => perform(async () => {
         <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
       </template>
       <template #header-actions>
-        <span v-if="assistant.quota" class="chat-page__quota">今日可用 {{ assistant.quota.remainingTokens.toLocaleString() }} tokens</span>
+        <span v-if="assistant.quota" class="chat-page__quota">{{ assistant.quota.unlimited ? `今日已用 ${assistant.quota.usedTokens.toLocaleString()} tokens · 不限额` : `今日可用 ${assistant.quota.remainingTokens.toLocaleString()} tokens` }}</span>
       </template>
     </YdAgentWorkbench>
     <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :confirm-button-disabled="!title.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: title.trim() }))">

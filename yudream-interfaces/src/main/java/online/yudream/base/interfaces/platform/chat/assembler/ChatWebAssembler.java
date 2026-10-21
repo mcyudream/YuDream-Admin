@@ -162,6 +162,7 @@ public final class ChatWebAssembler {
                 .remainingTokens(dto.remainingTokens())
                 .reservedTokens(dto.reservedTokens())
                 .uncertainTokens(dto.uncertainTokens())
+                .unlimited(dto.unlimited())
                 .build();
     }
 

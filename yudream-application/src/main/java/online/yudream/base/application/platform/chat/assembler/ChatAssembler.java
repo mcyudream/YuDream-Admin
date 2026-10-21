@@ -61,7 +61,8 @@ public final class ChatAssembler {
                 quota.getUsageDate(),
                 quota.getUsedTokens(),
                 quota.getLimitTokens(),
-                quota.remaining(), quota.getReservedTokens(), quota.getUncertainTokens());
+                quota.remaining(), quota.getReservedTokens(), quota.getUncertainTokens(),
+                quota.getLimitTokens() >= online.yudream.base.application.platform.chat.service.ChatQuotaAppService.UNLIMITED_TOKENS);
     }
 
     public static java.util.List<online.yudream.base.domain.platform.chat.valobj.ChatToolCall> projectionTools(

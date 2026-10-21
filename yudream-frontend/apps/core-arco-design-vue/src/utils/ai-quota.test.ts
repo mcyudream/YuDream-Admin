@@ -21,3 +21,10 @@ test('quota boundary rejects invalid, negative, fractional and unsafe counts wit
   }
   assert.throws(() => normalizeAiQuotaConfig({ dailyTokenLimit: '0' }), /systemDailyTokenLimit/)
 })
+
+test('administrator quota is flagged unlimited and stays within safe integers', () => {
+  const quota = normalizeAiQuota({ userId: '8', usageDate: '2026-10-21', usedTokens: '3000', limitTokens: '1000000000000000', remainingTokens: '999999999997000', unlimited: true })
+  assert.equal(quota.unlimited, true)
+  assert.equal(quota.limitTokens, 1_000_000_000_000_000)
+  assert.equal(normalizeAiQuota({ userId: '7', usageDate: '2026-10-21', usedTokens: 1, limitTokens: 100, remainingTokens: 99 }).unlimited, false)
+})

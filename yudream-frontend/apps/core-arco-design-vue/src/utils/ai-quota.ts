@@ -30,6 +30,8 @@ export function normalizeAiQuota(value: unknown) {
     uncertainTokens: quota.uncertainTokens === undefined ? undefined : parseAiTokenCount(quota.uncertainTokens, 'uncertainTokens'),
     limitTokens: parseAiTokenCount(quota.limitTokens, 'limitTokens'),
     remainingTokens: parseAiTokenCount(quota.remainingTokens, 'remainingTokens'),
+    /** 管理员不限额：只显示已用量 */
+    unlimited: quota.unlimited === true,
   }
 }
 

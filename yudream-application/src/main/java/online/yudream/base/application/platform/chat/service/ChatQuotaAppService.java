@@ -22,12 +22,40 @@ import java.util.Map;
 public class ChatQuotaAppService implements online.yudream.base.domain.platform.ai.service.AiUsageQuotaGateway {
 
     public static final long DEFAULT_DAILY_TOKEN_LIMIT = 200_000L;
+    /** 管理员账本的上限：10^15 视同不限；不超过 JS 安全整数（前端解析额度），仓储 $add 比较也不会溢出 */
+    public static final long UNLIMITED_TOKENS = 1_000_000_000_000_000L;
 
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ChatQuotaRepo quotaRepo;
     private final online.yudream.base.domain.platform.ai.repo.AiRunRepo runRepo;
     private final java.util.Map<String, online.yudream.base.domain.platform.ai.valobj.AiUsageReservation> liveReservations = new java.util.concurrent.ConcurrentHashMap<>();
+    private online.yudream.base.domain.system.user.repo.UserRepo users;
+    private online.yudream.base.domain.system.user.repo.RoleRepo roles;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void administrators(online.yudream.base.domain.system.user.repo.UserRepo users, online.yudream.base.domain.system.user.repo.RoleRepo roles) {
+        this.users = users;
+        this.roles = roles;
+    }
+
+    /**
+     * 管理员（持有管理员或超级管理员等级角色）不限 AI 额度：调用照常预占、结算与记账，只是不受每日上限拦截。
+     * SYSTEM 账户（userId 为空或 0）仍按系统任务上限。
+     */
+    public boolean unlimited(Long userId) {
+        if (userId == null || userId == 0L || users == null || roles == null) return false;
+        return users.findById(userId)
+                .map(user -> user.getRoles() == null ? java.util.List.<Long>of() : user.getRoles().stream().map(online.yudream.base.domain.system.user.valobj.RoleID::getValue).toList())
+                .filter(ids -> !ids.isEmpty())
+                .map(ids -> roles.findByIds(ids).stream().anyMatch(role -> role.getLevel() != null && role.getLevel().isManagement()))
+                .orElse(false);
+    }
+
+    private long limitFor(Long userId) {
+        if (userId == null || userId == 0L) return systemDailyLimit();
+        return unlimited(userId) ? UNLIMITED_TOKENS : dailyLimit();
+    }
 
     @Transactional(readOnly = true)
     public ChatQuotaDTO me(Long userId) {
@@ -66,7 +94,7 @@ public class ChatQuotaAppService implements online.yudream.base.domain.platform.
             throw new BizException("当前用户未登录");
         }
         reclaimExpired(userId, quotaDate());
-        return quotaRepo.getOrCreate(userId, quotaDate(), dailyLimit());
+        return quotaRepo.getOrCreate(userId, quotaDate(), limitFor(userId));
     }
 
     @Transactional
@@ -81,7 +109,7 @@ public class ChatQuotaAppService implements online.yudream.base.domain.platform.
         ensureEnabled();
         Long bucket = userId == null ? 0L : userId;
         LocalDate date = quotaDate();
-        long limit = userId == null || userId == 0L ? systemDailyLimit() : dailyLimit();
+        long limit = limitFor(userId);
         reclaimExpired(bucket, date);
         UserChatQuota quota = quotaRepo.getOrCreate(bucket, date, limit);
         long amount = Math.min(Math.max(1, tokenBudget), quota.remaining());
