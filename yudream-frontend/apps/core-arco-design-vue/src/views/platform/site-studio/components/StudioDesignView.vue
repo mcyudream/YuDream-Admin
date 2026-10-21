@@ -167,7 +167,14 @@ function injectThemeCss(frameDocument: Document) {
     style.textContent = themeCss.value
   }
 }
-watch(themeCss, () => frameDocuments.forEach(injectThemeCss))
+/** 注入到引擎当前的画布文档：画布 iframe 会在初始化与设备切换时重建文档，必须每次取现值 */
+function syncCanvasThemeCss() {
+  const canvasDocument = facade.value?.editor.Canvas.getDocument?.()
+  if (canvasDocument?.head) {
+    injectThemeCss(canvasDocument)
+  }
+}
+watch(themeCss, syncCanvasThemeCss)
 
 /**
  * 画布实际输入。默认是文档编译结果；画布自身的无损编辑写回文档后，改为引擎刚发出的快照，
@@ -269,6 +276,7 @@ function onBuilderReady(instance: YdPageBuilderEditorFacade) {
   ready.value = true
   builderError.value = ''
   lockThemeRegions()
+  syncCanvasThemeCss()
   instance.editor.setDevice(store.breakpoint)
   readZoom()
   requestAnimationFrame(() => fitCanvasWidth())
@@ -321,7 +329,6 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
     if (frameDocument) {
       frameDocuments.add(frameDocument)
       frameDocument.addEventListener('keydown', onStudioKeydown)
-      injectThemeCss(frameDocument)
     }
   }
   on('destroy', () => {
@@ -335,7 +342,10 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
   bindFrameKeydown(editor.Canvas.getFrameEl())
   on('canvas:frame:load', (payload) => {
     bindFrameKeydown((payload as { el?: HTMLIFrameElement }).el)
+    syncCanvasThemeCss()
   })
+  on('canvas:frame:load:body', () => syncCanvasThemeCss())
+  on('load', () => syncCanvasThemeCss())
 }
 
 function onCanvasChange(snapshot: YdPageBuilderSnapshot) {
