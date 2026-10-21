@@ -3,8 +3,10 @@ package online.yudream.base.application.system.menu.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.menu.assembler.MenuAssembler;
 import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
+import online.yudream.base.application.system.menu.cmd.MenuImportCmd;
 import online.yudream.base.application.system.menu.cmd.MenuUpdateCmd;
 import online.yudream.base.application.system.menu.dto.MenuCandidateDTO;
+import online.yudream.base.application.system.menu.dto.MenuImportDTO;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.menu.query.MenuCandidatePageQuery;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
@@ -194,6 +196,116 @@ public class MenuAppService {
             menu.disable();
         }
         return toDTO(menuDomainService.syncMenu(menu));
+    }
+
+    /**
+     * 数据模板导入的受控菜单写入（供模板应用服务按行调用；批量完成后请再调用
+     * {@link #syncPermissionCatalog()} 整体重建菜单权限目录）。
+     * <p>
+     * 匹配规则（ID 优先、业务键回退；即使调用方已预校验，本方法仍自行防御）：
+     * 1. sourceId 命中记录且其 code 与命令一致 → 命中该记录；
+     * 2. sourceId 未命中 → 按 code 回退匹配；
+     * 3. sourceId 命中了不同 code 的记录 → 忽略该命中、按 code 回退；code 也无目标时
+     *    安全失败（无法确定写入目标，绝不改写 sourceId 指向的无关记录）。
+     * <p>
+     * 命中现有菜单（SYSTEM）仅允许受控字段变更：name,type,parentCode,module,icon,
+     * path,component,link,sort,visible,permission,status；code、内部 id、来源与插件
+     * 归属/运行元数据一律保持。命中 PLUGIN 菜单拒绝模板覆盖。新建菜单固定 SYSTEM 来源。
+     * 命令中的 sourceId 只作定位，从不作为记录主键写入。
+     */
+    @Transactional
+    public MenuImportDTO importMenu(MenuImportCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getCode())) {
+            throw new BizException("导入菜单编码不能为空");
+        }
+        if (cmd.getType() == null) {
+            throw new BizException("导入菜单类型不能为空");
+        }
+        String code = cmd.getCode();
+        Menu target = resolveImportTarget(code, cmd.getSourceId());
+        if (target != null && target.isPluginMenu()) {
+            throw new BizException("模板导入不能覆盖插件菜单：" + code);
+        }
+        Menu menu;
+        boolean created;
+        if (target == null) {
+            created = true;
+            menu = Menu.builder()
+                    .code(code)
+                    .name(cmd.getName())
+                    .type(cmd.getType())
+                    .parentCode(blankToNull(cmd.getParentCode()))
+                    .module(cmd.getModule())
+                    .icon(cmd.getIcon())
+                    .path(resolvePath(cmd.getType(), code, cmd.getPath()))
+                    .component(resolveComponent(cmd.getType(), cmd.getComponent()))
+                    .link(sanitizeLink(cmd.getLink()))
+                    .sort(cmd.getSort() == null ? 0 : cmd.getSort())
+                    .visible(cmd.getVisible() == null || cmd.getVisible())
+                    .permission(cmd.getPermission())
+                    .status(cmd.getStatus() == MenuStatus.DISABLED ? MenuStatus.DISABLED : MenuStatus.ACTIVE)
+                    .source(MenuSource.SYSTEM)
+                    .build();
+            ensureParentExists(menu.getParentCode());
+        } else {
+            created = false;
+            menu = target;
+            ensureParentExists(cmd.getParentCode());
+            ensureNoParentCycle(menu.getCode(), cmd.getParentCode());
+            menu.updateBasic(
+                    cmd.getName(),
+                    cmd.getType(),
+                    blankToNull(cmd.getParentCode()),
+                    cmd.getModule(),
+                    cmd.getIcon(),
+                    resolvePath(cmd.getType(), menu.getCode(), cmd.getPath()),
+                    resolveComponent(cmd.getType(), cmd.getComponent()),
+                    sanitizeLink(cmd.getLink()),
+                    cmd.getSort(),
+                    cmd.getVisible() == null || cmd.getVisible(),
+                    cmd.getPermission()
+            );
+            // source/plugin 归属与 runtime 元数据不重置；内部 id 原样保留
+            if (cmd.getStatus() == MenuStatus.ACTIVE) {
+                menu.activate();
+            } else if (cmd.getStatus() == MenuStatus.DISABLED) {
+                ensureMenuCanDisable(menu.getCode());
+                menu.disable();
+            }
+        }
+        menuDomainService.syncMenu(menu);
+        return MenuImportDTO.builder()
+                .code(menu.getCode())
+                .created(created)
+                .matched(!created)
+                .build();
+    }
+
+    /** 导入匹配：sourceId 与 code 一致优先；若 ID 撞到无关记录则回退业务编码，无法回退才安全失败。 */
+    private Menu resolveImportTarget(String code, Long sourceId) {
+        if (sourceId == null) {
+            return menuRepo.findByCode(code).orElse(null);
+        }
+        Menu byId = menuRepo.findById(sourceId).orElse(null);
+        if (byId == null || code.equals(byId.getCode())) {
+            return byId == null ? menuRepo.findByCode(code).orElse(null) : byId;
+        }
+        Menu byCode = menuRepo.findByCode(code).orElse(null);
+        if (byCode != null) {
+            return byCode;
+        }
+        throw new BizException("导入菜单ID与编码均无法匹配目标记录，已拒绝写入：" + code);
+    }
+
+    /**
+     * 菜单导入批量完成后整体重建菜单权限目录（真实叶子补缺、状态刷新）；
+     * 只补缺，不夺取端点/插件/人工登记的来源与元数据。
+     *
+     * @return 同步的权限条数
+     */
+    @Transactional
+    public int syncPermissionCatalog() {
+        return menuDomainService.syncPermissionCatalog(menuRepo.findAll());
     }
 
     @Transactional
@@ -524,6 +636,7 @@ public class MenuAppService {
 
     private MenuManageDTO toDTO(Menu menu, String displayParentCode) {
         return MenuManageDTO.builder()
+                .id(menu.getId())
                 .code(menu.getCode())
                 .name(menu.getName())
                 .type(menu.getType())

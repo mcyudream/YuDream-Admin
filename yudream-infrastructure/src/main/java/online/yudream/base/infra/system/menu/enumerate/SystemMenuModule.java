@@ -232,6 +232,23 @@ public enum SystemMenuModule {
             parentName = "SECURITY", permission = "system:security:passkey:revoke")
     SECURITY_PASSKEY_REVOKE,
 
+    @MenuNode(code = "system:template", name = "数据模板", type = MenuNodeType.MENU,
+            parentName = "CONFIG", path = "/system/data-template", component = "system/data-template/index.vue",
+            icon = "morph:file-spreadsheet", sort = 12)
+    TEMPLATE,
+
+    @MenuNode(code = "system:template:view", name = "查看数据模板", type = MenuNodeType.BUTTON,
+            parentName = "TEMPLATE", permission = "system:template:view")
+    TEMPLATE_VIEW,
+
+    @MenuNode(code = "system:template:export", name = "导出数据模板", type = MenuNodeType.BUTTON,
+            parentName = "TEMPLATE", permission = "system:template:export")
+    TEMPLATE_EXPORT,
+
+    @MenuNode(code = "system:template:import", name = "导入数据模板", type = MenuNodeType.BUTTON,
+            parentName = "TEMPLATE", permission = "system:template:import")
+    TEMPLATE_IMPORT,
+
     @MenuNode(code = "system:menu", name = "菜单管理", type = MenuNodeType.MENU,
             parentName = "CONFIG", path = "/system/menu", component = "system/menu/index.vue",
             icon = "i-ri:menu-2-line", sort = 10)

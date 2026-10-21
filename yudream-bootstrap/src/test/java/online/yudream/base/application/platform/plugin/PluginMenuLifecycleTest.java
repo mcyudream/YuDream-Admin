@@ -860,6 +860,14 @@ class PluginMenuLifecycleTest {
         }
 
         @Override
+        public Optional<Menu> findById(Long id) {
+            if (id == null) {
+                return Optional.empty();
+            }
+            return menus.values().stream().filter(menu -> id.equals(menu.getId())).findFirst();
+        }
+
+        @Override
         public Optional<Menu> findByCode(String code) {
             return Optional.ofNullable(menus.get(code));
         }

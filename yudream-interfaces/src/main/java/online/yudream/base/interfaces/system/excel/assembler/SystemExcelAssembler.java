@@ -2,15 +2,21 @@ package online.yudream.base.interfaces.system.excel.assembler;
 
 import online.yudream.base.application.platform.agent.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
+import online.yudream.base.application.system.menu.cmd.MenuImportCmd;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
+import online.yudream.base.application.system.user.cmd.TemplateDeptUpsertCmd;
+import online.yudream.base.application.system.user.cmd.TemplateRoleUpsertCmd;
+import online.yudream.base.application.system.user.cmd.TemplateUserUpsertCmd;
 import online.yudream.base.application.system.user.cmd.RoleCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
 import online.yudream.base.application.system.user.dto.RoleManageDTO;
 import online.yudream.base.application.system.user.dto.UserManageDTO;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
 import online.yudream.base.domain.system.monitor.dto.OnlineUserDTO;
@@ -31,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -41,65 +48,36 @@ public class SystemExcelAssembler {
     private SystemExcelAssembler() {
     }
 
+    /** 空模板不再预填可被误提交的真实业务示例数据。 */
     public static UserExcelRow userTemplateRow() {
-        UserExcelRow row = new UserExcelRow();
-        row.setUsername("zhangsan");
-        row.setNickname("张三");
-        row.setEmail("zhangsan@example.com");
-        row.setPassword("Yd@123456");
-        row.setEmailVerified("是");
-        row.setDeptIds("1,3");
-        row.setDefaultDeptId(1L);
-        row.setRoleIds("1001,1002");
-        return row;
+        return new UserExcelRow();
     }
 
     public static RoleExcelRow roleTemplateRow() {
-        RoleExcelRow row = new RoleExcelRow();
-        row.setName("项目管理员");
-        row.setCode("project_admin");
-        row.setDeptId(1L);
-        row.setLevel("ADMIN");
-        row.setPermissions("system:user,system:user:create");
-        return row;
+        return new RoleExcelRow();
     }
 
     public static DeptExcelRow deptTemplateRow() {
-        DeptExcelRow row = new DeptExcelRow();
-        row.setName("研发部");
-        row.setParentId(1L);
-        row.setPhone("13800000000");
-        row.setSortOrder(10);
-        row.setDescription("部门描述");
-        return row;
+        return new DeptExcelRow();
     }
 
     public static MenuExcelRow menuTemplateRow() {
-        MenuExcelRow row = new MenuExcelRow();
-        row.setCode("system:demo");
-        row.setName("示例菜单");
-        row.setType("MENU");
-        row.setParentCode("system");
-        row.setPath("/system/demo");
-        row.setComponent("system/demo/index.vue");
-        row.setIcon("i-ri:file-list-line");
-        row.setSort(10);
-        row.setPermission("system:demo");
-        return row;
+        return new MenuExcelRow();
     }
 
     public static UserExcelRow toUserRow(UserManageDTO dto) {
         UserExcelRow row = new UserExcelRow();
-        row.setId(dto.getId());
+        row.setId(id(dto.getId()));
         row.setUsername(dto.getUsername());
         row.setNickname(dto.getNickname());
         row.setEmail(dto.getEmail());
         row.setPhone(dto.getPhone());
         row.setQq(dto.getQq());
+        // 密码、头像、消息身份、扩展字段均不属于可移植模板。
         row.setEmailVerified(yesNo(dto.isEmailVerified()));
         row.setDeptIds(join(dto.getDeptIds()));
         row.setDeptNames(join(dto.getDeptNames()));
-        row.setDefaultDeptId(dto.getDefaultDeptId());
+        row.setDefaultDeptId(id(dto.getDefaultDeptId()));
         row.setRoleIds(join(dto.getRoleIds()));
         row.setRoleNames(join(dto.getRoleNames()));
         row.setStatus(enumName(dto.getStatus()));
@@ -110,33 +88,56 @@ public class SystemExcelAssembler {
     public static UserCreateCmd toUserCreateCmd(UserExcelRow row) {
         UserCreateCmd cmd = new UserCreateCmd();
         cmd.setUsername(required(row.getUsername(), "用户名"));
-        cmd.setNickname(row.getNickname());
+        cmd.setNickname(trimToNull(row.getNickname()));
         cmd.setEmail(required(row.getEmail(), "邮箱"));
-        cmd.setPhone(row.getPhone());
-        cmd.setQq(row.getQq());
+        cmd.setPhone(trimToNull(row.getPhone()));
+        cmd.setQq(trimToNull(row.getQq()));
         cmd.setPassword(required(row.getPassword(), "初始密码"));
         cmd.setEmailVerified(parseBoolean(row.getEmailVerified()));
-        cmd.setRoleIds(parseLongList(row.getRoleIds()));
-        List<Long> deptIds = parseLongList(row.getDeptIds());
-        Long defaultDeptId = row.getDefaultDeptId() == null && !deptIds.isEmpty() ? deptIds.get(0) : row.getDefaultDeptId();
-        cmd.setDepts(deptIds.stream().map(id -> {
+        cmd.setRoleIds(parseLongList(row.getRoleIds(), "角色ID"));
+        List<Long> deptIds = parseLongList(row.getDeptIds(), "部门ID");
+        Long defaultDeptId = parseLong(row.getDefaultDeptId(), "默认部门ID");
+        if (defaultDeptId == null && !deptIds.isEmpty()) {
+            defaultDeptId = deptIds.getFirst();
+        }
+        Long finalDefaultDeptId = defaultDeptId;
+        cmd.setDepts(deptIds.stream().map(value -> {
             UserDeptAssignCmd dept = new UserDeptAssignCmd();
-            dept.setDeptId(id);
-            dept.setDefaultDept(Objects.equals(id, defaultDeptId));
+            dept.setDeptId(value);
+            dept.setDefaultDept(Objects.equals(value, finalDefaultDeptId));
             return dept;
         }).toList());
         return cmd;
     }
 
+    public static TemplateUserUpsertCmd toUserImportCmd(UserExcelRow row) {
+        TemplateUserUpsertCmd cmd = new TemplateUserUpsertCmd();
+        cmd.setSourceId(trimToNull(row.getId()));
+        cmd.setUsername(required(row.getUsername(), "用户名"));
+        cmd.setNickname(trimToNull(row.getNickname()));
+        cmd.setEmail(trimToNull(row.getEmail()));
+        cmd.setPhone(trimToNull(row.getPhone()));
+        cmd.setQq(trimToNull(row.getQq()));
+        cmd.setEmailVerified(parseNullableBoolean(row.getEmailVerified(), "邮箱已验证"));
+        cmd.setStatus(parseEnum(row.getStatus(), online.yudream.base.domain.system.user.enumerate.UserStatus.class,
+                null, "用户状态"));
+        cmd.setDeptIds(parseLongList(row.getDeptIds(), "部门ID"));
+        cmd.setDefaultDeptId(parseLong(row.getDefaultDeptId(), "默认部门ID"));
+        cmd.setRoleIds(parseLongList(row.getRoleIds(), "角色ID"));
+        return cmd;
+    }
+
     public static RoleExcelRow toRoleRow(RoleManageDTO dto) {
         RoleExcelRow row = new RoleExcelRow();
-        row.setId(dto.getId());
+        row.setId(id(dto.getId()));
         row.setName(dto.getName());
         row.setCode(dto.getCode());
-        row.setDeptId(dto.getDeptId());
+        row.setDeptId(id(dto.getDeptId()));
         row.setDeptName(dto.getDeptName());
         row.setLevel(enumName(dto.getLevel()));
         row.setPermissions(join(dto.getPermissions()));
+        row.setIcon(dto.getIcon());
+        row.setColor(dto.getColor());
         row.setSystemRole(yesNo(dto.isSystemRole()));
         row.setStatus(enumName(dto.getStatus()));
         row.setCreateTime(format(dto.getCreateTime()));
@@ -147,22 +148,40 @@ public class SystemExcelAssembler {
         RoleCreateCmd cmd = new RoleCreateCmd();
         cmd.setName(required(row.getName(), "角色名称"));
         cmd.setCode(required(row.getCode(), "角色编码"));
-        cmd.setDeptId(row.getDeptId());
-        cmd.setLevel(StringUtils.hasText(row.getLevel()) ? RoleLevel.valueOf(row.getLevel().trim()) : RoleLevel.USER);
+        cmd.setDeptId(requiredLong(row.getDeptId(), "部门ID"));
+        cmd.setLevel(parseEnum(row.getLevel(), RoleLevel.class, RoleLevel.USER, "角色等级"));
+        cmd.setIcon(trimToNull(row.getIcon()));
+        cmd.setColor(trimToNull(row.getColor()));
         cmd.setPermissions(parseStringList(row.getPermissions()));
+        return cmd;
+    }
+
+    public static TemplateRoleUpsertCmd toRoleImportCmd(RoleExcelRow row) {
+        TemplateRoleUpsertCmd cmd = new TemplateRoleUpsertCmd();
+        cmd.setSourceId(parseLong(row.getId(), "角色ID"));
+        cmd.setCode(required(row.getCode(), "角色编码"));
+        cmd.setName(required(row.getName(), "角色名称"));
+        cmd.setDeptId(parseLong(row.getDeptId(), "部门ID"));
+        cmd.setLevel(parseEnum(row.getLevel(), RoleLevel.class, null, "角色等级"));
+        cmd.setPermissions(parseStringList(row.getPermissions()));
+        cmd.setIcon(trimToNull(row.getIcon()));
+        cmd.setColor(trimToNull(row.getColor()));
+        cmd.setStatus(parseEnum(row.getStatus(), online.yudream.base.domain.system.user.enumerate.RoleStatus.class,
+                null, "角色状态"));
         return cmd;
     }
 
     public static DeptExcelRow toDeptRow(DeptManageDTO dto) {
         DeptExcelRow row = new DeptExcelRow();
-        row.setId(dto.getId());
+        row.setId(id(dto.getId()));
         row.setName(dto.getName());
-        row.setParentId(dto.getParentId());
-        row.setLeaderId(dto.getLeaderId());
+        row.setParentId(id(dto.getParentId()));
+        row.setLeaderId(id(dto.getLeaderId()));
         row.setLeaderName(dto.getLeaderName());
         row.setPhone(dto.getPhone());
         row.setSortOrder(dto.getSortOrder());
         row.setDescription(dto.getDescription());
+        row.setColor(dto.getColor());
         row.setSystemDept(yesNo(dto.isSystemDept()));
         row.setStatus(enumName(dto.getStatus()));
         row.setCreateTime(format(dto.getCreateTime()));
@@ -172,16 +191,35 @@ public class SystemExcelAssembler {
     public static DeptCreateCmd toDeptCreateCmd(DeptExcelRow row) {
         DeptCreateCmd cmd = new DeptCreateCmd();
         cmd.setName(required(row.getName(), "部门名称"));
-        cmd.setParentId(row.getParentId());
-        cmd.setLeaderId(row.getLeaderId());
-        cmd.setPhone(row.getPhone());
+        cmd.setParentId(parseLong(row.getParentId(), "上级部门ID"));
+        cmd.setLeaderId(parseLong(row.getLeaderId(), "负责人ID"));
+        cmd.setPhone(trimToNull(row.getPhone()));
         cmd.setSortOrder(row.getSortOrder());
-        cmd.setDescription(row.getDescription());
+        cmd.setDescription(trimToNull(row.getDescription()));
+        cmd.setColor(trimToNull(row.getColor()));
+        return cmd;
+    }
+
+    public static TemplateDeptUpsertCmd toDeptImportCmd(DeptExcelRow row) {
+        TemplateDeptUpsertCmd cmd = new TemplateDeptUpsertCmd();
+        cmd.setSourceId(parseLong(row.getId(), "部门ID"));
+        cmd.setName(required(row.getName(), "部门名称"));
+        cmd.setParentSpecified(true);
+        cmd.setParentId(parseLong(row.getParentId(), "上级部门ID"));
+        cmd.setLeaderSpecified(true);
+        cmd.setLeaderId(parseLong(row.getLeaderId(), "负责人ID"));
+        cmd.setPhone(trimToNull(row.getPhone()));
+        cmd.setSortOrder(row.getSortOrder());
+        cmd.setDescription(trimToNull(row.getDescription()));
+        cmd.setColor(trimToNull(row.getColor()));
+        cmd.setStatus(parseEnum(row.getStatus(), online.yudream.base.domain.system.user.enumerate.DeptStatus.class,
+                null, "部门状态"));
         return cmd;
     }
 
     public static MenuExcelRow toMenuRow(MenuManageDTO dto) {
         MenuExcelRow row = new MenuExcelRow();
+        row.setId(id(dto.getId()));
         row.setCode(dto.getCode());
         row.setName(dto.getName());
         row.setType(enumName(dto.getType()));
@@ -192,6 +230,7 @@ public class SystemExcelAssembler {
         row.setComponent(dto.getComponent());
         row.setLink(dto.getLink());
         row.setSort(dto.getSort());
+        row.setVisible(yesNo(dto.getVisible() == null || dto.getVisible()));
         row.setPermission(dto.getPermission());
         row.setStatus(enumName(dto.getStatus()));
         return row;
@@ -201,15 +240,35 @@ public class SystemExcelAssembler {
         MenuCreateCmd cmd = new MenuCreateCmd();
         cmd.setCode(required(row.getCode(), "菜单编码"));
         cmd.setName(required(row.getName(), "菜单名称"));
-        cmd.setType(StringUtils.hasText(row.getType()) ? MenuNodeType.valueOf(row.getType().trim()) : MenuNodeType.MENU);
-        cmd.setParentCode(row.getParentCode());
-        cmd.setModule(row.getModule());
-        cmd.setIcon(row.getIcon());
-        cmd.setPath(row.getPath());
-        cmd.setComponent(row.getComponent());
-        cmd.setLink(row.getLink());
+        cmd.setType(parseEnum(row.getType(), MenuNodeType.class, MenuNodeType.MENU, "菜单类型"));
+        cmd.setParentCode(trimToNull(row.getParentCode()));
+        cmd.setModule(trimToNull(row.getModule()));
+        cmd.setIcon(trimToNull(row.getIcon()));
+        cmd.setPath(trimToNull(row.getPath()));
+        cmd.setComponent(trimToNull(row.getComponent()));
+        cmd.setLink(trimToNull(row.getLink()));
         cmd.setSort(row.getSort());
-        cmd.setPermission(row.getPermission());
+        cmd.setVisible(parseNullableBoolean(row.getVisible(), "是否显示"));
+        cmd.setPermission(trimToNull(row.getPermission()));
+        return cmd;
+    }
+
+    public static MenuImportCmd toMenuImportCmd(MenuExcelRow row) {
+        MenuImportCmd cmd = new MenuImportCmd();
+        cmd.setSourceId(parseLong(row.getId(), "菜单ID"));
+        cmd.setCode(required(row.getCode(), "菜单编码"));
+        cmd.setName(required(row.getName(), "菜单名称"));
+        cmd.setType(parseEnum(row.getType(), MenuNodeType.class, MenuNodeType.MENU, "菜单类型"));
+        cmd.setParentCode(trimToNull(row.getParentCode()));
+        cmd.setModule(trimToNull(row.getModule()));
+        cmd.setIcon(trimToNull(row.getIcon()));
+        cmd.setPath(trimToNull(row.getPath()));
+        cmd.setComponent(trimToNull(row.getComponent()));
+        cmd.setLink(trimToNull(row.getLink()));
+        cmd.setSort(row.getSort());
+        cmd.setVisible(parseNullableBoolean(row.getVisible(), "是否显示"));
+        cmd.setPermission(trimToNull(row.getPermission()));
+        cmd.setStatus(parseEnum(row.getStatus(), MenuStatus.class, MenuStatus.ACTIVE, "菜单状态"));
         return cmd;
     }
 
@@ -294,26 +353,76 @@ public class SystemExcelAssembler {
         return result;
     }
 
-    private static String required(String value, String name) {
-        if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(name + "不能为空");
+    public static String required(String value, String name) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new BizException(name + "不能为空");
         }
-        return value.trim();
+        return normalized;
     }
 
-    private static boolean parseBoolean(String value) {
-        if (!StringUtils.hasText(value)) {
+    public static String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    public static Long requiredLong(String value, String name) {
+        Long parsed = parseLong(value, name);
+        if (parsed == null) {
+            throw new BizException(name + "不能为空");
+        }
+        return parsed;
+    }
+
+    public static Long parseLong(String value, String name) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(normalized);
+        }
+        catch (NumberFormatException e) {
+            throw new BizException(name + "必须是完整整数标识");
+        }
+    }
+
+    public static boolean parseBoolean(String value) {
+        Boolean parsed = parseNullableBoolean(value, "布尔值");
+        return Boolean.TRUE.equals(parsed);
+    }
+
+    public static Boolean parseNullableBoolean(String value, String name) {
+        String text = trimToNull(value);
+        if (text == null) {
+            return null;
+        }
+        if ("是".equals(text) || "true".equalsIgnoreCase(text) || "1".equals(text) || "yes".equalsIgnoreCase(text)) {
+            return true;
+        }
+        if ("否".equals(text) || "false".equalsIgnoreCase(text) || "0".equals(text) || "no".equalsIgnoreCase(text)) {
             return false;
         }
-        String text = value.trim();
-        return "是".equals(text) || "true".equalsIgnoreCase(text) || "1".equals(text) || "yes".equalsIgnoreCase(text);
+        throw new BizException(name + "仅支持 是/否 或 true/false");
     }
 
-    private static List<Long> parseLongList(String value) {
-        return parseStringList(value).stream().map(Long::valueOf).toList();
+    public static <E extends Enum<E>> E parseEnum(String value, Class<E> type, E defaultValue, String name) {
+        String text = trimToNull(value);
+        if (text == null) {
+            return defaultValue;
+        }
+        try {
+            return Enum.valueOf(type, text.toUpperCase(Locale.ROOT));
+        }
+        catch (IllegalArgumentException e) {
+            throw new BizException(name + "值无效：" + text);
+        }
     }
 
-    private static List<String> parseStringList(String value) {
+    public static List<Long> parseLongList(String value, String name) {
+        return parseStringList(value).stream().map(item -> parseLong(item, name)).toList();
+    }
+
+    public static List<String> parseStringList(String value) {
         if (!StringUtils.hasText(value)) {
             return new ArrayList<>();
         }
@@ -329,6 +438,10 @@ public class SystemExcelAssembler {
             return null;
         }
         return values.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    private static String id(Long value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private static String yesNo(boolean value) {

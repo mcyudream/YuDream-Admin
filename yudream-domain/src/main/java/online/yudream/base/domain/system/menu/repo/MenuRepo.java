@@ -12,6 +12,8 @@ public interface MenuRepo {
 
     Menu save(Menu menu);
 
+    Optional<Menu> findById(Long id);
+
     Optional<Menu> findByCode(String code);
 
     Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey);

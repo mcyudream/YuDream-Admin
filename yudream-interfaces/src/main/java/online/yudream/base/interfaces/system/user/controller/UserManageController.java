@@ -8,6 +8,7 @@ import online.yudream.base.application.system.security.service.LoginTokenAppServ
 import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserDeletionAppService;
+import online.yudream.base.application.system.user.service.UserInitialPasswordAppService;
 import online.yudream.base.application.system.user.service.UserManageAppService;
 import online.yudream.base.application.system.user.service.UserRoleChangesAppService;
 import online.yudream.base.application.system.user.service.UserStatsAppService;
@@ -51,6 +52,7 @@ public class UserManageController {
     private final UserRoleChangesAppService userRoleChangesAppService;
     private final UserStatsAppService userStatsAppService;
     private final UserDeletionAppService userDeletionAppService;
+    private final UserInitialPasswordAppService userInitialPasswordAppService;
 
     @PutMapping("/{id}/role-changes")
     @PermissionRegister(code = "system:user:assign-role", name = "分配用户角色", module = "系统管理", desc = "增量分配或移除用户角色")
@@ -129,6 +131,14 @@ public class UserManageController {
     @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "修改用户密码")
     public Result<Void> changePassword(@PathVariable Long id, @Valid @RequestBody UserPasswordChangeRequest request) {
         userManageAppService.changePassword(UserManageWebAssembler.toCmd(id, request));
+        return Result.ok();
+    }
+
+    @PostMapping("/{id}/initial-password-email")
+    @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "重发初始密码设置邮件（新导入用户首次设置密码）")
+    public Result<Void> sendInitialPasswordEmail(@PathVariable Long id) {
+        StpUtil.checkPermission("system:user:edit");
+        userInitialPasswordAppService.sendInitialPasswordSetupEmail(id);
         return Result.ok();
     }
 

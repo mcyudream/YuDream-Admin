@@ -45,7 +45,7 @@ class ExternalLoginAutoBindingTest {
                     throw new AssertionError(method.getName());
                 });
         UserAppService userApp = new UserAppService(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null) {
+                null, null, null, null, null, null, null, null) {
             @Override
             public UserProfileDTO profile(Long id) {
                 return UserProfileDTO.builder().id(id).username("student@site.edu.cn")

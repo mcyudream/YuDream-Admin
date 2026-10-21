@@ -17,6 +17,9 @@ public class MenuManageDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    /** 内部稳定主键，只读展示/导出用；不是 API 主键，业务标识仍是 code。 */
+    private Long id;
+
     private String code;
     private String name;
     private MenuNodeType type;

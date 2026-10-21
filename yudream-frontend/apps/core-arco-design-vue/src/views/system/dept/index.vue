@@ -12,6 +12,7 @@ import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
+import { templateImportFeedbackKind } from '@/utils/template-import-feedback'
 
 const modal = useYdModal()
 const toast = useYdToast()
@@ -324,7 +325,16 @@ async function downloadDeptTemplate() {
 function importDepts() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importDepts(excelForm(file))
-    toast.success(importResultMessage(res.data))
+    const feedback = templateImportFeedbackKind(res.data)
+    if (feedback === 'error') {
+      toast.error('导入完成，存在失败行', { description: importResultMessage(res.data) })
+    }
+    else if (feedback === 'warning') {
+      toast.warning('导入完成，但有提示', { description: importResultMessage(res.data) })
+    }
+    else {
+      toast.success(importResultMessage(res.data))
+    }
     await load()
   })
 }

@@ -14,6 +14,7 @@ import RelatedEntity from '@/components/RelatedEntity/index.vue'
 
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
+import { templateImportFeedbackKind } from '@/utils/template-import-feedback'
 import { permissionOperationError } from './components/permission-operations'
 import PermissionConstellation from './components/PermissionConstellation.vue'
 import PermissionMatrix from './components/PermissionMatrix.vue'
@@ -482,7 +483,16 @@ async function downloadRoleTemplate() {
 function importRoles() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importRoles(excelForm(file))
-    toast.success(importResultMessage(res.data))
+    const feedback = templateImportFeedbackKind(res.data)
+    if (feedback === 'error') {
+      toast.error('导入完成，存在失败行', { description: importResultMessage(res.data) })
+    }
+    else if (feedback === 'warning') {
+      toast.warning('导入完成，但有提示', { description: importResultMessage(res.data) })
+    }
+    else {
+      toast.success(importResultMessage(res.data))
+    }
     await refreshViews()
   })
 }

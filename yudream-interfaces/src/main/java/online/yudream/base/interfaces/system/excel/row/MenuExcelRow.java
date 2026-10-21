@@ -3,8 +3,13 @@ package online.yudream.base.interfaces.system.excel.row;
 import com.alibaba.excel.annotation.ExcelProperty;
 import lombok.Data;
 
+/**
+ * 菜单模板行。编码是跨系统身份，ID 仅用于同源回导定位。
+ */
 @Data
 public class MenuExcelRow {
+    @ExcelProperty("菜单ID")
+    private String id;
     @ExcelProperty("菜单编码")
     private String code;
     @ExcelProperty("菜单名称")
@@ -25,6 +30,8 @@ public class MenuExcelRow {
     private String link;
     @ExcelProperty("排序")
     private Integer sort;
+    @ExcelProperty("是否显示")
+    private String visible;
     @ExcelProperty("权限字符")
     private String permission;
     @ExcelProperty("状态")

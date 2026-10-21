@@ -207,6 +207,10 @@ class PluginMenuCategoryProjectionTest {
     private static class InMemoryMenuRepo implements MenuRepo {
         private final Map<String, Menu> menus = new LinkedHashMap<>();
         @Override public Menu save(Menu menu) { menus.put(menu.getCode(), menu); return menu; }
+        @Override public Optional<Menu> findById(Long id) {
+            if (id == null) { return Optional.empty(); }
+            return menus.values().stream().filter(menu -> id.equals(menu.getId())).findFirst();
+        }
         @Override public Optional<Menu> findByCode(String code) { return Optional.ofNullable(menus.get(code)); }
         @Override public Optional<Menu> findByPluginCodeAndRegistrationKey(String code, String key) {
             return findByPluginCode(code).stream().filter(menu -> key.equals(menu.getPluginRegistrationKey())).findFirst();

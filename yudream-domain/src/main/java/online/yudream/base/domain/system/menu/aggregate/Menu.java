@@ -20,6 +20,12 @@ import java.util.List;
 @AllArgsConstructor
 public class Menu {
 
+    /**
+     * 稳定内部主键（雪花 ID）。仅用于跨环境导入时按源记录定位目标，
+     * 不作为对外 API 的记录主键；code 仍是业务权威标识。
+     */
+    private Long id;
+
     private String code;
 
     private String name;

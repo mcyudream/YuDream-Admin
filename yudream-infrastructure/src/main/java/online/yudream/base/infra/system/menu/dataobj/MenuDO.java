@@ -28,7 +28,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 )
 public class MenuDO extends BaseDO {
 
-    @Indexed(unique = true)
+    /**
+     * 菜单业务唯一索引（uk_menu_code）。注意：启动期必须先经
+     * PluginMenuIndexInitializer 治理同 code 冗余，再确保该唯一索引，
+     * 否则脏数据会令索引创建失败。
+     */
+    @Indexed(unique = true, name = "uk_menu_code")
     private String code;
 
     private String name;

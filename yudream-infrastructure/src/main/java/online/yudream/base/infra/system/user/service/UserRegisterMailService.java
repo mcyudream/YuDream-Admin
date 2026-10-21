@@ -55,4 +55,25 @@ public class UserRegisterMailService implements UserRegisterMailSender {
                 .build();
         mailSender.send(message);
     }
+
+    /**
+     * 发送初始密码设置邮件（外部导入/模板创建的新用户）。
+     * <p>
+     * 复用 /reset-password 前端页面；token 族与普通重置独立，应用层据此区分处理。
+     * 邮件经由异步发送器提交，此处不代表实际送达。
+     */
+    @Override
+    public void sendInitialPasswordSetupEmail(String username, String email, String token) {
+        String setupUrl = integrationSettings.effectiveWebUrl() + "/reset-password?token=" + token;
+        MailMessage message = MailMessage.builder()
+                .to(List.of(email))
+                .subject("设置初始密码")
+                .templateId("initial-password-setup")
+                .templateVariables(Map.of(
+                        "username", username,
+                        "setupUrl", setupUrl
+                ))
+                .build();
+        mailSender.send(message);
+    }
 }

@@ -3,9 +3,11 @@ package online.yudream.base.application.system.user.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.user.cmd.RoleCreateCmd;
 import online.yudream.base.application.system.user.cmd.RoleUpdateCmd;
+import online.yudream.base.application.system.user.cmd.TemplateRoleUpsertCmd;
 import online.yudream.base.application.system.user.dto.OptionDTO;
 import online.yudream.base.application.system.user.dto.PermissionDTO;
 import online.yudream.base.application.system.user.dto.RoleManageDTO;
+import online.yudream.base.application.system.user.dto.TemplateRoleUpsertResult;
 import online.yudream.base.application.system.user.query.RolePageQuery;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
@@ -23,6 +25,7 @@ import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.function.Function;
@@ -124,6 +127,110 @@ public class RoleManageAppService {
         Role role = getRole(id);
         role.replacePermissions(resolvePermissionIds(permissions));
         return toDTO(roleRepo.save(role));
+    }
+
+    /**
+     * 模板导入：新建角色。目标是否存在由调用方（模板导入服务）先行判定，
+     * 判定不存在后调用本方法；编码冲突沿用「角色编码已存在」规则。
+     * 新建角色一律由服务端生成 ID，不写入模板来源 ID；
+     * 权限码按现有规则原样入库（失效码不阻断也不丢弃）。
+     */
+    @Transactional
+    public TemplateRoleUpsertResult createFromTemplate(TemplateRoleUpsertCmd cmd) {
+        if (!StringUtils.hasText(cmd.getName())) {
+            throw new BizException("角色名称不能为空");
+        }
+        if (!StringUtils.hasText(cmd.getCode())) {
+            throw new BizException("角色编码不能为空");
+        }
+        if (roleRepo.existsByCodeExcludeId(cmd.getCode(), null)) {
+            throw new BizException("角色编码已存在");
+        }
+        if (cmd.getDeptId() == null) {
+            throw new BizException("部门不能为空");
+        }
+        Dept dept = deptRepo.findById(cmd.getDeptId()).orElseThrow(() -> new BizException("部门不存在"));
+        Role role = Role.create(cmd.getName(), cmd.getCode(), DeptID.of(dept.getId()),
+                cmd.getLevel() == null ? RoleLevel.USER : cmd.getLevel(), cmd.getIcon(), cmd.getColor());
+        role.replacePermissions(resolvePermissionIds(cmd.getPermissions()));
+        if (cmd.getStatus() == RoleStatus.DEPRECATED) {
+            role.deactivate();
+        }
+        Role saved = roleRepo.save(role);
+        return TemplateRoleUpsertResult.builder()
+                .created(true)
+                .roleId(saved.getId())
+                .code(saved.getCode())
+                .name(saved.getName())
+                .build();
+    }
+
+    /**
+     * 模板导入：更新既有角色。目标匹配（来源 ID 优先、角色编码兜底）由调用方完成后传入。
+     * <p>
+     * 受控规则：
+     * - 系统角色拒绝模板修改；
+     * - 编码不可变：模板编码非空且与现有不一致时抛冲突异常，一致或为空则保持原编码；
+     * - 白名单 name/deptId/level/icon/color/permissions/status，模板行缺省（null）字段保持不变；
+     *   权限码为 null 或空时保持既有授权不变；
+     * - 停用沿用现有安全规则：仍被用户使用的角色不可停用；已停用角色再次要求停用视为幂等通过。
+     */
+    @Transactional
+    public TemplateRoleUpsertResult applyTemplateUpdate(Long roleId, TemplateRoleUpsertCmd cmd) {
+        if (roleId == null) {
+            throw new BizException("目标角色不能为空");
+        }
+        Role role = getRole(roleId);
+        if (role.isSystemRole()) {
+            throw new BizException("系统角色不允许通过模板导入修改");
+        }
+        if (!StringUtils.hasText(cmd.getName())) {
+            throw new BizException("角色名称不能为空");
+        }
+        if (StringUtils.hasText(cmd.getCode()) && !cmd.getCode().equals(role.getCode())) {
+            throw new BizException("角色编码不可修改：模板编码「" + cmd.getCode() + "」与现有编码「" + role.getCode() + "」不一致");
+        }
+        DeptID deptId = role.getDeptId();
+        if (cmd.getDeptId() != null) {
+            Dept dept = deptRepo.findById(cmd.getDeptId()).orElseThrow(() -> new BizException("部门不存在"));
+            deptId = DeptID.of(dept.getId());
+        }
+        role.updateBasic(cmd.getName(), role.getCode(), deptId,
+                cmd.getLevel() == null ? role.getLevel() : cmd.getLevel());
+        role.updateAppearance(
+                cmd.isTemplateSnapshot() ? cmd.getIcon() : cmd.getIcon() != null ? cmd.getIcon() : role.getIcon(),
+                cmd.isTemplateSnapshot() ? cmd.getColor() : cmd.getColor() != null ? cmd.getColor() : role.getColor());
+        if (cmd.isTemplateSnapshot() || cmd.getPermissions() != null) {
+            role.replacePermissions(resolvePermissionIds(cmd.getPermissions()));
+        }
+        if (cmd.getStatus() == RoleStatus.ACTIVE) {
+            role.activate();
+        } else if (cmd.getStatus() == RoleStatus.DEPRECATED && role.getStatus() != RoleStatus.DEPRECATED) {
+            ensureRoleUnused(role.getId());
+            role.deactivate();
+        }
+        Role saved = roleRepo.save(role);
+        return TemplateRoleUpsertResult.builder()
+                .created(false)
+                .roleId(saved.getId())
+                .code(saved.getCode())
+                .name(saved.getName())
+                .build();
+    }
+
+    /** 单资源 Excel 回导：来源 ID 优先，角色编码回退；新建记录仍由目标系统生成 ID。 */
+    @Transactional
+    public TemplateRoleUpsertResult importTemplateRow(TemplateRoleUpsertCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getCode())) {
+            throw new BizException("角色编码不能为空");
+        }
+        Role byId = cmd.getSourceId() == null ? null : roleRepo.findById(cmd.getSourceId()).orElse(null);
+        Role byCode = roleRepo.findByCode(cmd.getCode()).orElse(null);
+        Role target = byCode != null ? byCode : byId;
+        if (target != null && target.isSystemRole()) {
+            throw new BizException("系统角色不允许通过模板导入修改");
+        }
+        return target == null ? createFromTemplate(cmd) : applyTemplateUpdate(target.getId(), cmd);
     }
 
     private Role getRole(Long id) {

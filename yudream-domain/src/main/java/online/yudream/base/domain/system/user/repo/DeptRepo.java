@@ -27,6 +27,9 @@ public interface DeptRepo {
 
     boolean existsByNameAndParentExcludeId(String name, Long parentId, Long excludeId);
 
+    /** 按名称与父部门精确查找（parentId 为 null 表示顶层）；模板导入按路径解析目标部门时使用。 */
+    Optional<Dept> findByNameAndParent(String name, Long parentId);
+
     long countActiveChildren(Long parentId);
 
     void deleteById(Long id);

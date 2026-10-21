@@ -42,6 +42,14 @@ public class MenuRepoImpl implements MenuRepo {
     }
 
     @Override
+    public Optional<Menu> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(MenuInfraMapper.toDomain(mongoTemplate.findById(id, MenuDO.class)));
+    }
+
+    @Override
     public Optional<Menu> findByCode(String code) {
         Query query = Query.query(Criteria.where("code").is(code));
         MenuDO menuDO = mongoTemplate.findOne(query, MenuDO.class);

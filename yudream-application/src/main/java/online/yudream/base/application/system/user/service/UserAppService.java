@@ -29,11 +29,13 @@ import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.domain.system.user.service.EmailVerifyTokenProvider;
+import online.yudream.base.domain.system.user.service.InitialPasswordSetupTokenProvider;
 import online.yudream.base.domain.system.user.service.PasswordResetTokenProvider;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
 import online.yudream.base.domain.system.user.service.MessagingIdentityClassifier;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.EmailVerifyTarget;
+import online.yudream.base.domain.system.user.valobj.InitialPasswordSetupTarget;
 import online.yudream.base.domain.system.user.valobj.PasswordResetTarget;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.valobj.Email;
@@ -87,6 +89,7 @@ public class UserAppService {
     private final FileAppService fileAppService;
     private final ExternalLoginBindingAppService externalLoginBindingAppService;
     private final ApplicationEventPublisher eventPublisher;
+    private final InitialPasswordSetupTokenProvider initialPasswordSetupTokenProvider;
 
     @Transactional
     public User login(UserLoginCmd cmd) {
@@ -215,18 +218,57 @@ public class UserAppService {
         log.info("密码重置邮件已发送: id={}, email={}", user.get().getId(), email);
     }
 
+    /**
+     * 统一的密码设置入口：先按普通密码重置 token 处理（要求邮箱已验证，行为不变）；
+     * 校验失败时兼容初始密码设置 token（管理端/模板导入新建用户，允许邮箱未验证，
+     * 设置成功后把邮箱标记为已验证）。两类 token 使用不同存储前缀，不会互相碰撞。
+     */
     @Transactional
     public void resetPassword(UserPasswordResetCmd cmd) {
         if (cmd == null || !StringUtils.hasText(cmd.getToken())) {
             throw new BizException("重置链接已过期或无效");
         }
-        PasswordResetTarget target = passwordResetTokenProvider.validate(cmd.getToken())
+        Optional<PasswordResetTarget> resetTarget = passwordResetTokenProvider.validate(cmd.getToken());
+        if (resetTarget.isPresent()) {
+            User user = resolvePasswordResetUser(resetTarget.get());
+            user.resetPassword(Password.of(cmd.getPassword(), passwordEncoder));
+            userRepo.save(user);
+            passwordResetTokenProvider.remove(cmd.getToken());
+            log.info("用户密码重置成功: id={}, username={}", user.getId(), user.getUsername());
+            return;
+        }
+        completeInitialPasswordSetup(cmd.getToken(), Password.of(cmd.getPassword(), passwordEncoder));
+    }
+
+    /**
+     * 初始密码设置：面向服务端代置占位密码的导入新用户。
+     * 校验邮箱仍然归属本人，不校验 emailVerified；完成后邮箱验证、token 一次性消费，
+     * 并按现有邮箱验证口径清理同邮箱的未验证重复账号。
+     */
+    private void completeInitialPasswordSetup(String token, Password password) {
+        InitialPasswordSetupTarget target = initialPasswordSetupTokenProvider.validate(token)
                 .orElseThrow(() -> new BizException("重置链接已过期或无效"));
-        User user = resolvePasswordResetUser(target);
-        user.resetPassword(Password.of(cmd.getPassword(), passwordEncoder));
+        if (target.userId() == null || !StringUtils.hasText(target.email())) {
+            throw new BizException("重置链接已过期或无效");
+        }
+        User user = userRepo.findById(target.userId())
+                .orElseThrow(() -> new BizException("用户不存在"));
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BizException("用户已停用");
+        }
+        String currentEmail = userEmail(user);
+        if (!currentEmail.equalsIgnoreCase(target.email())) {
+            throw new BizException("重置链接已失效，请重新发送初始化邮件");
+        }
+        List<User> sameEmailUsers = userRepo.findByEmailAll(currentEmail);
+        ensureEmailCanBeVerified(user, sameEmailUsers);
+        user.resetPassword(password);
+        user.verifyEmail();
         userRepo.save(user);
-        passwordResetTokenProvider.remove(cmd.getToken());
-        log.info("用户密码重置成功: id={}, username={}", user.getId(), user.getUsername());
+        int removedCount = deleteSameEmailUnverifiedUsers(user, sameEmailUsers);
+        initialPasswordSetupTokenProvider.remove(token);
+        log.info("用户初始密码设置成功: id={}, username={}, removedUnverified={}",
+                user.getId(), user.getUsername(), removedCount);
     }
 
     @Transactional(readOnly = true)

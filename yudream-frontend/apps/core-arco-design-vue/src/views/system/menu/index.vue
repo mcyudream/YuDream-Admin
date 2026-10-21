@@ -7,6 +7,7 @@ import apiMenu from '@/api/modules/system-menu'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
+import { templateImportFeedbackKind } from '@/utils/template-import-feedback'
 
 interface TreeNode extends YdTreeNode {
   menu?: MenuManageItem
@@ -546,7 +547,16 @@ async function downloadMenuTemplate() {
 function importMenus() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importMenus(excelForm(file))
-    toast.success(importResultMessage(res.data))
+    const feedback = templateImportFeedbackKind(res.data)
+    if (feedback === 'error') {
+      toast.error('导入完成，存在失败行', { description: importResultMessage(res.data) })
+    }
+    else if (feedback === 'warning') {
+      toast.warning('导入完成，但有提示', { description: importResultMessage(res.data) })
+    }
+    else {
+      toast.success(importResultMessage(res.data))
+    }
     await load()
   })
 }

@@ -6,8 +6,10 @@ import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
 import online.yudream.base.application.system.user.cmd.DeptUpdateCmd;
+import online.yudream.base.application.system.user.cmd.TemplateDeptUpsertCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
 import online.yudream.base.application.system.user.dto.OptionDTO;
+import online.yudream.base.application.system.user.dto.TemplateDeptUpsertResult;
 import online.yudream.base.application.system.user.query.DeptTreeQuery;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.user.aggregate.Dept;
@@ -153,6 +155,106 @@ public class DeptManageAppService {
         Dept dept = getDept(id);
         dept.activate();
         deptRepo.save(dept);
+    }
+
+    /**
+     * 模板导入：新建部门。目标是否存在由调用方（模板导入服务）按来源 ID/路径先行判定，
+     * 判定不存在后调用本方法；{@code parentId} 必须是已解析的本地父部门 ID（可空表示顶层）。
+     * 新建部门一律由服务端生成 ID，不写入模板来源 ID。
+     */
+    @Transactional
+    public TemplateDeptUpsertResult createFromTemplate(TemplateDeptUpsertCmd cmd) {
+        if (!StringUtils.hasText(cmd.getName())) {
+            throw new BizException("部门名称不能为空");
+        }
+        ensureParentExists(cmd.getParentId());
+        ensureNameUnique(null, cmd.getName(), cmd.getParentId());
+        Dept dept = Dept.create(null, cmd.getName(), cmd.getDescription(), toUserID(cmd.getLeaderId()),
+                toPhone(cmd.getPhone()), toDeptID(cmd.getParentId()), cmd.getSortOrder(), cmd.getColor());
+        if (cmd.getStatus() == DeptStatus.DEPRECATED) {
+            dept.deactivate();
+        }
+        Dept saved = deptRepo.save(dept);
+        return TemplateDeptUpsertResult.builder()
+                .created(true)
+                .deptId(saved.getId())
+                .name(saved.getName())
+                .parentId(saved.getParentId() == null ? null : saved.getParentId().getValue())
+                .build();
+    }
+
+    /**
+     * 模板导入：更新既有部门。目标匹配（来源 ID 优先、来源路径逐段解析兜底）由调用方完成后传入。
+     * <p>
+     * 受控规则：
+     * - 系统部门与根部门拒绝模板修改；
+     * - 白名单 name/description/leaderId/phone/parentId/sortOrder/color/status，
+     *   模板行缺省（null/空白）字段保持现状不变；
+     *   父部门与主管支持显式指定：{@code parentSpecified}/{@code leaderSpecified} 为 true
+     *   （或对应 ID 非空）时按 ID 落库，null 即显式摘除到顶层/显式清空主管；
+     * - 名称可变，但沿用「同父同级同名唯一」规则；调整父部门时校验存在性与层级循环；
+     * - 停用沿用现有安全规则：存在启用子部门或仍有关联用户不可停用；
+     *   已停用部门再次要求停用视为幂等通过。
+     */
+    @Transactional
+    public TemplateDeptUpsertResult applyTemplateUpdate(Long deptId, TemplateDeptUpsertCmd cmd) {
+        if (deptId == null) {
+            throw new BizException("目标部门不能为空");
+        }
+        Dept dept = getDept(deptId);
+        if (dept.isSystem() || dept.isRoot()) {
+            throw new BizException("系统部门或根部门不允许通过模板导入修改");
+        }
+        if (!StringUtils.hasText(cmd.getName())) {
+            throw new BizException("部门名称不能为空");
+        }
+        boolean parentSpecified = cmd.isParentSpecified() || cmd.getParentId() != null;
+        Long parentId = parentSpecified ? cmd.getParentId()
+                : (dept.getParentId() == null ? null : dept.getParentId().getValue());
+        boolean leaderSpecified = cmd.isLeaderSpecified() || cmd.getLeaderId() != null;
+        UserID leader = leaderSpecified ? toUserID(cmd.getLeaderId()) : dept.getLeader();
+        ensureParentExists(parentId);
+        ensureNoParentCycle(dept.getId(), parentId);
+        ensureNameUnique(dept.getId(), cmd.getName(), parentId);
+        String description = cmd.isTemplateSnapshot() ? cmd.getDescription()
+                : cmd.getDescription() != null ? cmd.getDescription() : dept.getDescription();
+        Phone phone = cmd.isTemplateSnapshot() ? toPhone(cmd.getPhone())
+                : StringUtils.hasText(cmd.getPhone()) ? Phone.of(cmd.getPhone()) : dept.getPhone();
+        Integer sortOrder = cmd.isTemplateSnapshot() ? cmd.getSortOrder()
+                : cmd.getSortOrder() != null ? cmd.getSortOrder() : dept.getSortOrder();
+        dept.updateBasic(cmd.getName(), description, leader, phone, toDeptID(parentId), sortOrder);
+        if (cmd.isTemplateSnapshot() || cmd.getColor() != null) {
+            dept.updateColor(cmd.getColor());
+        }
+        if (cmd.getStatus() == DeptStatus.ACTIVE) {
+            dept.activate();
+        } else if (cmd.getStatus() == DeptStatus.DEPRECATED && dept.getStatus() != DeptStatus.DEPRECATED) {
+            ensureDeptCanDisable(dept.getId());
+            dept.deactivate();
+        }
+        Dept saved = deptRepo.save(dept);
+        return TemplateDeptUpsertResult.builder()
+                .created(false)
+                .deptId(saved.getId())
+                .name(saved.getName())
+                .parentId(saved.getParentId() == null ? null : saved.getParentId().getValue())
+                .build();
+    }
+
+    /** 单资源 Excel 回导：来源 ID 优先；同父同名作为本地业务键兜底。 */
+    @Transactional
+    public TemplateDeptUpsertResult importTemplateRow(TemplateDeptUpsertCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getName())) {
+            throw new BizException("部门名称不能为空");
+        }
+        Dept byId = cmd.getSourceId() == null ? null : deptRepo.findById(cmd.getSourceId()).orElse(null);
+        Long parentId = cmd.isParentSpecified() ? cmd.getParentId() : null;
+        Dept byBusinessKey = deptRepo.findByNameAndParent(cmd.getName(), parentId).orElse(null);
+        Dept target = byBusinessKey != null ? byBusinessKey : byId;
+        if (target != null && (target.isSystem() || target.isRoot())) {
+            throw new BizException("系统部门或根部门不允许通过模板导入修改");
+        }
+        return target == null ? createFromTemplate(cmd) : applyTemplateUpdate(target.getId(), cmd);
     }
 
     private Dept getDept(Long id) {

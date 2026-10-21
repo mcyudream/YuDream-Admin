@@ -16,6 +16,7 @@ public class MenuInfraMapper {
     public static MenuDO toDataObj(Menu menu) {
         if (menu == null) return null;
         MenuDO menuDO = new MenuDO();
+        menuDO.setId(menu.getId());
         menuDO.setCode(menu.getCode());
         menuDO.setName(menu.getName());
         menuDO.setType(menu.getType());
@@ -40,6 +41,7 @@ public class MenuInfraMapper {
     public static Menu toDomain(MenuDO menuDO) {
         if (menuDO == null) return null;
         return Menu.builder()
+                .id(menuDO.getId())
                 .code(menuDO.getCode())
                 .name(menuDO.getName())
                 .type(menuDO.getType())
