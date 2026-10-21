@@ -130,6 +130,8 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
     ...(skin.pixel ? pixelRules(skin) : []),
     ...themeClassRules(document, skin),
     skin.dark ? `html:has(:is(${STUDIO_PUBLIC_ROOTS.join(',')})){color-scheme:dark}` : '',
+    // 站点外壳占用底部（如固定物品栏）时，返回顶部按钮抬到外壳之上，不压住物品栏
+    skin.bottomOffset ? `html:has(.studio-shadow-layout,.studio-shadow-region) .app-back-to-top{bottom:calc(${skin.bottomOffset} + 12px) !important}` : '',
   ].filter(Boolean).join('\n')
 }
 

@@ -61,7 +61,7 @@ function handleBackToTop() {
 <template>
   <Teleport to="body">
     <Transition v-bind="transitionClass">
-      <YdButton v-if="scrollTop >= 200" variant="outline" size="icon" class="rounded-full h-12 w-12 transition-all inset-b-4 fixed z-2000 dark:bg-background -inset-e-9 dark:hover:bg-background/50" :class="{ 'inset-e-3!': show }" @mouseenter="handleMouseenter" @mouseleave="handleMouseleave" @click="handleBackToTop">
+      <YdButton v-if="scrollTop >= 200" variant="outline" size="icon" class="app-back-to-top rounded-full h-12 w-12 transition-all inset-b-4 fixed z-2000 dark:bg-background -inset-e-9 dark:hover:bg-background/50" :class="{ 'inset-e-3!': show }" @mouseenter="handleMouseenter" @mouseleave="handleMouseleave" @click="handleBackToTop">
         <YdIcon name="morph:arrow-up-to-line" class="size-6" />
       </YdButton>
     </Transition>
