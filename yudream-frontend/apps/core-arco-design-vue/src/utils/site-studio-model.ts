@@ -129,13 +129,16 @@ function mutate(document: SiteDocument, command: StudioCommand) {
       break
     }
     case 'set-theme': {
-      for (const key of ['tokens', 'header', 'footer'] as const) {
+      for (const key of ['tokens', 'header', 'footer', 'classes', 'fonts', 'keyframes'] as const) {
         if (command[key] !== undefined) {
           Object.assign(document.theme, { [key]: cloneStudioJson(command[key]) })
         }
       }
       break
     }
+    case 'set-features':
+      document.features = cloneStudioJson(command.features)
+      break
     case 'add-page':
       document.pages.push(cloneStudioJson(command.page))
       break
@@ -207,7 +210,7 @@ function applyBatchItem(document: SiteDocument, item: StudioCommand, guard: Batc
     case 'insert': {
       validateStudioNodes([item.node])
       const ids = subtreeIds(item.node)
-      studioAssert(guard.count + ids.length <= STUDIO_LIMITS.nodes, '节点数超过 2000')
+      studioAssert(guard.count + ids.length <= STUDIO_LIMITS.nodes, `节点数超过 ${STUDIO_LIMITS.nodes}`)
       ids.forEach(id => studioAssert(!guard.ids.has(id), `重复 ID：${id}`))
       mutate(document, item)
       ids.forEach(id => guard.ids.add(id))

@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { findStudioNode } from '@/utils/site-studio'
 import { uploadStudioAsset } from './studio-upload'
+import StudioNodeBindings from './StudioNodeBindings.vue'
 
 defineOptions({ name: 'StudioInspector' })
 
@@ -360,6 +361,8 @@ function removeSelected() {
         <label class="text-xs flex flex-col gap-1 min-w-0"><span>排列方向</span><YdSelect class="min-w-0 w-full" :model-value="currentStyles['flex-direction'] || node.styles['flex-direction'] || 'row'" :options="[{ label: '水平', value: 'row' }, { label: '垂直', value: 'column' }]" aria-label="排列方向" @update:model-value="quickStyle('flex-direction', String($event))" /></label>
         <label v-for="field in quickFields" :key="field.key" class="text-xs flex flex-col gap-1"><span>{{ field.label }}</span><YdInput :model-value="currentStyles[field.key] || ''" :placeholder="quickPlaceholder(field)" :aria-label="field.label" @change="quickStyle(field.key, String($event.target.value))" /></label>
       </section>
+
+      <StudioNodeBindings :node="node" />
 
       <section class="flex flex-col gap-2" aria-label="属性">
         <div class="flex items-center justify-between">

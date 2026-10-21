@@ -131,7 +131,7 @@ const statusText = computed(() => source.value === 'live'
       <YdEmpty v-else-if="!document" description="该主题还没有站点草稿，先在网站工作台创建并保存" />
       <YdEmpty v-else-if="!page" description="草稿中没有这个路径的页面，从右上角选择要预览的页面" />
       <div v-else class="site-preview__viewport" :style="{ width: deviceWidths[device] }">
-        <StudioFrame :srcdoc="srcdoc" :base-path="basePath" />
+        <StudioFrame :srcdoc="srcdoc" :base-path="basePath" height="calc(100svh - 96px)" :runtime="document && page ? { document, page } : undefined" />
       </div>
     </main>
   </div>

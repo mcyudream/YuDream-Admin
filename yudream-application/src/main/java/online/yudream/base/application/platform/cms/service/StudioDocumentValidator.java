@@ -10,8 +10,11 @@ import org.springframework.stereotype.Component;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -19,6 +22,12 @@ import java.util.regex.Pattern;
 @Component
 public class StudioDocumentValidator {
     public static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
+    public static final int MAX_NODES = 6000;
+    private static final List<String> STYLE_STATES = List.of("hover", "focus", "active", "current", "pressed");
+    private static final Set<String> PARTICLE_PRESETS = Set.of("none", "snow", "petals", "embers", "spores", "stars", "dust");
+    private static final Pattern CLASS_NAME = Pattern.compile("[a-z][a-z0-9-]{0,63}");
+    private static final Pattern FONT_FAMILY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_ -]{0,63}");
+    private static final Pattern KEYFRAME_KEY = Pattern.compile("from|to|(?:100|[1-9]?\\d)(?:\\.\\d{1,2})?%");
     private static final Set<String> TAGS = Set.of("a abbr address article aside audio b bdi bdo blockquote br button caption cite code col colgroup dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr track u ul var video wbr".split(" "));
     private static final Set<String> ATTRIBUTES = Set.of("id class title lang dir role href target rel download src poster alt width height controls autoplay loop muted preload loading decoding crossorigin type media sizes datetime cite open colspan rowspan scope headers span start reversed value kind srclang label".split(" "));
     private static final Set<String> DATA_MIMES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm", "video/mp4", "video/webm", "video/ogg", "font/woff", "font/woff2", "font/ttf", "font/otf");
@@ -63,11 +72,11 @@ public class StudioDocumentValidator {
         final JsonNode document;
         try { document = mapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(documentJson); }
         catch (Exception ex) { throw new BizException("站点文档不是有效JSON"); }
-        object(document); keys(document, "schemaVersion", "id", "name", "theme", "pages", "assets");
+        object(document); keys(document, "schemaVersion", "id", "name", "theme", "pages", "assets", "features");
         if (!document.path("schemaVersion").isIntegralNumber() || !document.path("schemaVersion").canConvertToInt() || document.path("schemaVersion").intValue() != 1) fail("文档schemaVersion必须为1");
         Set<String> ids = new HashSet<>();
         identity(document, ids); string(document, "name");
-        JsonNode theme = document.get("theme"); object(theme); keys(theme, "tokens", "header", "footer");
+        JsonNode theme = document.get("theme"); object(theme); keys(theme, "tokens", "header", "footer", "classes", "fonts", "keyframes");
         JsonNode tokens = theme.get("tokens"); object(tokens);
         Set<String> tokenNames = new HashSet<>();
         tokens.fields().forEachRemaining(entry -> {
@@ -84,7 +93,7 @@ public class StudioDocumentValidator {
         JsonNode pages = document.get("pages"); array(pages);
         if (pages.isEmpty() || pages.size() > 200) fail("页面数量必须为1至200");
         for (JsonNode page : pages) {
-            object(page); keys(page, "id", "name", "path", "root"); identity(page, ids); string(page, "name");
+            object(page); keys(page, "id", "name", "path", "root", "settings"); identity(page, ids); string(page, "name");
             String path = text(page, "path");
             if (!path.matches("/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?")) fail("页面路由必须为不含点段、查询串的站内绝对路径");
             if (!paths.add(path.toLowerCase(Locale.ROOT))) fail("页面路由不能重复");
@@ -103,12 +112,117 @@ public class StudioDocumentValidator {
             if (!kind.equals("file") && !mime.startsWith(kind + "/")) fail("资源mimeType与kind不匹配");
             if (url.startsWith("data:") && !url.startsWith("data:" + mime + ";base64,")) fail("内嵌资源mimeType不匹配");
         }
+        Map<String, String> assetKinds = new HashMap<>();
+        for (JsonNode asset : assets) assetKinds.put(asset.get("id").asText(), asset.get("kind").asText());
+        themeExtras(theme, assetKinds);
+        for (JsonNode page : pages) if (page.has("settings")) pageSettings(page.get("settings"), assetKinds);
+        if (document.has("features")) features(document.get("features"), assetKinds);
+    }
+
+    /** 主题扩展：共享样式类（含状态与断点）、字体（引用 font 资产）、关键帧；与前端 validateStudioDocument 同规则。 */
+    private void themeExtras(JsonNode theme, Map<String, String> assetKinds) {
+        if (theme.has("classes")) {
+            JsonNode classes = theme.get("classes"); array(classes);
+            if (classes.size() > 500) fail("样式类不得超过500个");
+            Set<String> names = new HashSet<>();
+            for (JsonNode item : classes) {
+                object(item); keys(item, "name", "styles", "responsive", "states");
+                String name = text(item, "name");
+                if (!CLASS_NAME.matcher(name).matches() || !names.add(name)) fail("样式类名须为小写字母开头的唯一名称");
+                styles(item.get("styles"));
+                if (item.has("responsive")) {
+                    JsonNode responsive = item.get("responsive"); object(responsive); keys(responsive, "tablet", "mobile");
+                    responsive.elements().forEachRemaining(this::styles);
+                }
+                if (item.has("states")) {
+                    JsonNode states = item.get("states"); object(states); keys(states, STYLE_STATES.toArray(String[]::new));
+                    states.elements().forEachRemaining(this::styles);
+                }
+            }
+        }
+        if (theme.has("fonts")) {
+            JsonNode fonts = theme.get("fonts"); array(fonts);
+            if (fonts.size() > 32) fail("字体不得超过32个");
+            for (JsonNode item : fonts) {
+                object(item); keys(item, "family", "assetId", "weight", "style");
+                if (!FONT_FAMILY.matcher(text(item, "family")).matches()) fail("字体族名只能含字母、数字、空格、下划线与连字符");
+                assetRef(item, "assetId", "font", assetKinds);
+                if (item.has("weight") && !text(item, "weight").matches("normal|bold|[1-9]00")) fail("字重须为normal、bold或100至900");
+                if (item.has("style") && !Set.of("normal", "italic").contains(text(item, "style"))) fail("字形须为normal或italic");
+            }
+        }
+        if (theme.has("keyframes")) {
+            JsonNode keyframes = theme.get("keyframes"); array(keyframes);
+            if (keyframes.size() > 64) fail("关键帧动画不得超过64个");
+            Set<String> names = new HashSet<>();
+            for (JsonNode item : keyframes) {
+                object(item); keys(item, "name", "frames");
+                String name = text(item, "name");
+                if (!CLASS_NAME.matcher(name).matches() || !names.add(name)) fail("动画名须为小写字母开头的唯一名称");
+                JsonNode frames = item.get("frames"); object(frames);
+                if (frames.isEmpty() || frames.size() > 32) fail("关键帧数量须为1至32");
+                frames.fields().forEachRemaining(entry -> {
+                    if (!KEYFRAME_KEY.matcher(entry.getKey()).matches()) fail("关键帧须为from、to或0%至100%");
+                    styles(entry.getValue());
+                });
+            }
+        }
+    }
+
+    private void pageSettings(JsonNode settings, Map<String, String> assetKinds) {
+        object(settings); keys(settings, "particles", "toast");
+        if (settings.has("particles")) particles(settings.get("particles"));
+        if (settings.has("toast")) {
+            JsonNode toast = settings.get("toast"); object(toast); keys(toast, "title", "body", "iconAssetId");
+            boundedText(toast, "title", 80, false);
+            boundedText(toast, "body", 200, true);
+            if (toast.has("iconAssetId")) assetRef(toast, "iconAssetId", "image", assetKinds);
+        }
+    }
+
+    private void features(JsonNode features, Map<String, String> assetKinds) {
+        object(features); keys(features, "audio", "particles");
+        if (features.has("particles")) particles(features.get("particles"));
+        if (!features.has("audio")) return;
+        JsonNode audio = features.get("audio"); object(audio);
+        keys(audio, "tracks", "musicVolume", "effectVolume", "effectsDefaultOn", "clickSoundAssetId", "buttonSoundAssetId", "toastSoundAssetId");
+        JsonNode tracks = audio.get("tracks"); array(tracks);
+        if (tracks.size() > 20) fail("背景音乐不得超过20首");
+        for (JsonNode track : tracks) {
+            object(track); keys(track, "title", "assetId");
+            boundedText(track, "title", 80, false);
+            assetRef(track, "assetId", "audio", assetKinds);
+        }
+        volume(audio.get("musicVolume")); volume(audio.get("effectVolume"));
+        if (audio.get("effectsDefaultOn") == null || !audio.get("effectsDefaultOn").isBoolean()) fail("effectsDefaultOn须为布尔值");
+        for (String key : List.of("clickSoundAssetId", "buttonSoundAssetId", "toastSoundAssetId")) {
+            if (audio.has(key)) assetRef(audio, key, "audio", assetKinds);
+        }
+    }
+
+    private void particles(JsonNode value) {
+        if (value == null || !value.isTextual() || !PARTICLE_PRESETS.contains(value.asText())) fail("无效的粒子效果");
+    }
+
+    private void volume(JsonNode value) {
+        if (value == null || !value.isIntegralNumber() || value.intValue() < 0 || value.intValue() > 100) fail("音量须为0至100的整数");
+    }
+
+    private void boundedText(JsonNode node, String key, int max, boolean allowEmpty) {
+        JsonNode value = node.get(key);
+        if (value == null || !value.isTextual()) fail(key + "必须为字符串");
+        String text = value.asText();
+        if ((!allowEmpty && text.isBlank()) || text.length() > max || text.chars().anyMatch(c -> c < 32 || c == 127)) fail(key + "须为" + max + "字以内的文本");
+    }
+
+    private void assetRef(JsonNode node, String key, String kind, Map<String, String> assetKinds) {
+        if (!kind.equals(assetKinds.get(text(node, key)))) fail(key + "必须引用已有的" + kind + "资源");
     }
     private void nodes(JsonNode nodes, Set<String> ids, int[] count, int depth) {
         array(nodes);
         if (depth > 32 && !nodes.isEmpty()) fail("节点深度不得超过32");
         for (JsonNode node : nodes) {
-            if (++count[0] > 2000) fail("节点数量不得超过2000");
+            if (++count[0] > MAX_NODES) fail("节点数量不得超过" + MAX_NODES);
             object(node); keys(node, "id", "type", "tag", "text", "attributes", "styles", "responsive", "children"); identity(node, ids); text(node, "type");
             if (!TAGS.contains(text(node, "tag"))) fail("节点标签不在安全白名单内");
             if (node.has("text") && !node.get("text").isTextual()) fail("节点text必须是字符串");

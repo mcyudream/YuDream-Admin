@@ -1,5 +1,5 @@
 import type { Declaration, Rule } from 'postcss'
-import type { SiteDocument, StudioCompileOptions, StudioNode } from '../types/site-studio'
+import type { SiteDocument, StudioCompileOptions, StudioNode, StudioStyleState } from '../types/site-studio'
 import { parse } from 'postcss'
 import { STUDIO_BREAKPOINTS, STUDIO_LIMITS, STUDIO_VOID_TAGS, studioAssert, validateStudioDocument, validateStudioNodes, validateStudioStyle } from './site-studio-validation'
 
@@ -23,10 +23,57 @@ function renderNode(node: StudioNode): string {
   }
   return `<${node.tag}${attrs}>${node.text !== undefined ? escapeStudioHtml(node.text) : node.children.map(renderNode).join('')}</${node.tag}>`
 }
-function renderCss(nodes: StudioNode[], scope = '') {
-  const base: string[] = []
+const STATE_SELECTORS: Record<StudioStyleState, string> = {
+  hover: ':hover',
+  focus: ':focus-visible',
+  active: ':active',
+  current: '[aria-current="page"]',
+  pressed: '[aria-pressed="true"]',
+}
+const FONT_FORMATS: Record<string, string> = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'truetype', 'font/otf': 'opentype' }
+
+/**
+ * 主题级 CSS：@font-face、@keyframes 与共享样式类（基础 → 状态），以及样式类的断点规则。
+ * 名称与声明均已过文档校验；样式类先于节点规则输出，节点自身样式同特异度后写覆盖。
+ */
+function renderThemeCss(document: SiteDocument, scope: string) {
+  const assets = new Map(document.assets.map(asset => [asset.id, asset]))
+  const head: string[] = []
+  for (const font of document.theme.fonts ?? []) {
+    const asset = assets.get(font.assetId)!
+    const format = FONT_FORMATS[asset.mimeType]
+    head.push(`@font-face{font-family:"${font.family}";src:url("${asset.url}")${format ? ` format("${format}")` : ''};font-weight:${font.weight ?? 'normal'};font-style:${font.style ?? 'normal'};font-display:swap}`)
+  }
+  for (const item of document.theme.keyframes ?? []) {
+    head.push(`@keyframes ${item.name}{${Object.entries(item.frames).map(([key, styles]) => `${key}{${declarations(styles)}}`).join('')}}`)
+  }
   const tablet: string[] = []
   const mobile: string[] = []
+  const states: string[] = []
+  for (const item of document.theme.classes ?? []) {
+    const selector = `${scope}.${item.name}`
+    if (Object.keys(item.styles).length) {
+      head.push(`${selector}{${declarations(item.styles)}}`)
+    }
+    for (const [state, styles] of Object.entries(item.states ?? {})) {
+      if (styles && Object.keys(styles).length) {
+        states.push(`${selector}${STATE_SELECTORS[state as StudioStyleState]}{${declarations(styles)}}`)
+      }
+    }
+    if (item.responsive?.tablet && Object.keys(item.responsive.tablet).length) {
+      tablet.push(`${selector}{${declarations(item.responsive.tablet)}}`)
+    }
+    if (item.responsive?.mobile && Object.keys(item.responsive.mobile).length) {
+      mobile.push(`${selector}{${declarations(item.responsive.mobile)}}`)
+    }
+  }
+  return { head: [...head, ...states], tablet, mobile }
+}
+
+function renderCss(nodes: StudioNode[], scope = '', theme: { head: string[], tablet: string[], mobile: string[] } = { head: [], tablet: [], mobile: [] }) {
+  const base: string[] = [...theme.head]
+  const tablet: string[] = [...theme.tablet]
+  const mobile: string[] = [...theme.mobile]
   const rule = (node: StudioNode, styles: Record<string, string>) => `${scope}${selector(node.id)}{${declarations(styles)}}`
   const visit = (node: StudioNode) => {
     if (Object.keys(node.styles).length) {
@@ -61,7 +108,21 @@ export function compileStudioPage(document: SiteDocument, pageId: string, option
   const chrome = options.includeChrome !== false
   const tokens = Object.fromEntries(Object.entries(document.theme.tokens).map(([key, value]) => [key.startsWith('--') ? key : `--${key}`, value]))
   const html = `<div data-studio-document="${document.id}">${chrome ? `<header data-studio-region="header">${document.theme.header.map(renderNode).join('')}</header>` : ''}<main data-studio-region="page">${page.root.map(renderNode).join('')}</main>${chrome ? `<footer data-studio-region="footer">${document.theme.footer.map(renderNode).join('')}</footer>` : ''}</div>`
-  return { html, css: [`${scope}{${declarations(tokens)}}`, renderCss([...(chrome ? document.theme.header : []), ...page.root, ...(chrome ? document.theme.footer : [])], `${scope} `)].filter(Boolean).join('\n') }
+  const theme = options.themeCss === false ? undefined : renderThemeCss(document, `${scope} `)
+  return { html, css: [`${scope}{${declarations(tokens)}}`, renderCss([...(chrome ? document.theme.header : []), ...page.root, ...(chrome ? document.theme.footer : [])], `${scope} `, theme)].filter(Boolean).join('\n') }
+}
+
+/**
+ * 只含主题级 CSS（字体、关键帧、样式类）。编辑画布单独以 <style> 注入：它不进入引擎 CSS，
+ * 因而不会经快照回流成逐节点样式。
+ */
+export function compileStudioThemeCss(document: SiteDocument) {
+  const theme = renderThemeCss(document, `[data-studio-document="${document.id}"] `)
+  return [
+    ...theme.head,
+    ...(theme.tablet.length ? [`@media (max-width: ${STUDIO_BREAKPOINTS.tablet}px){${theme.tablet.join('\n')}}`] : []),
+    ...(theme.mobile.length ? [`@media (max-width: ${STUDIO_BREAKPOINTS.mobile}px){${theme.mobile.join('\n')}}`] : []),
+  ].join('\n')
 }
 /**
  * 站点文档基础样式：编辑画布（引擎 protectedCss，不进入文档回流）、公开站、草稿预览与静态导出共用同一份，
@@ -73,6 +134,17 @@ export const STUDIO_BASE_CSS = [
   'body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}',
   '[data-studio-document]{color:var(--foreground,#1f2933);background:var(--background,#ffffff)}',
   '[data-studio-document] img,[data-studio-document] video{max-width:100%;height:auto}',
+  '[data-studio-document] [hidden]{display:none!important}',
+  // 宿主运行时元素的默认外观；主题可定义同名样式类（作用域内特异度更高）覆盖
+  '.yd-site-particles{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:var(--yd-particles-z,1)}',
+  '.yd-site-toast-layer{position:fixed;top:16px;right:16px;z-index:1000;display:flex;flex-direction:column;gap:8px;pointer-events:none}',
+  '.yd-site-toast{display:flex;gap:12px;align-items:center;min-width:240px;max-width:min(360px,calc(100vw - 32px));padding:12px 16px;background:#1f2933;color:#ffffff;box-shadow:0 6px 20px rgba(0,0,0,.25);animation:yd-site-toast-in .28s ease-out}',
+  '.yd-site-toast--out{opacity:0;transform:translateY(-6px);transition:opacity .28s,transform .28s}',
+  '.yd-site-toast-icon{width:32px;height:32px;flex:none}',
+  '.yd-site-toast-title{font-weight:600}',
+  '.yd-site-toast-body{font-size:13px;opacity:.85}',
+  '@keyframes yd-site-toast-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}',
+  '@media (prefers-reduced-motion: reduce){.yd-site-toast{animation:none}}',
 ].join('\n')
 
 /** 公开站与草稿预览共用的整页 HTML（含主题页头页脚），两处渲染因此完全一致。 */

@@ -13,6 +13,7 @@ import { useSiteStudioStore } from '@/store/modules/site-studio'
 import {
   compileStudioNodes,
   compileStudioPage,
+  compileStudioThemeCss,
   createStudioGrapesAdapter,
   parseStudioHtml,
   STUDIO_BASE_CSS,
@@ -134,13 +135,39 @@ const compiled = computed(() => {
   }
   if (store.editRegion === 'page') {
     // 编辑页面时连同主题页头页脚一起渲染（只读），画布与公开站所见一致；解析只取 page 区域
-    return store.activePage ? compileStudioPage(document, store.activePage.id, { includeChrome: true }) : null
+    return store.activePage ? compileStudioPage(document, store.activePage.id, { includeChrome: true, themeCss: false }) : null
   }
   const output = compileStudioNodes(document.theme[store.editRegion])
   const root = `[data-studio-document="${document.id}"]`
   const tokens = Object.entries(document.theme.tokens).map(([name, value]) => `${name.startsWith('--') ? name : `--${name}`}:${value}`).join(';')
   return { html: `<div data-studio-document="${document.id}">${output.html}</div>`, css: `${root}{${tokens}}\n${output.css}` }
 })
+
+/**
+ * 主题级 CSS（字体/关键帧/样式类）不进引擎：以独立 <style> 注入画布文档，随文档变化原地更新。
+ * 若进入引擎 CSS，快照回流会把样式类展开成逐节点样式，@font-face/@keyframes 也会被解析拒绝。
+ */
+const themeCss = computed(() => {
+  try {
+    return store.doc ? compileStudioThemeCss(store.doc) : ''
+  }
+  catch {
+    return ''
+  }
+})
+const THEME_STYLE_ID = 'yd-studio-theme-css'
+function injectThemeCss(frameDocument: Document) {
+  let style = frameDocument.getElementById(THEME_STYLE_ID)
+  if (!style) {
+    style = frameDocument.createElement('style')
+    style.id = THEME_STYLE_ID
+    frameDocument.head?.appendChild(style)
+  }
+  if (style.textContent !== themeCss.value) {
+    style.textContent = themeCss.value
+  }
+}
+watch(themeCss, () => frameDocuments.forEach(injectThemeCss))
 
 /**
  * 画布实际输入。默认是文档编译结果；画布自身的无损编辑写回文档后，改为引擎刚发出的快照，
@@ -294,6 +321,7 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
     if (frameDocument) {
       frameDocuments.add(frameDocument)
       frameDocument.addEventListener('keydown', onStudioKeydown)
+      injectThemeCss(frameDocument)
     }
   }
   on('destroy', () => {

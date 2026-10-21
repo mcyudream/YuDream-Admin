@@ -1,16 +1,19 @@
 <script setup lang="ts">
 // 公开站新文档渲染容器：srcdoc 静态 HTML + sandbox 隔离（禁脚本/表单/顶层导航），
-// 站内链接经同源 contentDocument 点击桥接回宿主路由，外部链接新开标签；
-// 高度随内容自动增长，滚动仍由宿主页面承载。
+// 站内链接经同源 contentDocument 点击桥接回宿主路由，外部链接新开标签。
+// 视口模式：iframe 占满容器高度、内部滚动，文档内 position:fixed（固定顶栏/底栏/背景）按访客视口生效。
+// 站点功能（音频、粒子、进入提示、当前链接、数据绑定）由宿主运行时在同源文档上实现，文档本身不执行脚本。
+import type { SiteDocument, StudioPage } from '@/types/site-studio'
 import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { attachStudioRuntime, stopStudioAudio } from '@/utils/site-studio-runtime'
 
 // basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
-const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string }>(), { basePath: '/site' })
+// height：容器高度，公开站默认占满视口；runtime：当前文档与页面，提供时挂载站点功能
+const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string, height?: string, runtime?: { document: SiteDocument, page: StudioPage } }>(), { basePath: '/site', height: '100svh' })
 
 const frame = ref<HTMLIFrameElement | null>(null)
 const router = useRouter()
-let resizeObserver: ResizeObserver | undefined
 let cleanupDocument: (() => void) | undefined
 
 function resolveUrl(href: string) {
@@ -41,7 +44,8 @@ function handleClick(event: MouseEvent) {
     return
   }
   const raw = anchor.getAttribute('href') || ''
-  const url = resolveUrl(raw)
+  // 数据绑定生成的导航/条目链接指向宿主路由（插件页、/market 等），原样跳转
+  const url = anchor.hasAttribute('data-yd-host-link') && raw.startsWith('/') && !raw.startsWith('//') && raw !== '/site' && !raw.startsWith('/site/') ? raw : resolveUrl(raw)
   if (!url) {
     event.preventDefault()
     return
@@ -70,29 +74,23 @@ function handleClick(event: MouseEvent) {
 function bindDocument() {
   cleanupDocument?.()
   cleanupDocument = undefined
-  resizeObserver?.disconnect()
   const element = frame.value
   const document = element?.contentDocument
-  if (!element || !document) {
+  const frameWindow = element?.contentWindow
+  if (!element || !document || !frameWindow) {
     return
   }
   document.addEventListener('click', handleClick)
-  cleanupDocument = () => document.removeEventListener('click', handleClick)
-  const grow = () => {
-    const height = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0)
-    element.style.height = `${Math.max(height, 240)}px`
-  }
-  grow()
-  resizeObserver = new ResizeObserver(grow)
-  resizeObserver.observe(document.documentElement)
-  if (document.body) {
-    resizeObserver.observe(document.body)
+  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath }) : undefined
+  cleanupDocument = () => {
+    document.removeEventListener('click', handleClick)
+    detachRuntime?.()
   }
 }
 
 onBeforeUnmount(() => {
   cleanupDocument?.()
-  resizeObserver?.disconnect()
+  stopStudioAudio()
 })
 </script>
 
@@ -103,6 +101,7 @@ onBeforeUnmount(() => {
     title="站点内容"
     sandbox="allow-same-origin"
     :srcdoc="srcdoc"
+    :style="{ height }"
     @load="bindDocument"
   />
 </template>

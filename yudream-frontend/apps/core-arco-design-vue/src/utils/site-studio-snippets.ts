@@ -28,7 +28,7 @@ export const STUDIO_SNIPPET_LIMITS = {
   nodeBytes: 256 * 1024,
   /** 单用户片段库存储总字节上限 */
   totalBytes: 1024 * 1024,
-  /** 单个区块的节点数量上限（插入目标文档还有自身 2000 节点与 2 MiB 限制兜底） */
+  /** 单个区块的节点数量上限（插入目标文档还有自身节点总数与 2 MiB 限制兜底） */
   nodes: 200,
 } as const
 

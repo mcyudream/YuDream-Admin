@@ -51,4 +51,5 @@
 - `docs/yd-ui-guidelines.md` §5 新增「关联实体触发器/跨页定位行」视觉约定（头像/图标 + 名称、`yd-entity-trigger` 自定义触发器交互语义、命中行主色呼吸提亮）：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
 - 系统工具模块化与 MCP 服务接入（`docs/platform/ai-foundation.md` 新增「工具模块与按需加载」「MCP 服务接入」两节 + 宿主 `platform:mcp:server:*` 权限码与 `mcp:<serverCode>` 工具模块开关）：宿主侧新增能力，插件不新增 SPI/SDK 契约，插件工具只是被动归入 `plugin:<pluginCode>` 模块并受总开关/模块开关约束；待同步插件仓 AI 消费方文档一节（插件仓当前有大量未提交 WIP，先保留不动）。
 - AI 助手统一网关与用户工作区（`docs/platform/ai-foundation.md`：每用户默认工作区 `platform:chat:workspace:view/edit` + `workspace.list`/`workspace.read` 只读工具；CMS 画布/站点工作区改走 chat 网关会话，删除 AG-UI WebSocket 与 CMS 专用生成/流式端点；新增平台工具模块 `workspace`）：本仓未发布新 SPI/SDK 契约，插件侧无需改代码，待插件仓 WIP 落定后同步 AI 消费方文档一节。
+- 主题配置 schema 新增 `audio` 字段类型（`docs/dev/plugin-system.md` 主题配置条目，a271ab48；与 image 同语义，旧宿主拒绝含 audio 的 schema）：插件仓 `docs/dev/plugin-development.md` 目前无主题配置字段类型清单，待其 WIP 落定后在主题节补一句引用；插件侧无需改代码。
 - `docs/yd-ui-guidelines.md` §7 新增 `YdFloatBall`（可拖拽圆球入口）与 `YdChatWindow` 非模态浮动窗口约定：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。

@@ -23,6 +23,24 @@ export function createStudioPackage(document: SiteDocument, kind: StudioPackage[
     }
     collect(exported.theme.header)
     collect(exported.theme.footer)
+    // 样式类/关键帧里的 url()、字体与站点功能引用的资产随主题包导出
+    const styleValues = [
+      ...(exported.theme.classes ?? []).flatMap(item => [item.styles, item.responsive?.tablet ?? {}, item.responsive?.mobile ?? {}, ...Object.values(item.states ?? {})]),
+      ...(exported.theme.keyframes ?? []).flatMap(item => Object.values(item.frames)),
+    ].flatMap(styles => Object.values(styles ?? {}))
+    const audio = exported.features?.audio
+    const assetIds = new Set([
+      ...(exported.theme.fonts ?? []).map(font => font.assetId),
+      ...(audio?.tracks ?? []).map(track => track.assetId),
+      audio?.clickSoundAssetId,
+      audio?.buttonSoundAssetId,
+      audio?.toastSoundAssetId,
+    ].filter(Boolean))
+    for (const asset of exported.assets) {
+      if (assetIds.has(asset.id) || styleValues.some(value => value.includes(asset.url))) {
+        referenced.add(asset.url)
+      }
+    }
     for (const value of Object.values(exported.theme.tokens)) {
       for (const asset of exported.assets) {
         if (value.includes(asset.url)) {

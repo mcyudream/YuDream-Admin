@@ -2,7 +2,7 @@ import type { SiteDocument, StudioNode } from '../types/site-studio'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { applyStudioCommand, compileStudioPage, createStudioDocument, createStudioGrapesAdapter, createStudioNode, createStudioPackage, exportStudioStaticHtml, findStudioNode, importStudioPackage, studioNodesToGrapesModel, validateStudioDocument, validateStudioStyle, validateStudioUrl } from './site-studio'
+import { applyStudioCommand, compileStudioPage, compileStudioThemeCss, createStudioDocument, createStudioGrapesAdapter, createStudioNode, createStudioPackage, exportStudioStaticHtml, findStudioNode, importStudioPackage, STUDIO_LIMITS, studioNodesToGrapesModel, validateStudioDocument, validateStudioStyle, validateStudioUrl } from './site-studio'
 
 function sample() {
   const doc = createStudioDocument('测试')
@@ -198,7 +198,7 @@ test('batch steps keep IDs unique and the node budget at every step, final check
 
 test('batch node budget applies mid-batch and duplicate cannot amplify past the size limit', () => {
   const doc = createStudioDocument('预算')
-  for (let index = 0; index < 1999; index++) {
+  for (let index = 0; index < STUDIO_LIMITS.nodes - 1; index++) {
     doc.pages[0]!.root.push(createStudioNode('text'))
   }
   const extra = createStudioNode('section')
@@ -206,10 +206,63 @@ test('batch node budget applies mid-batch and duplicate cannot amplify past the 
   assert.throws(() => applyStudioCommand(doc, { type: 'batch', commands: [
     { type: 'insert', target: { pageId: doc.pages[0]!.id }, node: extra },
     { type: 'remove', nodeId: extra.id },
-  ] }), /节点数超过 2000/)
+  ] }), new RegExp(`节点数超过 ${STUDIO_LIMITS.nodes}`))
   const big = createStudioDocument('体积')
   const heavy = createStudioNode('text')
   heavy.text = '长'.repeat(400_000)
   big.pages[0]!.root = [heavy]
   assert.throws(() => applyStudioCommand(big, { type: 'batch', commands: Array.from({ length: 5 }, () => ({ type: 'duplicate' as const, nodeId: heavy.id })) }), /2 MiB/)
+})
+function extendedDocument(): SiteDocument {
+  const doc = createStudioDocument('扩展')
+  doc.assets = [
+    { id: 'font1', name: 'mc', url: '/api/files/mc.woff2', mimeType: 'font/woff2', kind: 'font' },
+    { id: 'img1', name: 'icon', url: '/api/files/i.png', mimeType: 'image/png', kind: 'image' },
+    { id: 'ogg1', name: 'bgm', url: '/api/files/m.ogg', mimeType: 'audio/ogg', kind: 'audio' },
+  ]
+  doc.theme.classes = [{ name: 'mc-btn', styles: { color: '#fff', animation: 'bob 2s steps(4) infinite' }, responsive: { mobile: { padding: '4px' } }, states: { hover: { color: '#ff5' }, current: { color: '#5f5' } } }]
+  doc.theme.fonts = [{ family: 'Minecraft', assetId: 'font1' }]
+  doc.theme.keyframes = [{ name: 'bob', frames: { 'from': { transform: 'translateY(0)' }, '50.5%': { transform: 'translateY(-4px)' } } }]
+  doc.pages[0]!.settings = { particles: 'snow', toast: { title: '进度已达成！', body: '多人游戏', iconAssetId: 'img1' } }
+  doc.features = { particles: 'stars', audio: { tracks: [{ title: 'Sweden', assetId: 'ogg1' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true, clickSoundAssetId: 'ogg1' } }
+  const button = createStudioNode('link')
+  button.attributes = { class: 'mc-btn', href: '/servers' }
+  button.styles = { margin: '0' }
+  doc.pages[0]!.root = [button]
+  return doc
+}
+test('theme classes, fonts, keyframes and features validate and compile in order', () => {
+  const doc = extendedDocument()
+  validateStudioDocument(doc)
+  const css = compileStudioPage(doc, doc.pages[0]!.id).css
+  const scope = `[data-studio-document="${doc.id}"]`
+  assert.ok(css.includes('@font-face{font-family:"Minecraft";src:url("/api/files/mc.woff2") format("woff2")'))
+  assert.ok(css.includes('@keyframes bob{from{transform:translateY(0)}50.5%{transform:translateY(-4px)}}'))
+  assert.ok(css.includes(`${scope} .mc-btn:hover{color:#ff5}`))
+  assert.ok(css.includes(`${scope} .mc-btn[aria-current="page"]{color:#5f5}`))
+  // 样式类先于节点规则：节点自身样式同特异度后写覆盖
+  assert.ok(css.indexOf(`${scope} .mc-btn{`) < css.indexOf(`${scope} [data-studio-id=`))
+  assert.ok(/@media \(max-width: 768px\)\{[^}]*\.mc-btn\{padding:4px\}/.test(css))
+  assert.ok(!compileStudioPage(doc, doc.pages[0]!.id, { themeCss: false }).css.includes('@font-face'))
+  assert.ok(compileStudioThemeCss(doc).includes('@keyframes bob'))
+})
+test('extension references and names fail closed', () => {
+  const cases: ((doc: SiteDocument) => void)[] = [
+    doc => (doc.theme.classes![0]!.name = 'Mc_Btn'),
+    doc => (doc.theme.classes![0]!.states = { before: { color: 'red' } } as never),
+    doc => (doc.theme.classes![0]!.styles.color = 'red;position:fixed'),
+    doc => (doc.theme.fonts![0]!.assetId = 'img1'),
+    doc => (doc.theme.fonts![0]!.family = 'Mc"}x'),
+    doc => (doc.theme.keyframes![0]!.frames = { '150%': {} }),
+    doc => (doc.pages[0]!.settings = { particles: 'fire' as never }),
+    doc => (doc.pages[0]!.settings!.toast!.iconAssetId = 'ogg1'),
+    doc => (doc.features!.audio!.musicVolume = 180),
+    doc => (doc.features!.audio!.clickSoundAssetId = 'missing'),
+    doc => ((doc.features as Record<string, unknown>).script = 'x'),
+  ]
+  for (const mutate of cases) {
+    const doc = extendedDocument()
+    mutate(doc)
+    assert.throws(() => validateStudioDocument(doc))
+  }
 })

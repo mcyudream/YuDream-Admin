@@ -3,11 +3,13 @@
 // 这里的变量是「站点输出变量」（编译时注入公开站文档作用域），可以任意取值，
 // 但它们只影响公开站内容，不影响后台界面主题；后台主题仍在「主题中心」管理。
 // 所有修改统一经 store.execute 走 set-theme 命令；高级 JSON 为受控草稿，校验通过后才应用。
-import type { SiteDocument, StudioNode } from '@/types/site-studio'
+import type { SiteDocument } from '@/types/site-studio'
 import { computed, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { serializeStudioPackage } from '@/utils/site-studio'
 import { isStudioEmbeddedAsset, validateStudioDocument } from '@/utils/site-studio-validation'
+import StudioSiteFeatures from './StudioSiteFeatures.vue'
+import StudioThemeStylesheet from './StudioThemeStylesheet.vue'
 
 defineOptions({ name: 'StudioThemeView' })
 
@@ -37,6 +39,10 @@ const tokenPresets: TokenPreset[] = [
 ]
 
 const tokens = computed<Record<string, string>>(() => store.doc?.theme.tokens || {})
+/** 图片类变量（值为 url(...)）可直接从图片资源中选择替换，如各页背景 */
+const imageAssetOptions = computed(() => (store.doc?.assets || []).filter(asset => asset.kind === 'image').map(asset => ({ label: asset.name, value: `url("${asset.url}")` })))
+const isImageToken = (value: string) => /^url\(/i.test(value.trim())
+
 const customEntries = computed(() =>
   Object.entries(tokens.value).filter(([key]) => !tokenPresets.some(preset => preset.key === key)),
 )
@@ -138,6 +144,9 @@ function themeJsonText(): string {
     tokens: doc?.theme.tokens || {},
     header: doc?.theme.header || [],
     footer: doc?.theme.footer || [],
+    classes: doc?.theme.classes || [],
+    fonts: doc?.theme.fonts || [],
+    keyframes: doc?.theme.keyframes || [],
   }, null, 2)
 }
 
@@ -151,7 +160,10 @@ watch(() => store.editRevision, () => {
  * 校验草稿主题：解析 JSON → 构造替换 theme 后的完整文档 → 走完整文档校验。
  * dryRun 为 true 时只校验不应用。
  */
-function validateThemeDraft(value: string): { tokens?: Record<string, string>, header?: StudioNode[], footer?: StudioNode[] } {
+type ThemeDraft = Partial<Pick<SiteDocument['theme'], 'tokens' | 'header' | 'footer' | 'classes' | 'fonts' | 'keyframes'>>
+const THEME_KEYS = ['tokens', 'header', 'footer', 'classes', 'fonts', 'keyframes'] as const
+
+function validateThemeDraft(value: string): ThemeDraft {
   const doc = store.doc
   if (!doc) {
     throw new Error('尚未创建站点文档')
@@ -167,12 +179,12 @@ function validateThemeDraft(value: string): { tokens?: Record<string, string>, h
     throw new Error('主题必须是对象')
   }
   const record = parsed as Record<string, unknown>
-  const unknownKeys = Object.keys(record).filter(key => !['tokens', 'header', 'footer'].includes(key))
+  const unknownKeys = Object.keys(record).filter(key => !(THEME_KEYS as readonly string[]).includes(key))
   if (unknownKeys.length) {
-    throw new Error(`未知字段：${unknownKeys.join('、')}（仅允许 tokens/header/footer）`)
+    throw new Error(`未知字段：${unknownKeys.join('、')}（仅允许 ${THEME_KEYS.join('/')}）`)
   }
-  const applied: { tokens?: Record<string, string>, header?: StudioNode[], footer?: StudioNode[] } = {}
-  for (const key of ['tokens', 'header', 'footer'] as const) {
+  const applied: ThemeDraft = {}
+  for (const key of THEME_KEYS) {
     if (record[key] !== undefined) {
       applied[key] = record[key] as any
     }
@@ -251,7 +263,17 @@ function applyThemeDraft() {
           <div v-for="[key, value] in customEntries" :key="key" class="flex flex-wrap gap-2 items-center">
             <span class="text-sm shrink-0 w-20">自定义</span>
             <code class="text-xs font-mono shrink-0 w-24">--{{ key }}</code>
+            <YdSelect
+              v-if="isImageToken(value) && imageAssetOptions.length"
+              v-auth="'platform:cms:edit'"
+              :model-value="value"
+              :options="imageAssetOptions.some(option => option.value === value) ? imageAssetOptions : [{ label: value, value }, ...imageAssetOptions]"
+              class="flex-1 min-w-40"
+              :aria-label="`选择变量 ${key} 的图片`"
+              @update:model-value="(next: unknown) => setToken(key, String(next))"
+            />
             <YdInput
+              v-else
               :model-value="value"
               class="flex-1 min-w-40"
               :aria-label="`自定义变量 ${key} 的值`"
@@ -277,6 +299,10 @@ function applyThemeDraft() {
           </YdButton>
         </div>
       </section>
+
+      <StudioThemeStylesheet />
+
+      <StudioSiteFeatures />
 
       <section class="flex flex-col gap-2" aria-label="页头页脚">
         <h2 class="text-sm font-semibold m-0">
@@ -318,7 +344,7 @@ function applyThemeDraft() {
           高级：完整主题 JSON
         </h2>
         <p class="text-xs text-muted-foreground m-0">
-          直接编辑 tokens / header / footer 的完整 JSON 草稿；每次输入实时校验，校验通过后才会应用，不会绕过统一命令管道。
+          直接编辑 tokens / header / footer / classes / fonts / keyframes 的完整 JSON 草稿；每次输入实时校验，校验通过后才会应用，不会绕过统一命令管道。
         </p>
         <YdCodeEditor
           v-auth="'platform:cms:edit'"

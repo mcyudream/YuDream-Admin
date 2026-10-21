@@ -26,7 +26,8 @@ const commandKeys: Record<string, string[]> = {
   'remove': ['nodeId'],
   'move': ['nodeId', 'target', 'index'],
   'duplicate': ['nodeId'],
-  'set-theme': ['tokens', 'header', 'footer'],
+  'set-theme': ['tokens', 'header', 'footer', 'classes', 'fonts', 'keyframes'],
+  'set-features': ['features'],
   'add-page': ['page'],
   'update-page': ['pageId', 'patch'],
   'remove-page': ['pageId'],
@@ -56,7 +57,7 @@ export function parseStudioAgentCommand(value: unknown): StudioCommand {
     requireValue(typeof raw.text === 'string', 'text 必须是字符串')
   }
   if (type === 'update-node' || type === 'update-page') {
-    const allowed = type === 'update-node' ? ['type', 'tag', 'text', 'attributes', 'styles', 'responsive', 'children'] : ['name', 'path', 'root']
+    const allowed = type === 'update-node' ? ['type', 'tag', 'text', 'attributes', 'styles', 'responsive', 'children'] : ['name', 'path', 'root', 'settings']
     requireValue(Object.keys(object(raw.patch)).every(key => allowed.includes(key)), 'patch 包含未授权字段')
   }
   if (keys.includes('target')) {
@@ -74,6 +75,9 @@ export function parseStudioAgentCommand(value: unknown): StudioCommand {
   }
   if (type === 'add-page') {
     object(raw.page)
+  }
+  if (type === 'set-features') {
+    object(raw.features)
   }
   if (type === 'set-assets') {
     requireValue(Array.isArray(raw.assets), 'assets 必须为数组')

@@ -1,7 +1,12 @@
 import type { SiteDocument, StudioAsset, StudioNode } from '../types/site-studio'
 import { parse } from 'postcss'
+import { STUDIO_PARTICLE_PRESETS, STUDIO_STYLE_STATES } from '../types/site-studio'
 
-export const STUDIO_LIMITS = { bytes: 2 * 1024 * 1024, nodes: 2000, depth: 32 } as const
+export const STUDIO_LIMITS = { bytes: 2 * 1024 * 1024, nodes: 6000, depth: 32, classes: 500, fonts: 32, keyframes: 64, tracks: 20 } as const
+/** 样式类与关键帧名：小写字母开头，可含数字与连字符 */
+export const STUDIO_CLASS_NAME = /^[a-z][a-z0-9-]{0,63}$/
+const FONT_FAMILY = /^[a-z0-9][\w -]{0,63}$/i
+const KEYFRAME_KEY = /^(?:from|to|(?:100|[1-9]?\d)(?:\.\d{1,2})?%)$/
 export const STUDIO_BREAKPOINTS = { tablet: 992, mobile: 768 } as const
 const safeTags = new Set('a abbr address article aside audio b bdi bdo blockquote br button caption cite code col colgroup dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr track u ul var video wbr'.split(' '))
 export const STUDIO_VOID_TAGS = new Set('br col hr img source track wbr'.split(' '))
@@ -115,7 +120,7 @@ export function validateStudioPath(value: unknown) {
 }
 export function validateStudioDocument(value: unknown): asserts value is SiteDocument {
   studioRecord(value)
-  studioKeys(value, ['schemaVersion', 'id', 'name', 'theme', 'pages', 'assets'])
+  studioKeys(value, ['schemaVersion', 'id', 'name', 'theme', 'pages', 'assets', 'features'])
   studioAssert(value.schemaVersion === 1, '不支持的文档 schemaVersion')
   let json: string
   try {
@@ -141,7 +146,7 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
     for (const node of nodes) {
       studioRecord(node)
       studioKeys(node, ['id', 'type', 'tag', 'text', 'attributes', 'styles', 'responsive', 'children'])
-      studioAssert(++count <= STUDIO_LIMITS.nodes, '节点数超过 2000')
+      studioAssert(++count <= STUDIO_LIMITS.nodes, `节点数超过 ${STUDIO_LIMITS.nodes}`)
       addId(node.id)
       string(node.type, '节点类型')
       studioAssert(node.type.trim().length > 0, '节点类型不能为空')
@@ -170,7 +175,7 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
     }
   }
   studioRecord(value.theme)
-  studioKeys(value.theme, ['tokens', 'header', 'footer'])
+  studioKeys(value.theme, ['tokens', 'header', 'footer', 'classes', 'fonts', 'keyframes'])
   studioRecord(value.theme.tokens)
   for (const [key, item] of Object.entries(value.theme.tokens)) {
     studioAssert(/^(?:--)?[a-z][\w-]*$/i.test(key), '主题变量名无效')
@@ -185,7 +190,7 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
   const paths = new Set<string>()
   for (const page of value.pages) {
     studioRecord(page)
-    studioKeys(page, ['id', 'name', 'path', 'root'])
+    studioKeys(page, ['id', 'name', 'path', 'root', 'settings'])
     addId(page.id)
     string(page.name, '页面名称')
     validateStudioPath(page.path)
@@ -209,6 +214,137 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
     validateStudioUrl(asset.url, asset.kind !== 'file')
     if (asset.url.startsWith('data:')) {
       studioAssert(asset.url.startsWith(`data:${asset.mimeType};base64,`), '资产 data MIME 不符')
+    }
+  }
+  const assetKinds = new Map((value.assets as StudioAsset[]).map(asset => [asset.id, asset.kind]))
+  const assetRef = (id: unknown, kind: StudioAsset['kind'], name: string) => {
+    string(id, name)
+    studioAssert(assetKinds.get(id) === kind, `${name}必须引用已有的${kind}资产`)
+  }
+  validateStudioThemeExtras(value.theme, assetRef)
+  for (const page of value.pages as Record<string, unknown>[]) {
+    if (page.settings !== undefined) {
+      validatePageSettings(page.settings, assetRef)
+    }
+  }
+  if (value.features !== undefined) {
+    validateFeatures(value.features, assetRef)
+  }
+}
+type AssetRef = (id: unknown, kind: StudioAsset['kind'], name: string) => void
+function boundedText(value: unknown, name: string, max: number, allowEmpty = false) {
+  string(value, name)
+  studioAssert((allowEmpty || value.trim().length > 0) && value.length <= max && !hasControl(value), `${name}须为 ${max} 字以内的文本`)
+}
+function stateStyles(value: unknown) {
+  studioRecord(value)
+  studioKeys(value, STUDIO_STYLE_STATES)
+  Object.values(value).forEach(styles)
+}
+/** 主题扩展：共享样式类、字体、关键帧（均可缺省，旧文档不受影响）。 */
+function validateStudioThemeExtras(theme: Record<string, unknown>, assetRef: AssetRef) {
+  if (theme.classes !== undefined) {
+    studioAssert(Array.isArray(theme.classes) && theme.classes.length <= STUDIO_LIMITS.classes, `样式类须为不超过 ${STUDIO_LIMITS.classes} 项的数组`)
+    const names = new Set<string>()
+    for (const item of theme.classes) {
+      studioRecord(item)
+      studioKeys(item, ['name', 'styles', 'responsive', 'states'])
+      string(item.name, '样式类名')
+      studioAssert(STUDIO_CLASS_NAME.test(item.name) && !names.has(item.name), '样式类名须为小写字母开头的唯一名称')
+      names.add(item.name)
+      styles(item.styles)
+      if (item.responsive !== undefined) {
+        studioRecord(item.responsive)
+        studioKeys(item.responsive, ['tablet', 'mobile'])
+        Object.values(item.responsive).forEach(styles)
+      }
+      if (item.states !== undefined) {
+        stateStyles(item.states)
+      }
+    }
+  }
+  if (theme.fonts !== undefined) {
+    studioAssert(Array.isArray(theme.fonts) && theme.fonts.length <= STUDIO_LIMITS.fonts, `字体须为不超过 ${STUDIO_LIMITS.fonts} 项的数组`)
+    for (const item of theme.fonts) {
+      studioRecord(item)
+      studioKeys(item, ['family', 'assetId', 'weight', 'style'])
+      string(item.family, '字体族名')
+      studioAssert(FONT_FAMILY.test(item.family), '字体族名只能含字母、数字、空格、下划线与连字符')
+      assetRef(item.assetId, 'font', '字体文件')
+      if (item.weight !== undefined) {
+        string(item.weight, '字重')
+        studioAssert(/^(?:normal|bold|[1-9]00)$/.test(item.weight), '字重须为 normal、bold 或 100–900')
+      }
+      if (item.style !== undefined) {
+        studioAssert(item.style === 'normal' || item.style === 'italic', '字形须为 normal 或 italic')
+      }
+    }
+  }
+  if (theme.keyframes !== undefined) {
+    studioAssert(Array.isArray(theme.keyframes) && theme.keyframes.length <= STUDIO_LIMITS.keyframes, `关键帧动画须为不超过 ${STUDIO_LIMITS.keyframes} 项的数组`)
+    const names = new Set<string>()
+    for (const item of theme.keyframes) {
+      studioRecord(item)
+      studioKeys(item, ['name', 'frames'])
+      string(item.name, '动画名')
+      studioAssert(STUDIO_CLASS_NAME.test(item.name) && !names.has(item.name), '动画名须为小写字母开头的唯一名称')
+      names.add(item.name)
+      studioRecord(item.frames)
+      const keys = Object.keys(item.frames)
+      studioAssert(keys.length > 0 && keys.length <= 32, '关键帧数量须为 1 至 32')
+      for (const key of keys) {
+        studioAssert(KEYFRAME_KEY.test(key), '关键帧须为 from、to 或 0%–100%')
+        styles(item.frames[key])
+      }
+    }
+  }
+}
+function particles(value: unknown) {
+  studioAssert(STUDIO_PARTICLE_PRESETS.includes(value as never), '无效的粒子效果')
+}
+function validatePageSettings(value: unknown, assetRef: AssetRef) {
+  studioRecord(value)
+  studioKeys(value, ['particles', 'toast'])
+  if (value.particles !== undefined) {
+    particles(value.particles)
+  }
+  if (value.toast !== undefined) {
+    studioRecord(value.toast)
+    studioKeys(value.toast, ['title', 'body', 'iconAssetId'])
+    boundedText(value.toast.title, '提示标题', 80)
+    boundedText(value.toast.body, '提示内容', 200, true)
+    if (value.toast.iconAssetId !== undefined) {
+      assetRef(value.toast.iconAssetId, 'image', '提示图标')
+    }
+  }
+}
+function volume(value: unknown, name: string) {
+  studioAssert(Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100, `${name}须为 0–100 的整数`)
+}
+function validateFeatures(value: unknown, assetRef: AssetRef) {
+  studioRecord(value)
+  studioKeys(value, ['audio', 'particles'])
+  if (value.particles !== undefined) {
+    particles(value.particles)
+  }
+  if (value.audio !== undefined) {
+    const audio = value.audio
+    studioRecord(audio)
+    studioKeys(audio, ['tracks', 'musicVolume', 'effectVolume', 'effectsDefaultOn', 'clickSoundAssetId', 'buttonSoundAssetId', 'toastSoundAssetId'])
+    studioAssert(Array.isArray(audio.tracks) && audio.tracks.length <= STUDIO_LIMITS.tracks, `背景音乐须为不超过 ${STUDIO_LIMITS.tracks} 首的数组`)
+    for (const track of audio.tracks) {
+      studioRecord(track)
+      studioKeys(track, ['title', 'assetId'])
+      boundedText(track.title, '曲名', 80)
+      assetRef(track.assetId, 'audio', '曲目音频')
+    }
+    volume(audio.musicVolume, '音乐音量')
+    volume(audio.effectVolume, '音效音量')
+    studioAssert(typeof audio.effectsDefaultOn === 'boolean', 'effectsDefaultOn 须为布尔值')
+    for (const key of ['clickSoundAssetId', 'buttonSoundAssetId', 'toastSoundAssetId'] as const) {
+      if (audio[key] !== undefined) {
+        assetRef(audio[key], 'audio', '音效')
+      }
     }
   }
 }

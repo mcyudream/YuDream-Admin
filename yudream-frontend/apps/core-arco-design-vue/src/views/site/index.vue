@@ -640,7 +640,7 @@ function dateText(value?: string) {
       <div v-if="studioFailed" class="site-studio-notice" role="status">
         网站文档加载失败，当前展示旧版内容
       </div>
-      <StudioFrame v-if="studioFrameHtml" :srcdoc="studioFrameHtml" />
+      <StudioFrame v-if="studioFrameHtml" :srcdoc="studioFrameHtml" :runtime="studioDocument && studioPage ? { document: studioDocument, page: studioPage } : undefined" />
       <SiteChrome v-else :settings="home?.settings" :blank="isBlankPage">
         <div class="site-layout-frame">
           <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">

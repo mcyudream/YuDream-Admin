@@ -245,8 +245,8 @@ export default {
   deletePreset: (code: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/cms/presets/${encodeURIComponent(code)}`)
   },
-  publicHome: () => {
-    return systemClient.get<unknown, ApiResponse<HomePageLayout>>('api/public/cms/home')
+  publicHome: (config?: { skipGlobalToast?: boolean }) => {
+    return systemClient.get<unknown, ApiResponse<HomePageLayout>>('api/public/cms/home', config)
   },
   publicPage: (slug: string) => {
     return systemClient.get<unknown, ApiResponse<CmsPage>>('api/public/cms/pages', { params: { slug } })

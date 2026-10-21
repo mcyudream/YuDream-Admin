@@ -72,7 +72,7 @@ public class CmsStudioClientTools {
         List<String> required = new ArrayList<>(properties.keySet());
         if (write) {
             properties.put("expectedRevision", Map.of("type", "string"));
-            properties.put("command", Map.of("type", "object", "description", "StudioCommand：set-text/update-node/set-style/insert/remove/move/duplicate/set-theme/add-page/update-page/remove-page/set-assets/batch；batch 禁止嵌套"));
+            properties.put("command", Map.of("type", "object", "description", "StudioCommand：set-text/update-node/set-style/insert/remove/move/duplicate/set-theme(含 classes/fonts/keyframes)/set-features/add-page/update-page(含 settings)/remove-page/set-assets/batch；batch 禁止嵌套"));
             required.addAll(List.of("expectedRevision", "command"));
         } else if (name.endsWith("read")) {
             properties.put("cursor", Map.of("type", "integer", "minimum", 0));

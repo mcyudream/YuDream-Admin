@@ -104,6 +104,140 @@
           }
         ]
       }
+    },
+    {
+      "name": "theme-extensions",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
     }
   ],
   "invalid": [
@@ -1122,6 +1256,1476 @@
             "kind": "image"
           }
         ]
+      }
+    },
+    {
+      "name": "extension-class-name",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "Mc_Btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-class-state",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                },
+                "before": {
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-class-css",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "red;position:fixed",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-font-asset-kind",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "img1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-font-family",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Mc\"}x",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-keyframe-key",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "150%": {}
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-page-particles",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "fire",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-toast-icon-kind",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "ogg1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-volume",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 180,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-missing-asset",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "missing"
+          }
+        }
+      }
+    },
+    {
+      "name": "extension-unknown-feature",
+      "document": {
+        "schemaVersion": 1,
+        "id": "site-extended",
+        "name": "扩展契约",
+        "theme": {
+          "tokens": {
+            "bg-home": "url(/api/files/a.webp)"
+          },
+          "header": [],
+          "footer": [],
+          "classes": [
+            {
+              "name": "mc-btn",
+              "styles": {
+                "color": "#fff",
+                "animation": "bob 2s steps(4) infinite"
+              },
+              "responsive": {
+                "mobile": {
+                  "padding": "4px"
+                }
+              },
+              "states": {
+                "hover": {
+                  "color": "#ff5"
+                },
+                "current": {
+                  "color": "#5f5"
+                },
+                "pressed": {
+                  "color": "#5ff"
+                }
+              }
+            }
+          ],
+          "fonts": [
+            {
+              "family": "Minecraft",
+              "assetId": "font1",
+              "weight": "400",
+              "style": "normal"
+            }
+          ],
+          "keyframes": [
+            {
+              "name": "bob",
+              "frames": {
+                "from": {
+                  "transform": "translateY(0)"
+                },
+                "50.5%": {
+                  "transform": "translateY(-4px)"
+                },
+                "to": {
+                  "transform": "translateY(0)"
+                }
+              }
+            }
+          ]
+        },
+        "pages": [
+          {
+            "id": "page-home",
+            "name": "首页",
+            "path": "/",
+            "root": [
+              {
+                "id": "node-link",
+                "type": "link",
+                "tag": "a",
+                "text": "服务器",
+                "attributes": {
+                  "class": "mc-btn",
+                  "href": "/servers",
+                  "data-yd-source": "block:server-list",
+                  "data-yd-item": "true",
+                  "data-yd-text": "name"
+                },
+                "styles": {},
+                "children": []
+              }
+            ],
+            "settings": {
+              "particles": "snow",
+              "toast": {
+                "title": "进度已达成！",
+                "body": "多人游戏",
+                "iconAssetId": "img1"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "id": "font1",
+            "name": "mc",
+            "url": "/api/files/mc.woff",
+            "mimeType": "font/woff",
+            "kind": "font"
+          },
+          {
+            "id": "img1",
+            "name": "icon",
+            "url": "/api/files/i.png",
+            "mimeType": "image/png",
+            "kind": "image"
+          },
+          {
+            "id": "ogg1",
+            "name": "bgm",
+            "url": "/api/files/m.ogg",
+            "mimeType": "audio/ogg",
+            "kind": "audio"
+          }
+        ],
+        "features": {
+          "particles": "dust",
+          "audio": {
+            "tracks": [
+              {
+                "title": "Sweden",
+                "assetId": "ogg1"
+              }
+            ],
+            "musicVolume": 18,
+            "effectVolume": 30,
+            "effectsDefaultOn": true,
+            "clickSoundAssetId": "ogg1"
+          },
+          "script": "x"
+        }
       }
     }
   ]
