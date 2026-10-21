@@ -12,9 +12,10 @@ test('provider failures map to actionable Chinese guidance', () => {
   assert.match(describeAiRunError('').message, /没有完成/)
 })
 
-test('bubble content keeps raw detail in a code block without HTML', () => {
+test('bubble content keeps raw detail in a wrapping quote without HTML', () => {
   const content = aiRunErrorContent('Retries exhausted: 2/2')
-  assert.match(content, /原始信息：\n\n```text\nRetries exhausted: 2\/2\n```$/)
-  assert.doesNotMatch(content, /<details>/)
+  assert.match(content, /> 原始信息：\n>\n> Retries exhausted: 2\/2$/)
+  assert.doesNotMatch(content, /<details>|```/)
+  assert.match(aiRunErrorContent('bad <script> `x`'), /> bad \\<script\\> \\`x\\`/)
   assert.equal(aiRunErrorContent(''), describeAiRunError('').message)
 })

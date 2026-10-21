@@ -184,6 +184,18 @@ function selectTool(tool: YdAgentToolCall) {
   text-underline-offset: 3px;
 }
 
+/* 长代码行在气泡内横向滚动，不撑破对话列 */
+.yd-agent-answer__markdown :deep(.md-editor),
+.yd-agent-answer__markdown :deep(.md-editor-preview) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview pre) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .yd-agent-answer__markdown :deep(.md-editor-preview pre),
 .yd-agent-answer__markdown :deep(.md-editor-preview code) {
   color: var(--color-text-1);

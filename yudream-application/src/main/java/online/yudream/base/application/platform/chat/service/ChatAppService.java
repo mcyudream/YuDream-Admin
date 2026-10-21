@@ -59,6 +59,15 @@ public class ChatAppService {
                                   Consumer<String> onReasoningDelta,
                                   Consumer<AiAgentToolResult> onTool,
                                   Consumer<ChatActivity> onActivity) {
+        return send(userId, cmd, onDelta, onReasoningDelta, onTool, onActivity, null);
+    }
+
+    public ChatSendResultDTO send(Long userId, ChatSendCmd cmd,
+                                  Consumer<String> onDelta,
+                                  Consumer<String> onReasoningDelta,
+                                  Consumer<AiAgentToolResult> onTool,
+                                  Consumer<ChatActivity> onActivity,
+                                  java.util.function.BiConsumer<String, String> onPersistedInput) {
         capabilities.ensureEnabled("ai", "AI 助手");
         requireUser(userId);
         if (cmd == null || !StringUtils.hasText(cmd.getQuestion())) {
@@ -75,6 +84,15 @@ public class ChatAppService {
                 cmd.getContextRefs(), "cms-studio".equalsIgnoreCase(cmd.getAgentCode()) ? null : cmd.getSpaceSlug(), cmd.getQuestion(), permissionCodes);
         List<AiChatMessage> history = List.of();
         ChatMessage userMessage = persistUserMessage(session, userId, cmd);
+        if (onPersistedInput != null) onPersistedInput.accept(String.valueOf(userMessage.getId()), userMessage.getContent());
+        // 首条消息一落库就按问题命名会话：回答失败或被取消时会话也不会一直叫「新的对话」
+        if (isDefaultTitle(session.getTitle())) {
+            String title = conversationTitle(cmd.getQuestion());
+            if (StringUtils.hasText(title)) {
+                session.rename(title);
+                sessionRepo.save(session);
+            }
+        }
         ChatRunState runState = new ChatRunState();
         ChatMessage assistantMessage = persistAssistantMessage(session, userId);
         try {
@@ -125,9 +143,6 @@ public class ChatAppService {
             messageRepo.save(assistantMessage);
             quota = quotaService.todayQuota(userId);
             session.recordMessage();
-            if (!StringUtils.hasText(session.getTitle()) || "新的对话".equals(session.getTitle())) {
-                session.rename(truncate(cmd.getQuestion(), 40));
-            }
             sessionRepo.save(session);
             return resultOf(session, userMessage, assistantMessage, quota);
         } catch (ChatStreamCancelledException error) {
@@ -247,7 +262,7 @@ public class ChatAppService {
             session.belongsTo(userId);
         } else {
             ChatScopeType scopeType = cmd.getScopeType() == null ? ChatScopeType.GENERAL : cmd.getScopeType();
-            session = ChatSession.create(userId, truncate(cmd.getQuestion(), 40), scopeType);
+            session = ChatSession.create(userId, conversationTitle(cmd.getQuestion()), scopeType);
             session.setAgentCode(cmd.getAgentCode());
             session.setSpaceSlug(cmd.getSpaceSlug());
             session.setProviderCode(cmd.getProviderCode());
@@ -411,6 +426,29 @@ public class ChatAppService {
                 "complete",
                 tool.message(),
                 tool.payload());
+    }
+
+    private static boolean isDefaultTitle(String title) {
+        return !StringUtils.hasText(title) || "新的对话".equals(title.trim());
+    }
+
+    /**
+     * 由首条问题生成会话名：去掉面板附带的设计器绑定等机器上下文，取第一行有效文字，
+     * 去掉 Markdown 前缀与多余空白，超过 30 字截断加省略号。
+     */
+    static String conversationTitle(String question) {
+        if (question == null) return "";
+        String visible = question.split("\n\n当前设计器绑定", 2)[0];
+        visible = visible.replaceFirst("^作用目标：[^。]*。", "");
+        for (String line : visible.split("\r?\n")) {
+            String text = line.replaceFirst("^\\s*(?:[#>*\\-]+|\\d+[.)])\\s*", "").replaceAll("\\s+", " ").trim();
+            if (!text.isEmpty()) {
+                return text.codePointCount(0, text.length()) > 30
+                        ? text.substring(0, text.offsetByCodePoints(0, 30)) + "…"
+                        : text;
+            }
+        }
+        return "";
     }
 
     private String truncate(String value, int limit) {

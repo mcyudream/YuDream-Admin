@@ -20,8 +20,12 @@ export function describeAiRunError(raw?: string | null) {
   return { message: rule?.message ?? 'AI 这次没有完成回答。可以直接重试；如果反复失败，请把下面的原始信息发给管理员。', detail }
 }
 
-/** 失败回答的气泡正文：可读说明 + 原始信息代码块（Markdown，不用 HTML，避免被清洗） */
+/** 失败回答的气泡正文：可读说明 + 原始信息引用块（Markdown 引用会自动换行；不用 HTML，避免被清洗） */
 export function aiRunErrorContent(raw?: string | null) {
   const { message, detail } = describeAiRunError(raw)
-  return detail && detail !== message ? `${message}\n\n原始信息：\n\n\`\`\`text\n${detail.slice(0, 1200)}\n\`\`\`` : message
+  if (!detail || detail === message) {
+    return message
+  }
+  const quoted = detail.slice(0, 1200).split(/\r?\n/).map(line => `> ${line.replace(/([\\`*_[\]<>])/g, '\\$1')}`).join('\n')
+  return `${message}\n\n> 原始信息：\n>\n${quoted}`
 }
