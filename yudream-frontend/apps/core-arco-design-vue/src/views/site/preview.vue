@@ -7,6 +7,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import apiStudio from '@/api/modules/platform-cms-studio'
 import { buildStudioSiteHtml, validateStudioDocument } from '@/utils/site-studio'
+import { matchStudioPage } from '@/utils/site-studio-links'
 import { normalizeStudioPreviewPath, openStudioPreviewChannel, studioPagePathToSlug } from '@/utils/site-studio-preview'
 import StudioFrame from './studio-frame.vue'
 
@@ -24,10 +25,8 @@ const error = ref('')
 const device = ref<'desktop' | 'tablet' | 'mobile'>('desktop')
 const deviceWidths = { desktop: '100%', tablet: '992px', mobile: '390px' }
 
-const page = computed(() => {
-  const target = normalizeStudioPreviewPath(route.params.slug as string[] | string | undefined)
-  return document.value?.pages.find(item => item.path.toLowerCase() === target) ?? null
-})
+const matched = computed(() => document.value ? matchStudioPage(document.value, normalizeStudioPreviewPath(route.params.slug as string[] | string | undefined)) : null)
+const page = computed(() => matched.value?.page ?? null)
 const pageOptions = computed(() => (document.value?.pages ?? []).map(item => ({ label: `${item.name}（${item.path}）`, value: item.id })))
 const srcdoc = computed(() => document.value && page.value ? buildStudioSiteHtml(document.value, page.value.id) : '')
 const basePath = computed(() => `/site-preview/${encodeURIComponent(themeCode.value)}`)
@@ -131,7 +130,7 @@ const statusText = computed(() => source.value === 'live'
       <YdEmpty v-else-if="!document" description="该主题还没有站点草稿，先在网站工作台创建并保存" />
       <YdEmpty v-else-if="!page" description="草稿中没有这个路径的页面，从右上角选择要预览的页面" />
       <div v-else class="site-preview__viewport" :style="{ width: deviceWidths[device] }">
-        <StudioFrame :srcdoc="srcdoc" :base-path="basePath" height="calc(100svh - 96px)" :runtime="document && page ? { document, page } : undefined" />
+        <StudioFrame :srcdoc="srcdoc" :base-path="basePath" height="calc(100svh - 96px)" :runtime="document && page ? { document, page, params: matched?.params } : undefined" />
       </div>
     </main>
   </div>

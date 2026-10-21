@@ -5,8 +5,9 @@ import apiPublicTheme from '@/api/modules/public-theme'
 import systemClient from '@/api/modules/system-client'
 import { useAppAccountStore } from '@/store/modules/app/account'
 import { useAppSettingsStore } from '@/store/modules/app/settings'
-import { buildNavigationTree, loadSiteNavigation } from '@/views/site/site-navigation'
+import { buildNavigationTree, loadSiteCapabilities, loadSiteNavigation, studioRequirementsMet } from '@/views/site/site-navigation'
 import { toBackendAssetUrl } from './backend-url'
+import { resolveStudioHref } from './site-studio-links'
 import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-validation'
 
 /**
@@ -314,12 +315,16 @@ function asRecords(value: unknown): DataRecord[] {
 async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   const assetUrl = (id?: string) => document.assets.find(item => item.id === id && item.kind === 'image')?.url ?? ''
   const own = document.features?.navigation
+  // 依赖未满足（插件未启用、能力关闭）的条目与指向已关闭页面的条目一律隐藏
+  const available = await loadSiteCapabilities()
+  const closedPages = new Set(document.pages.filter(page => !studioRequirementsMet(page.settings?.requires, available)).map(page => page.path === '/' ? '/site' : `/site${page.path}`))
+  const open = (item: { url: string, requires?: string[] }) => studioRequirementsMet(item.requires, available) && !closedPages.has(item.url.replace(/\/+$/, '') || '/site')
   let tree: { label: string, url: string, icon?: string, children?: unknown[] }[]
   if (own) {
     // 站点文档自带导航（工作台「站点导航」）：为准；可选按 URL 去重追加插件页面与市场/知识库入口
-    const flat = own.items.flatMap((item, index) => [
+    const flat = own.items.filter(open).flatMap((item, index) => [
       { id: item.id, label: item.label, url: item.url, icon: assetUrl(item.iconAssetId), visible: true, sort: index },
-      ...(item.children ?? []).map((child, childIndex) => ({ id: child.id, parentId: item.id, label: child.label, url: child.url, icon: assetUrl(child.iconAssetId), visible: true, sort: childIndex })),
+      ...(item.children ?? []).filter(open).map((child, childIndex) => ({ id: child.id, parentId: item.id, label: child.label, url: child.url, icon: assetUrl(child.iconAssetId), visible: true, sort: childIndex })),
     ])
     tree = own.appendAuto ? await loadSiteNavigation(JSON.stringify(flat)) : buildNavigationTree(flat)
     // 合并后保留条目自带图标
@@ -329,7 +334,7 @@ async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   }
   else {
     const navigationJson = await apiCms.publicHome({ skipGlobalToast: true }).then(res => res.data?.settings?.navigationJson as string | undefined, () => undefined)
-    const pages = document.pages.filter(page => page.path !== '/').map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
+    const pages = document.pages.filter(page => page.path !== '/' && !page.path.includes(':') && studioRequirementsMet(page.settings?.requires, available)).map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
     tree = await loadSiteNavigation(navigationJson, pages)
   }
   // 指向站点文档页面的条目带上该页图标（页面设置 iconAssetId）
@@ -526,7 +531,7 @@ function fillItem(item: Element, record: DataRecord, index: number) {
   for (const element of targets) {
     const textPath = element.getAttribute('data-yd-text')
     if (textPath) {
-      element.textContent = value(textPath)
+      element.textContent = formatValue(value(textPath), element.getAttribute('data-yd-format'))
     }
     const hrefPath = element.getAttribute('data-yd-href')
     if (hrefPath) {
@@ -570,6 +575,25 @@ function fillItem(item: Element, record: DataRecord, index: number) {
       }
     }
   }
+}
+
+/** 文本格式化：data-yd-format="datetime|date|time" 把时间戳（秒/毫秒）或 ISO 时间转为本地时间 */
+function formatValue(raw: string, format: string | null) {
+  if (!format || !raw) {
+    return raw
+  }
+  const numeric = /^\d{9,13}$/.test(raw) ? Number(raw) * (raw.length <= 10 ? 1000 : 1) : Number.NaN
+  const date = new Date(Number.isNaN(numeric) ? raw : numeric)
+  if (Number.isNaN(date.getTime())) {
+    return raw
+  }
+  if (format === 'date') {
+    return date.toLocaleDateString('zh-CN')
+  }
+  if (format === 'time') {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+  return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 /** 账号绑定：登录状态显隐、账号名/头像/首字 */
@@ -705,33 +729,29 @@ export function attachStudioRuntime(options: {
   }
   let alive = true
   configureAudio(document)
-  const current = normalizePath(options.currentPath ?? page?.path ?? '/')
 
-  // 当前页链接：文档内链接按文档路径比较；站点前缀（/site 或预览前缀）先剥离。数据绑定插入的链接在填充后再标记一次
+  // 当前页链接：所有链接按点击时同一规则解析为宿主路由后与当前路由比较（站点页、宿主公开页、外壳导航一致）
+  const toRoute = (href: string, hostLink: boolean) => normalizePath(resolveStudioHref(href, basePath, hostLink))
+  let current = normalizePath(options.currentPath ?? resolveStudioHref(page?.path ?? '/', basePath))
   const markCurrent = () => {
     for (const anchor of host.querySelectorAll('a[href]')) {
       const href = anchor.getAttribute('href') || ''
-      if (!href.startsWith('/')) {
-        continue
-      }
-      let path = normalizePath(href)
-      for (const prefix of options.currentPath ? [] : [basePath.toLowerCase(), '/site']) {
-        if (path === prefix) {
-          path = '/'
-        }
-        else if (path.startsWith(`${prefix}/`)) {
-          path = path.slice(prefix.length)
-        }
-      }
-      anchor.toggleAttribute('aria-current', path === current)
-      if (path === current) {
+      const isCurrent = href.startsWith('/') && !href.startsWith('//') && toRoute(href, anchor.hasAttribute('data-yd-host-link')) === current
+      anchor.toggleAttribute('aria-current', isCurrent)
+      if (isCurrent) {
         anchor.setAttribute('aria-current', 'page')
       }
     }
-    // 当前页在某个菜单的子菜单里时，该菜单的触发项也标记为当前（如 /wiki 高亮「知识库」物品栏格）
+    // 菜单触发项：当前页在其（可见）子菜单里，或当前路由位于其路径之下（如 /site/activities/:id 高亮「活动平台」，首页根路径除外）
     for (const menu of host.querySelectorAll('[data-yd-menu]')) {
       const trigger = menu.querySelector('[data-yd-menu-trigger]')
-      if (trigger?.tagName === 'A' && trigger.getAttribute('aria-current') !== 'page' && menu.querySelector('[data-yd-submenu] a[aria-current="page"],[data-yd-each] a[aria-current="page"]')) {
+      if (trigger?.tagName !== 'A' || trigger.getAttribute('aria-current') === 'page') {
+        continue
+      }
+      const href = trigger.getAttribute('href') || ''
+      const base = href.startsWith('/') ? toRoute(href, trigger.hasAttribute('data-yd-host-link')) : ''
+      const below = Boolean(base) && base !== '/site' && base !== '/' && current.startsWith(`${base}/`)
+      if (below || menu.querySelector('[data-yd-submenu]:not([hidden]) a[aria-current="page"],[data-yd-each]:not([hidden]) a[aria-current="page"]')) {
         trigger.setAttribute('aria-current', 'page')
       }
     }
@@ -831,11 +851,60 @@ export function attachStudioRuntime(options: {
   bindSources(host, () => alive, document, markCurrent, options.query ?? {})
   bindCounts(host, () => alive, document, options.query ?? {})
 
-  return () => {
+  // 经验条：data-yd-progress="scroll" 宽度跟随页面滚动；="visited" 显示本次访问去过的页面数
+  const VISITED_KEY = 'yd.site.visited'
+  const recordVisit = () => {
+    let visited: string[] = []
+    try {
+      visited = JSON.parse(sessionStorage.getItem(VISITED_KEY) || '[]') as string[]
+    }
+    catch {
+      visited = []
+    }
+    if (!visited.includes(current)) {
+      visited = [...visited, current].slice(-100)
+      sessionStorage.setItem(VISITED_KEY, JSON.stringify(visited))
+    }
+    return visited.length
+  }
+  const updateProgress = () => {
+    const root = frameWindow.document.documentElement
+    const max = root.scrollHeight - frameWindow.innerHeight
+    const percent = max > 0 ? Math.min(100, Math.max(0, (frameWindow.scrollY / max) * 100)) : 0
+    host.querySelectorAll<HTMLElement>('[data-yd-progress="scroll"]').forEach((element) => {
+      element.style.width = `${percent.toFixed(1)}%`
+    })
+  }
+  const updateVisited = () => {
+    const count = String(recordVisit())
+    host.querySelectorAll('[data-yd-progress="visited"]').forEach((element) => {
+      element.textContent = count
+    })
+  }
+  updateVisited()
+  updateProgress()
+  frameWindow.addEventListener('scroll', updateProgress, { passive: true })
+  frameWindow.addEventListener('resize', updateProgress, { passive: true })
+
+  const detach = () => {
     alive = false
     doc.removeEventListener('click', onClick as EventListener, true)
     doc.removeEventListener('keydown', onKeydown as EventListener)
+    frameWindow.removeEventListener('scroll', updateProgress)
+    frameWindow.removeEventListener('resize', updateProgress)
     stopParticles()
     stopToast()
   }
+  /** 持久外壳在路由切换时只更新当前链接、访问数与经验条，不重建 DOM */
+  return Object.assign(detach, {
+    setCurrentPath(path: string) {
+      current = normalizePath(path)
+      closeMenus()
+      // 登录/退出后跳转时刷新账号显示（外壳不重建）
+      bindAccount(host)
+      markCurrent()
+      updateVisited()
+      frameWindow.requestAnimationFrame(updateProgress)
+    },
+  })
 }

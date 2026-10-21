@@ -223,7 +223,7 @@ function extendedDocument(): SiteDocument {
   doc.theme.classes = [{ name: 'mc-btn', styles: { color: '#fff', animation: 'bob 2s steps(4) infinite' }, responsive: { mobile: { padding: '4px' } }, states: { 'hover': { color: '#ff5' }, 'current': { color: '#5f5' }, 'parent-hover': { display: 'flex' } } }]
   doc.theme.fonts = [{ family: 'Minecraft', assetId: 'font1' }]
   doc.theme.keyframes = [{ name: 'bob', frames: { 'from': { transform: 'translateY(0)' }, '50.5%': { transform: 'translateY(-4px)' } } }]
-  doc.pages[0]!.settings = { particles: 'snow', iconAssetId: 'img1', hostRoutes: ['/wiki', '/market'], toast: { title: '进度已达成！', body: '多人游戏', iconAssetId: 'img1' } }
+  doc.pages[0]!.settings = { particles: 'snow', iconAssetId: 'img1', hostRoutes: ['/wiki', '/market'], requires: ['plugin:minecraft-server', 'capability:wiki'], toast: { title: '进度已达成！', body: '多人游戏', iconAssetId: 'img1' } }
   doc.features = { particles: 'stars', publicSkin: { chrome: true, dark: true, background: '#0e1014', surface: '#1f2430', text: '#ffffff', muted: '#a8a8a8', border: '#3a3f4b', primary: '#3c8527', primaryText: '#ffffff', fontFamily: 'Minecraft', backgroundImageAssetId: 'img1', bottomOffset: '120px' }, dataSources: [{ id: 'activity', label: '活动详情', endpoint: '/api/plugins/minecraft-activity-proof/public/activities/{id}', single: true, fields: { time: 'meta' } }], navigation: { appendAuto: true, items: [{ id: 'nav-home', label: '首页', url: '/site', iconAssetId: 'img1', children: [{ id: 'nav-wiki', label: '知识库', url: '/wiki' }] }] }, audio: { tracks: [{ title: 'Sweden', assetId: 'ogg1' }], musicVolume: 18, effectVolume: 30, effectsDefaultOn: true, clickSoundAssetId: 'ogg1' } }
   const button = createStudioNode('link')
   button.attributes = { class: 'mc-btn', href: '/servers' }
@@ -276,10 +276,23 @@ test('extension references and names fail closed', () => {
     doc => (doc.features!.publicSkin!.bottomOffset = '10vh'),
     doc => (doc.pages[0]!.settings!.hostRoutes = ['/site/x']),
     doc => (doc.pages[0]!.settings!.hostRoutes = ['wiki']),
+    doc => (doc.pages[0]!.settings!.requires = ['plugin:../x']),
+    doc => (doc.pages[0]!.settings!.requires = ['capability:ai']),
+    doc => (doc.pages[0]!.path = '/activities/:'),
   ]
   for (const mutate of cases) {
     const doc = extendedDocument()
     mutate(doc)
     assert.throws(() => validateStudioDocument(doc))
   }
+})
+
+test('dynamic page paths validate and match with params', async () => {
+  const { matchStudioPage } = await import('./site-studio-links')
+  const doc = createStudioDocument('动态')
+  doc.pages.push({ id: 'detail', name: '详情', path: '/activities/:id', root: [] }, { id: 'list', name: '列表', path: '/activities', root: [] })
+  validateStudioDocument(doc)
+  assert.equal(matchStudioPage(doc, 'activities')?.page.id, 'list')
+  assert.deepEqual(matchStudioPage(doc, 'activities/a%20b')?.params, { id: 'a b' })
+  assert.equal(matchStudioPage(doc, 'activities/x/y'), null)
 })

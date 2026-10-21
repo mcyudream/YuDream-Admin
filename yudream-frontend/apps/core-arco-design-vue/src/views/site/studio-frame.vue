@@ -11,7 +11,7 @@ import { attachStudioRuntime, stopStudioAudio } from '@/utils/site-studio-runtim
 
 // basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
 // height：容器高度，公开站默认占满视口；runtime：当前文档与页面，提供时挂载站点功能
-const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string, height?: string, runtime?: { document: SiteDocument, page: StudioPage } }>(), { basePath: '/site', height: '100svh' })
+const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string, height?: string, runtime?: { document: SiteDocument, page: StudioPage, params?: Record<string, string> } }>(), { basePath: '/site', height: '100svh' })
 
 const frame = ref<HTMLIFrameElement | null>(null)
 const router = useRouter()
@@ -64,7 +64,7 @@ function bindDocument() {
     return
   }
   document.addEventListener('click', handleClick)
-  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath, query: currentQuery() }) : undefined
+  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath, query: { ...currentQuery(), ...props.runtime.params } }) : undefined
   cleanupDocument = () => {
     document.removeEventListener('click', handleClick)
     detachRuntime?.()

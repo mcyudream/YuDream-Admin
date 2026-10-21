@@ -79,7 +79,7 @@ class StudioDocumentValidatorTest {
                "classes":[{"name":"mc-btn","styles":{"color":"#fff","animation":"bob 2s steps(4) infinite"},"responsive":{"mobile":{"padding":"4px"}},"states":{"hover":{"color":"#ff5"},"current":{"color":"#5f5"},"parent-hover":{"display":"flex"}}}],
                "fonts":[{"family":"Minecraft","assetId":"font1","weight":"normal","style":"normal"}],
                "keyframes":[{"name":"bob","frames":{"from":{"transform":"translateY(0)"},"50.5%":{"transform":"translateY(-4px)"},"to":{"transform":"translateY(0)"}}}]},
-             "pages":[{"id":"home","name":"首页","path":"/","root":[],"settings":{"particles":"snow","iconAssetId":"img1","hostRoutes":["/wiki","/market"],"toast":{"title":"进度已达成！","body":"多人游戏","iconAssetId":"img1"}}}],
+             "pages":[{"id":"home","name":"首页","path":"/","root":[],"settings":{"particles":"snow","iconAssetId":"img1","hostRoutes":["/wiki","/market"],"requires":["plugin:minecraft-server","capability:wiki"],"toast":{"title":"进度已达成！","body":"多人游戏","iconAssetId":"img1"}}}],
              "assets":[{"id":"font1","name":"mc","url":"/api/files/mc.woff2","mimeType":"font/woff2","kind":"font"},
                        {"id":"img1","name":"icon","url":"/api/files/i.png","mimeType":"image/png","kind":"image"},
                        {"id":"ogg1","name":"bgm","url":"/api/files/m.ogg","mimeType":"audio/ogg","kind":"audio"}],
@@ -107,6 +107,8 @@ class StudioDocumentValidatorTest {
             "\"url\":\"/wiki\"|\"url\":\"javascript:alert(1)\"",
             "/public/activities/{id}|/admin/users",
             "\"hostRoutes\":[\"/wiki\"|\"hostRoutes\":[\"/site/x\"",
+            "\"capability:wiki\"|\"capability:ai\"",
+            "\"path\":\"/\"|\"path\":\"/a/:\"",
             "\"primary\":\"#3c8527\"|\"primary\":\"red\"",
             "\"fontFamily\":\"Minecraft\"|\"fontFamily\":\"Comic\"",
             "\"bottomOffset\":\"120px\"|\"bottomOffset\":\"10vh\"",
@@ -120,5 +122,11 @@ class StudioDocumentValidatorTest {
         String[] parts = replacement.split("\\|", 2);
         assertThat(EXTENDED).contains(parts[0]);
         assertThatThrownBy(() -> validator.validate(EXTENDED.replace(parts[0], parts[1]))).isInstanceOf(BizException.class);
+    }
+
+    @Test void acceptsDynamicPagePaths() throws Exception {
+        var doc = (ObjectNode) mapper.readTree(DOCUMENT);
+        ((ObjectNode) doc.at("/pages/0")).put("path", "/activities/:id");
+        assertThatCode(() -> validator.validate(doc.toString())).doesNotThrowAnyException();
     }
 }

@@ -4,15 +4,17 @@ import type { PluginRouteMeta } from '@/plugins/use-plugin-remote-component'
 import type { SiteDocument } from '@/types/site-studio'
 import apiCms from '@/api/modules/platform-cms'
 import { fetchPublishedStudio } from '@/api/modules/platform-cms-studio'
+import { useStudioPublicShell } from '@/composables/use-published-studio'
 import { useActivePluginTheme } from '@/plugins/theme-runtime'
 import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-component'
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
-import { buildStudioSiteHtml, validateStudioDocument } from '@/utils/site-studio'
+import { validateStudioDocument } from '@/utils/site-studio'
+import { matchStudioPage } from '@/utils/site-studio-links'
 import SiteChrome from './site-chrome.vue'
-import { useSiteNavigation } from './site-navigation'
-import StudioFrame from './studio-frame.vue'
+import { loadSiteCapabilities, studioRequirementsMet, useSiteNavigation } from './site-navigation'
+import StudioShadowLayout from './studio-shadow-layout.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,28 +82,17 @@ const slug = computed(() => {
 
 // ===== 新站点文档（网站工作台发布）渲染分支 =====
 
-function normalizeStudioPath(value: string) {
-  return value.replace(/^\/+|\/+$/g, '')
-}
-
-/** 首页匹配 path '/'（或空）；子页按归一化路径精确匹配 */
-const studioPage = computed(() => {
-  const document = studioDocument.value
-  if (!document) {
-    return null
-  }
-  const target = normalizeStudioPath(slug.value)
-  return document.pages.find(page => normalizeStudioPath(page.path) === target) || null
-})
-
-/** 新文档页有独立的 header/footer，渲染时不再包宿主 SiteChrome，避免两层站点壳 */
-const studioFrameHtml = computed(() => {
-  const document = studioDocument.value
-  const matched = studioPage.value
-  if (!document || !matched) {
-    return ''
-  }
-  return buildStudioSiteHtml(document, matched.id)
+/** 首页匹配 path '/'（或空）；子页精确匹配优先，其次动态页面（:参数 段，参数传给数据绑定） */
+const studioMatch = computed(() => studioDocument.value ? matchStudioPage(studioDocument.value, slug.value) : null)
+const studioPage = computed(() => studioMatch.value?.page ?? null)
+// 公开站持久外壳存在时页面只渲染正文，否则连同文档页头/页脚一起渲染
+const studioShell = useStudioPublicShell()
+// 页面依赖（插件/能力）未满足时关闭页面
+const studioCapabilities = shallowRef<Set<string> | null>(null)
+void loadSiteCapabilities().then(value => studioCapabilities.value = value)
+const studioPageClosed = computed(() => {
+  const requires = studioPage.value?.settings?.requires
+  return Boolean(requires?.length) && (!studioCapabilities.value || !studioRequirementsMet(requires, studioCapabilities.value))
 })
 
 async function loadStudioDocument(seq: number) {
@@ -640,7 +631,10 @@ function dateText(value?: string) {
       <div v-if="studioFailed" class="site-studio-notice" role="status">
         网站文档加载失败，当前展示旧版内容
       </div>
-      <StudioFrame v-if="studioFrameHtml" :srcdoc="studioFrameHtml" :runtime="studioDocument && studioPage ? { document: studioDocument, page: studioPage } : undefined" />
+      <div v-if="studioDocument && studioPage && studioPageClosed" class="site-state">
+        {{ studioCapabilities ? '页面未开放：相关功能尚未启用' : '加载中...' }}
+      </div>
+      <StudioShadowLayout v-else-if="studioDocument && studioPage" :document="studioDocument" :page="studioPage" :params="studioMatch?.params" :chrome="!studioShell" />
       <SiteChrome v-else :settings="home?.settings" :blank="isBlankPage">
         <div class="site-layout-frame">
           <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">

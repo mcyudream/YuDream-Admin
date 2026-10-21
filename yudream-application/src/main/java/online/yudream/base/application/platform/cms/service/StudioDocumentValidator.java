@@ -95,7 +95,7 @@ public class StudioDocumentValidator {
         for (JsonNode page : pages) {
             object(page); keys(page, "id", "name", "path", "root", "settings"); identity(page, ids); string(page, "name");
             String path = text(page, "path");
-            if (!path.matches("/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?")) fail("页面路由必须为不含点段、查询串的站内绝对路径");
+            if (!path.matches("/(?:(?:[A-Za-z0-9_-]+|:[a-zA-Z][A-Za-z0-9_]{0,31})(?:/(?:[A-Za-z0-9_-]+|:[a-zA-Z][A-Za-z0-9_]{0,31}))*)?")) fail("页面路由必须为不含点段、查询串的站内绝对路径（动态段写作:参数）");
             if (!paths.add(path.toLowerCase(Locale.ROOT))) fail("页面路由不能重复");
             nodes(page.get("root"), ids, count, 1);
         }
@@ -172,7 +172,8 @@ public class StudioDocumentValidator {
     }
 
     private void pageSettings(JsonNode settings, Map<String, String> assetKinds) {
-        object(settings); keys(settings, "particles", "toast", "iconAssetId", "hostRoutes");
+        object(settings); keys(settings, "particles", "toast", "iconAssetId", "hostRoutes", "requires");
+        if (settings.has("requires")) requires(settings.get("requires"));
         if (settings.has("hostRoutes")) {
             JsonNode routes = settings.get("hostRoutes"); array(routes);
             if (routes.size() > 10) fail("承载路由最多10个");
@@ -249,7 +250,7 @@ public class StudioDocumentValidator {
     /** 公开页适配：颜色限 #rrggbb，字体须为主题字体族，背景图引用图片资源；与前端 validatePublicSkin 同规则 */
     private void publicSkin(JsonNode skin, Map<String, String> assetKinds, Set<String> fontFamilies) {
         object(skin);
-        java.util.List<String> allowed = new java.util.ArrayList<>(List.of("chrome", "dark", "fontFamily", "backgroundImageAssetId", "bottomOffset"));
+        java.util.List<String> allowed = new java.util.ArrayList<>(List.of("chrome", "dark", "fontFamily", "backgroundImageAssetId", "bottomOffset", "pixel"));
         allowed.addAll(SKIN_COLORS);
         keys(skin, allowed.toArray(String[]::new));
         if (skin.get("chrome") == null || !skin.get("chrome").isBoolean() || skin.get("dark") == null || !skin.get("dark").isBoolean()) fail("chrome/dark须为布尔值");
@@ -258,6 +259,7 @@ public class StudioDocumentValidator {
         }
         if (skin.has("fontFamily") && !fontFamilies.contains(text(skin, "fontFamily"))) fail("公开页字体须为主题字体族");
         if (skin.has("backgroundImageAssetId")) assetRef(skin, "backgroundImageAssetId", "image", assetKinds);
+        if (skin.has("pixel") && !skin.get("pixel").isBoolean()) fail("pixel须为布尔值");
         if (skin.has("bottomOffset") && !text(skin, "bottomOffset").matches("0|\\d{1,3}(?:px|rem)")) fail("底部留白须为0至999px或rem");
     }
 
@@ -272,7 +274,8 @@ public class StudioDocumentValidator {
         array(items);
         if (items.size() > 30) fail("每级导航最多30项");
         for (JsonNode item : items) {
-            object(item); keys(item, "id", "label", "url", "iconAssetId", "children");
+            object(item); keys(item, "id", "label", "url", "iconAssetId", "requires", "children");
+            if (item.has("requires")) requires(item.get("requires"));
             String id = text(item, "id");
             if (!id.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}") || !ids.add(id)) fail("导航ID须唯一且安全");
             boundedText(item, "label", 40, false);
@@ -284,6 +287,15 @@ public class StudioDocumentValidator {
                 if (depth != 1) fail("导航最多两级");
                 navItems(item.get("children"), depth + 1, ids, assetKinds);
             }
+        }
+    }
+
+    /** 依赖声明：plugin:插件编码 或 capability:wiki / capability:plugin-market，最多10项 */
+    private void requires(JsonNode value) {
+        array(value);
+        if (value.size() > 10) fail("依赖最多10项");
+        for (JsonNode item : value) {
+            if (!item.isTextual() || !item.asText().matches("plugin:[a-z0-9][a-z0-9-]{0,63}|capability:(?:wiki|plugin-market)")) fail("依赖须为plugin:插件编码或capability:wiki/plugin-market");
         }
     }
 

@@ -23,6 +23,11 @@ export interface StudioPageSettings {
    * data-yd-outlet 节点位置渲染（Shadow DOM 插槽），页面中 data-yd-host-hide 的节点在承载时隐藏。
    */
   hostRoutes?: string[]
+  /**
+   * 页面依赖（plugin:插件编码、capability:wiki、capability:plugin-market）：任一未启用时页面关闭（公开站按不存在处理），
+   * 站点导航中指向该页的条目同时隐藏
+   */
+  requires?: string[]
 }
 
 export interface StudioPage {
@@ -74,6 +79,8 @@ export interface StudioNavItem {
   label: string
   url: string
   iconAssetId?: string
+  /** 条目依赖，未满足时隐藏（格式同页面 requires） */
+  requires?: string[]
   children?: StudioNavItem[]
 }
 
@@ -119,6 +126,8 @@ export interface StudioPublicSkin {
   backgroundImageAssetId?: string
   /** 外壳占用的底部高度（如固定物品栏），宿主页内容留出空间，如 120px */
   bottomOffset?: string
+  /** 像素风：嵌入主题页的宿主页面统一直角、硬边框、斜面高光与投影（卡片、按钮、输入框） */
+  pixel?: boolean
 }
 
 export interface StudioFeatures {

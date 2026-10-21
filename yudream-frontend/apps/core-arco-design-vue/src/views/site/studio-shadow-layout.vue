@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// 宿主公开页嵌入站点主题页面：把承载该路由的站点页面（含页头页脚、背景、物品栏等）渲染在 Shadow DOM 中，
-// 页面里的 data-yd-outlet 节点内放 <slot>，宿主页面（知识库、插件市场、插件公开页）作为插槽内容投影到该位置，
-// 因此这些页面与站点菜单页同属一个主题。文档不执行脚本，行为由站点运行时提供。
+// 公开站统一页面渲染：站点页面与承载宿主公开页的主题页都在这里渲染到 Shadow DOM（同一视口滚动、同一入场过渡）。
+// 有默认插槽时为承载模式：data-yd-outlet 节点内放 <slot>，宿主页面（知识库、插件市场、插件公开页、登录）作为插槽内容投影，
+// 与菜单页同属一个主题。chrome 为 true 时连同页头/页脚一起渲染（无持久外壳时）；否则页头页脚由应用级持久外壳提供。
+// 文档不执行脚本，行为由站点运行时提供。
 import type { SiteDocument, StudioPage } from '@/types/site-studio'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useSlots, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { compileStudioPage, STUDIO_BASE_CSS } from '@/utils/site-studio-html'
 import { resolveStudioHref } from '@/utils/site-studio-links'
@@ -11,7 +12,8 @@ import { attachStudioRuntime } from '@/utils/site-studio-runtime'
 
 defineOptions({ name: 'StudioShadowLayout' })
 
-const props = defineProps<{ document: SiteDocument, page: StudioPage, pageTitle?: string }>()
+const props = withDefaults(defineProps<{ document: SiteDocument, page: StudioPage, pageTitle?: string, chrome?: boolean, params?: Record<string, string> }>(), { chrome: false })
+const slots = useSlots()
 
 const host = ref<HTMLElement | null>(null)
 const route = useRoute()
@@ -48,20 +50,27 @@ function render() {
   }
   shadow ??= host.value.attachShadow({ mode: 'open' })
   detach?.()
-  const output = compileStudioPage(props.document, props.page.id, { includeChrome: true })
+  const hosting = Boolean(slots.default)
+  const output = compileStudioPage(props.document, props.page.id, { includeChrome: props.chrome })
   // 来自已过校验的站点文档编译结果（与公开站 srcdoc 同源），不含脚本与事件属性
   shadow.innerHTML = `<style>${STUDIO_BASE_CSS}\n${output.css}\n[data-yd-outlet]{display:block}</style>${output.html}`
-  const outlet = shadow.querySelector('[data-yd-outlet]') ?? shadow.querySelector('[data-studio-region="page"]')
-  outlet?.replaceChildren(window.document.createElement('slot'))
+  if (hosting) {
+    const outlet = shadow.querySelector('[data-yd-outlet]') ?? shadow.querySelector('[data-studio-region="page"]')
+    outlet?.replaceChildren(window.document.createElement('slot'))
+  }
   const query = Object.fromEntries(Object.entries(route.query).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : []))
-  detach = attachStudioRuntime({ document: props.document, page: props.page, frameWindow: window, basePath: '/site', root: shadow, currentPath: route.path, query, hostMode: true, pageTitle: props.pageTitle })
+  detach = attachStudioRuntime({ document: props.document, page: props.page, frameWindow: window, basePath: '/site', root: shadow, currentPath: route.path, query: { ...query, ...props.params }, hostMode: hosting, pageTitle: props.pageTitle })
+  // 统一入场过渡（站点页与宿主页一致）；系统减少动态效果时跳过
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    host.value.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.22,.61,.36,1)' })
+  }
 }
 
 onMounted(() => {
   render()
   shadow?.addEventListener('click', onClick)
 })
-watch(() => [props.document, props.page, route.path, props.pageTitle] as const, render)
+watch(() => [props.document, props.page, route.fullPath, props.pageTitle, props.chrome] as const, render)
 onBeforeUnmount(() => {
   detach?.()
   shadow?.removeEventListener('click', onClick)

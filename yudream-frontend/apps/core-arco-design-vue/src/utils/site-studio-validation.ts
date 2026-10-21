@@ -116,7 +116,8 @@ export function validateStudioAttributes(value: unknown, nodeId: string) {
 }
 export function validateStudioPath(value: unknown) {
   string(value, '页面路径')
-  studioAssert(/^\/(?:[\w-]+(?:\/[\w-]+)*)?$/.test(value), '页面路径必须是 / 或 /about 格式的站内绝对路径')
+  // 动态页面：段可为 :参数（如 /activities/:id），参数值经数据绑定传给插件数据适配器
+  studioAssert(/^\/(?:(?:[\w-]+|:[a-z]\w{0,31})(?:\/(?:[\w-]+|:[a-z]\w{0,31}))*)?$/i.test(value), '页面路径必须是 / 、/about 或 /activities/:id 格式的站内绝对路径')
 }
 export function validateStudioDocument(value: unknown): asserts value is SiteDocument {
   studioRecord(value)
@@ -304,7 +305,10 @@ function particles(value: unknown) {
 }
 function validatePageSettings(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
-  studioKeys(value, ['particles', 'toast', 'iconAssetId', 'hostRoutes'])
+  studioKeys(value, ['particles', 'toast', 'iconAssetId', 'hostRoutes', 'requires'])
+  if (value.requires !== undefined) {
+    validateRequires(value.requires)
+  }
   if (value.hostRoutes !== undefined) {
     studioAssert(Array.isArray(value.hostRoutes) && value.hostRoutes.length <= 10, '承载路由最多 10 个')
     for (const route of value.hostRoutes) {
@@ -362,10 +366,21 @@ function validateDataSources(value: unknown) {
     }
   }
 }
+/** 依赖声明：plugin:插件编码 或 capability:wiki / capability:plugin-market */
+export const STUDIO_REQUIREMENT = /^(?:plugin:[a-z0-9][a-z0-9-]{0,63}|capability:(?:wiki|plugin-market))$/
+function validateRequires(value: unknown) {
+  studioAssert(Array.isArray(value) && value.length <= 10, '依赖最多 10 项')
+  for (const item of value) {
+    studioAssert(typeof item === 'string' && STUDIO_REQUIREMENT.test(item), '依赖须为 plugin:插件编码 或 capability:wiki / capability:plugin-market')
+  }
+}
 const SKIN_COLORS = ['background', 'surface', 'text', 'muted', 'border', 'primary', 'primaryText'] as const
 function validatePublicSkin(value: unknown, assetRef: AssetRef, fontFamilies: string[]) {
   studioRecord(value)
-  studioKeys(value, ['chrome', 'dark', ...SKIN_COLORS, 'fontFamily', 'backgroundImageAssetId', 'bottomOffset'])
+  studioKeys(value, ['chrome', 'dark', ...SKIN_COLORS, 'fontFamily', 'backgroundImageAssetId', 'bottomOffset', 'pixel'])
+  if (value.pixel !== undefined) {
+    studioAssert(typeof value.pixel === 'boolean', 'pixel 须为布尔值')
+  }
   studioAssert(typeof value.chrome === 'boolean' && typeof value.dark === 'boolean', 'chrome/dark 须为布尔值')
   for (const key of SKIN_COLORS) {
     string(value[key], '公开页颜色')
@@ -391,7 +406,10 @@ function validateNavigation(value: unknown, assetRef: AssetRef) {
     studioAssert(Array.isArray(list) && list.length <= 30, '每级导航最多 30 项')
     for (const item of list) {
       studioRecord(item)
-      studioKeys(item, ['id', 'label', 'url', 'iconAssetId', 'children'])
+      studioKeys(item, ['id', 'label', 'url', 'iconAssetId', 'requires', 'children'])
+      if (item.requires !== undefined) {
+        validateRequires(item.requires)
+      }
       string(item.id, '导航 ID')
       studioAssert(/^[a-z0-9][\w-]{0,63}$/i.test(item.id) && !ids.has(item.id), '导航 ID 须唯一且安全')
       ids.add(item.id)

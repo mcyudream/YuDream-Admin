@@ -51,6 +51,9 @@ function update(path: number[], patch: Partial<StudioNavItem> | null) {
     if (!merged.iconAssetId) {
       delete merged.iconAssetId
     }
+    if (!merged.requires?.length) {
+      delete merged.requires
+    }
     list[index] = merged
   }
   if (child !== undefined && !next[top!]!.children!.length) {
@@ -82,6 +85,12 @@ function addChild(top: number) {
   apply({ appendAuto: navigation.value?.appendAuto ?? true, items: next })
 }
 
+/** 依赖输入：逗号分隔，空则移除 */
+function requiresOf(event: Event) {
+  const list = text(event).split(/[\s,，]+/).filter(Boolean)
+  return list.length ? list : undefined
+}
+
 function text(event: Event) {
   return ((event.target as HTMLInputElement | null)?.value ?? '').trim()
 }
@@ -94,7 +103,8 @@ function text(event: Event) {
     </h2>
     <p class="text-xs text-muted-foreground m-0">
       页面中绑定「站点导航」数据源的列表据此显示（如底部物品栏），二级条目以子菜单展开。地址可填站点页面（/site/...）、宿主页面（/wiki、/market、插件页）或 http(s) 外链。
-      未设置时使用「主题中心 → 导航」与站点页面自动生成。
+      未设置时使用「主题中心 → 导航」与站点页面自动生成。条目可填依赖（plugin:插件编码、capability:wiki / plugin-market），未启用时自动隐藏；
+      指向已关闭页面的条目同样隐藏。
     </p>
     <div v-if="!navigation" class="flex flex-wrap gap-2">
       <YdButton v-auth="'platform:cms:edit'" variant="outline" :disabled="!store.doc" @click="initialize">
@@ -111,6 +121,7 @@ function text(event: Event) {
           <YdInput :model-value="item.label" class="w-32" aria-label="导航名称" @change="(event: Event) => text(event) && update([top], { label: text(event) })" />
           <YdInput :model-value="item.url" class="flex-1 min-w-40" aria-label="导航地址" @change="(event: Event) => text(event) && update([top], { url: text(event) })" />
           <YdSelect class="w-44" :model-value="item.iconAssetId ?? ''" :options="iconOptions" aria-label="导航图标" @update:model-value="(value: unknown) => update([top], { iconAssetId: String(value || '') })" />
+          <YdInput :model-value="(item.requires ?? []).join(', ')" class="w-56" placeholder="依赖，如 plugin:timeline" aria-label="导航依赖" @change="(event: Event) => update([top], { requires: requiresOf(event) })" />
           <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="上移" :disabled="top === 0" @click="move([top], -1)">
             <YdIcon name="morph:arrow-up" />
           </YdButton>
@@ -127,6 +138,7 @@ function text(event: Event) {
         <div v-for="(child, index) in item.children ?? []" :key="child.id" class="pl-6 flex flex-wrap gap-2 items-center">
           <YdInput :model-value="child.label" class="w-32" aria-label="子菜单名称" @change="(event: Event) => text(event) && update([top, index], { label: text(event) })" />
           <YdInput :model-value="child.url" class="flex-1 min-w-40" aria-label="子菜单地址" @change="(event: Event) => text(event) && update([top, index], { url: text(event) })" />
+          <YdInput :model-value="(child.requires ?? []).join(', ')" class="w-56" placeholder="依赖" aria-label="子菜单依赖" @change="(event: Event) => update([top, index], { requires: requiresOf(event) })" />
           <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="上移子菜单" :disabled="index === 0" @click="move([top, index], -1)">
             <YdIcon name="morph:arrow-up" />
           </YdButton>

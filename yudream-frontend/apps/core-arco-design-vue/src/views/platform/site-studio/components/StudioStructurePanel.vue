@@ -20,7 +20,7 @@ const regionOptions = [
 
 const pageFormOpen = ref(false)
 const pageFormEditing = ref('')
-const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '' })
+const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '', requires: '' })
 const particleOptions = [
   { label: '沿用站点默认', value: '' },
   { label: '无', value: 'none' },
@@ -78,6 +78,7 @@ function openPageForm(pageId?: string) {
     toastIcon: page?.settings?.toast?.iconAssetId ?? '',
     icon: page?.settings?.iconAssetId ?? '',
     hostRoutes: (page?.settings?.hostRoutes ?? []).join(', '),
+    requires: (page?.settings?.requires ?? []).join(', '),
   }
   pageFormOpen.value = true
 }
@@ -88,14 +89,14 @@ function normalizePagePath(value: string) {
     return '/'
   }
   const body = trimmed.replace(/^\/+|\/+$/g, '')
-  return /^[\w\-/]*$/.test(body) ? `/${body}` : ''
+  return /^[\w\-/:]*$/.test(body) ? `/${body}` : ''
 }
 
 function submitPageForm() {
   const name = pageForm.value.name.trim()
   const path = normalizePagePath(pageForm.value.path)
   if (!name || !path) {
-    toast.error('页面名称与路径不能为空，路径仅支持字母数字与 - _ /')
+    toast.error('页面名称与路径不能为空，路径仅支持字母数字、- _ / 与动态段 :参数')
     return
   }
   const form = pageForm.value
@@ -103,6 +104,7 @@ function submitPageForm() {
     ...(form.particles ? { particles: form.particles } : {}),
     ...(form.icon ? { iconAssetId: form.icon } : {}),
     ...(form.hostRoutes.trim() ? { hostRoutes: form.hostRoutes.split(/[\s,，]+/).filter(Boolean) } : {}),
+    ...(form.requires.trim() ? { requires: form.requires.split(/[\s,，]+/).filter(Boolean) } : {}),
     ...(form.toastTitle.trim() ? { toast: { title: form.toastTitle.trim(), body: form.toastBody.trim(), ...(form.toastIcon ? { iconAssetId: form.toastIcon } : {}) } } : {}),
   }
   const settingsPatch = Object.keys(settings).length ? { settings } : {}
@@ -226,6 +228,10 @@ function confirmRemovePage(pageId: string) {
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>页面图标（站点导航中显示，如快捷栏物品图标）</span>
         <YdSelect v-model="pageForm.icon" :options="imageOptions" aria-label="页面图标" />
+      </label>
+      <label class="text-sm mt-2 flex flex-col gap-1">
+        <span>页面依赖（未启用时页面关闭、导航隐藏）</span>
+        <YdInput v-model="pageForm.requires" placeholder="如 plugin:minecraft-server, capability:wiki" aria-label="页面依赖" />
       </label>
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>承载宿主公开页（如 /wiki、/market、/timeline；逗号分隔）</span>

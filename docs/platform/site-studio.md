@@ -45,16 +45,19 @@
 - 页面 `settings.iconAssetId`：页面图标，站点导航数据中指向该页的条目带上 `icon`。
 - `features.navigation`：站点导航（最多两级、每级 30 项，名称/地址/图标），随草稿发布；数据源 `site:navigation` 以它为准，`appendAuto` 时按 URL 去重追加插件 siteNav 页面与插件市场/知识库入口。未设置时回落「主题中心 → 导航」与站点页面。工作台「主题 → 站点导航」编辑。
 - `features.dataSources`（插件数据适配器）：把插件匿名公开接口 `/api/plugins/{插件}/public/...`（仅 GET、不带凭据；校验禁止其他前缀、`..` 与外部地址）声明为数据源 `adapter:{编码}`；路径 `{参数}` 取页面地址查询参数，`single` 表示单条（详情），`recordsPath` 指向列表，`fields` 做字段改名。用于插件主题块之外的数据与详情页（列表条目以链接模板 `data-yd-link="/site/activity?id={id}"` 跳转；同一页面只换查询参数时重载框架文档按新参数取数）。工作台「主题 → 插件数据适配器」可试取接口查看字段。
-- `features.publicSkin`（公开页适配）：登录/注册、知识库、插件市场、插件公开页沿用站点外观。颜色限 `#rrggbb`，宿主换算为站点变量 `--yb-site-*`、组件库中性变量 `--color-*` 与 OKLCH 设计令牌，只在公开路由注入（后台不受影响）；组件库编号主色 `--primary-N` 受品牌令牌门禁约束不覆写。字体须为主题字体族（主题字体以 `@font-face` 注册到文档，Shadow DOM 内依赖它）。`chrome` 为 true 时宿主公开页使用站点页头/页脚（Shadow DOM 渲染、同一运行时）作为外壳，`bottomOffset` 为固定底栏留白。
+- `features.publicSkin`（公开页适配）：登录/注册、知识库、插件市场、插件公开页沿用站点外观。颜色限 `#rrggbb`，宿主换算为站点变量 `--yb-site-*`、组件库中性变量 `--color-*` 与 OKLCH 设计令牌，只在公开路由注入（后台不受影响）；组件库编号主色 `--primary-N` 受品牌令牌门禁约束不覆写。字体须为主题字体族（主题字体以 `@font-face` 注册到文档，Shadow DOM 内依赖它）。`chrome` 为 true 时所有公开页使用站点页头/页脚作为持久外壳，`bottomOffset` 为固定底栏留白；`pixel` 为 true 时嵌入主题页的宿主页面统一直角、硬边框、斜面与投影（按卡片/按钮/输入框等通用选择器，不写插件专属类名）。
 - 页面 `settings.hostRoutes`（承载宿主公开页）：访问 `/wiki`、`/market`、插件公开页（如 `/timeline`）或 `/login` 等路由时（最长前缀匹配，需开启站点外壳），宿主页面嵌入该站点页面渲染：整页（背景、页头页脚、物品栏）在 Shadow DOM 中，`data-yd-outlet` 节点内放 `<slot>`，宿主 Vue 页面作为插槽内容投影进来，与菜单页同属一个主题；`data-yd-host-hide` 节点在承载时隐藏、普通访问时 outlet 隐藏；`data-yd-site="pageTitle"` 显示宿主页面标题。嵌入时宿主页面根背景透明。
 - 页面 `settings.toast`：首次进入该页时的提示（同一会话每页一次），元素类名 `yd-site-toast-layer / yd-site-toast / -icon / -copy / -title / -body / --out`，主题可定义同名样式类覆盖默认外观。
 - 当前页链接自动带 `aria-current="page"`，配合样式类 `current` 状态做导航高亮。
 - 账号：`data-yd-auth="guest|user"` 按登录状态显隐，`data-yd-account="name|avatar|initial"` 显示账号名、头像（无头像时首字）；账号菜单链接（控制台 `/`、个人资料 `/profile`、退出 `/logout`）用 `data-yd-host-link` 指向宿主路由。
+- 经验条与格式化：`data-yd-progress="scroll"` 宽度跟随页面滚动、`="visited"` 显示本次访问去过的页面数；`data-yd-format="datetime|date|time"` 把时间戳/ISO 时间格式化为本地时间。
 - 计数与显隐：`data-yd-count="数据源"` 显示真实条数（首页统计等）；条目内 `data-yd-show / data-yd-hide="字段"` 按字段真假显隐（如服务器在线信号）。数据源另有 `market:categories`（插件市场分类与数量）；市场 v2 协议为裸 JSON，运行时以原生 fetch 读取。
 - 菜单：`[data-yd-menu]` 内 `[data-yd-menu-trigger]` 在按钮或触屏上切换 `aria-expanded`（子菜单为 `[data-yd-submenu]` 或嵌套列表），点外部/Esc 收起；桌面悬停由 `parent-hover` 直接展开、链接照常跳转（子菜单贴合触发项并以透明下边框作为悬停桥，指针移入途中不丢失悬停）。当前页落在某菜单的子菜单内时，该菜单触发项也标记为当前。
 - 站点信息：`data-yd-site="name|description|logo|copyright|year"` 取宿主「系统设置」的公开站点信息（Logo 写入图片 `src`），未设置时保留作者内容。
 - 数据绑定：容器 `data-yd-source`（`site:navigation`、`block:<主题块编码>`、`cms:latest`、`wiki:spaces`、`market:plugins`）与 `data-yd-limit`；容器内首个 `data-yd-item` 为条目模板，其余同标记项是示例；字段经 `data-yd-text / -href / -src / -title` 绑定（链接、图片地址按文档 URL 规则过滤；`$index` 为序号；图片无值时保留作者默认图），条目内 `data-yd-each="children"` 为嵌套列表（如二级菜单，无子项时隐藏并标记 `data-yd-has-children`），`data-yd-link` 为由字段拼出的链接模板。无数据或接口未启用时原样显示作者写的示例条目；`data-yd-sample` 仅在示例状态可见、`data-yd-live` 仅在真实数据时可见，容器外的标记用 `data-yd-for="数据源"` 关联。`site:navigation` 与公开站导航同一合并规则（CMS 导航 + 站点文档页面 + 插件 siteNav 页面 + 插件市场/知识库），其链接与绑定条目链接指向宿主路由（`data-yd-host-link`），不映射到 `/site` 前缀。检查器「样式类与数据」可视化编辑以上属性。
-- 公开站与草稿预览的渲染容器为视口模式：iframe 占满视口并在内部滚动，文档内 `position: fixed`（固定顶栏、底栏、背景层）按访客视口生效。
+- 公开站统一渲染：站点页面与承载的宿主公开页都以 Shadow DOM 渲染到主文档（`StudioShadowLayout`，同一视口滚动、同一入场过渡），文档内 `position: fixed`（背景层、底栏）按访客视口生效；文档经 schema 校验不含脚本、事件属性与危险 URL/CSS。开启站点外壳时页头/页脚由应用级持久外壳渲染（`App.vue`），跨路由不重建，只更新当前链接、账号、经验条，导航位置与数据在所有公开页一致。草稿预览仍用 iframe 以模拟桌面/平板/手机宽度。
+- 动态页面：页面路径段可写 `:参数`（如 `/activities/:id`），精确路径优先匹配，参数值与查询参数一起传给数据绑定（插件数据适配器 `{id}`、链接模板 `/site/activities/{id}`）。
+- 页面与导航依赖 `requires`（`plugin:插件编码`、`capability:wiki`、`capability:plugin-market`）：任一未启用时页面显示「页面未开放」、导航条目（含指向该页的条目）隐藏；启用状态取公开前端清单与知识库/市场公开能力。
 - 主题变量可承载图片（`--bg-xxx: url(...)`），主题面板对这类变量直接提供图片资产选择，用于“默认内置、可替换”的背景。
 
 ## 4. AI 修改的边界

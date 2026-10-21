@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// 宿主公开页的站点外壳：把已发布站点文档的页头或页脚编译为静态 HTML，渲染在 Shadow DOM 中（样式与宿主隔离、
-// 不执行脚本），并挂载与公开站相同的站点运行时（导航数据、账号、二级菜单、音频开关）。链接按站点规则映射到宿主路由。
+// 公开站持久外壳的一个区域（页头或页脚）：已发布站点文档的区域编译为静态 HTML 渲染在 Shadow DOM 中（不执行脚本），
+// 挂载站点运行时（导航数据、账号、二级菜单、音频、经验条）。只在文档变化时重建；路由切换仅更新当前链接与经验条，
+// 因此所有公开页面的导航位置、数据与状态保持一致。链接按站点规则映射到宿主路由。
 import type { SiteDocument } from '@/types/site-studio'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,7 +17,7 @@ const host = ref<HTMLElement | null>(null)
 const route = useRoute()
 const router = useRouter()
 let shadow: ShadowRoot | null = null
-let detach: (() => void) | undefined
+let detach: ((() => void) & { setCurrentPath?: (path: string) => void }) | undefined
 
 function onClick(event: Event) {
   const mouse = event as MouseEvent
@@ -53,7 +54,8 @@ onMounted(() => {
   render()
   shadow?.addEventListener('click', onClick)
 })
-watch(() => [props.document, route.path] as const, render)
+watch(() => props.document, render)
+watch(() => route.path, path => detach?.setCurrentPath?.(path))
 onBeforeUnmount(() => {
   detach?.()
   shadow?.removeEventListener('click', onClick)

@@ -61,6 +61,25 @@ export function useStudioHostLayout() {
   })
 }
 
+/**
+ * 应用级持久外壳：已发布文档开启「站点外壳」时，所有公开页面（站点页、承载的宿主公开页）共用同一份页头/页脚，
+ * 跨路由不重建（导航位置、数据与当前状态一致）。草稿预览与嵌入页不使用。
+ */
+export function useStudioPublicShell() {
+  const route = useRoute()
+  const document = usePublishedStudioDocument()
+  return computed(() => {
+    const current = document.value
+    if (!current?.features?.publicSkin?.chrome) {
+      return null
+    }
+    if (route.path.startsWith('/site-preview') || route.path.startsWith('/embed') || !isSiteThemeVisible(route.meta?.public === true)) {
+      return null
+    }
+    return current
+  })
+}
+
 const SKIN_STYLE_ID = 'yd-studio-public-skin'
 
 /**

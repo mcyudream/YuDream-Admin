@@ -122,8 +122,24 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
     // 嵌入站点主题页（Shadow DOM 插槽）时宿主页面根透明，露出主题页背景
     `html .studio-shadow-layout .login-page{min-height:auto !important;background:transparent !important}`,
     `html .studio-shadow-layout :is(.site-chrome,.wiki-public,.wiki-home,.wiki-search-page,.discover,.plugin,.public-form-page,.tl-page,.ev-page){background:transparent !important}`,
+    ...(skin.pixel ? pixelRules(skin) : []),
     skin.dark ? `html:has(:is(${STUDIO_PUBLIC_ROOTS.join(',')})){color-scheme:dark}` : '',
   ].filter(Boolean).join('\n')
+}
+
+/** 像素风：只作用于嵌入主题页（.studio-shadow-layout 插槽内）的宿主页面，用通用选择器而非插件专属类名 */
+function pixelRules(skin: StudioPublicSkin) {
+  const scope = 'html .studio-shadow-layout'
+  const panels = `${scope} :is([data-slot="card"],[data-slot="popover-content"],[data-slot="dropdown-menu-content"],[class*="card"]:not([class*="__"]),aside,.login-box)`
+  const controls = `${scope} :is([data-slot="input-group"],[data-slot="select-trigger"],[data-slot="popover-trigger"],[data-slot="form-control"],textarea,input:not([type="checkbox"]):not([type="radio"]))`
+  const buttons = `${scope} :is([data-slot="button"],button.yd-action,[data-slot="tabs-trigger"])`
+  return [
+    `${scope} *{border-radius:0 !important}`,
+    `${panels}{background:${skin.surface}e6 !important;border:2px solid #000 !important;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),4px 4px 0 rgba(0,0,0,.45) !important}`,
+    `${controls}{background:rgba(0,0,0,.45) !important;border:2px solid #000 !important;box-shadow:inset 2px 2px 0 rgba(0,0,0,.5) !important}`,
+    `${buttons}{border:2px solid #000 !important;box-shadow:inset 2px 2px 0 rgba(255,255,255,.28),inset -2px -2px 0 rgba(0,0,0,.35) !important}`,
+    `${buttons}:active{box-shadow:inset -2px -2px 0 rgba(255,255,255,.2),inset 2px 2px 0 rgba(0,0,0,.4) !important}`,
+  ]
 }
 
 /**

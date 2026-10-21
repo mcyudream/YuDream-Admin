@@ -96,8 +96,10 @@ export function navigationHref(item: Pick<SiteNavigationItem, 'url' | 'label' | 
 let wikiEnabledPromise: Promise<boolean> | null = null
 let marketEnabledPromise: Promise<boolean> | null = null
 let pluginSiteNavPromise: Promise<SiteNavigationItem[]> | null = null
+let enabledPluginsPromise: Promise<string[]> | null = null
 
 export function resetSiteNavigationCache() {
+  enabledPluginsPromise = null
   wikiEnabledPromise = null
   marketEnabledPromise = null
   pluginSiteNavPromise = null
@@ -138,6 +140,24 @@ function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
     })
     .catch(() => [])
   return pluginSiteNavPromise
+}
+
+/**
+ * 公开站可见的已启用能力：已启用插件（前端清单中的插件编码）与知识库、插件市场公开能力。
+ * 站点文档的页面/导航依赖（requires）据此判定是否开放。
+ */
+export async function loadSiteCapabilities() {
+  enabledPluginsPromise ??= import('@/api/modules/platform-plugin')
+    .then(({ default: apiPlugin }) => apiPlugin.frontendManifest())
+    .then(res => (res.data.modules || []).map(module => module.pluginCode))
+    .catch(() => [])
+  const [plugins, wiki, market] = await Promise.all([enabledPluginsPromise, loadWikiEnabled(), loadMarketEnabled()])
+  return new Set([...plugins.map(code => `plugin:${code}`), ...(wiki ? ['capability:wiki'] : []), ...(market ? ['capability:plugin-market'] : [])])
+}
+
+/** 依赖是否全部满足 */
+export function studioRequirementsMet(requires: string[] | undefined, available: Set<string>) {
+  return (requires ?? []).every(item => available.has(item))
 }
 
 function isHomeNavigationUrl(url?: string) {

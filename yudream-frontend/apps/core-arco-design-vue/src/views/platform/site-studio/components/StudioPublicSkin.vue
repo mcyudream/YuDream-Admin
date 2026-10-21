@@ -82,6 +82,10 @@ function setColor(key: keyof StudioPublicSkin, value: unknown) {
           <span>使用站点外壳（页头/页脚）</span>
         </label>
         <label class="text-xs flex gap-2 items-center">
+          <YdSwitch :model-value="Boolean(skin.pixel)" aria-label="像素风" @update:model-value="(value: unknown) => patch({ pixel: Boolean(value) })" />
+          <span>像素风（直角、硬边框、斜面）</span>
+        </label>
+        <label class="text-xs flex gap-2 items-center">
           <YdSwitch :model-value="skin.dark" aria-label="深色方案" @update:model-value="(value: unknown) => patch({ dark: Boolean(value) })" />
           <span>深色方案</span>
         </label>
