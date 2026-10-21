@@ -15,6 +15,7 @@ interface Member {
   status: 'active' | 'suspended' | 'invited'
   role: string
   avatar?: string
+  trace?: string
 }
 
 const members = ref<Member[]>([
@@ -27,6 +28,7 @@ const members = ref<Member[]>([
     status: 'active',
     role: '管理员',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lin',
+    trace: '9f2c7a1e4b6d8f0a3c5e7b9d1f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a',
   },
   {
     id: '9007199254740994',
@@ -120,6 +122,7 @@ const fixedColumns: EnhancedTableProps<Member>['columns'] = [
   ...columns,
   { accessorKey: 'email', header: '邮箱', width: 240 },
   { accessorKey: 'id', header: '用户 ID', width: 200 },
+  { accessorKey: 'trace', header: '追踪 ID', width: 180 },
 ]
 
 type UserColumnFixedMode = 'left' | 'right' | 'none'
@@ -219,6 +222,7 @@ const responsiveActions: ActionMenuItem<Member>[] = [
     />
     <ul class="text-xs text-muted-foreground mt-3 space-y-1">
       <li>横向滚动这张宽表：用户列默认吸附在左侧并带边缘阴影，切到「不固定」后随内容一起滚动，「右固定」则吸附在右侧操作列之前。</li>
+      <li>单元格默认可换行：长 ID/哈希（如「追踪 ID」）在列宽内折行，不再溢出覆盖相邻列；只需单行的列在 <code>cellClass</code> 传 <code>whitespace-nowrap</code>。</li>
     </ul>
   </DemoCard>
 </template>
