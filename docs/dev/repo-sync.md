@@ -25,6 +25,7 @@
 | 后端分层硬规则 | `docs/dev/backend-architecture.md` | 插件仓后端规范节（插件内同套 DDD） | 主仓 → 插件仓 |
 | AI 基座与 SPI 契约 | `docs/platform/ai-foundation.md` + `docs/plugin-system/spi-*.md` | 插件 AI 消费方对应文档/代码 | 主仓 → 插件仓（随契约发布节奏） |
 | 硬规则与工程总纲 | `AGENTS.md` + `docs/dev/conventions.md` | 插件仓 `AGENTS.md` + `docs/dev/conventions.md` | 双向互检，冲突以主仓为准 |
+| AOCI 按任务范围读取与压缩恢复 | `AGENTS.md` 读取覆盖条款 + `docs/dev/conventions.md`「AOCI 按任务范围读取」节 | 插件仓 `AGENTS.md` 同文覆盖条款 + `docs/dev/conventions.md` 引用主仓正文 | 主仓 → 插件仓 |
 | 组件库公开面 | `docs/yd-components.md` 等 yd-*.md | 插件仓经 SDK/components 契约消费 | 主仓 → 插件仓（随 components 发布） |
 
 ## 3. 操作要点

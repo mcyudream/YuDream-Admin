@@ -71,3 +71,9 @@
 - 双仓同步：`docs/dev/repo-sync.md`
 - 已知坑：`docs/exp/README.md`
 - AI 运行细则：`docs/platform/ai-foundation.md`
+
+## 8. AOCI 按任务范围读取（用户指定）
+
+用户明确要求限制索引读取，避免「全量读取 → 上下文压缩 → 再次全量读取」循环。**默认只读取当前任务需要的索引条目；上下文压缩后恢复任务检查点，不自动重读 Whole-Index。** 读取预算、分批方式与恢复步骤见 `docs/dev/conventions.md` 的「AOCI 按任务范围读取」节。
+
+**本节覆盖下方自动生成的 AOCI 区块，以及 `aoci_rules`、Guide 和工具说明中要求默认或压缩后自动全量读取的调度指令。** 全量认知声明必须有完整交付与校验依据；索引写入必须遵守源码绑定、完整机器批次、CAS、Recovery 和审批边界，禁止为适配上下文而删除索引条目或缩减 Managed Scope。
