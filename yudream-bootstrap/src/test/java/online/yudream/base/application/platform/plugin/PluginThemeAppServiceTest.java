@@ -1,6 +1,9 @@
 package online.yudream.base.application.platform.plugin;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
+import online.yudream.base.application.platform.cms.service.StudioAppService;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
 import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -37,13 +41,19 @@ class PluginThemeAppServiceTest {
     @Mock
     private CmsPresetAppService cmsPresetAppService;
 
+    @Mock
+    private StudioAppService studioAppService;
+
+    @Mock
+    private ObjectProvider<StudioAppService> studioProvider;
+
     private InMemorySettingRepo settingRepo;
     private PluginThemeAppService service;
 
     @BeforeEach
     void setUp() {
         settingRepo = new InMemorySettingRepo();
-        service = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService);
+        service = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService, studioProvider, new ObjectMapper());
     }
 
     @Test
@@ -178,6 +188,25 @@ class PluginThemeAppServiceTest {
 
         verify(cmsPresetAppService).importPluginPreset("neco", "Neco 主题", presetJson);
         verify(cmsPresetAppService, never()).ensureThemeLayout(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void activateSiteThemeWithStudioPackageSeedsStudioSiteWithoutLegacyImport() {
+        PluginThemeInfo terrain = new PluginThemeInfo("terrain", "terrain", "地形主题", "工作台站点主题",
+                Set.of("SITE"), List.of(), "", "site-preset.json", "", "", "", "", "rev-1");
+        stubTheme(terrain);
+        when(studioProvider.getIfAvailable()).thenReturn(studioAppService);
+        String presetJson = "{\"studioPackage\":{\"type\":\"yudream-site-package\",\"version\":1,\"kind\":\"site\",\"document\":{}}}";
+        when(pluginRuntimeGateway.frontendAsset("terrain", "site-preset.json"))
+                .thenReturn(Optional.of(new PluginFrontendAssetInfo("site-preset.json", "application/json",
+                        presetJson.getBytes(StandardCharsets.UTF_8))));
+
+        service.activate("terrain");
+
+        verify(studioAppService).seedThemePackage(org.mockito.ArgumentMatchers.eq("terrain"), org.mockito.ArgumentMatchers.any(JsonNode.class));
+        verify(cmsPresetAppService, never()).importPluginPreset(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        assertThat(readSlot("SITE")).isEqualTo("terrain");
     }
 
     @Test

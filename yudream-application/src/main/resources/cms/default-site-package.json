@@ -1,0 +1,1086 @@
+{
+ "type": "yudream-site-package",
+ "version": 1,
+ "kind": "site",
+ "document": {
+  "schemaVersion": 1,
+  "id": "site-default",
+  "name": "默认站点",
+  "theme": {
+   "tokens": {
+    "bg": "#f7f8fa",
+    "surface": "#ffffff",
+    "text": "#1d2129",
+    "muted": "#6b7280",
+    "border": "#e5e7eb",
+    "primary": "#2563eb",
+    "primary-text": "#ffffff",
+    "radius": "12px",
+    "font": "system-ui,-apple-system,\"PingFang SC\",\"Microsoft YaHei\",sans-serif"
+   },
+   "header": [
+    {
+     "id": "n-011",
+     "type": "header",
+     "tag": "header",
+     "attributes": {
+      "class": "header"
+     },
+     "styles": {},
+     "children": [
+      {
+       "id": "n-010",
+       "type": "div",
+       "tag": "div",
+       "attributes": {
+        "class": "wrap header-inner"
+       },
+       "styles": {},
+       "children": [
+        {
+         "id": "n-003",
+         "type": "link",
+         "tag": "a",
+         "attributes": {
+          "href": "/",
+          "class": "brand"
+         },
+         "styles": {},
+         "children": [
+          {
+           "id": "n-001",
+           "type": "image",
+           "tag": "img",
+           "attributes": {
+            "src": "/favicon.ico",
+            "alt": "",
+            "data-yd-site": "logo",
+            "class": "brand-logo"
+           },
+           "styles": {},
+           "children": []
+          },
+          {
+           "id": "n-002",
+           "type": "text",
+           "tag": "span",
+           "attributes": {
+            "data-yd-site": "name"
+           },
+           "styles": {},
+           "children": [],
+           "text": "站点名称"
+          }
+         ]
+        },
+        {
+         "id": "n-006",
+         "type": "ul",
+         "tag": "ul",
+         "attributes": {
+          "data-yd-source": "site:navigation",
+          "data-yd-limit": "12",
+          "aria-label": "站点导航",
+          "class": "nav"
+         },
+         "styles": {},
+         "children": [
+          {
+           "id": "n-005",
+           "type": "li",
+           "tag": "li",
+           "attributes": {
+            "data-yd-item": "true"
+           },
+           "styles": {},
+           "children": [
+            {
+             "id": "n-004",
+             "type": "link",
+             "tag": "a",
+             "attributes": {
+              "href": "/",
+              "data-yd-text": "label",
+              "data-yd-href": "url",
+              "class": "nav-link"
+             },
+             "styles": {},
+             "children": [],
+             "text": "首页"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "id": "n-009",
+         "type": "div",
+         "tag": "div",
+         "attributes": {
+          "class": "account"
+         },
+         "styles": {},
+         "children": [
+          {
+           "id": "n-007",
+           "type": "link",
+           "tag": "a",
+           "attributes": {
+            "href": "/login",
+            "data-yd-host-link": "true",
+            "data-yd-auth": "guest",
+            "class": "btn btn-sm"
+           },
+           "styles": {},
+           "children": [],
+           "text": "登录"
+          },
+          {
+           "id": "n-008",
+           "type": "link",
+           "tag": "a",
+           "attributes": {
+            "href": "/",
+            "data-yd-host-link": "true",
+            "data-yd-auth": "user",
+            "class": "btn btn-ghost btn-sm"
+           },
+           "styles": {},
+           "children": [],
+           "text": "进入控制台"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "footer": [
+    {
+     "id": "n-018",
+     "type": "footer",
+     "tag": "footer",
+     "attributes": {
+      "class": "footer"
+     },
+     "styles": {},
+     "children": [
+      {
+       "id": "n-017",
+       "type": "div",
+       "tag": "div",
+       "attributes": {
+        "class": "wrap footer-inner"
+       },
+       "styles": {},
+       "children": [
+        {
+         "id": "n-012",
+         "type": "text",
+         "tag": "span",
+         "attributes": {
+          "data-yd-site": "copyright"
+         },
+         "styles": {},
+         "children": [],
+         "text": "© 本站"
+        },
+        {
+         "id": "n-016",
+         "type": "span",
+         "tag": "span",
+         "attributes": {},
+         "styles": {},
+         "children": [
+          {
+           "id": "n-013",
+           "type": "text",
+           "tag": "span",
+           "attributes": {
+            "data-yd-site": "name"
+           },
+           "styles": {},
+           "children": [],
+           "text": "站点名称"
+          },
+          {
+           "id": "n-014",
+           "type": "text",
+           "tag": "span",
+           "attributes": {},
+           "styles": {},
+           "children": [],
+           "text": " · "
+          },
+          {
+           "id": "n-015",
+           "type": "text",
+           "tag": "span",
+           "attributes": {
+            "data-yd-site": "year"
+           },
+           "styles": {},
+           "children": [],
+           "text": "2026"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "classes": [
+    {
+     "name": "site",
+     "styles": {
+      "min-height": "100vh",
+      "display": "flex",
+      "flex-direction": "column",
+      "background": "var(--bg)",
+      "color": "var(--text)",
+      "font-family": "var(--font)",
+      "line-height": "1.6"
+     }
+    },
+    {
+     "name": "wrap",
+     "styles": {
+      "width": "min(1120px, calc(100% - 40px))",
+      "margin": "0 auto"
+     },
+     "responsive": {
+      "mobile": {
+       "width": "calc(100% - 32px)"
+      }
+     }
+    },
+    {
+     "name": "header",
+     "styles": {
+      "position": "sticky",
+      "top": "0",
+      "z-index": "10",
+      "background": "rgba(255,255,255,.92)",
+      "backdrop-filter": "blur(8px)",
+      "border-bottom": "1px solid var(--border)"
+     }
+    },
+    {
+     "name": "header-inner",
+     "styles": {
+      "display": "flex",
+      "align-items": "center",
+      "gap": "24px",
+      "height": "64px"
+     },
+     "responsive": {
+      "mobile": {
+       "flex-wrap": "wrap",
+       "gap": "4px 12px",
+       "height": "auto",
+       "padding": "10px 0 6px"
+      }
+     }
+    },
+    {
+     "name": "brand",
+     "styles": {
+      "display": "flex",
+      "align-items": "center",
+      "gap": "10px",
+      "flex": "none",
+      "color": "var(--text)",
+      "text-decoration": "none",
+      "font-weight": "600",
+      "font-size": "17px"
+     }
+    },
+    {
+     "name": "brand-logo",
+     "styles": {
+      "width": "32px",
+      "height": "32px",
+      "object-fit": "contain",
+      "border-radius": "8px"
+     }
+    },
+    {
+     "name": "nav",
+     "styles": {
+      "display": "flex",
+      "align-items": "center",
+      "gap": "4px",
+      "margin": "0",
+      "padding": "0",
+      "list-style": "none",
+      "flex": "1",
+      "min-width": "0",
+      "overflow-x": "auto"
+     },
+     "responsive": {
+      "mobile": {
+       "order": "3",
+       "flex-basis": "100%",
+       "margin": "0 -8px"
+      }
+     }
+    },
+    {
+     "name": "nav-link",
+     "styles": {
+      "display": "block",
+      "padding": "8px 12px",
+      "border-radius": "8px",
+      "color": "var(--muted)",
+      "text-decoration": "none",
+      "white-space": "nowrap",
+      "font-size": "15px"
+     },
+     "states": {
+      "hover": {
+       "color": "var(--text)",
+       "background": "#f2f3f5"
+      },
+      "current": {
+       "color": "var(--primary)",
+       "background": "#eff4ff"
+      }
+     }
+    },
+    {
+     "name": "account",
+     "styles": {
+      "flex": "none",
+      "display": "flex",
+      "align-items": "center",
+      "gap": "8px"
+     },
+     "responsive": {
+      "mobile": {
+       "margin-left": "auto"
+      }
+     }
+    },
+    {
+     "name": "btn",
+     "styles": {
+      "display": "inline-flex",
+      "align-items": "center",
+      "justify-content": "center",
+      "gap": "6px",
+      "padding": "10px 18px",
+      "border-radius": "10px",
+      "background": "var(--primary)",
+      "color": "var(--primary-text)",
+      "text-decoration": "none",
+      "font-size": "15px",
+      "font-weight": "500",
+      "border": "1px solid var(--primary)"
+     },
+     "states": {
+      "hover": {
+       "filter": "brightness(1.08)"
+      }
+     }
+    },
+    {
+     "name": "btn-ghost",
+     "styles": {
+      "background": "var(--surface)",
+      "color": "var(--text)",
+      "border": "1px solid var(--border)"
+     },
+     "states": {
+      "hover": {
+       "background": "#f2f3f5"
+      }
+     }
+    },
+    {
+     "name": "btn-sm",
+     "styles": {
+      "padding": "6px 14px",
+      "font-size": "14px"
+     }
+    },
+    {
+     "name": "hero",
+     "styles": {
+      "padding": "88px 0 72px",
+      "background-color": "#eef3ff",
+      "background-size": "cover",
+      "background-position": "center",
+      "border-bottom": "1px solid var(--border)"
+     },
+     "responsive": {
+      "mobile": {
+       "padding": "48px 0 40px"
+      }
+     }
+    },
+    {
+     "name": "hero-title",
+     "styles": {
+      "margin": "0 0 16px",
+      "font-size": "44px",
+      "line-height": "1.2",
+      "font-weight": "700",
+      "letter-spacing": "-.01em"
+     },
+     "responsive": {
+      "mobile": {
+       "font-size": "30px"
+      }
+     }
+    },
+    {
+     "name": "hero-text",
+     "styles": {
+      "margin": "0 0 28px",
+      "max-width": "640px",
+      "font-size": "18px",
+      "color": "var(--muted)"
+     },
+     "responsive": {
+      "mobile": {
+       "font-size": "16px"
+      }
+     }
+    },
+    {
+     "name": "actions",
+     "styles": {
+      "display": "flex",
+      "flex-wrap": "wrap",
+      "gap": "12px"
+     }
+    },
+    {
+     "name": "section",
+     "styles": {
+      "padding": "64px 0"
+     },
+     "responsive": {
+      "mobile": {
+       "padding": "40px 0"
+      }
+     }
+    },
+    {
+     "name": "section-title",
+     "styles": {
+      "margin": "0 0 8px",
+      "font-size": "28px",
+      "font-weight": "700"
+     },
+     "responsive": {
+      "mobile": {
+       "font-size": "22px"
+      }
+     }
+    },
+    {
+     "name": "section-text",
+     "styles": {
+      "margin": "0 0 28px",
+      "color": "var(--muted)"
+     }
+    },
+    {
+     "name": "grid",
+     "styles": {
+      "display": "grid",
+      "grid-template-columns": "repeat(3, minmax(0, 1fr))",
+      "gap": "20px"
+     },
+     "responsive": {
+      "tablet": {
+       "grid-template-columns": "repeat(2, minmax(0, 1fr))"
+      },
+      "mobile": {
+       "grid-template-columns": "minmax(0, 1fr)"
+      }
+     }
+    },
+    {
+     "name": "card",
+     "styles": {
+      "display": "flex",
+      "flex-direction": "column",
+      "gap": "10px",
+      "padding": "22px",
+      "background": "var(--surface)",
+      "border": "1px solid var(--border)",
+      "border-radius": "var(--radius)",
+      "color": "var(--text)",
+      "text-decoration": "none",
+      "transition": "box-shadow .15s, transform .15s"
+     },
+     "states": {
+      "hover": {
+       "box-shadow": "0 8px 24px rgba(15,23,42,.08)",
+       "transform": "translateY(-2px)"
+      }
+     }
+    },
+    {
+     "name": "card-icon",
+     "styles": {
+      "width": "40px",
+      "height": "40px",
+      "object-fit": "contain"
+     }
+    },
+    {
+     "name": "card-title",
+     "styles": {
+      "margin": "0",
+      "font-size": "18px",
+      "font-weight": "600"
+     }
+    },
+    {
+     "name": "card-text",
+     "styles": {
+      "margin": "0",
+      "color": "var(--muted)",
+      "font-size": "15px"
+     }
+    },
+    {
+     "name": "card-meta",
+     "styles": {
+      "margin-top": "auto",
+      "color": "var(--muted)",
+      "font-size": "13px"
+     }
+    },
+    {
+     "name": "empty",
+     "styles": {
+      "padding": "32px",
+      "text-align": "center",
+      "color": "var(--muted)",
+      "background": "var(--surface)",
+      "border": "1px dashed var(--border)",
+      "border-radius": "var(--radius)"
+     }
+    },
+    {
+     "name": "footer",
+     "styles": {
+      "margin-top": "auto",
+      "padding": "28px 0",
+      "border-top": "1px solid var(--border)",
+      "background": "var(--surface)",
+      "color": "var(--muted)",
+      "font-size": "14px"
+     }
+    },
+    {
+     "name": "footer-inner",
+     "styles": {
+      "display": "flex",
+      "flex-wrap": "wrap",
+      "justify-content": "space-between",
+      "gap": "12px"
+     }
+    }
+   ]
+  },
+  "pages": [
+   {
+    "id": "page-home",
+    "name": "首页",
+    "path": "/",
+    "root": [
+     {
+      "id": "n-045",
+      "type": "div",
+      "tag": "div",
+      "attributes": {
+       "class": "site"
+      },
+      "styles": {},
+      "children": [
+       {
+        "id": "n-025",
+        "type": "section",
+        "tag": "section",
+        "attributes": {
+         "data-yd-content-bg": "heroImage",
+         "class": "hero"
+        },
+        "styles": {},
+        "children": [
+         {
+          "id": "n-024",
+          "type": "div",
+          "tag": "div",
+          "attributes": {
+           "class": "wrap"
+          },
+          "styles": {},
+          "children": [
+           {
+            "id": "n-019",
+            "type": "heading",
+            "tag": "h1",
+            "attributes": {
+             "data-yd-content": "heroTitle",
+             "class": "hero-title"
+            },
+            "styles": {},
+            "children": [],
+            "text": "欢迎来到本站"
+           },
+           {
+            "id": "n-020",
+            "type": "text",
+            "tag": "p",
+            "attributes": {
+             "data-yd-content": "heroText",
+             "class": "hero-text"
+            },
+            "styles": {},
+            "children": [],
+            "text": "在这里介绍你的站点：它是做什么的、适合谁、从哪里开始。"
+           },
+           {
+            "id": "n-023",
+            "type": "div",
+            "tag": "div",
+            "attributes": {
+             "class": "actions"
+            },
+            "styles": {},
+            "children": [
+             {
+              "id": "n-021",
+              "type": "link",
+              "tag": "a",
+              "attributes": {
+               "href": "/",
+               "data-yd-content": "primaryText",
+               "data-yd-content-href": "primaryLink",
+               "class": "btn"
+              },
+              "styles": {},
+              "children": [],
+              "text": "开始浏览"
+             },
+             {
+              "id": "n-022",
+              "type": "link",
+              "tag": "a",
+              "attributes": {
+               "href": "/",
+               "data-yd-content": "secondaryText",
+               "data-yd-content-href": "secondaryLink",
+               "data-yd-content-show": "secondaryShow",
+               "class": "btn btn-ghost"
+              },
+              "styles": {},
+              "children": [],
+              "text": "了解更多"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "n-035",
+        "type": "section",
+        "tag": "section",
+        "attributes": {
+         "data-yd-content-show": "featuresShow",
+         "class": "section"
+        },
+        "styles": {},
+        "children": [
+         {
+          "id": "n-034",
+          "type": "div",
+          "tag": "div",
+          "attributes": {
+           "class": "wrap"
+          },
+          "styles": {},
+          "children": [
+           {
+            "id": "n-026",
+            "type": "heading",
+            "tag": "h2",
+            "attributes": {
+             "data-yd-content": "featuresTitle",
+             "class": "section-title"
+            },
+            "styles": {},
+            "children": [],
+            "text": "我们提供什么"
+           },
+           {
+            "id": "n-027",
+            "type": "text",
+            "tag": "p",
+            "attributes": {
+             "data-yd-content": "featuresText",
+             "class": "section-text"
+            },
+            "styles": {},
+            "children": [],
+            "text": "用几张卡片介绍主要内容或服务。"
+           },
+           {
+            "id": "n-033",
+            "type": "div",
+            "tag": "div",
+            "attributes": {
+             "data-yd-source": "content:features",
+             "data-yd-limit": "12",
+             "class": "grid"
+            },
+            "styles": {},
+            "children": [
+             {
+              "id": "n-031",
+              "type": "link",
+              "tag": "a",
+              "attributes": {
+               "href": "/",
+               "data-yd-item": "true",
+               "data-yd-href": "url",
+               "class": "card"
+              },
+              "styles": {},
+              "children": [
+               {
+                "id": "n-028",
+                "type": "image",
+                "tag": "img",
+                "attributes": {
+                 "src": "/favicon.ico",
+                 "alt": "",
+                 "data-yd-src": "icon",
+                 "data-yd-show": "icon",
+                 "class": "card-icon"
+                },
+                "styles": {},
+                "children": []
+               },
+               {
+                "id": "n-029",
+                "type": "heading",
+                "tag": "h3",
+                "attributes": {
+                 "data-yd-text": "title",
+                 "class": "card-title"
+                },
+                "styles": {},
+                "children": [],
+                "text": "卡片标题"
+               },
+               {
+                "id": "n-030",
+                "type": "text",
+                "tag": "p",
+                "attributes": {
+                 "data-yd-text": "text",
+                 "class": "card-text"
+                },
+                "styles": {},
+                "children": [],
+                "text": "卡片说明"
+               }
+              ]
+             },
+             {
+              "id": "n-032",
+              "type": "text",
+              "tag": "p",
+              "attributes": {
+               "data-yd-empty": "true",
+               "class": "empty"
+              },
+              "styles": {},
+              "children": [],
+              "text": "还没有添加卡片。"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "n-044",
+        "type": "section",
+        "tag": "section",
+        "attributes": {
+         "data-yd-content-show": "articlesShow",
+         "class": "section"
+        },
+        "styles": {},
+        "children": [
+         {
+          "id": "n-043",
+          "type": "div",
+          "tag": "div",
+          "attributes": {
+           "class": "wrap"
+          },
+          "styles": {},
+          "children": [
+           {
+            "id": "n-036",
+            "type": "heading",
+            "tag": "h2",
+            "attributes": {
+             "data-yd-content": "articlesTitle",
+             "class": "section-title"
+            },
+            "styles": {},
+            "children": [],
+            "text": "最新文章"
+           },
+           {
+            "id": "n-042",
+            "type": "div",
+            "tag": "div",
+            "attributes": {
+             "data-yd-source": "cms:latest",
+             "data-yd-limit": "6",
+             "class": "grid"
+            },
+            "styles": {},
+            "children": [
+             {
+              "id": "n-040",
+              "type": "link",
+              "tag": "a",
+              "attributes": {
+               "href": "/",
+               "data-yd-item": "true",
+               "data-yd-href": "url",
+               "class": "card"
+              },
+              "styles": {},
+              "children": [
+               {
+                "id": "n-037",
+                "type": "heading",
+                "tag": "h3",
+                "attributes": {
+                 "data-yd-text": "title",
+                 "class": "card-title"
+                },
+                "styles": {},
+                "children": [],
+                "text": "文章标题"
+               },
+               {
+                "id": "n-038",
+                "type": "text",
+                "tag": "p",
+                "attributes": {
+                 "data-yd-text": "summary",
+                 "class": "card-text"
+                },
+                "styles": {},
+                "children": [],
+                "text": "文章摘要"
+               },
+               {
+                "id": "n-039",
+                "type": "text",
+                "tag": "span",
+                "attributes": {
+                 "data-yd-text": "publishedAt",
+                 "data-yd-format": "date",
+                 "class": "card-meta"
+                },
+                "styles": {},
+                "children": [],
+                "text": ""
+               }
+              ]
+             },
+             {
+              "id": "n-041",
+              "type": "text",
+              "tag": "p",
+              "attributes": {
+               "data-yd-empty": "true",
+               "class": "empty"
+              },
+              "styles": {},
+              "children": [],
+              "text": "还没有发布文章。"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "assets": [],
+  "features": {
+   "content": {
+    "sections": [
+     {
+      "code": "home-hero",
+      "title": "首页横幅",
+      "description": "首屏标题、介绍、按钮与可选背景图。",
+      "fields": [
+       {
+        "key": "heroTitle",
+        "label": "标题",
+        "type": "text",
+        "defaultValue": "欢迎来到本站"
+       },
+       {
+        "key": "heroText",
+        "label": "介绍",
+        "type": "textarea",
+        "defaultValue": "在这里介绍你的站点：它是做什么的、适合谁、从哪里开始。"
+       },
+       {
+        "key": "heroImage",
+        "label": "背景图（可选）",
+        "type": "image"
+       },
+       {
+        "key": "primaryText",
+        "label": "主按钮文字",
+        "type": "text",
+        "defaultValue": "开始浏览"
+       },
+       {
+        "key": "primaryLink",
+        "label": "主按钮链接",
+        "type": "link",
+        "defaultValue": "/wiki"
+       },
+       {
+        "key": "secondaryShow",
+        "label": "显示次按钮",
+        "type": "switch",
+        "defaultValue": true
+       },
+       {
+        "key": "secondaryText",
+        "label": "次按钮文字",
+        "type": "text",
+        "defaultValue": "登录"
+       },
+       {
+        "key": "secondaryLink",
+        "label": "次按钮链接",
+        "type": "link",
+        "defaultValue": "/login"
+       }
+      ]
+     },
+     {
+      "code": "home-features",
+      "title": "首页卡片",
+      "description": "介绍主要内容或服务，可增删排序。",
+      "fields": [
+       {
+        "key": "featuresShow",
+        "label": "显示本区块",
+        "type": "switch",
+        "defaultValue": true
+       },
+       {
+        "key": "featuresTitle",
+        "label": "标题",
+        "type": "text",
+        "defaultValue": "我们提供什么"
+       },
+       {
+        "key": "featuresText",
+        "label": "说明",
+        "type": "textarea",
+        "defaultValue": "用几张卡片介绍主要内容或服务。"
+       },
+       {
+        "key": "features",
+        "label": "卡片",
+        "type": "list",
+        "itemFields": [
+         {
+          "key": "title",
+          "label": "标题",
+          "type": "text"
+         },
+         {
+          "key": "text",
+          "label": "说明",
+          "type": "textarea"
+         },
+         {
+          "key": "icon",
+          "label": "图标（可选）",
+          "type": "image"
+         },
+         {
+          "key": "url",
+          "label": "链接",
+          "type": "link"
+         }
+        ],
+        "defaultValue": [
+         {
+          "title": "知识库",
+          "text": "公开的文档与指南，随时查阅。",
+          "url": "/wiki"
+         },
+         {
+          "title": "插件市场",
+          "text": "浏览本站发布的插件与扩展。",
+          "url": "/market"
+         },
+         {
+          "title": "加入我们",
+          "text": "注册账号，参与社区与活动。",
+          "url": "/register"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "code": "home-articles",
+      "title": "最新文章",
+      "fields": [
+       {
+        "key": "articlesShow",
+        "label": "显示本区块",
+        "type": "switch",
+        "defaultValue": true
+       },
+       {
+        "key": "articlesTitle",
+        "label": "标题",
+        "type": "text",
+        "defaultValue": "最新文章"
+       }
+      ]
+     }
+    ],
+    "values": {}
+   }
+  }
+ },
+ "assets": []
+}

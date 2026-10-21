@@ -288,6 +288,13 @@ chrome 接管（chromeComponent，推荐）与变量契约（回落）：
 - 内容注入约定：主题页面与 `settings.homeHtml` 一律用 `data-yb-*` 模板指令（`data-yb-for/if/html/markdown/limit` 等）与 `{{路径}}` 变量注入系统数据（站点信息、登录态、最新页面/Wiki 等）；**禁止声明 `navigationJson`**，导航归属主题布局的 settings、始终由系统渲染。主题自带页面 CSS 只写布局，配色应消费主题自身变量。
 - 主题中心：后台「平台 → 主题中心」聚合展示全部 SITE 主题卡（预览图、是否含首页方案/页面集、激活态）并支持一键启用/恢复默认；CMS 页面/首页外观/导航/媒体库/首页方案管理均并入主题中心，工作台顶部提供「编辑主题」选择器（默认当前激活主题，可离线预编辑任意主题的内容），页面列表标记归属主题与「插件托管」。注意：菜单为种子初始化，既有部署升级后需手工清理旧的「内容站点（platform:cms）」菜单节点。
 
+主题自带工作台站点（homePreset.studioPackage）：
+
+- SITE 主题的 homePreset JSON 可带 `studioPackage`：一份网站工作台便携包（`{"type":"yudream-site-package","version":1,"kind":"site","document":{…},"assets":[…]}`，`document` 为工作台站点文档，校验规则与工作台保存一致）。主题激活时若该主题（`themeCode={pluginCode}`）还没有站点工作区，宿主导入为草稿并立即发布；已有工作区（管理员编辑过或此前已导入）一律不覆盖，升级插件不改动已有站点。
+- 站点文档里的媒体放在同一 JAR 前端目录，按 `/api/platform/plugins/{pluginCode}/assets/...` 引用，不引用安装实例的 `/api/files/...`，保证主题可分发；插件停用后资产与站点一起对外不可见。
+- 只带 `studioPackage` 的方案不走旧版 CMS 首页导入；同时带旧字段（title/sections/pages 等）时两者都执行。内容定制能力未启用或包不合法时只记日志，不阻塞主题激活。
+- 框架内置主题 `default` 自带一份常规站点（浅色、系统字体、内容模型可编辑），仅在 `default` 尚无站点工作区时于启动时导入；个性化主题（如 Minecraft 风格）一律由主题插件提供，不进宿主。
+
 主题配置（configSchema，WordPress 自定义器形态）：
 
 - SITE 主题可声明 `configSchema` 指向 JAR 内一份 `theme-config.json`（路径校验规则与 `homePreset` 相同）；声明后主题卡出现「配置」入口，进入独立配置页 `/platform/theme-center/config/{theme}`（左侧分节导航 + 右侧分节表单，宿主按 schema 渲染，主题不提供前端页面）。

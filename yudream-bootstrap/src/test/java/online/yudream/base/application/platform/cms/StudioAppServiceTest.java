@@ -22,12 +22,35 @@ class StudioAppServiceTest {
     final CapabilityModuleRepo capability = mock(CapabilityModuleRepo.class);
     final SiteThemeQueryService theme = mock(SiteThemeQueryService.class);
     final MemoryRepo repo = new MemoryRepo();
-    final StudioAppService service = new StudioAppService(capability, repo, theme, new StudioDocumentValidator());
+    final StudioAppService service = new StudioAppService(capability, repo, theme, new StudioDocumentValidator(), new com.fasterxml.jackson.databind.ObjectMapper());
     @BeforeEach void setup() {
         CapabilityModule module = mock(CapabilityModule.class);
         when(module.getEnabled()).thenReturn(true);
         when(capability.findByCode("cms")).thenReturn(Optional.of(module));
         when(theme.activeSiteThemeCode()).thenReturn("alpha");
+    }
+    @Test void themePackageSeedsAndPublishesOnlyWhenThemeHasNoWorkspace() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var pkg = mapper.createObjectNode().put("type", "yudream-site-package").put("version", 1).put("kind", "site");
+        pkg.set("document", mapper.readTree(StudioDocumentValidatorTest.DOCUMENT));
+        assertThat(service.seedThemePackage("beta", pkg)).isTrue();
+        var state = service.state("beta");
+        assertThat(state.revision()).isEqualTo("2");
+        when(theme.activeSiteThemeCode()).thenReturn("beta");
+        assertThat(service.publicDocument()).isNotNull();
+        // 已有工作区（管理员已编辑）时不覆盖
+        service.saveDraft("beta", new StudioDraftSaveCmd("2", StudioDocumentValidatorTest.DOCUMENT.replace("你好", "管理员修改")));
+        assertThat(service.seedThemePackage("beta", pkg)).isFalse();
+        assertThat(service.state("beta").revision()).isEqualTo("3");
+        var bad = mapper.createObjectNode().put("type", "other");
+        assertThatThrownBy(() -> service.seedThemePackage("gamma", bad)).isInstanceOf(BizException.class);
+    }
+    @Test void builtinSiteSeedsOnceAndPassesBackendValidation() {
+        assertThat(service.seedBuiltinSite()).isTrue();
+        when(theme.activeSiteThemeCode()).thenReturn(StudioAppService.BUILTIN_THEME_CODE);
+        assertThat(service.publicDocument()).isNotNull();
+        assertThat(service.state(StudioAppService.BUILTIN_THEME_CODE).revision()).isEqualTo("2");
+        assertThat(service.seedBuiltinSite()).isFalse();
     }
     @Test void roundTripPublishRestoreNeverLeaksDraftAndIsThemeIsolated() {
         assertThat(service.state("alpha").revision()).isEqualTo("0");
@@ -74,7 +97,7 @@ class StudioAppServiceTest {
         assertThatThrownBy(() -> service.publish("alpha", new StudioRevisionCmd("0"))).isInstanceOf(BizException.class).hasMessageContaining("冲突");
         StudioWorkspaceRepo conflictRepo = mock(StudioWorkspaceRepo.class);
         when(conflictRepo.findByThemeCode("alpha")).thenReturn(Optional.empty());
-        var conflict = new StudioAppService(capability, conflictRepo, theme, new StudioDocumentValidator());
+        var conflict = new StudioAppService(capability, conflictRepo, theme, new StudioDocumentValidator(), new com.fasterxml.jackson.databind.ObjectMapper());
         assertThatThrownBy(() -> conflict.saveDraft("alpha", new StudioDraftSaveCmd("0", StudioDocumentValidatorTest.DOCUMENT))).isInstanceOf(BizException.class).hasMessageContaining("冲突");
         verify(conflictRepo, times(1)).compareAndSet(eq(0L), any());
     }

@@ -1,8 +1,11 @@
 package online.yudream.base.application.platform.plugin.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
+import online.yudream.base.application.platform.cms.service.StudioAppService;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
@@ -12,6 +15,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
 import online.yudream.base.domain.system.setting.enumerate.SettingType;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,6 +43,8 @@ public class PluginThemeAppService {
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final SettingRepo settingRepo;
     private final CmsPresetAppService cmsPresetAppService;
+    private final ObjectProvider<StudioAppService> studioAppService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 公开站/后台当前激活的主题（scope -> 主题），未激活的 scope 不出现在结果中。
@@ -113,14 +119,37 @@ public class PluginThemeAppService {
         }
     }
 
+    /** 首页方案中旧版 CMS 首页/页面集字段；方案只带 studioPackage 时不走旧版导入 */
+    private static final List<String> LEGACY_PRESET_KEYS = List.of("title", "subtitle", "heroImageUrl", "settings", "sections", "pages");
+
     private void importHomePreset(PluginThemeInfo theme) {
         try {
             String presetJson = pluginRuntimeGateway.frontendAsset(theme.pluginCode(), theme.homePreset())
                     .map(asset -> new String(asset.body(), StandardCharsets.UTF_8))
                     .orElseThrow(() -> new BizException("主题首页方案资产不存在"));
-            cmsPresetAppService.importPluginPreset(theme.pluginCode(), theme.name(), presetJson);
+            JsonNode preset = objectMapper.readTree(presetJson);
+            if (preset != null && preset.has("studioPackage")) {
+                seedStudioSite(theme, preset.get("studioPackage"));
+            }
+            if (preset != null && LEGACY_PRESET_KEYS.stream().anyMatch(preset::has)) {
+                cmsPresetAppService.importPluginPreset(theme.pluginCode(), theme.name(), presetJson);
+            }
         } catch (Exception e) {
             log.warn("导入插件主题首页方案失败，仅应用主题样式：plugin={}, reason={}", theme.pluginCode(), e.getMessage());
+        }
+    }
+
+    /** 主题自带工作台站点：该主题尚无站点工作区时导入并发布，从不覆盖管理员内容 */
+    private void seedStudioSite(PluginThemeInfo theme, JsonNode sitePackage) {
+        StudioAppService studio = studioAppService.getIfAvailable();
+        if (studio == null) {
+            log.info("内容定制能力未装配，跳过主题自带站点：plugin={}", theme.pluginCode());
+            return;
+        }
+        try {
+            studio.seedThemePackage(theme.pluginCode(), sitePackage);
+        } catch (Exception e) {
+            log.warn("导入主题自带站点失败：plugin={}, reason={}", theme.pluginCode(), e.getMessage());
         }
     }
 

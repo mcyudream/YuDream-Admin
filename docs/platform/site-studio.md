@@ -63,6 +63,7 @@
 - 示例与空状态：示例条目只在草稿预览中显示；公开站取数前隐藏条目，无数据（含接口不可用）时移除示例并显示 `data-yd-empty` 元素，不向访客展示假数据。
 - 页面 `settings.shell`（承载外壳页）：须同时声明 `hostRoutes`；页面只为这些宿主/插件页面提供主题外壳（背景、页头页脚），自身地址不注册、不进自动导航。业务数据页一律由插件注册（如 `/servers`、`/activities`、`/timeline`），主题不再自建一份数据页。
 - `publicSkin.classes`（沿用主题样式类）：`panel / button / control / heading` 各指向一个主题样式类，嵌入主题页的宿主/插件页面中最外层卡片、按钮（仅 `data-slot="button"` 与标签页触发器，不含作为点击区域的 `YdAction`）、输入框、`h1/h2` 套用该类的视觉属性（背景、边框/边框图、阴影、文字色、字距等）与 hover/active/focus 状态，不改尺寸布局；类中引用的主题变量只写到嵌入区域。
+- 主题分发：框架只自带 `default` 主题的常规站点（启动时在无工作区时导入）；个性化站点做成 SITE 主题插件，在 homePreset JSON 的 `studioPackage` 里携带工作台站点、媒体放进插件资产目录（按 `/api/platform/plugins/{code}/assets/...` 引用），启用即导入发布、已有站点不覆盖（见 `docs/plugin-system/specification.md`）。示例：插件仓 `mc-terrain-theme`（方块地形主题）。
 - 主题变量可承载图片（`--bg-xxx: url(...)`），主题面板对这类变量直接提供图片资产选择，用于“默认内置、可替换”的背景。
 
 ## 4. AI 修改的边界

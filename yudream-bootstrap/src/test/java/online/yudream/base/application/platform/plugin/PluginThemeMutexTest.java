@@ -79,7 +79,7 @@ class PluginThemeMutexTest {
     @BeforeEach
     void setUp() {
         settingRepo = new InMemorySettingRepo();
-        themeAppService = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService);
+        themeAppService = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService, org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class), new com.fasterxml.jackson.databind.ObjectMapper());
         service = new PluginAppService(
                 pluginModuleRepo,
                 pluginRuntimeGateway,

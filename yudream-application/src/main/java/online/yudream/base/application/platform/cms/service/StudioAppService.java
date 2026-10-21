@@ -1,6 +1,9 @@
 package online.yudream.base.application.platform.cms.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.cms.assembler.StudioAssembler;
 import online.yudream.base.application.platform.cms.cmd.StudioDraftSaveCmd;
 import online.yudream.base.application.platform.cms.cmd.StudioRevisionCmd;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.cms", name = "enabled", havingValue = "true")
@@ -24,6 +28,7 @@ public class StudioAppService {
     private final StudioWorkspaceRepo workspaceRepo;
     private final SiteThemeQueryService siteThemeQueryService;
     private final StudioDocumentValidator validator;
+    private final ObjectMapper objectMapper;
 
     public StudioStateDTO state(String themeCode) {
         ensureEnabled();
@@ -62,6 +67,54 @@ public class StudioAppService {
         long offset = ((long) page - 1) * size;
         var list = releases.stream().skip(offset).limit(size).map(StudioAssembler::toDTO).toList();
         return new PageResult<>(list, releases.size(), page, size);
+    }
+    /**
+     * 主题插件自带站点（首页方案 JSON 的 studioPackage，格式同工作台便携包 yudream-site-package v1）：
+     * 该主题尚无站点工作区时写入草稿并发布；已有工作区（管理员已编辑或此前已导入）时不覆盖。
+     * 返回是否导入。能力未启用、包不合法时抛出，由调用方记录且不阻塞主题激活。
+     */
+    public boolean seedThemePackage(String themeCode, JsonNode sitePackage) {
+        ensureEnabled();
+        if (workspaceRepo.findByThemeCode(themeCode).isPresent()) {
+            log.info("主题已有站点工作区，保留管理员内容不导入自带站点：theme={}", themeCode);
+            return false;
+        }
+        if (sitePackage == null || !sitePackage.isObject() || !"yudream-site-package".equals(sitePackage.path("type").asText())
+                || sitePackage.path("version").asInt() != 1 || !"site".equals(sitePackage.path("kind").asText()) || !sitePackage.path("document").isObject()) {
+            throw new BizException("主题自带站点须为 yudream-site-package v1 的 site 包");
+        }
+        String documentJson;
+        try {
+            documentJson = objectMapper.writeValueAsString(sitePackage.get("document"));
+        } catch (Exception ex) {
+            throw new BizException("主题自带站点无法序列化");
+        }
+        validator.validate(documentJson);
+        StudioWorkspace empty = StudioWorkspace.empty(themeCode);
+        Instant now = Instant.now();
+        StudioWorkspace drafted = empty.saveDraft("0", documentJson, now);
+        StudioWorkspace published = drafted.publish(Long.toString(drafted.revision()), UUID.randomUUID().toString(), now);
+        persist(empty, published);
+        log.info("已导入并发布主题自带站点：theme={}", themeCode);
+        return true;
+    }
+    /** 框架内置主题编码与其自带的常规站点（浅色、系统字体、内容模型可编辑），主题个性化由主题插件提供 */
+    public static final String BUILTIN_THEME_CODE = "default";
+    private static final String BUILTIN_SITE_PACKAGE = "cms/default-site-package.json";
+
+    /** 内置主题尚无站点工作区时导入并发布框架自带的常规站点；已有工作区不覆盖。返回是否导入。 */
+    public boolean seedBuiltinSite() {
+        if (workspaceRepo.findByThemeCode(BUILTIN_THEME_CODE).isPresent()) {
+            return false;
+        }
+        try (var input = getClass().getClassLoader().getResourceAsStream(BUILTIN_SITE_PACKAGE)) {
+            if (input == null) {
+                throw new BizException("框架内置站点资源缺失");
+            }
+            return seedThemePackage(BUILTIN_THEME_CODE, objectMapper.readTree(input));
+        } catch (java.io.IOException ex) {
+            throw new BizException("框架内置站点读取失败");
+        }
     }
     public StudioPublicDocumentDTO publicDocument() {
         ensureEnabled();
