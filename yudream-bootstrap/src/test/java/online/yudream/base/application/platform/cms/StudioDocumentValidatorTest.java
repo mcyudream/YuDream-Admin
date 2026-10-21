@@ -79,11 +79,11 @@ class StudioDocumentValidatorTest {
                "classes":[{"name":"mc-btn","styles":{"color":"#fff","animation":"bob 2s steps(4) infinite"},"responsive":{"mobile":{"padding":"4px"}},"states":{"hover":{"color":"#ff5"},"current":{"color":"#5f5"},"parent-hover":{"display":"flex"}}}],
                "fonts":[{"family":"Minecraft","assetId":"font1","weight":"normal","style":"normal"}],
                "keyframes":[{"name":"bob","frames":{"from":{"transform":"translateY(0)"},"50.5%":{"transform":"translateY(-4px)"},"to":{"transform":"translateY(0)"}}}]},
-             "pages":[{"id":"home","name":"首页","path":"/","root":[],"settings":{"particles":"snow","iconAssetId":"img1","toast":{"title":"进度已达成！","body":"多人游戏","iconAssetId":"img1"}}}],
+             "pages":[{"id":"home","name":"首页","path":"/","root":[],"settings":{"particles":"snow","iconAssetId":"img1","hostRoutes":["/wiki","/market"],"toast":{"title":"进度已达成！","body":"多人游戏","iconAssetId":"img1"}}}],
              "assets":[{"id":"font1","name":"mc","url":"/api/files/mc.woff2","mimeType":"font/woff2","kind":"font"},
                        {"id":"img1","name":"icon","url":"/api/files/i.png","mimeType":"image/png","kind":"image"},
                        {"id":"ogg1","name":"bgm","url":"/api/files/m.ogg","mimeType":"audio/ogg","kind":"audio"}],
-             "features":{"particles":"stars","dataSources":[{"id":"activity","label":"活动详情","endpoint":"/api/plugins/minecraft-activity-proof/public/activities/{id}","single":true,"fields":{"time":"meta"}}],"navigation":{"appendAuto":true,"items":[{"id":"nav-home","label":"首页","url":"/site","iconAssetId":"img1","children":[{"id":"nav-wiki","label":"知识库","url":"/wiki"}]}]},"audio":{"tracks":[{"title":"Sweden","assetId":"ogg1"}],"musicVolume":18,"effectVolume":30,"effectsDefaultOn":true,"clickSoundAssetId":"ogg1"}}}
+             "features":{"particles":"stars","publicSkin":{"chrome":true,"dark":true,"background":"#0e1014","surface":"#1f2430","text":"#ffffff","muted":"#a8a8a8","border":"#3a3f4b","primary":"#3c8527","primaryText":"#ffffff","fontFamily":"Minecraft","backgroundImageAssetId":"img1","bottomOffset":"120px"},"dataSources":[{"id":"activity","label":"活动详情","endpoint":"/api/plugins/minecraft-activity-proof/public/activities/{id}","single":true,"fields":{"time":"meta"}}],"navigation":{"appendAuto":true,"items":[{"id":"nav-home","label":"首页","url":"/site","iconAssetId":"img1","children":[{"id":"nav-wiki","label":"知识库","url":"/wiki"}]}]},"audio":{"tracks":[{"title":"Sweden","assetId":"ogg1"}],"musicVolume":18,"effectVolume":30,"effectsDefaultOn":true,"clickSoundAssetId":"ogg1"}}}
             """;
 
     @Test void acceptsThemeClassesFontsKeyframesAndSiteFeatures() {
@@ -106,6 +106,10 @@ class StudioDocumentValidatorTest {
             "\"features\":{|\"features\":{\"script\":\"x\",",
             "\"url\":\"/wiki\"|\"url\":\"javascript:alert(1)\"",
             "/public/activities/{id}|/admin/users",
+            "\"hostRoutes\":[\"/wiki\"|\"hostRoutes\":[\"/site/x\"",
+            "\"primary\":\"#3c8527\"|\"primary\":\"red\"",
+            "\"fontFamily\":\"Minecraft\"|\"fontFamily\":\"Comic\"",
+            "\"bottomOffset\":\"120px\"|\"bottomOffset\":\"10vh\"",
             "/api/plugins/minecraft-activity-proof/public|/api/platform",
             "/public/activities/{id}|/public/../admin",
             "\"time\":\"meta\"|\"time\":\"a;b\"",

@@ -23,6 +23,9 @@ const siteOptions = [
   { label: '站点 Logo（图片元素）', value: 'logo' },
   { label: '版权信息', value: 'copyright' },
   { label: '当前年份', value: 'year' },
+  { label: '今天日期', value: 'date' },
+  { label: '当前页面标题（承载宿主页时为其标题）', value: 'pageTitle' },
+  { label: '当前时间', value: 'time' },
 ]
 const accountOptions = [
   { label: '不绑定', value: '' },
@@ -158,6 +161,20 @@ function onLimit(event: Event) {
       />
     </label>
 
+    <label class="text-xs flex flex-col gap-1">
+      <span>显示数据源条数（如首页统计数字）</span>
+      <YdSelect v-auth="'platform:cms:edit'" :model-value="attrs['data-yd-count'] || ''" :options="sourceOptions" aria-label="条数数据源" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-count': String(value || '') || null })" />
+    </label>
+    <div v-if="ancestorSource" class="gap-2 grid grid-cols-2">
+      <label class="text-xs flex flex-col gap-1 min-w-0">
+        <span>字段为真时显示</span>
+        <YdInput :model-value="attrs['data-yd-show'] || ''" placeholder="如 online" aria-label="字段为真时显示" @change="(event: Event) => setAttributes({ 'data-yd-show': ((event.target as HTMLInputElement | null)?.value || '').trim() || null })" />
+      </label>
+      <label class="text-xs flex flex-col gap-1 min-w-0">
+        <span>字段为真时隐藏</span>
+        <YdInput :model-value="attrs['data-yd-hide'] || ''" placeholder="如 online" aria-label="字段为真时隐藏" @change="(event: Event) => setAttributes({ 'data-yd-hide': ((event.target as HTMLInputElement | null)?.value || '').trim() || null })" />
+      </label>
+    </div>
     <label v-if="ancestorSource" class="text-xs flex flex-col gap-1">
       <span>链接模板（由字段拼出地址，如 /site/activity?id={id}）</span>
       <YdInput :model-value="attrs['data-yd-link'] || ''" placeholder="/site/详情页?id={id}" aria-label="链接模板" @change="(event: Event) => setAttributes({ 'data-yd-link': ((event.target as HTMLInputElement | null)?.value || '').trim() || null })" />
@@ -180,6 +197,18 @@ function onLimit(event: Event) {
         <YdSelect v-auth="'platform:cms:edit'" class="min-w-0 w-full" :model-value="menuRole" :options="menuOptions" aria-label="菜单角色" @update:model-value="setMenuRole" />
       </label>
     </div>
+
+    <h3 class="text-xs text-muted-foreground font-medium mt-1">
+      宿主页面承载
+    </h3>
+    <label class="text-xs flex gap-2 items-center">
+      <YdSwitch :model-value="'data-yd-outlet' in attrs" aria-label="宿主页面插槽" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-outlet': value ? 'true' : null, 'data-yd-host-hide': null })" />
+      <span>宿主页面插槽（承载 /wiki 等页面时内容显示在这里；普通访问时隐藏）</span>
+    </label>
+    <label class="text-xs flex gap-2 items-center">
+      <YdSwitch :model-value="'data-yd-host-hide' in attrs" aria-label="承载时隐藏" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-host-hide': value ? 'true' : null, 'data-yd-outlet': null })" />
+      <span>承载宿主页面时隐藏本元素</span>
+    </label>
 
     <h3 class="text-xs text-muted-foreground font-medium mt-1">
       数据绑定

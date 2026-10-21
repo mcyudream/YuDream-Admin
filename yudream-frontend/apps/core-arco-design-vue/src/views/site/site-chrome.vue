@@ -7,7 +7,10 @@ import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runti
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
 import Profile from '@/components/AppAccountButton/profile.vue'
+import { usePublishedStudioDocument, useStudioHostLayout } from '@/composables/use-published-studio'
 import { useSiteNavigation } from './site-navigation'
+import StudioShadowLayout from './studio-shadow-layout.vue'
+import StudioShadowRegion from './studio-shadow-region.vue'
 
 // 公开站共享页头/页脚：/site 页面与声明了 siteNav 的公开插件页共用。
 // settings 为 CMS 首页设置（navigationJson/footer*/homeCss 中的历史 chrome 样式），缺省时退化为纯插件导航。
@@ -69,6 +72,15 @@ const {
 const themeChromeReady = computed(() => !!themeChromeMeta.value && !!themeChromeComponent.value && !themeChromeError.value)
 /** 主题声明了 chrome 且尚未失败：加载期间也不回落宿主浅色页头，避免白闪 */
 const themeOwnsChrome = computed(() => !!themeChromeMeta.value && !themeChromeError.value)
+// 网站工作台已发布文档开启「公开页适配 → 使用站点外壳」时，宿主公开页改用站点文档的页头/页脚（Shadow DOM 渲染）
+const publishedStudio = usePublishedStudioDocument()
+const studioChrome = computed(() => {
+  const document = publishedStudio.value
+  return !themeOwnsChrome.value && document?.features?.publicSkin?.chrome ? document : null
+})
+const studioBottomOffset = computed(() => studioChrome.value?.features?.publicSkin?.bottomOffset ?? '0')
+// 承载当前宿主路由的站点页面（页面设置 hostRoutes）：宿主页面嵌入该主题页渲染
+const studioLayout = useStudioHostLayout()
 const chromeProps = computed(() => ({
   navigation: navigationTree.value,
   footerNavigation: footerNavigationItems.value,
@@ -229,6 +241,14 @@ onBeforeUnmount(() => {
     </component>
     <div v-else-if="themeOwnsChrome" class="site-chrome__theme-pending">
       <slot />
+    </div>
+    <StudioShadowLayout v-else-if="studioChrome && studioLayout && !blank" :document="studioLayout.document" :page="studioLayout.page" :page-title="studioLayout.pageTitle">
+      <slot />
+    </StudioShadowLayout>
+    <div v-else-if="studioChrome" class="site-chrome__studio" :style="{ paddingBottom: blank ? undefined : studioBottomOffset }">
+      <StudioShadowRegion v-if="!blank && studioChrome.theme.header.length" :document="studioChrome" region="header" />
+      <slot />
+      <StudioShadowRegion v-if="!blank && studioChrome.theme.footer.length" :document="studioChrome" region="footer" />
     </div>
     <template v-else>
     <component :is="'style'">

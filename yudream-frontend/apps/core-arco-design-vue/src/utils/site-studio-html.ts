@@ -115,6 +115,12 @@ export function compileStudioPage(document: SiteDocument, pageId: string, option
   return { html, css: [`${scope}{${declarations(tokens)}}`, renderCss([...(chrome ? document.theme.header : []), ...page.root, ...(chrome ? document.theme.footer : [])], `${scope} `, theme)].filter(Boolean).join('\n') }
 }
 
+/** 节点规则（含断点）按文档作用域编译，不含主题级 CSS；供 Shadow DOM 外壳单独渲染页头/页脚 */
+export function compileStudioScopedNodeCss(document: SiteDocument, nodes: StudioNode[]) {
+  validateStudioNodes(nodes)
+  return renderCss(nodes, `[data-studio-document="${document.id}"] `)
+}
+
 /**
  * 只含主题级 CSS（字体、关键帧、样式类）。编辑画布单独以 <style> 注入：它不进入引擎 CSS，
  * 因而不会经快照回流成逐节点样式。

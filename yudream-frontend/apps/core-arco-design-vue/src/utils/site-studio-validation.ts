@@ -228,7 +228,7 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
     }
   }
   if (value.features !== undefined) {
-    validateFeatures(value.features, assetRef)
+    validateFeatures(value.features, assetRef, ((value.theme as SiteDocument['theme']).fonts ?? []).map(font => font.family))
   }
 }
 type AssetRef = (id: unknown, kind: StudioAsset['kind'], name: string) => void
@@ -304,7 +304,14 @@ function particles(value: unknown) {
 }
 function validatePageSettings(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
-  studioKeys(value, ['particles', 'toast', 'iconAssetId'])
+  studioKeys(value, ['particles', 'toast', 'iconAssetId', 'hostRoutes'])
+  if (value.hostRoutes !== undefined) {
+    studioAssert(Array.isArray(value.hostRoutes) && value.hostRoutes.length <= 10, '承载路由最多 10 个')
+    for (const route of value.hostRoutes) {
+      string(route, '承载路由')
+      studioAssert(/^\/[a-z0-9][\w/-]{0,63}$/i.test(route) && !/^\/site(?:\/|$)/i.test(route) && !route.includes('//'), '承载路由须为宿主公开页路径（如 /wiki），不能是 /site')
+    }
+  }
   if (value.particles !== undefined) {
     particles(value.particles)
   }
@@ -355,6 +362,26 @@ function validateDataSources(value: unknown) {
     }
   }
 }
+const SKIN_COLORS = ['background', 'surface', 'text', 'muted', 'border', 'primary', 'primaryText'] as const
+function validatePublicSkin(value: unknown, assetRef: AssetRef, fontFamilies: string[]) {
+  studioRecord(value)
+  studioKeys(value, ['chrome', 'dark', ...SKIN_COLORS, 'fontFamily', 'backgroundImageAssetId', 'bottomOffset'])
+  studioAssert(typeof value.chrome === 'boolean' && typeof value.dark === 'boolean', 'chrome/dark 须为布尔值')
+  for (const key of SKIN_COLORS) {
+    string(value[key], '公开页颜色')
+    studioAssert(/^#[0-9a-f]{6}$/i.test(value[key]), '公开页颜色须为 #rrggbb')
+  }
+  if (value.fontFamily !== undefined) {
+    studioAssert(fontFamilies.includes(value.fontFamily as string), '公开页字体须为主题字体族')
+  }
+  if (value.backgroundImageAssetId !== undefined) {
+    assetRef(value.backgroundImageAssetId, 'image', '公开页背景图')
+  }
+  if (value.bottomOffset !== undefined) {
+    string(value.bottomOffset, '底部留白')
+    studioAssert(/^(?:0|\d{1,3}(?:px|rem))$/.test(value.bottomOffset), '底部留白须为 0–999px 或 rem')
+  }
+}
 function validateNavigation(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
   studioKeys(value, ['items', 'appendAuto'])
@@ -386,9 +413,12 @@ function validateNavigation(value: unknown, assetRef: AssetRef) {
 function volume(value: unknown, name: string) {
   studioAssert(Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100, `${name}须为 0–100 的整数`)
 }
-function validateFeatures(value: unknown, assetRef: AssetRef) {
+function validateFeatures(value: unknown, assetRef: AssetRef, fontFamilies: string[] = []) {
   studioRecord(value)
-  studioKeys(value, ['audio', 'particles', 'navigation', 'dataSources'])
+  studioKeys(value, ['audio', 'particles', 'navigation', 'dataSources', 'publicSkin'])
+  if (value.publicSkin !== undefined) {
+    validatePublicSkin(value.publicSkin, assetRef, fontFamilies)
+  }
   if (value.dataSources !== undefined) {
     validateDataSources(value.dataSources)
   }

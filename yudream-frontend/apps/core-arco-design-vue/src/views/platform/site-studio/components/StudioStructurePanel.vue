@@ -20,7 +20,7 @@ const regionOptions = [
 
 const pageFormOpen = ref(false)
 const pageFormEditing = ref('')
-const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '' })
+const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '' })
 const particleOptions = [
   { label: '沿用站点默认', value: '' },
   { label: '无', value: 'none' },
@@ -77,6 +77,7 @@ function openPageForm(pageId?: string) {
     toastBody: page?.settings?.toast?.body ?? '',
     toastIcon: page?.settings?.toast?.iconAssetId ?? '',
     icon: page?.settings?.iconAssetId ?? '',
+    hostRoutes: (page?.settings?.hostRoutes ?? []).join(', '),
   }
   pageFormOpen.value = true
 }
@@ -101,6 +102,7 @@ function submitPageForm() {
   const settings: StudioPageSettings = {
     ...(form.particles ? { particles: form.particles } : {}),
     ...(form.icon ? { iconAssetId: form.icon } : {}),
+    ...(form.hostRoutes.trim() ? { hostRoutes: form.hostRoutes.split(/[\s,，]+/).filter(Boolean) } : {}),
     ...(form.toastTitle.trim() ? { toast: { title: form.toastTitle.trim(), body: form.toastBody.trim(), ...(form.toastIcon ? { iconAssetId: form.toastIcon } : {}) } } : {}),
   }
   const settingsPatch = Object.keys(settings).length ? { settings } : {}
@@ -224,6 +226,11 @@ function confirmRemovePage(pageId: string) {
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>页面图标（站点导航中显示，如快捷栏物品图标）</span>
         <YdSelect v-model="pageForm.icon" :options="imageOptions" aria-label="页面图标" />
+      </label>
+      <label class="text-sm mt-2 flex flex-col gap-1">
+        <span>承载宿主公开页（如 /wiki、/market、/timeline；逗号分隔）</span>
+        <YdInput v-model="pageForm.hostRoutes" placeholder="留空则不承载" aria-label="承载宿主公开页" />
+        <span class="text-xs text-muted-foreground">访问这些地址时，宿主页面嵌入本页「宿主页面插槽」位置显示；需在「公开页适配」中开启站点外壳</span>
       </label>
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>氛围粒子</span>

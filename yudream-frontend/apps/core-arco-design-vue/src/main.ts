@@ -8,6 +8,7 @@ import icons from '@/iconify/index.json'
 // 自定义指令
 import directive from '@/utils/directive'
 import App from './App.vue'
+import { installStudioPublicSkin } from './composables/use-published-studio'
 import { bootstrapPluginThemes, watchPluginThemeScope } from './plugins/theme-runtime'
 import router from './router'
 import { applyStartupBranding, initializeStartupBranding } from './startup-branding'
@@ -55,6 +56,8 @@ async function bootstrap() {
   loadingFadeOut()
   // 启动页还在时不要按路由关掉 SITE media，否则淡出结尾会闪回宿主彩虹方块。
   watchPluginThemeScope(router)
+  // 网站工作台已发布文档的公开页适配（登录、知识库、插件市场等宿主公开页换肤）
+  installStudioPublicSkin(router)
 }
 
 void bootstrap()

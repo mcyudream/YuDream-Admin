@@ -116,7 +116,9 @@ public class StudioDocumentValidator {
         for (JsonNode asset : assets) assetKinds.put(asset.get("id").asText(), asset.get("kind").asText());
         themeExtras(theme, assetKinds);
         for (JsonNode page : pages) if (page.has("settings")) pageSettings(page.get("settings"), assetKinds);
-        if (document.has("features")) features(document.get("features"), assetKinds);
+        Set<String> fontFamilies = new HashSet<>();
+        if (theme.has("fonts")) theme.get("fonts").forEach(font -> fontFamilies.add(font.path("family").asText()));
+        if (document.has("features")) features(document.get("features"), assetKinds, fontFamilies);
     }
 
     /** 主题扩展：共享样式类（含状态与断点）、字体（引用 font 资产）、关键帧；与前端 validateStudioDocument 同规则。 */
@@ -170,7 +172,14 @@ public class StudioDocumentValidator {
     }
 
     private void pageSettings(JsonNode settings, Map<String, String> assetKinds) {
-        object(settings); keys(settings, "particles", "toast", "iconAssetId");
+        object(settings); keys(settings, "particles", "toast", "iconAssetId", "hostRoutes");
+        if (settings.has("hostRoutes")) {
+            JsonNode routes = settings.get("hostRoutes"); array(routes);
+            if (routes.size() > 10) fail("承载路由最多10个");
+            for (JsonNode route : routes) {
+                if (!route.isTextual() || !route.asText().matches("/[A-Za-z0-9][A-Za-z0-9_/-]{0,63}") || route.asText().matches("(?i)/site(/.*)?") || route.asText().contains("//")) fail("承载路由须为宿主公开页路径且不能是/site");
+            }
+        }
         if (settings.has("particles")) particles(settings.get("particles"));
         if (settings.has("iconAssetId")) assetRef(settings, "iconAssetId", "image", assetKinds);
         if (settings.has("toast")) {
@@ -181,8 +190,9 @@ public class StudioDocumentValidator {
         }
     }
 
-    private void features(JsonNode features, Map<String, String> assetKinds) {
-        object(features); keys(features, "audio", "particles", "navigation", "dataSources");
+    private void features(JsonNode features, Map<String, String> assetKinds, Set<String> fontFamilies) {
+        object(features); keys(features, "audio", "particles", "navigation", "dataSources", "publicSkin");
+        if (features.has("publicSkin")) publicSkin(features.get("publicSkin"), assetKinds, fontFamilies);
         if (features.has("dataSources")) dataSources(features.get("dataSources"));
         if (features.has("particles")) particles(features.get("particles"));
         if (features.has("navigation")) navigation(features.get("navigation"), assetKinds);
@@ -232,6 +242,23 @@ public class StudioDocumentValidator {
                 });
             }
         }
+    }
+
+    private static final List<String> SKIN_COLORS = List.of("background", "surface", "text", "muted", "border", "primary", "primaryText");
+
+    /** 公开页适配：颜色限 #rrggbb，字体须为主题字体族，背景图引用图片资源；与前端 validatePublicSkin 同规则 */
+    private void publicSkin(JsonNode skin, Map<String, String> assetKinds, Set<String> fontFamilies) {
+        object(skin);
+        java.util.List<String> allowed = new java.util.ArrayList<>(List.of("chrome", "dark", "fontFamily", "backgroundImageAssetId", "bottomOffset"));
+        allowed.addAll(SKIN_COLORS);
+        keys(skin, allowed.toArray(String[]::new));
+        if (skin.get("chrome") == null || !skin.get("chrome").isBoolean() || skin.get("dark") == null || !skin.get("dark").isBoolean()) fail("chrome/dark须为布尔值");
+        for (String key : SKIN_COLORS) {
+            if (!text(skin, key).matches("#[0-9a-fA-F]{6}")) fail("公开页颜色须为#rrggbb");
+        }
+        if (skin.has("fontFamily") && !fontFamilies.contains(text(skin, "fontFamily"))) fail("公开页字体须为主题字体族");
+        if (skin.has("backgroundImageAssetId")) assetRef(skin, "backgroundImageAssetId", "image", assetKinds);
+        if (skin.has("bottomOffset") && !text(skin, "bottomOffset").matches("0|\\d{1,3}(?:px|rem)")) fail("底部留白须为0至999px或rem");
     }
 
     /** 站点导航：最多两级、每级 30 项，ID 唯一，地址为站内路径或 http(s)，图标引用图片资源 */

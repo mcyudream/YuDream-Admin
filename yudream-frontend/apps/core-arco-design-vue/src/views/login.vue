@@ -9,6 +9,7 @@ import ResetPassword from '@/components/AppAccountForm/reset-password.vue'
 import ColorScheme from '@/layouts/components/Topbar/Toolbar/ColorScheme/index.vue'
 import settingsDefault from '@/settings'
 import { sanitizeRedirect, stashExternalLoginRedirect } from '@/utils/login-redirect'
+import StudioHostWrapper from './site/studio-host-wrapper.vue'
 
 defineOptions({
   name: 'Login',
@@ -84,93 +85,95 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="login-page">
-    <div v-if="appSettingsStore.mode === 'pc' || appSettingsStore.settings.toolbar.colorScheme" class="login-toolbar">
-      <YdDropdown
-        v-if="appSettingsStore.mode === 'pc'"
-        :items="[[
-          { label: '左侧布局', disabled: layoutAlign === 'left', handle: () => { layoutAlign = 'left' } },
-          { label: '居中布局', disabled: layoutAlign === 'center', handle: () => { layoutAlign = 'center' } },
-          { label: '右侧布局', disabled: layoutAlign === 'right', handle: () => { layoutAlign = 'right' } },
-        ]]"
-      >
-        <YdButton variant="ghost" size="icon-sm" aria-label="切换登录页布局">
-          <YdIcon
-            :name="{
-              left: 'morph:panel-left',
-              center: 'morph:square',
-              right: 'morph:panel-right',
-            }[layoutAlign]" class="size-4"
-          />
-        </YdButton>
-      </YdDropdown>
-      <ColorScheme v-if="appSettingsStore.settings.toolbar.colorScheme" />
-    </div>
-    <div class="login-box" :class="layoutAlign">
-      <div class="login-banner">
-        <div class="banner-heading">
-          <img :src="logo" class="banner-logo" alt="">
-          <h1>{{ appSettingsStore.siteName }}</h1>
-          <p>{{ appSettingsStore.siteDescription || '你的工作、内容与社区，从这里连接。' }}</p>
-        </div>
-        <div class="banner-artwork" aria-hidden="true">
-          <img :src="loginBanner" class="banner" alt="">
-        </div>
+  <StudioHostWrapper>
+    <div class="login-page">
+      <div v-if="appSettingsStore.mode === 'pc' || appSettingsStore.settings.toolbar.colorScheme" class="login-toolbar">
+        <YdDropdown
+          v-if="appSettingsStore.mode === 'pc'"
+          :items="[[
+            { label: '左侧布局', disabled: layoutAlign === 'left', handle: () => { layoutAlign = 'left' } },
+            { label: '居中布局', disabled: layoutAlign === 'center', handle: () => { layoutAlign = 'center' } },
+            { label: '右侧布局', disabled: layoutAlign === 'right', handle: () => { layoutAlign = 'right' } },
+          ]]"
+        >
+          <YdButton variant="ghost" size="icon-sm" aria-label="切换登录页布局">
+            <YdIcon
+              :name="{
+                left: 'morph:panel-left',
+                center: 'morph:square',
+                right: 'morph:panel-right',
+              }[layoutAlign]" class="size-4"
+            />
+          </YdButton>
+        </YdDropdown>
+        <ColorScheme v-if="appSettingsStore.settings.toolbar.colorScheme" />
       </div>
-      <div class="login-form flex-col-center">
-        <div class="login-form-content w-full">
-          <template v-if="formType === 'binding'">
-            <div class="p-12 flex-col-stretch-center min-h-500px w-full">
-              <div class="mb-8 space-y-2">
-                <h3 class="text-4xl font-bold">
-                  绑定第三方账号
-                </h3>
-                <p class="text-sm text-muted-foreground lg:text-base">
-                  请选择要绑定的账号类型
-                </p>
-              </div>
-              <YdButton size="lg" class="w-full" @click="formType = 'login'">
-                登录已有账号
-              </YdButton>
-              <YdButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
-                注册新账号
-              </YdButton>
-            </div>
-          </template>
-          <div v-if="bindingToken && formType !== 'binding'" class="binding-notice" role="status">
-            该第三方账号尚未绑定。请登录已有账号完成绑定，或注册新账号后绑定。
+      <div class="login-box" :class="layoutAlign">
+        <div class="login-banner">
+          <div class="banner-heading">
+            <img :src="logo" class="banner-logo" alt="">
+            <h1>{{ appSettingsStore.siteName }}</h1>
+            <p>{{ appSettingsStore.siteDescription || '你的工作、内容与社区，从这里连接。' }}</p>
           </div>
-          <template v-if="formType === 'login'">
-            <Login
+          <div class="banner-artwork" aria-hidden="true">
+            <img :src="loginBanner" class="banner" alt="">
+          </div>
+        </div>
+        <div class="login-form flex-col-center">
+          <div class="login-form-content w-full">
+            <template v-if="formType === 'binding'">
+              <div class="p-12 flex-col-stretch-center min-h-500px w-full">
+                <div class="mb-8 space-y-2">
+                  <h3 class="text-4xl font-bold">
+                    绑定第三方账号
+                  </h3>
+                  <p class="text-sm text-muted-foreground lg:text-base">
+                    请选择要绑定的账号类型
+                  </p>
+                </div>
+                <YdButton size="lg" class="w-full" @click="formType = 'login'">
+                  登录已有账号
+                </YdButton>
+                <YdButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
+                  注册新账号
+                </YdButton>
+              </div>
+            </template>
+            <div v-if="bindingToken && formType !== 'binding'" class="binding-notice" role="status">
+              该第三方账号尚未绑定。请登录已有账号完成绑定，或注册新账号后绑定。
+            </div>
+            <template v-if="formType === 'login'">
+              <Login
+                :account
+                :binding-token="bindingToken"
+                :external-entries="externalEntries"
+                :external-loading="externalLoading"
+                :preferred-method="bindingToken ? '' : appSettingsStore.loginDefaultMethod"
+                @on-login="handleLogin"
+                @on-external-login="loginWithExternal"
+                @on-register="(val) => { formType = 'register'; account = val }"
+                @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
+              />
+            </template>
+            <Register
+              v-if="formType === 'register'"
               :account
               :binding-token="bindingToken"
-              :external-entries="externalEntries"
-              :external-loading="externalLoading"
-              :preferred-method="bindingToken ? '' : appSettingsStore.loginDefaultMethod"
-              @on-login="handleLogin"
-              @on-external-login="loginWithExternal"
-              @on-register="(val) => { formType = 'register'; account = val }"
-              @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
+              @on-register="(val) => { formType = 'login'; account = val }"
+              @on-login="formType = 'login'"
             />
-          </template>
-          <Register
-            v-if="formType === 'register'"
-            :account
-            :binding-token="bindingToken"
-            @on-register="(val) => { formType = 'login'; account = val }"
-            @on-login="formType = 'login'"
-          />
-          <ResetPassword
-            v-if="formType === 'resetPassword'"
-            :account
-            @on-reset-password="(val) => { formType = 'login'; account = val }"
-            @on-login="formType = 'login'"
-          />
+            <ResetPassword
+              v-if="formType === 'resetPassword'"
+              :account
+              @on-reset-password="(val) => { formType = 'login'; account = val }"
+              @on-login="formType = 'login'"
+            />
+          </div>
         </div>
       </div>
+      <AppCopyright class="copyright" />
     </div>
-    <AppCopyright class="copyright" />
-  </div>
+  </StudioHostWrapper>
 </template>
 
 <style scoped>

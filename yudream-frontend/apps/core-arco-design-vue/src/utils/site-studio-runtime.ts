@@ -22,6 +22,7 @@ import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-valida
  *   点外部或 Esc 收起；桌面悬停由 parent-hover 状态直接展开，链接点击照常跳转
  * - 插件数据适配器：features.dataSources 声明的插件公开接口作为数据源 adapter:{id}（仅 GET、不带凭据，{参数} 取页面查询参数）；
  *   条目链接可用 data-yd-link="/site/activity?id={id}" 由字段拼出（字段值逐个 URL 编码）
+ * - 计数：data-yd-count="数据源" 显示该数据源的真实条数（如首页统计）；条目内 data-yd-show / data-yd-hide="字段" 按字段真假显隐
  * - 复制：按钮 data-yd-action="copy" 复制自身 title（可经 data-yd-title 绑定字段，如服务器地址）
  * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段（$index 为序号）；
  *   条目内 data-yd-each="children" 为嵌套列表（如二级菜单），无子项时隐藏并给条目写 data-yd-has-children；
@@ -346,6 +347,23 @@ async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   return tree.map(item => toRecord(item))
 }
 
+/** 读取匿名公开接口（不带凭据）；兼容 {code,data} 包装与裸 JSON，失败抛错由调用方降级为无数据 */
+async function fetchPublicJson(path: string): Promise<unknown> {
+  const response = await fetch(toBackendAssetUrl(path), { credentials: 'omit', headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  const body: unknown = await response.json()
+  if (body && typeof body === 'object' && !Array.isArray(body) && 'code' in body) {
+    const envelope = body as { code: unknown, data?: unknown }
+    if (Number(envelope.code) !== 200) {
+      throw new Error('接口返回错误')
+    }
+    return envelope.data
+  }
+  return body
+}
+
 /** 插件数据适配器：读取插件匿名公开接口并按声明映射为记录；缺参数、非 2xx 或业务错误时无数据 */
 async function loadAdapter(document: SiteDocument, id: string, query: Record<string, string>): Promise<DataRecord[]> {
   const adapter = document.features?.dataSources?.find(item => item.id === id)
@@ -401,9 +419,14 @@ async function loadSource(source: string, limit: number, document: SiteDocument,
       const res = await systemClient.get<unknown, { data: unknown }>('api/public/wiki/spaces', quiet)
       return asRecords(res.data).map(item => ({ ...item, url: item.slug ? `/wiki/${encodeURIComponent(String(item.slug))}` : '' }))
     }
+    case 'market:categories': {
+      // 市场 v2 协议返回裸 JSON（无 {code,data} 包装），systemClient 会按业务错误拒绝，改用原生 fetch
+      const res = await fetchPublicJson('/api/public/plugin-market/api/v2/categories')
+      return asRecords(res).map(item => ({ ...item, url: `/market?category=${encodeURIComponent(String(item.code ?? item.name ?? ''))}` }))
+    }
     case 'market:plugins': {
-      const res = await systemClient.get<unknown, { data: unknown }>('api/public/plugin-market/api/v2/plugins', { ...quiet, params: { page: 1, size: limit } })
-      return asRecords(res.data).map(item => ({ ...item, name: item.displayName || item.name || item.code, url: item.code ? `/market/${encodeURIComponent(String(item.code))}` : '' }))
+      const res = await fetchPublicJson(`/api/public/plugin-market/api/v2/plugins?page=1&size=${limit}`)
+      return asRecords(res).map(item => ({ ...item, name: item.displayName || item.name || item.code, url: item.code ? `/market/${encodeURIComponent(String(item.code))}` : '' }))
     }
     default:
       return []
@@ -419,6 +442,7 @@ export const STUDIO_DATA_SOURCES = [
   { value: 'cms:latest', label: '最新文章（CMS）', fields: ['title', 'summary', 'excerpt', 'publishedAt', 'url'] },
   { value: 'wiki:spaces', label: '知识库空间', fields: ['name', 'description', 'slug', 'url'] },
   { value: 'market:plugins', label: '插件市场', fields: ['name', 'description', 'category', 'latestVersion', 'url'] },
+  { value: 'market:categories', label: '插件市场分类', fields: ['name', 'count', 'url'] },
 ] as const
 
 function fetchSource(source: string, limit: number, document: SiteDocument, query: Record<string, string>) {
@@ -497,7 +521,7 @@ function fillItem(item: Element, record: DataRecord, index: number) {
     container.toggleAttribute('hidden', !expanded)
     item.setAttribute('data-yd-has-children', String(expanded))
   }
-  const targets = [item, ...item.querySelectorAll('[data-yd-text],[data-yd-href],[data-yd-src],[data-yd-title],[data-yd-link]')].filter(element => ownerItem(element) === item)
+  const targets = [item, ...item.querySelectorAll('[data-yd-text],[data-yd-href],[data-yd-src],[data-yd-title],[data-yd-link],[data-yd-show],[data-yd-hide]')].filter(element => ownerItem(element) === item)
   const value = (path: string) => path === '$index' ? String(index + 1) : text(field(record, path))
   for (const element of targets) {
     const textPath = element.getAttribute('data-yd-text')
@@ -512,6 +536,14 @@ function fillItem(item: Element, record: DataRecord, index: number) {
       }
       else {
         element.removeAttribute('href')
+      }
+    }
+    for (const [attribute, invert] of [['data-yd-show', false], ['data-yd-hide', true]] as const) {
+      const path = element.getAttribute(attribute)
+      if (path) {
+        const raw = field(record, path)
+        const truthy = Boolean(raw) && raw !== 'false' && raw !== '0'
+        element.toggleAttribute('hidden', invert ? truthy : !truthy)
       }
     }
     const linkTemplate = element.getAttribute('data-yd-link')
@@ -568,7 +600,7 @@ function bindAccount(host: Element) {
 }
 
 /** 站点信息绑定：宿主公开设置（站点名称/简介/Logo/版权），无值时保留作者内容 */
-function bindSiteInfo(host: Element) {
+function bindSiteInfo(host: Element, extra: Record<string, string> = {}) {
   const settings = useAppSettingsStore()
   const copyright = settings.settings.app.copyright
   const values: Record<string, string> = {
@@ -577,6 +609,9 @@ function bindSiteInfo(host: Element) {
     logo: settings.logo,
     copyright: [copyright.dates ? `© ${copyright.dates}` : '', copyright.company].filter(Boolean).join(' '),
     year: String(new Date().getFullYear()),
+    date: new Date().toLocaleDateString('zh-CN'),
+    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    ...extra,
   }
   for (const element of host.querySelectorAll('[data-yd-site]')) {
     const value = values[element.getAttribute('data-yd-site') || ''] || ''
@@ -592,6 +627,18 @@ function bindSiteInfo(host: Element) {
     else {
       element.textContent = value
     }
+  }
+}
+
+/** 计数绑定：data-yd-count 元素显示数据源真实条数（接口不可用时保留作者内容） */
+function bindCounts(host: Element, isAlive: () => boolean, document: SiteDocument, query: Record<string, string>) {
+  for (const element of host.querySelectorAll('[data-yd-count]')) {
+    const source = element.getAttribute('data-yd-count') || ''
+    void fetchSource(source, 50, document, query).then((records) => {
+      if (isAlive()) {
+        element.textContent = String(records.length)
+      }
+    })
   }
 }
 
@@ -634,16 +681,31 @@ function normalizePath(value: string) {
  * 在一次页面加载上挂载运行时；返回卸载函数（页面切换或容器卸载时调用）。
  * pagePath 为文档内页面路径（/、/servers）；链接 href 按文档路径或带前缀的站点路径比较。
  */
-export function attachStudioRuntime(options: { document: SiteDocument, page: StudioPage, frameWindow: Window, basePath: string, query?: Record<string, string> }) {
+export function attachStudioRuntime(options: {
+  document: SiteDocument
+  /** 站点文档页面；为空表示只挂载页头页脚外壳（宿主公开页），不启用粒子与进入提示 */
+  page?: StudioPage
+  frameWindow: Window
+  basePath: string
+  query?: Record<string, string>
+  /** 挂载根：默认 frameWindow.document；宿主公开页外壳传 ShadowRoot */
+  root?: Document | ShadowRoot
+  /** 宿主当前路由路径：外壳模式下按它标记当前链接 */
+  currentPath?: string
+  /** 承载宿主公开页：隐藏 data-yd-host-hide 节点；否则隐藏 data-yd-outlet（普通站点页面不显示空插槽） */
+  hostMode?: boolean
+  /** 当前页面标题（宿主页面路由标题），供 data-yd-site="pageTitle" */
+  pageTitle?: string
+}) {
   const { document, page, frameWindow, basePath } = options
-  const doc = frameWindow.document
+  const doc = options.root ?? frameWindow.document
   const host = doc.querySelector('[data-studio-document]')
   if (!host) {
     return () => undefined
   }
   let alive = true
   configureAudio(document)
-  const current = normalizePath(page.path)
+  const current = normalizePath(options.currentPath ?? page?.path ?? '/')
 
   // 当前页链接：文档内链接按文档路径比较；站点前缀（/site 或预览前缀）先剥离。数据绑定插入的链接在填充后再标记一次
   const markCurrent = () => {
@@ -653,7 +715,7 @@ export function attachStudioRuntime(options: { document: SiteDocument, page: Stu
         continue
       }
       let path = normalizePath(href)
-      for (const prefix of [basePath.toLowerCase(), '/site']) {
+      for (const prefix of options.currentPath ? [] : [basePath.toLowerCase(), '/site']) {
         if (path === prefix) {
           path = '/'
         }
@@ -664,6 +726,13 @@ export function attachStudioRuntime(options: { document: SiteDocument, page: Stu
       anchor.toggleAttribute('aria-current', path === current)
       if (path === current) {
         anchor.setAttribute('aria-current', 'page')
+      }
+    }
+    // 当前页在某个菜单的子菜单里时，该菜单的触发项也标记为当前（如 /wiki 高亮「知识库」物品栏格）
+    for (const menu of host.querySelectorAll('[data-yd-menu]')) {
+      const trigger = menu.querySelector('[data-yd-menu-trigger]')
+      if (trigger?.tagName === 'A' && trigger.getAttribute('aria-current') !== 'page' && menu.querySelector('[data-yd-submenu] a[aria-current="page"],[data-yd-each] a[aria-current="page"]')) {
+        trigger.setAttribute('aria-current', 'page')
       }
     }
   }
@@ -746,24 +815,26 @@ export function attachStudioRuntime(options: { document: SiteDocument, page: Stu
       playEffect(control.tagName === 'BUTTON' ? 'button' : 'click')
     }
   }
-  doc.addEventListener('click', onClick, true)
+  doc.addEventListener('click', onClick as EventListener, true)
   const onKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       closeMenus()
     }
   }
-  doc.addEventListener('keydown', onKeydown)
+  doc.addEventListener('keydown', onKeydown as EventListener)
 
-  const stopParticles = startParticles(frameWindow, host, page.settings?.particles ?? document.features?.particles ?? 'none')
-  const stopToast = showPageToast(document, page, host)
-  bindSiteInfo(host)
+  const stopParticles = page ? startParticles(frameWindow, host, page.settings?.particles ?? document.features?.particles ?? 'none') : () => undefined
+  const stopToast = page ? showPageToast(document, page, host) : () => undefined
+  host.querySelectorAll(options.hostMode ? '[data-yd-host-hide]' : '[data-yd-outlet]').forEach(element => element.setAttribute('hidden', ''))
+  bindSiteInfo(host, { pageTitle: options.pageTitle || page?.name || '' })
   bindAccount(host)
   bindSources(host, () => alive, document, markCurrent, options.query ?? {})
+  bindCounts(host, () => alive, document, options.query ?? {})
 
   return () => {
     alive = false
-    doc.removeEventListener('click', onClick, true)
-    doc.removeEventListener('keydown', onKeydown)
+    doc.removeEventListener('click', onClick as EventListener, true)
+    doc.removeEventListener('keydown', onKeydown as EventListener)
     stopParticles()
     stopToast()
   }

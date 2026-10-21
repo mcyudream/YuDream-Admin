@@ -18,6 +18,11 @@ export interface StudioPageSettings {
   toast?: { title: string, body: string, iconAssetId?: string }
   /** 页面图标（图片资产）：站点导航数据中该页条目的 icon 字段 */
   iconAssetId?: string
+  /**
+   * 承载的宿主公开页路由前缀（如 /wiki、/market、插件公开页 /timeline）：访问这些路由时，宿主页面内容嵌入本页
+   * data-yd-outlet 节点位置渲染（Shadow DOM 插槽），页面中 data-yd-host-hide 的节点在承载时隐藏。
+   */
+  hostRoutes?: string[]
 }
 
 export interface StudioPage {
@@ -95,6 +100,27 @@ export interface StudioDataSource {
   fields?: Record<string, string>
 }
 
+/**
+ * 公开页适配：宿主公开页（登录/注册、知识库、插件市场、插件公开页、旧版 CMS 页）按站点外观换肤。
+ * 颜色为 #rrggbb，宿主换算为站点变量、组件库变量与 OKLCH 设计令牌；fontFamily 须为主题字体族；
+ * chrome 为 true 时这些页面使用站点文档的页头/页脚（如底部物品栏）作为外壳。
+ */
+export interface StudioPublicSkin {
+  chrome: boolean
+  dark: boolean
+  background: string
+  surface: string
+  text: string
+  muted: string
+  border: string
+  primary: string
+  primaryText: string
+  fontFamily?: string
+  backgroundImageAssetId?: string
+  /** 外壳占用的底部高度（如固定物品栏），宿主页内容留出空间，如 120px */
+  bottomOffset?: string
+}
+
 export interface StudioFeatures {
   audio?: {
     tracks: { title: string, assetId: string }[]
@@ -108,6 +134,7 @@ export interface StudioFeatures {
   particles?: StudioParticlePreset
   navigation?: StudioNavigation
   dataSources?: StudioDataSource[]
+  publicSkin?: StudioPublicSkin
 }
 
 export interface StudioAsset {

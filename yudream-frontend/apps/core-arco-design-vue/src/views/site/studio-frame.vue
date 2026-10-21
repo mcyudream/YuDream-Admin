@@ -6,6 +6,7 @@
 import type { SiteDocument, StudioPage } from '@/types/site-studio'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { resolveStudioHref } from '@/utils/site-studio-links'
 import { attachStudioRuntime, stopStudioAudio } from '@/utils/site-studio-runtime'
 
 // basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
@@ -21,36 +22,13 @@ function currentQuery() {
 }
 let cleanupDocument: (() => void) | undefined
 
-function resolveUrl(href: string) {
-  const value = (href || '').trim()
-  if (!value) {
-    return ''
-  }
-  if (/^(?:https?:|mailto:|tel:)/i.test(value) || value.startsWith('//')) {
-    return value
-  }
-  if (value.startsWith('#')) {
-    return value
-  }
-  // 站点文档内的根相对路径一律映射到站点前缀，避免站内跳转落进后台
-  const base = props.basePath
-  if (value === base || value.startsWith(`${base}/`) || ['/wiki', '/market', '/forms'].some(prefix => value === prefix || value.startsWith(`${prefix}/`))) {
-    return value
-  }
-  if (base !== '/site' && (value === '/site' || value.startsWith('/site/'))) {
-    return `${base}${value.slice('/site'.length) || '/'}`
-  }
-  return `${base}${value.startsWith('/') ? value : `/${value}`}`
-}
-
 function handleClick(event: MouseEvent) {
   const anchor = (event.target as HTMLElement | null)?.closest?.('a')
   if (!anchor || event.defaultPrevented || event.button !== 0) {
     return
   }
   const raw = anchor.getAttribute('href') || ''
-  // 数据绑定生成的导航/条目链接指向宿主路由（插件页、/market 等），原样跳转
-  const url = anchor.hasAttribute('data-yd-host-link') && raw.startsWith('/') && !raw.startsWith('//') && raw !== '/site' && !raw.startsWith('/site/') ? raw : resolveUrl(raw)
+  const url = resolveStudioHref(raw, props.basePath, anchor.hasAttribute('data-yd-host-link'))
   if (!url) {
     event.preventDefault()
     return
