@@ -26,7 +26,7 @@ import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-valida
  * - 计数：data-yd-count="数据源" 显示该数据源的真实条数（如首页统计）；条目内 data-yd-show / data-yd-hide="字段" 按字段真假显隐
  * - 复制：按钮 data-yd-action="copy" 复制自身 title（可经 data-yd-title 绑定字段，如服务器地址）
  * - 站点内容（features.content，运营在「站点内容」页填写）：data-yd-content="字段" 写文本（img 写 src），
- *   data-yd-content-href 写链接（按宿主路由解析，站点页写 /site/...），data-yd-content-bg 设背景图，
+ *   data-yd-content-href 写链接（按宿主路由解析，站点页写 /site/...），data-yd-content-title 写提示（复制按钮复制该值），data-yd-content-bg 设背景图，
  *   data-yd-content-show="开关字段" 为 false 时隐藏；列表字段作为数据源 content:{字段}，条目字段照常经 data-yd-text/-src/-href 绑定
  * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段（$index 为序号）；
  *   条目内 data-yd-each="children" 为嵌套列表（如二级菜单），无子项时隐藏并给条目写 data-yd-has-children；
@@ -716,6 +716,12 @@ function bindContent(host: Element, document: SiteDocument) {
     if (href && element.tagName === 'A') {
       element.setAttribute('href', href)
       element.setAttribute('data-yd-host-link', '')
+    }
+  }
+  for (const element of host.querySelectorAll('[data-yd-content-title]')) {
+    const value = scalar(element.getAttribute('data-yd-content-title') || '')
+    if (value) {
+      element.setAttribute('title', value)
     }
   }
   for (const element of host.querySelectorAll('[data-yd-content-bg]')) {

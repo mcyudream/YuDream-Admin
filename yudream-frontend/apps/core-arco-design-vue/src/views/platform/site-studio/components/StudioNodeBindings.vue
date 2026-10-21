@@ -57,6 +57,7 @@ const contentOptions = (types: string[]) => [{ label: '不绑定', value: '' }, 
 const contentBindings = computed(() => [
   { attr: 'data-yd-content', label: '文本 / 图片', options: contentOptions(['text', 'textarea', 'number', 'image', 'select', 'color']) },
   { attr: 'data-yd-content-href', label: '链接地址', options: contentOptions(['link']) },
+  { attr: 'data-yd-content-title', label: '提示 / 复制内容', options: contentOptions(['text', 'link']) },
   { attr: 'data-yd-content-bg', label: '背景图', options: contentOptions(['image']) },
   { attr: 'data-yd-content-show', label: '开关显隐', options: contentOptions(['switch']) },
 ])
