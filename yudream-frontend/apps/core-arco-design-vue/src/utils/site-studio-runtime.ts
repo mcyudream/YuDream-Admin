@@ -25,10 +25,14 @@ import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-valida
  *   条目链接可用 data-yd-link="/site/activity?id={id}" 由字段拼出（字段值逐个 URL 编码）
  * - 计数：data-yd-count="数据源" 显示该数据源的真实条数（如首页统计）；条目内 data-yd-show / data-yd-hide="字段" 按字段真假显隐
  * - 复制：按钮 data-yd-action="copy" 复制自身 title（可经 data-yd-title 绑定字段，如服务器地址）
+ * - 站点内容（features.content，运营在「站点内容」页填写）：data-yd-content="字段" 写文本（img 写 src），
+ *   data-yd-content-href 写链接（按宿主路由解析，站点页写 /site/...），data-yd-content-bg 设背景图，
+ *   data-yd-content-show="开关字段" 为 false 时隐藏；列表字段作为数据源 content:{字段}，条目字段照常经 data-yd-text/-src/-href 绑定
  * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段（$index 为序号）；
  *   条目内 data-yd-each="children" 为嵌套列表（如二级菜单），无子项时隐藏并给条目写 data-yd-has-children；
- *   无数据时保留作者写的示例条目（data-yd-sample 元素仅在示例状态显示，data-yd-live 仅在真实数据时显示；
- *   容器外的标记用 data-yd-for="数据源" 关联，如列表上方的“示例/实时”状态条）
+ *   示例条目只在草稿预览（samples）中显示：data-yd-sample 元素仅在示例状态显示，data-yd-live 仅在真实数据时显示；
+ *   公开站不显示示例——取数前条目隐藏，无数据（含接口不可用）时移除条目并显示 data-yd-empty 元素（空状态）；
+ *   容器外的标记用 data-yd-for="数据源" 关联，如列表上方的“示例/实时”状态条或空状态提示）
  */
 
 // ===== 音频（宿主侧单例） =====
@@ -317,7 +321,8 @@ async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   const own = document.features?.navigation
   // 依赖未满足（插件未启用、能力关闭）的条目与指向已关闭页面的条目一律隐藏
   const available = await loadSiteCapabilities()
-  const closedPages = new Set(document.pages.filter(page => !studioRequirementsMet(page.settings?.requires, available)).map(page => page.path === '/' ? '/site' : `/site${page.path}`))
+  // 承载外壳页自身地址不注册，同样视为关闭
+  const closedPages = new Set(document.pages.filter(page => page.settings?.shell || !studioRequirementsMet(page.settings?.requires, available)).map(page => page.path === '/' ? '/site' : `/site${page.path}`))
   const open = (item: { url: string, requires?: string[] }) => studioRequirementsMet(item.requires, available) && !closedPages.has(item.url.replace(/\/+$/, '') || '/site')
   let tree: { label: string, url: string, icon?: string, children?: unknown[] }[]
   if (own) {
@@ -334,13 +339,14 @@ async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   }
   else {
     const navigationJson = await apiCms.publicHome({ skipGlobalToast: true }).then(res => res.data?.settings?.navigationJson as string | undefined, () => undefined)
-    const pages = document.pages.filter(page => page.path !== '/' && !page.path.includes(':') && studioRequirementsMet(page.settings?.requires, available)).map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
+    const pages = document.pages.filter(page => page.path !== '/' && !page.path.includes(':') && !page.settings?.shell && studioRequirementsMet(page.settings?.requires, available)).map((page, index) => ({ id: `studio-${page.id}`, label: page.name, url: `/site${page.path}`, visible: true, sort: 1000 + index }))
     tree = await loadSiteNavigation(navigationJson, pages)
   }
   // 指向站点文档页面的条目带上该页图标（页面设置 iconAssetId）
   const icons = new Map(document.pages.flatMap((page) => {
     const asset = document.assets.find(item => item.id === page.settings?.iconAssetId && item.kind === 'image')
-    return asset ? [[page.path === '/' ? '/site' : `/site${page.path}`, asset.url] as const] : []
+    // 外壳页的图标同时用于它承载的宿主页面条目（如「活动平台」指向插件页 /activities）
+    return asset ? [page.path === '/' ? '/site' : `/site${page.path}`, ...(page.settings?.hostRoutes ?? [])].map(url => [url, asset.url] as const) : []
   }))
   const toRecord = (item: { label: string, url: string, icon?: string, children?: unknown[] }): DataRecord => ({
     label: item.label,
@@ -410,6 +416,9 @@ async function loadSource(source: string, limit: number, document: SiteDocument,
   if (source === 'site:navigation') {
     return loadNavigation(document)
   }
+  if (source.startsWith('content:')) {
+    return asRecords(studioContentValue(document, source.slice('content:'.length))).slice(0, limit)
+  }
   if (source.startsWith('block:')) {
     const code = source.slice('block:'.length)
     const res = await apiPublicTheme.context({ blocks: [code], limit })
@@ -451,6 +460,10 @@ export const STUDIO_DATA_SOURCES = [
 ] as const
 
 function fetchSource(source: string, limit: number, document: SiteDocument, query: Record<string, string>) {
+  // 站点内容随文档变化（预览即时生效），不走接口缓存
+  if (source.startsWith('content:')) {
+    return loadSource(source, limit, document, query).catch(() => [] as DataRecord[])
+  }
   const key = `${document.id}|${source}|${limit}|${source.startsWith('adapter:') ? JSON.stringify(query) : ''}`
   const cached = dataCache.get(key)
   if (cached && Date.now() - cached.at < DATA_TTL) {
@@ -510,6 +523,7 @@ function expandItems(container: Element, records: DataRecord[], limit: number) {
         link.setAttribute('data-yd-host-link', '')
       }
     }
+    clone.removeAttribute('hidden')
     fragment.appendChild(clone)
   })
   parent.insertBefore(fragment, anchor)
@@ -654,6 +668,69 @@ function bindSiteInfo(host: Element, extra: Record<string, string> = {}) {
   }
 }
 
+/** 站点内容字段值：已填写的值优先，其次字段默认值；都没有时返回 undefined（保留作者内容） */
+export function studioContentValue(document: SiteDocument, key: string): unknown {
+  const content = document.features?.content
+  if (!content) {
+    return undefined
+  }
+  const value = content.values[key]
+  if (value !== undefined && value !== '') {
+    return value
+  }
+  for (const section of content.sections) {
+    const field = section.fields.find(item => item.key === key)
+    if (field) {
+      return field.defaultValue === '' ? undefined : field.defaultValue
+    }
+  }
+  return undefined
+}
+
+/** 站点内容单值绑定：文本/图片、链接、背景图与开关显隐 */
+function bindContent(host: Element, document: SiteDocument) {
+  const scalar = (key: string) => {
+    const value = studioContentValue(document, key)
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+  }
+  for (const element of host.querySelectorAll('[data-yd-content]')) {
+    const value = scalar(element.getAttribute('data-yd-content') || '')
+    if (!value) {
+      continue
+    }
+    if (element.tagName === 'IMG') {
+      const src = safeUrl(value, false)
+      if (src) {
+        element.setAttribute('src', src)
+      }
+    }
+    else {
+      element.textContent = value
+      if (value.includes('\n')) {
+        (element as HTMLElement).style.whiteSpace = 'pre-line'
+      }
+    }
+  }
+  for (const element of host.querySelectorAll('[data-yd-content-href]')) {
+    const href = safeUrl(scalar(element.getAttribute('data-yd-content-href') || ''), true)
+    if (href && element.tagName === 'A') {
+      element.setAttribute('href', href)
+      element.setAttribute('data-yd-host-link', '')
+    }
+  }
+  for (const element of host.querySelectorAll('[data-yd-content-bg]')) {
+    const src = safeUrl(scalar(element.getAttribute('data-yd-content-bg') || ''), false)
+    if (src && !src.startsWith('#')) {
+      (element as HTMLElement).style.backgroundImage = `url("${src}")`
+    }
+  }
+  for (const element of host.querySelectorAll('[data-yd-content-show]')) {
+    if (studioContentValue(document, element.getAttribute('data-yd-content-show') || '') === false) {
+      element.setAttribute('hidden', '')
+    }
+  }
+}
+
 /** 计数绑定：data-yd-count 元素显示数据源真实条数（接口不可用时保留作者内容） */
 function bindCounts(host: Element, isAlive: () => boolean, document: SiteDocument, query: Record<string, string>) {
   for (const element of host.querySelectorAll('[data-yd-count]')) {
@@ -666,21 +743,49 @@ function bindCounts(host: Element, isAlive: () => boolean, document: SiteDocumen
   }
 }
 
-function bindSources(host: Element, isAlive: () => boolean, document: SiteDocument, onFilled: () => void, query: Record<string, string>) {
+/** 容器直属的条目模板/示例条目（不含嵌套列表的条目） */
+function ownItems(container: Element) {
+  return [...container.querySelectorAll('[data-yd-item]')].filter(item => item.parentElement?.closest('[data-yd-each],[data-yd-source]') === container)
+}
+
+function bindSources(host: Element, isAlive: () => boolean, document: SiteDocument, onFilled: () => void, query: Record<string, string>, samples: boolean) {
   host.querySelectorAll('[data-yd-live]').forEach(element => element.setAttribute('hidden', ''))
+  host.querySelectorAll('[data-yd-empty]').forEach(element => element.setAttribute('hidden', ''))
   const containers = [...host.querySelectorAll('[data-yd-source]')]
   for (const container of containers) {
     const source = container.getAttribute('data-yd-source') || ''
     const limit = Math.min(Math.max(Number.parseInt(container.getAttribute('data-yd-limit') || '12', 10) || 12, 1), 50)
+    const linked = () => [...host.querySelectorAll('[data-yd-for]')].filter(element => element.getAttribute('data-yd-for') === source)
+    // 公开站：取数前隐藏示例，避免假数据闪现
+    if (!samples) {
+      container.setAttribute('data-yd-state', 'loading')
+      for (const element of [...ownItems(container), ...container.querySelectorAll('[data-yd-sample]'), ...linked().filter(element => element.hasAttribute('data-yd-sample'))]) {
+        element.setAttribute('hidden', '')
+      }
+    }
     void fetchSource(source, limit, document, query).then((records) => {
-      if (!isAlive() || !records.length) {
+      if (!isAlive()) {
+        return
+      }
+      if (!records.length) {
+        if (!samples) {
+          ownItems(container).forEach(item => item.remove())
+          for (const element of [...container.querySelectorAll('[data-yd-sample],[data-yd-empty]'), ...linked()]) {
+            if (element.hasAttribute('data-yd-sample')) {
+              element.remove()
+            }
+            else if (element.hasAttribute('data-yd-empty')) {
+              element.removeAttribute('hidden')
+            }
+          }
+          container.setAttribute('data-yd-state', 'empty')
+        }
         return
       }
       if (!expandItems(container, records, limit)) {
         return
       }
-      const linked = [...host.querySelectorAll('[data-yd-for]')].filter(element => element.getAttribute('data-yd-for') === source)
-      for (const element of [...container.querySelectorAll('[data-yd-sample],[data-yd-live]'), ...linked]) {
+      for (const element of [...container.querySelectorAll('[data-yd-sample],[data-yd-live]'), ...linked()]) {
         if (element.hasAttribute('data-yd-sample')) {
           element.remove()
         }
@@ -720,6 +825,8 @@ export function attachStudioRuntime(options: {
   hostMode?: boolean
   /** 当前页面标题（宿主页面路由标题），供 data-yd-site="pageTitle" */
   pageTitle?: string
+  /** 草稿预览：无数据时保留作者示例条目；公开站不传，示例不对访客显示 */
+  samples?: boolean
 }) {
   const { document, page, frameWindow, basePath } = options
   const doc = options.root ?? frameWindow.document
@@ -848,7 +955,8 @@ export function attachStudioRuntime(options: {
   host.querySelectorAll(options.hostMode ? '[data-yd-host-hide]' : '[data-yd-outlet]').forEach(element => element.setAttribute('hidden', ''))
   bindSiteInfo(host, { pageTitle: options.pageTitle || page?.name || '' })
   bindAccount(host)
-  bindSources(host, () => alive, document, markCurrent, options.query ?? {})
+  bindSources(host, () => alive, document, markCurrent, options.query ?? {}, options.samples ?? false)
+  bindContent(host, document)
   bindCounts(host, () => alive, document, options.query ?? {})
 
   // 经验条：data-yd-progress="scroll" 宽度跟随页面滚动；="visited" 显示本次访问去过的页面数

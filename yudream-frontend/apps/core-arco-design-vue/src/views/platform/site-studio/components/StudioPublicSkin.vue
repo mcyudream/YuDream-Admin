@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 公开页适配：让登录/注册、知识库、插件市场、插件公开页等宿主公开页沿用站点外观。
 // 颜色与字体换算为宿主变量（站点变量、组件库变量与设计令牌）；可选用站点页头/页脚作为这些页面的外壳。经 set-features 命令保存。
-import type { StudioPublicSkin } from '@/types/site-studio'
+import type { StudioPublicSkin, StudioSkinRole } from '@/types/site-studio'
 import { computed } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 
@@ -22,6 +22,27 @@ const colorFields: { key: keyof StudioPublicSkin, label: string }[] = [
   { key: 'primaryText', label: '主色上的文字' },
 ]
 const fontOptions = computed(() => [{ label: '沿用宿主字体', value: '' }, ...(store.doc?.theme.fonts ?? []).map(font => ({ label: font.family, value: font.family }))])
+const classOptions = computed(() => [{ label: '不沿用', value: '' }, ...(store.doc?.theme.classes ?? []).map(item => ({ label: item.name, value: item.name }))])
+const roleFields: { role: StudioSkinRole, label: string }[] = [
+  { role: 'panel', label: '卡片 / 面板' },
+  { role: 'button', label: '按钮' },
+  { role: 'control', label: '输入框 / 选择器' },
+  { role: 'heading', label: '大标题（h1/h2）' },
+]
+function setRoleClass(role: StudioSkinRole, value: unknown) {
+  const classes = { ...skin.value?.classes }
+  if (value) {
+    classes[role] = String(value)
+  }
+  else {
+    delete classes[role]
+  }
+  const next: StudioPublicSkin = { ...(skin.value ?? DEFAULT_SKIN), classes }
+  if (!Object.keys(classes).length) {
+    delete next.classes
+  }
+  apply(next)
+}
 const imageOptions = computed(() => [{ label: '无背景图', value: '' }, ...(store.doc?.assets ?? []).filter(asset => asset.kind === 'image').map(asset => ({ label: asset.name, value: asset.id }))])
 
 function apply(next: StudioPublicSkin | undefined) {
@@ -116,6 +137,16 @@ function setColor(key: keyof StudioPublicSkin, value: unknown) {
           <span>背景图（叠加暗色遮罩）</span>
           <YdSelect :model-value="skin.backgroundImageAssetId ?? ''" :options="imageOptions" aria-label="公开页背景图" @update:model-value="(value: unknown) => patch({ backgroundImageAssetId: String(value || '') })" />
         </label>
+      </div>
+      <div class="flex flex-col gap-2">
+        <span class="text-xs font-medium">沿用主题样式类</span>
+        <span class="text-xs text-muted-foreground">嵌入主题页的宿主与插件页面（大事记、插件市场、知识库、活动等）直接套用这些主题样式类的外观（背景、边框、阴影、文字色与悬停状态，不改尺寸布局），与主题页同一风格。</span>
+        <div class="gap-2 grid grid-cols-1 sm:grid-cols-2">
+          <label v-for="field in roleFields" :key="field.role" class="text-xs flex flex-col gap-1">
+            <span>{{ field.label }}</span>
+            <YdSelect :model-value="skin.classes?.[field.role] ?? ''" :options="classOptions" :aria-label="`${field.label}沿用的样式类`" @update:model-value="(value: unknown) => setRoleClass(field.role, value)" />
+          </label>
+        </div>
       </div>
       <div>
         <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" @click="apply(undefined)">

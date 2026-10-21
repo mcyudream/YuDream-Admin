@@ -20,7 +20,7 @@ const regionOptions = [
 
 const pageFormOpen = ref(false)
 const pageFormEditing = ref('')
-const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '', requires: '' })
+const pageForm = ref({ name: '', path: '/', particles: '' as StudioParticlePreset | '', toastTitle: '', toastBody: '', toastIcon: '', icon: '', hostRoutes: '', requires: '', shell: false })
 const particleOptions = [
   { label: '沿用站点默认', value: '' },
   { label: '无', value: 'none' },
@@ -79,6 +79,7 @@ function openPageForm(pageId?: string) {
     icon: page?.settings?.iconAssetId ?? '',
     hostRoutes: (page?.settings?.hostRoutes ?? []).join(', '),
     requires: (page?.settings?.requires ?? []).join(', '),
+    shell: Boolean(page?.settings?.shell),
   }
   pageFormOpen.value = true
 }
@@ -100,11 +101,16 @@ function submitPageForm() {
     return
   }
   const form = pageForm.value
+  if (form.shell && !form.hostRoutes.trim()) {
+    toast.error('承载外壳页须填写承载的宿主公开页')
+    return
+  }
   const settings: StudioPageSettings = {
     ...(form.particles ? { particles: form.particles } : {}),
     ...(form.icon ? { iconAssetId: form.icon } : {}),
     ...(form.hostRoutes.trim() ? { hostRoutes: form.hostRoutes.split(/[\s,，]+/).filter(Boolean) } : {}),
     ...(form.requires.trim() ? { requires: form.requires.split(/[\s,，]+/).filter(Boolean) } : {}),
+    ...(form.shell ? { shell: true } : {}),
     ...(form.toastTitle.trim() ? { toast: { title: form.toastTitle.trim(), body: form.toastBody.trim(), ...(form.toastIcon ? { iconAssetId: form.toastIcon } : {}) } } : {}),
   }
   const settingsPatch = Object.keys(settings).length ? { settings } : {}
@@ -237,6 +243,13 @@ function confirmRemovePage(pageId: string) {
         <span>承载宿主公开页（如 /wiki、/market、/timeline；逗号分隔）</span>
         <YdInput v-model="pageForm.hostRoutes" placeholder="留空则不承载" aria-label="承载宿主公开页" />
         <span class="text-xs text-muted-foreground">访问这些地址时，宿主页面嵌入本页「宿主页面插槽」位置显示；需在「公开页适配」中开启站点外壳</span>
+      </label>
+      <label class="text-sm mt-2 flex gap-2 items-start">
+        <YdSwitch v-model="pageForm.shell" aria-label="承载外壳页" />
+        <span class="flex flex-col gap-0.5">
+          <span>只作承载外壳</span>
+          <span class="text-xs text-muted-foreground">本页只为上面的宿主/插件页面提供主题外观，自身地址不开放、不进导航；业务数据由插件页面提供</span>
+        </span>
       </label>
       <label class="text-sm mt-2 flex flex-col gap-1">
         <span>氛围粒子</span>

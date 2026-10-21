@@ -1,6 +1,6 @@
-import type { SiteDocument, StudioAsset, StudioNode } from '../types/site-studio'
+import type { SiteDocument, StudioAsset, StudioContentField, StudioNode } from '../types/site-studio'
 import { parse } from 'postcss'
-import { STUDIO_PARTICLE_PRESETS, STUDIO_STYLE_STATES } from '../types/site-studio'
+import { STUDIO_CONTENT_FIELD_TYPES, STUDIO_PARTICLE_PRESETS, STUDIO_SKIN_ROLES, STUDIO_STYLE_STATES } from '../types/site-studio'
 
 export const STUDIO_LIMITS = { bytes: 2 * 1024 * 1024, nodes: 6000, depth: 32, classes: 500, fonts: 32, keyframes: 64, tracks: 20 } as const
 /** 样式类与关键帧名：小写字母开头，可含数字与连字符 */
@@ -229,7 +229,7 @@ export function validateStudioDocument(value: unknown): asserts value is SiteDoc
     }
   }
   if (value.features !== undefined) {
-    validateFeatures(value.features, assetRef, ((value.theme as SiteDocument['theme']).fonts ?? []).map(font => font.family))
+    validateFeatures(value.features, assetRef, ((value.theme as SiteDocument['theme']).fonts ?? []).map(font => font.family), ((value.theme as SiteDocument['theme']).classes ?? []).map(item => item.name))
   }
 }
 type AssetRef = (id: unknown, kind: StudioAsset['kind'], name: string) => void
@@ -305,7 +305,11 @@ function particles(value: unknown) {
 }
 function validatePageSettings(value: unknown, assetRef: AssetRef) {
   studioRecord(value)
-  studioKeys(value, ['particles', 'toast', 'iconAssetId', 'hostRoutes', 'requires'])
+  studioKeys(value, ['particles', 'toast', 'iconAssetId', 'hostRoutes', 'requires', 'shell'])
+  if (value.shell !== undefined) {
+    studioAssert(typeof value.shell === 'boolean', 'shell 须为布尔值')
+    studioAssert(!value.shell || (Array.isArray(value.hostRoutes) && value.hostRoutes.length > 0), '承载外壳页须声明至少一个承载路由')
+  }
   if (value.requires !== undefined) {
     validateRequires(value.requires)
   }
@@ -375,9 +379,16 @@ function validateRequires(value: unknown) {
   }
 }
 const SKIN_COLORS = ['background', 'surface', 'text', 'muted', 'border', 'primary', 'primaryText'] as const
-function validatePublicSkin(value: unknown, assetRef: AssetRef, fontFamilies: string[]) {
+function validatePublicSkin(value: unknown, assetRef: AssetRef, fontFamilies: string[], classNames: string[]) {
   studioRecord(value)
-  studioKeys(value, ['chrome', 'dark', ...SKIN_COLORS, 'fontFamily', 'backgroundImageAssetId', 'bottomOffset', 'pixel'])
+  studioKeys(value, ['chrome', 'dark', ...SKIN_COLORS, 'fontFamily', 'backgroundImageAssetId', 'bottomOffset', 'pixel', 'classes'])
+  if (value.classes !== undefined) {
+    studioRecord(value.classes)
+    studioKeys(value.classes, STUDIO_SKIN_ROLES)
+    for (const name of Object.values(value.classes)) {
+      studioAssert(typeof name === 'string' && classNames.includes(name), '公开页沿用的样式类须为已有主题样式类')
+    }
+  }
   if (value.pixel !== undefined) {
     studioAssert(typeof value.pixel === 'boolean', 'pixel 须为布尔值')
   }
@@ -428,14 +439,136 @@ function validateNavigation(value: unknown, assetRef: AssetRef) {
   }
   items(value.items, 1)
 }
+/** 站点内容字段键：字母开头，可含字母数字下划线 */
+export const STUDIO_CONTENT_KEY = /^[a-z]\w{0,47}$/i
+export const STUDIO_CONTENT_LIMITS = { sections: 20, fields: 40, itemFields: 12, items: 50, text: 2000, textarea: 5000 } as const
+/** 内容文本：允许换行与制表符，禁止其他控制字符 */
+function contentText(value: unknown, name: string, max: number) {
+  string(value, name)
+  studioAssert(value.length <= max && ![...value].some(char => (char.charCodeAt(0) < 32 && char !== '\n' && char !== '\t') || char.charCodeAt(0) === 127), `${name}须为 ${max} 字以内的文本`)
+}
+function contentFieldSchema(value: unknown, keys: Set<string>, nested: boolean) {
+  studioRecord(value)
+  studioKeys(value, ['key', 'label', 'type', 'description', 'placeholder', 'defaultValue', 'options', 'itemFields'])
+  string(value.key, '字段键')
+  studioAssert(STUDIO_CONTENT_KEY.test(value.key) && !keys.has(value.key), `字段键须为字母开头的唯一名称：${value.key}`)
+  keys.add(value.key)
+  boundedText(value.label, '字段名称', 40)
+  studioAssert(STUDIO_CONTENT_FIELD_TYPES.includes(value.type as never), `字段类型无效：${String(value.type)}`)
+  if (value.description !== undefined) {
+    boundedText(value.description, '字段说明', 200, true)
+  }
+  if (value.placeholder !== undefined) {
+    boundedText(value.placeholder, '字段占位', 100, true)
+  }
+  if (value.type === 'select') {
+    studioAssert(Array.isArray(value.options) && value.options.length > 0 && value.options.length <= 30, '下拉字段须有 1–30 个选项')
+    for (const option of value.options) {
+      studioRecord(option)
+      studioKeys(option, ['label', 'value'])
+      boundedText(option.label, '选项名称', 40)
+      boundedText(option.value, '选项值', 64)
+    }
+  }
+  else {
+    studioAssert(value.options === undefined, '只有下拉字段可声明选项')
+  }
+  if (value.type === 'list') {
+    studioAssert(!nested, '列表条目内不能再嵌套列表')
+    studioAssert(Array.isArray(value.itemFields) && value.itemFields.length > 0 && value.itemFields.length <= STUDIO_CONTENT_LIMITS.itemFields, `列表须声明 1–${STUDIO_CONTENT_LIMITS.itemFields} 个条目字段`)
+    const itemKeys = new Set<string>()
+    value.itemFields.forEach(item => contentFieldSchema(item, itemKeys, true))
+  }
+  else {
+    studioAssert(value.itemFields === undefined, '只有列表字段可声明条目字段')
+  }
+  if (value.defaultValue !== undefined) {
+    validateContentValue(value as unknown as StudioContentField, value.defaultValue)
+  }
+}
+/** 按字段类型校验内容值；空串表示未填写 */
+export function validateContentValue(field: StudioContentField, value: unknown) {
+  const name = field.label
+  switch (field.type) {
+    case 'number':
+      studioAssert(typeof value === 'number' && Number.isFinite(value), `${name}须为数字`)
+      return
+    case 'switch':
+      studioAssert(typeof value === 'boolean', `${name}须为开关值`)
+      return
+    case 'list': {
+      studioAssert(Array.isArray(value) && value.length <= STUDIO_CONTENT_LIMITS.items, `${name}最多 ${STUDIO_CONTENT_LIMITS.items} 条`)
+      for (const item of value) {
+        studioRecord(item)
+        for (const [key, itemValue] of Object.entries(item)) {
+          const itemField = field.itemFields?.find(candidate => candidate.key === key)
+          studioAssert(itemField, `${name}含未声明的字段：${key}`)
+          validateContentValue(itemField, itemValue)
+        }
+      }
+      return
+    }
+    default:
+      contentText(value, name, field.type === 'textarea' ? STUDIO_CONTENT_LIMITS.textarea : STUDIO_CONTENT_LIMITS.text)
+      if (value === '') {
+        return
+      }
+      if (field.type === 'color') {
+        studioAssert(/^#[0-9a-f]{6}$/i.test(value as string), `${name}须为 #rrggbb`)
+      }
+      else if (field.type === 'image') {
+        validateStudioUrl(value as string)
+        studioAssert(!(value as string).startsWith('#'), `${name}须为图片地址`)
+      }
+      else if (field.type === 'link') {
+        validateStudioUrl(value as string)
+      }
+      else if (field.type === 'select') {
+        studioAssert(field.options?.some(option => option.value === value), `${name}不是可选值`)
+      }
+  }
+}
+function validateContent(value: unknown) {
+  studioRecord(value)
+  studioKeys(value, ['sections', 'values'])
+  studioAssert(Array.isArray(value.sections) && value.sections.length <= STUDIO_CONTENT_LIMITS.sections, `内容分区最多 ${STUDIO_CONTENT_LIMITS.sections} 个`)
+  const codes = new Set<string>()
+  const keys = new Set<string>()
+  const fields = new Map<string, StudioContentField>()
+  for (const section of value.sections) {
+    studioRecord(section)
+    studioKeys(section, ['code', 'title', 'description', 'fields'])
+    string(section.code, '分区编码')
+    studioAssert(/^[a-z][a-z0-9-]{0,31}$/.test(section.code) && !codes.has(section.code), '分区编码须为小写字母开头的唯一名称')
+    codes.add(section.code)
+    boundedText(section.title, '分区标题', 40)
+    if (section.description !== undefined) {
+      boundedText(section.description, '分区说明', 200, true)
+    }
+    studioAssert(Array.isArray(section.fields) && section.fields.length <= STUDIO_CONTENT_LIMITS.fields, `每个分区最多 ${STUDIO_CONTENT_LIMITS.fields} 个字段`)
+    for (const field of section.fields) {
+      contentFieldSchema(field, keys, false)
+      fields.set((field as { key: string }).key, field as StudioContentField)
+    }
+  }
+  studioRecord(value.values)
+  for (const [key, fieldValue] of Object.entries(value.values)) {
+    const field = fields.get(key)
+    studioAssert(field, `内容值含未声明的字段：${key}`)
+    validateContentValue(field, fieldValue)
+  }
+}
 function volume(value: unknown, name: string) {
   studioAssert(Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100, `${name}须为 0–100 的整数`)
 }
-function validateFeatures(value: unknown, assetRef: AssetRef, fontFamilies: string[] = []) {
+function validateFeatures(value: unknown, assetRef: AssetRef, fontFamilies: string[] = [], classNames: string[] = []) {
   studioRecord(value)
-  studioKeys(value, ['audio', 'particles', 'navigation', 'dataSources', 'publicSkin'])
+  studioKeys(value, ['audio', 'particles', 'navigation', 'dataSources', 'publicSkin', 'content'])
+  if (value.content !== undefined) {
+    validateContent(value.content)
+  }
   if (value.publicSkin !== undefined) {
-    validatePublicSkin(value.publicSkin, assetRef, fontFamilies)
+    validatePublicSkin(value.publicSkin, assetRef, fontFamilies, classNames)
   }
   if (value.dataSources !== undefined) {
     validateDataSources(value.dataSources)

@@ -118,7 +118,9 @@ public class StudioDocumentValidator {
         for (JsonNode page : pages) if (page.has("settings")) pageSettings(page.get("settings"), assetKinds);
         Set<String> fontFamilies = new HashSet<>();
         if (theme.has("fonts")) theme.get("fonts").forEach(font -> fontFamilies.add(font.path("family").asText()));
-        if (document.has("features")) features(document.get("features"), assetKinds, fontFamilies);
+        Set<String> classNames = new HashSet<>();
+        if (theme.has("classes")) theme.get("classes").forEach(item -> classNames.add(item.path("name").asText()));
+        if (document.has("features")) features(document.get("features"), assetKinds, fontFamilies, classNames);
     }
 
     /** 主题扩展：共享样式类（含状态与断点）、字体（引用 font 资产）、关键帧；与前端 validateStudioDocument 同规则。 */
@@ -172,7 +174,11 @@ public class StudioDocumentValidator {
     }
 
     private void pageSettings(JsonNode settings, Map<String, String> assetKinds) {
-        object(settings); keys(settings, "particles", "toast", "iconAssetId", "hostRoutes", "requires");
+        object(settings); keys(settings, "particles", "toast", "iconAssetId", "hostRoutes", "requires", "shell");
+        if (settings.has("shell")) {
+            if (!settings.get("shell").isBoolean()) fail("shell须为布尔值");
+            if (settings.get("shell").booleanValue() && (!settings.has("hostRoutes") || !settings.get("hostRoutes").isArray() || settings.get("hostRoutes").isEmpty())) fail("承载外壳页须声明至少一个承载路由");
+        }
         if (settings.has("requires")) requires(settings.get("requires"));
         if (settings.has("hostRoutes")) {
             JsonNode routes = settings.get("hostRoutes"); array(routes);
@@ -191,9 +197,10 @@ public class StudioDocumentValidator {
         }
     }
 
-    private void features(JsonNode features, Map<String, String> assetKinds, Set<String> fontFamilies) {
-        object(features); keys(features, "audio", "particles", "navigation", "dataSources", "publicSkin");
-        if (features.has("publicSkin")) publicSkin(features.get("publicSkin"), assetKinds, fontFamilies);
+    private void features(JsonNode features, Map<String, String> assetKinds, Set<String> fontFamilies, Set<String> classNames) {
+        object(features); keys(features, "audio", "particles", "navigation", "dataSources", "publicSkin", "content");
+        if (features.has("content")) content(features.get("content"));
+        if (features.has("publicSkin")) publicSkin(features.get("publicSkin"), assetKinds, fontFamilies, classNames);
         if (features.has("dataSources")) dataSources(features.get("dataSources"));
         if (features.has("particles")) particles(features.get("particles"));
         if (features.has("navigation")) navigation(features.get("navigation"), assetKinds);
@@ -248,9 +255,9 @@ public class StudioDocumentValidator {
     private static final List<String> SKIN_COLORS = List.of("background", "surface", "text", "muted", "border", "primary", "primaryText");
 
     /** 公开页适配：颜色限 #rrggbb，字体须为主题字体族，背景图引用图片资源；与前端 validatePublicSkin 同规则 */
-    private void publicSkin(JsonNode skin, Map<String, String> assetKinds, Set<String> fontFamilies) {
+    private void publicSkin(JsonNode skin, Map<String, String> assetKinds, Set<String> fontFamilies, Set<String> classNames) {
         object(skin);
-        java.util.List<String> allowed = new java.util.ArrayList<>(List.of("chrome", "dark", "fontFamily", "backgroundImageAssetId", "bottomOffset", "pixel"));
+        java.util.List<String> allowed = new java.util.ArrayList<>(List.of("chrome", "dark", "fontFamily", "backgroundImageAssetId", "bottomOffset", "pixel", "classes"));
         allowed.addAll(SKIN_COLORS);
         keys(skin, allowed.toArray(String[]::new));
         if (skin.get("chrome") == null || !skin.get("chrome").isBoolean() || skin.get("dark") == null || !skin.get("dark").isBoolean()) fail("chrome/dark须为布尔值");
@@ -260,6 +267,12 @@ public class StudioDocumentValidator {
         if (skin.has("fontFamily") && !fontFamilies.contains(text(skin, "fontFamily"))) fail("公开页字体须为主题字体族");
         if (skin.has("backgroundImageAssetId")) assetRef(skin, "backgroundImageAssetId", "image", assetKinds);
         if (skin.has("pixel") && !skin.get("pixel").isBoolean()) fail("pixel须为布尔值");
+        if (skin.has("classes")) {
+            JsonNode classes = skin.get("classes"); object(classes); keys(classes, "panel", "button", "control", "heading");
+            classes.fields().forEachRemaining(entry -> {
+                if (!entry.getValue().isTextual() || !classNames.contains(entry.getValue().asText())) fail("公开页沿用的样式类须为已有主题样式类");
+            });
+        }
         if (skin.has("bottomOffset") && !text(skin, "bottomOffset").matches("0|\\d{1,3}(?:px|rem)")) fail("底部留白须为0至999px或rem");
     }
 
@@ -286,6 +299,106 @@ public class StudioDocumentValidator {
             if (item.has("children")) {
                 if (depth != 1) fail("导航最多两级");
                 navItems(item.get("children"), depth + 1, ids, assetKinds);
+            }
+        }
+    }
+
+    private static final Set<String> CONTENT_TYPES = Set.of("text", "textarea", "number", "switch", "select", "color", "image", "link", "list");
+    private static final Pattern CONTENT_KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,47}");
+
+    /** 站点内容：内容模型（分区 → 字段，list 带条目字段且不嵌套）与按类型校验的值；与前端 validateContent 同规则 */
+    private void content(JsonNode content) {
+        object(content); keys(content, "sections", "values");
+        JsonNode sections = content.get("sections"); array(sections);
+        if (sections.size() > 20) fail("内容分区最多20个");
+        Set<String> codes = new HashSet<>();
+        Map<String, JsonNode> fields = new HashMap<>();
+        for (JsonNode section : sections) {
+            object(section); keys(section, "code", "title", "description", "fields");
+            String code = text(section, "code");
+            if (!code.matches("[a-z][a-z0-9-]{0,31}") || !codes.add(code)) fail("分区编码须为小写字母开头的唯一名称");
+            boundedText(section, "title", 40, false);
+            if (section.has("description")) boundedText(section, "description", 200, true);
+            JsonNode list = section.get("fields"); array(list);
+            if (list.size() > 40) fail("每个分区最多40个字段");
+            for (JsonNode field : list) contentField(field, fields, false);
+        }
+        JsonNode values = content.get("values"); object(values);
+        values.fields().forEachRemaining(entry -> {
+            JsonNode field = fields.get(entry.getKey());
+            if (field == null) fail("内容值含未声明的字段：" + entry.getKey());
+            contentValue(field, entry.getValue());
+        });
+    }
+
+    private void contentField(JsonNode field, Map<String, JsonNode> fields, boolean nested) {
+        object(field); keys(field, "key", "label", "type", "description", "placeholder", "defaultValue", "options", "itemFields");
+        String key = text(field, "key");
+        if (!CONTENT_KEY.matcher(key).matches() || fields.containsKey(key)) fail("字段键须为字母开头的唯一名称：" + key);
+        fields.put(key, field);
+        boundedText(field, "label", 40, false);
+        String type = text(field, "type");
+        if (!CONTENT_TYPES.contains(type)) fail("字段类型无效：" + type);
+        if (field.has("description")) boundedText(field, "description", 200, true);
+        if (field.has("placeholder")) boundedText(field, "placeholder", 100, true);
+        if ("select".equals(type)) {
+            JsonNode options = field.get("options"); array(options);
+            if (options.isEmpty() || options.size() > 30) fail("下拉字段须有1至30个选项");
+            for (JsonNode option : options) {
+                object(option); keys(option, "label", "value");
+                boundedText(option, "label", 40, false);
+                boundedText(option, "value", 64, false);
+            }
+        } else if (field.has("options")) fail("只有下拉字段可声明选项");
+        if ("list".equals(type)) {
+            if (nested) fail("列表条目内不能再嵌套列表");
+            JsonNode items = field.get("itemFields"); array(items);
+            if (items.isEmpty() || items.size() > 12) fail("列表须声明1至12个条目字段");
+            Map<String, JsonNode> itemFields = new HashMap<>();
+            for (JsonNode item : items) contentField(item, itemFields, true);
+        } else if (field.has("itemFields")) fail("只有列表字段可声明条目字段");
+        if (field.has("defaultValue")) contentValue(field, field.get("defaultValue"));
+    }
+
+    /** 按字段类型校验内容值；空串表示未填写 */
+    private void contentValue(JsonNode field, JsonNode value) {
+        String type = field.get("type").asText();
+        String name = field.get("label").asText();
+        switch (type) {
+            case "number" -> { if (value == null || !value.isNumber() || !Double.isFinite(value.doubleValue())) fail(name + "须为数字"); }
+            case "switch" -> { if (value == null || !value.isBoolean()) fail(name + "须为开关值"); }
+            case "list" -> {
+                array(value);
+                if (value.size() > 50) fail(name + "最多50条");
+                for (JsonNode item : value) {
+                    object(item);
+                    item.fields().forEachRemaining(entry -> {
+                        JsonNode itemField = null;
+                        for (JsonNode candidate : field.get("itemFields")) {
+                            if (entry.getKey().equals(candidate.get("key").asText())) itemField = candidate;
+                        }
+                        if (itemField == null) fail(name + "含未声明的字段：" + entry.getKey());
+                        contentValue(itemField, entry.getValue());
+                    });
+                }
+            }
+            default -> {
+                if (value == null || !value.isTextual()) fail(name + "必须为字符串");
+                String text = value.asText();
+                int max = "textarea".equals(type) ? 5000 : 2000;
+                if (text.length() > max || text.chars().anyMatch(c -> (c < 32 && c != '\n' && c != '\t') || c == 127)) fail(name + "须为" + max + "字以内的文本");
+                if (text.isEmpty()) return;
+                switch (type) {
+                    case "color" -> { if (!text.matches("#[0-9a-fA-F]{6}")) fail(name + "须为#rrggbb"); }
+                    case "image" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为图片地址"); safeUrl(text, false); }
+                    case "link" -> { if (text.startsWith("data:")) fail(name + "须为链接地址"); safeUrl(text, false); }
+                    case "select" -> {
+                        boolean found = false;
+                        for (JsonNode option : field.get("options")) found |= text.equals(option.get("value").asText());
+                        if (!found) fail(name + "不是可选值");
+                    }
+                    default -> { }
+                }
             }
         }
     }

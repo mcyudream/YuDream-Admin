@@ -58,6 +58,10 @@
 - 公开站统一渲染：站点页面与承载的宿主公开页都以 Shadow DOM 渲染到主文档（`StudioShadowLayout`，同一视口滚动、同一入场过渡），文档内 `position: fixed`（背景层、底栏）按访客视口生效；文档经 schema 校验不含脚本、事件属性与危险 URL/CSS。开启站点外壳时页头/页脚由应用级持久外壳渲染（`App.vue`），跨路由不重建，只更新当前链接、账号、经验条，导航位置与数据在所有公开页一致。草稿预览仍用 iframe 以模拟桌面/平板/手机宽度。
 - 动态页面：页面路径段可写 `:参数`（如 `/activities/:id`），精确路径优先匹配，参数值与查询参数一起传给数据绑定（插件数据适配器 `{id}`、链接模板 `/site/activities/{id}`）。
 - 页面与导航依赖 `requires`（`plugin:插件编码`、`capability:wiki`、`capability:plugin-market`）：任一未启用时页面不注册（匹配时排除，访问落到未找到页），导航条目（含指向该页的条目）隐藏；启用状态取公开前端清单与知识库/市场公开能力。站点主题只承载数据与外观：业务页（如活动列表/详情）由插件以 siteNav 公开路由注册，CMS 页面经 `hostRoutes` 包裹，不在主题里复制业务数据。带 `:param` 的插件路由不进入导航。
+- `features.content`（站点内容，数据驱动）：主题作者在「主题 → 站点内容模型」用 JSON 声明分区与字段（`text/textarea/number/switch/select/color/image/link/list`，`list` 以 `itemFields` 声明条目字段、不嵌套），运营在后台「内容站点 → 站点内容」页（`YdSettingsLayout`，同页还管理站点导航与公开页外观）可视化填写，写入同一草稿、保存/发布与工作台一致。页面绑定：`data-yd-content`（文本，图片元素写 `src`）、`data-yd-content-href`（链接，按宿主路由解析，站点页写 `/site/...`）、`data-yd-content-bg`（背景图）、`data-yd-content-show`（开关为 false 时隐藏）；列表字段作为数据源 `content:{字段}`。未填写时用字段 `defaultValue`，再缺省保留作者内容。值按字段类型校验（链接/图片走文档 URL 规则），前后端同规则。
+- 示例与空状态：示例条目只在草稿预览中显示；公开站取数前隐藏条目，无数据（含接口不可用）时移除示例并显示 `data-yd-empty` 元素，不向访客展示假数据。
+- 页面 `settings.shell`（承载外壳页）：须同时声明 `hostRoutes`；页面只为这些宿主/插件页面提供主题外壳（背景、页头页脚），自身地址不注册、不进自动导航。业务数据页一律由插件注册（如 `/servers`、`/activities`、`/timeline`），主题不再自建一份数据页。
+- `publicSkin.classes`（沿用主题样式类）：`panel / button / control / heading` 各指向一个主题样式类，嵌入主题页的宿主/插件页面中最外层卡片、按钮（仅 `data-slot="button"` 与标签页触发器，不含作为点击区域的 `YdAction`）、输入框、`h1/h2` 套用该类的视觉属性（背景、边框/边框图、阴影、文字色、字距等）与 hover/active/focus 状态，不改尺寸布局；类中引用的主题变量只写到嵌入区域。
 - 主题变量可承载图片（`--bg-xxx: url(...)`），主题面板对这类变量直接提供图片资产选择，用于“默认内置、可替换”的背景。
 
 ## 4. AI 修改的边界

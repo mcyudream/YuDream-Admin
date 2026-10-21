@@ -28,6 +28,11 @@ export interface StudioPageSettings {
    * 站点导航中指向该页的条目同时隐藏
    */
   requires?: string[]
+  /**
+   * 承载外壳页：只作为 hostRoutes 中宿主/插件公开页的主题外壳（背景、页头页脚、标题区），自身地址不注册、不进导航，
+   * 避免主题再维护一份业务数据页；数据页由插件注册（如 /timeline、/activities）。
+   */
+  shell?: boolean
 }
 
 export interface StudioPage {
@@ -128,6 +133,46 @@ export interface StudioPublicSkin {
   bottomOffset?: string
   /** 像素风：嵌入主题页的宿主页面统一直角、硬边框、斜面高光与投影（卡片、按钮、输入框） */
   pixel?: boolean
+  /**
+   * 沿用主题样式类：嵌入主题页的宿主/插件页面中，卡片、按钮、输入框、大标题直接套用这些主题样式类的外观
+   * （只取背景、边框/边框图、阴影、文字色等视觉属性与 hover/active 状态，不改尺寸与布局）。
+   */
+  classes?: Partial<Record<StudioSkinRole, string>>
+}
+
+export type StudioSkinRole = 'panel' | 'button' | 'control' | 'heading'
+export const STUDIO_SKIN_ROLES: StudioSkinRole[] = ['panel', 'button', 'control', 'heading']
+
+/** 站点内容字段类型（与主题配置 schema 同形）：list 为可增删的条目列表，条目字段由 itemFields 声明（不嵌套 list） */
+export type StudioContentFieldType = 'text' | 'textarea' | 'number' | 'switch' | 'select' | 'color' | 'image' | 'link' | 'list'
+export const STUDIO_CONTENT_FIELD_TYPES: StudioContentFieldType[] = ['text', 'textarea', 'number', 'switch', 'select', 'color', 'image', 'link', 'list']
+
+export interface StudioContentField {
+  key: string
+  label: string
+  type: StudioContentFieldType
+  description?: string
+  placeholder?: string
+  defaultValue?: unknown
+  options?: { label: string, value: string }[]
+  itemFields?: StudioContentField[]
+}
+
+export interface StudioContentSection {
+  code: string
+  title: string
+  description?: string
+  fields: StudioContentField[]
+}
+
+/**
+ * 站点内容（数据驱动）：主题作者声明内容模型 sections（分区 → 字段），运营在「站点内容」页可视化填写 values，
+ * 随草稿/发布版本化。页面经 data-yd-content / -content-bg / -content-show 绑定单值字段，
+ * 经 data-yd-source="content:列表字段" 绑定可增删的条目列表；未填写时用字段 defaultValue，再缺省保留作者内容。
+ */
+export interface StudioContent {
+  sections: StudioContentSection[]
+  values: Record<string, unknown>
 }
 
 export interface StudioFeatures {
@@ -144,6 +189,7 @@ export interface StudioFeatures {
   navigation?: StudioNavigation
   dataSources?: StudioDataSource[]
   publicSkin?: StudioPublicSkin
+  content?: StudioContent
 }
 
 export interface StudioAsset {

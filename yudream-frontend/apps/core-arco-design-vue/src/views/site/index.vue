@@ -91,7 +91,8 @@ const studioMatch = computed(() => {
   if (!document || !available) {
     return null
   }
-  const open = document.pages.filter(page => studioRequirementsMet(page.settings?.requires, available))
+  // 依赖未满足的页面与承载外壳页（只包裹宿主/插件页面）不注册，按不存在处理
+  const open = document.pages.filter(page => !page.settings?.shell && studioRequirementsMet(page.settings?.requires, available))
   return matchStudioPage({ ...document, pages: open }, slug.value)
 })
 const studioPage = computed(() => studioMatch.value?.page ?? null)

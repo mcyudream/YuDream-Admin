@@ -64,7 +64,7 @@ function bindDocument() {
     return
   }
   document.addEventListener('click', handleClick)
-  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath, query: { ...currentQuery(), ...props.runtime.params } }) : undefined
+  const detachRuntime = props.runtime ? attachStudioRuntime({ ...props.runtime, frameWindow, basePath: props.basePath, samples: true, query: { ...currentQuery(), ...props.runtime.params } }) : undefined
   cleanupDocument = () => {
     document.removeEventListener('click', handleClick)
     detachRuntime?.()

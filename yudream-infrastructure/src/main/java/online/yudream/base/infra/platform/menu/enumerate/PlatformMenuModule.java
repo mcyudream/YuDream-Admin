@@ -327,6 +327,11 @@ public enum PlatformMenuModule {
             icon = "i-ri:palette-line", sort = 60)
     THEME_CENTER,
 
+    @MenuNode(code = "platform:site-content", capability = "cms", name = "站点内容", type = MenuNodeType.MENU,
+            parentName = "CONTENT_HUB", path = "/platform/site-content", component = "platform/site-content/index.vue",
+            icon = "i-ri:file-list-3-line", sort = 61, permission = "platform:cms:view")
+    SITE_CONTENT,
+
     @MenuNode(code = "platform:cms-workspace", capability = "cms", name = "站点工作区", type = MenuNodeType.MENU,
             parentName = "CONTENT_HUB", path = "/platform/cms/workspace", component = "platform/cms/workspace/index.vue",
             icon = "i-ri:layout-masonry-line", sort = 59, permission = "platform:ai:generate")

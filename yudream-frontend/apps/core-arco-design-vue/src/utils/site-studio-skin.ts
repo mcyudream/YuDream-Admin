@@ -1,4 +1,4 @@
-import type { SiteDocument, StudioPublicSkin } from '../types/site-studio'
+import type { SiteDocument, StudioPublicSkin, StudioSkinRole, StudioStyleClass } from '../types/site-studio'
 import { compileStudioNodes, compileStudioScopedNodeCss, compileStudioThemeCss, STUDIO_BASE_CSS } from './site-studio-html'
 
 /**
@@ -128,18 +128,28 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
     `html .studio-shadow-layout .login-page{min-height:auto !important;background:transparent !important}`,
     `html .studio-shadow-layout :is(.site-chrome,.wiki-public,.wiki-home,.wiki-search-page,.discover,.plugin,.public-form-page,.tl-page,.ev-page){background:transparent !important}`,
     ...(skin.pixel ? pixelRules(skin) : []),
+    ...themeClassRules(document, skin),
     skin.dark ? `html:has(:is(${STUDIO_PUBLIC_ROOTS.join(',')})){color-scheme:dark}` : '',
   ].filter(Boolean).join('\n')
 }
 
 /** 像素风：只作用于嵌入主题页（.studio-shadow-layout 插槽内）的宿主页面，用通用选择器而非插件专属类名 */
+const SKIN_SCOPE = 'html .studio-shadow-layout'
+// 只给最外层卡片加框：卡片内部的「-card-body / -card-title」等子元素不再各自成框
+const SKIN_CARD = ':is([data-slot="card"],[class*="card"])'
+const SKIN_SELECTORS: Record<StudioSkinRole, string> = {
+  panel: `${SKIN_SCOPE} :is(${SKIN_CARD}:not(${SKIN_CARD} *),aside,.login-box)`,
+  control: `${SKIN_SCOPE} :is([data-slot="input-group"],[data-slot="select-trigger"],[data-slot="popover-trigger"],[data-slot="form-control"],textarea,input:not([type="checkbox"]):not([type="radio"]))`,
+  // 只匹配真正的按钮；YdAction 也常作整张卡片的点击区域，不套按钮外观
+  button: `${SKIN_SCOPE} :is([data-slot="button"],[data-slot="tabs-trigger"])`,
+  heading: `${SKIN_SCOPE} :is(h1,h2)`,
+}
+
 function pixelRules(skin: StudioPublicSkin) {
-  const scope = 'html .studio-shadow-layout'
-  // 只给最外层卡片加像素框：卡片内部的「-card-body / -card-title」等子元素不再各自成框
-  const card = ':is([data-slot="card"],[class*="card"])'
-  const panels = `${scope} :is(${card}:not(${card} *),aside,.login-box)`
-  const controls = `${scope} :is([data-slot="input-group"],[data-slot="select-trigger"],[data-slot="popover-trigger"],[data-slot="form-control"],textarea,input:not([type="checkbox"]):not([type="radio"]))`
-  const buttons = `${scope} :is([data-slot="button"],button.yd-action,[data-slot="tabs-trigger"])`
+  const panels = SKIN_SELECTORS.panel
+  const controls = SKIN_SELECTORS.control
+  const buttons = SKIN_SELECTORS.button
+  const scope = SKIN_SCOPE
   return [
     `${scope} *{border-radius:0 !important}`,
     `${panels}{background:${skin.surface}e6 !important;border:2px solid #000 !important;box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),4px 4px 0 rgba(0,0,0,.45) !important}`,
@@ -147,6 +157,44 @@ function pixelRules(skin: StudioPublicSkin) {
     `${buttons}{border:2px solid #000 !important;box-shadow:inset 2px 2px 0 rgba(255,255,255,.28),inset -2px -2px 0 rgba(0,0,0,.35) !important}`,
     `${buttons}:active{box-shadow:inset -2px -2px 0 rgba(255,255,255,.2),inset 2px 2px 0 rgba(0,0,0,.4) !important}`,
   ]
+}
+
+/** 沿用主题样式类时只取视觉属性：不改宿主/插件页面的尺寸与布局 */
+const VISUAL_PROPERTY = /^(?:background(?:-[a-z]+)*|border(?:-[a-z]+)*|box-shadow|color|text-shadow|image-rendering|letter-spacing|filter|outline(?:-[a-z]+)*|font-family|font-weight)$/
+const TOKEN_REF = /var\(--([\w-]+)/g
+
+function visualDeclarations(styles: Record<string, string> | undefined) {
+  return Object.entries(styles ?? {}).filter(([property]) => VISUAL_PROPERTY.test(property)).map(([property, value]) => `${property}:${value} !important`).join(';')
+}
+
+/**
+ * 公开页沿用主题样式类（publicSkin.classes）：嵌入主题页的宿主/插件页面中卡片、按钮、输入框、大标题套用对应主题样式类的
+ * 视觉属性与 hover/active 状态；样式类引用的主题变量（如 --gs、--shadow）一并写到嵌入区域，不外泄到后台。
+ */
+function themeClassRules(document: SiteDocument, skin: StudioPublicSkin) {
+  const mapping = skin.classes ?? {}
+  const classes = new Map((document.theme.classes ?? []).map(item => [item.name, item] as const))
+  const rules: string[] = []
+  const tokens = new Set<string>()
+  for (const [role, name] of Object.entries(mapping) as [StudioSkinRole, string][]) {
+    const item: StudioStyleClass | undefined = classes.get(name)
+    if (!item) {
+      continue
+    }
+    const selector = SKIN_SELECTORS[role]
+    const parts: [string, Record<string, string> | undefined][] = [['', item.styles], [':hover', item.states?.hover], [':active', item.states?.active], [':focus-visible', item.states?.focus]]
+    for (const [state, styles] of parts) {
+      const declarations = visualDeclarations(styles)
+      if (declarations) {
+        rules.push(`${state ? selector.replace(/\)$/, `)${state}`) : selector}{${declarations}}`)
+        for (const match of declarations.matchAll(TOKEN_REF)) {
+          tokens.add(match[1]!)
+        }
+      }
+    }
+  }
+  const values = Object.entries(document.theme.tokens).filter(([key]) => tokens.has(key.replace(/^--/, ''))).map(([key, value]) => `${key.startsWith('--') ? key : `--${key}`}:${value}`)
+  return values.length ? [`${SKIN_SCOPE}{${values.join(';')}}`, ...rules] : rules
 }
 
 /**

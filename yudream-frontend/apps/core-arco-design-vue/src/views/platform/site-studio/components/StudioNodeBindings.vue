@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 检查器「样式类与数据」：节点引用主题样式类；数据绑定把插件/框架数据填进作者设计好的条目模板。
-// 全部落为普通属性（class、data-yd-*），由公开站运行时解释；无数据时页面原样显示作者写的示例条目。
+// 全部落为普通属性（class、data-yd-*），由公开站运行时解释；示例条目只在草稿预览中显示，公开站无数据时显示空状态。
 import type { StudioNode } from '@/types/site-studio'
 import { computed } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
@@ -51,8 +51,19 @@ const menuRole = computed(() => menuOptions.find(option => option.value && optio
 function setMenuRole(value: unknown) {
   setAttributes({ 'data-yd-menu': null, 'data-yd-menu-trigger': null, 'data-yd-submenu': null, ...(value ? { [String(value)]: 'true' } : {}) })
 }
+/** 站点内容字段（「站点内容」页填写）：单值字段按类型分组，列表字段作为数据源 content:{键} */
+const contentFields = computed(() => (store.doc?.features?.content?.sections ?? []).flatMap(section => section.fields.map(field => ({ ...field, section: section.title }))))
+const contentOptions = (types: string[]) => [{ label: '不绑定', value: '' }, ...contentFields.value.filter(field => types.includes(field.type)).map(field => ({ label: `${field.section} · ${field.label}`, value: field.key }))]
+const contentBindings = computed(() => [
+  { attr: 'data-yd-content', label: '文本 / 图片', options: contentOptions(['text', 'textarea', 'number', 'image', 'select', 'color']) },
+  { attr: 'data-yd-content-href', label: '链接地址', options: contentOptions(['link']) },
+  { attr: 'data-yd-content-bg', label: '背景图', options: contentOptions(['image']) },
+  { attr: 'data-yd-content-show', label: '开关显隐', options: contentOptions(['switch']) },
+])
+const contentSummary = computed(() => contentBindings.value.map(item => attrs.value[item.attr]).filter(Boolean).join(' · '))
 const sourceOptions = computed(() => [
   { label: '不绑定', value: '' },
+  ...contentFields.value.filter(field => field.type === 'list').map(field => ({ label: `站点内容：${field.section} · ${field.label}`, value: `content:${field.key}` })),
   ...STUDIO_DATA_SOURCES.map(item => ({ label: item.label, value: item.value as string })),
   ...(store.doc?.features?.dataSources ?? []).map(item => ({ label: `插件适配器：${item.label}`, value: `adapter:${item.id}` })),
 ])
@@ -80,6 +91,10 @@ const ancestorSource = computed(() => {
   return walk(roots, '') ?? ''
 })
 const fieldOptions = computed(() => {
+  const listField = ancestorSource.value.startsWith('content:') ? contentFields.value.find(field => `content:${field.key}` === ancestorSource.value) : undefined
+  if (listField) {
+    return [{ label: '不绑定', value: '' }, { label: '$index（序号）', value: '$index' }, ...(listField.itemFields ?? []).map(field => ({ label: `${field.label}（${field.key}）`, value: field.key }))]
+  }
   const source = STUDIO_DATA_SOURCES.find(item => item.value === ancestorSource.value)
   return [{ label: '不绑定', value: '' }, ...(source?.fields ?? []).map(field => ({ label: field, value: field as string }))]
 })
@@ -152,6 +167,26 @@ function onLimit(event: Event) {
       <p v-else class="text-xs text-muted-foreground m-0">
         主题里还没有样式类；在「主题 → 主题样式表」中定义后可在此套用。
       </p>
+    </StudioInspectorSection>
+    <StudioInspectorSection id="content" title="站点内容" :summary="contentSummary">
+      <p v-if="!contentFields.length" class="text-xs text-muted-foreground m-0">
+        还没有内容模型；在「主题 → 站点内容模型」中声明字段后，运营可在「站点内容」页可视化填写并绑定到这里。
+      </p>
+      <template v-else>
+        <p class="text-xs text-muted-foreground m-0">
+          显示「站点内容」页填写的值（未填写时用字段默认值，再缺省保留当前内容）。可增删的列表请在「数据绑定」里选「站点内容」数据源。
+        </p>
+        <label v-for="binding in contentBindings" :key="binding.attr" class="text-xs flex flex-col gap-1">
+          <span>{{ binding.label }}</span>
+          <YdSelect
+            v-auth="'platform:cms:edit'"
+            :model-value="attrs[binding.attr] || ''"
+            :options="binding.options"
+            :aria-label="`站点内容${binding.label}`"
+            @update:model-value="(value: unknown) => setAttributes({ [binding.attr]: String(value || '') || null })"
+          />
+        </label>
+      </template>
     </StudioInspectorSection>
     <StudioInspectorSection id="site" title="站点信息与计数" :summary="attrs['data-yd-site'] || attrs['data-yd-count'] || ''">
       <label class="text-xs flex flex-col gap-1">
@@ -237,7 +272,11 @@ function onLimit(event: Event) {
         <YdSwitch :model-value="'data-yd-live' in attrs" aria-label="仅真实数据时显示" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-live': value ? 'true' : null, 'data-yd-sample': null })" />
         <span>仅有真实数据时可见</span>
       </label>
-      <label v-if="!ancestorSource && ('data-yd-sample' in attrs || 'data-yd-live' in attrs)" class="text-xs flex flex-col gap-1">
+      <label class="text-xs flex gap-2 items-center">
+        <YdSwitch :model-value="'data-yd-empty' in attrs" aria-label="无数据时显示" @update:model-value="(value: unknown) => setAttributes({ 'data-yd-empty': value ? 'true' : null })" />
+        <span>无数据时显示（空状态提示；公开站不显示示例条目）</span>
+      </label>
+      <label v-if="!ancestorSource && ('data-yd-sample' in attrs || 'data-yd-live' in attrs || 'data-yd-empty' in attrs)" class="text-xs flex flex-col gap-1">
         <span>关联数据源（标记不在数据容器内时）</span>
         <YdSelect
           v-auth="'platform:cms:edit'"

@@ -176,10 +176,12 @@ onBeforeUnmount(() => {
           <div v-else class="wiki-portal__spaces">
             <RouterLink v-for="space in spaces" :key="space.slug" class="wiki-portal__space-link" :to="spaceHref(space)">
               <YdCard class="wiki-portal__space" content-class="wiki-portal__space-content">
-                <YdIcon name="morph:book-open" />
-                <strong>{{ space.name }}</strong>
+                <div class="wiki-portal__space-head">
+                  <span class="wiki-portal__space-icon" aria-hidden="true"><YdIcon name="morph:book-open" /></span>
+                  <strong>{{ space.name }}</strong>
+                </div>
                 <p>{{ space.description || '查看已发布文档' }}</p>
-                <span>进入知识库 <YdIcon name="morph:arrow-right" /></span>
+                <span class="wiki-portal__space-more">进入知识库 <YdIcon name="morph:arrow-right" /></span>
               </YdCard>
             </RouterLink>
           </div>
@@ -237,11 +239,13 @@ onBeforeUnmount(() => {
 .wiki-portal__space-link:focus-visible { outline: 2px solid var(--yb-site-text-2, var(--color-text-2)); outline-offset: 2px; }
 .wiki-portal__space { min-height: 185px; cursor: pointer; border: 1px solid var(--yb-site-border, var(--color-border-2)); border-radius: 10px; background: var(--yb-site-surface, var(--color-bg-2)); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); transition: box-shadow 0.15s; }
 .wiki-portal__space-link:hover .wiki-portal__space { box-shadow: 0 6px 18px rgb(0 0 0 / 10%); }
-.wiki-portal__space-content { display: flex; min-height: 185px; flex-direction: column; align-items: flex-start; gap: 10px; }
-.wiki-portal__space-content > :deep(svg) { color: var(--yb-site-heading, var(--color-text-1)); font-size: 22px; }
-.wiki-portal__space-content strong { color: var(--yb-site-heading, var(--color-text-1)); font-size: 16px; overflow-wrap: anywhere; }
+.wiki-portal__space-content { display: flex; min-height: 185px; flex-direction: column; align-items: stretch; gap: 12px; }
+/* 图标与标题同行：图标置于固定尺寸的方块内，与标题首行居中对齐；YdIcon 外层为 i.yd-icon，按其定尺寸 */
+.wiki-portal__space-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.wiki-portal__space-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; color: var(--yb-site-heading, var(--color-text-1)); background: var(--yb-site-surface-2, var(--color-fill-2)); font-size: 20px; }
+.wiki-portal__space-head strong { min-width: 0; color: var(--yb-site-heading, var(--color-text-1)); font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
 .wiki-portal__space-content p { margin: 0; color: var(--yb-site-muted, var(--color-text-3)); font-size: 14px; line-height: 1.6; }
-.wiki-portal__space-content span { display: inline-flex; align-items: center; gap: 4px; margin-top: auto; color: var(--yb-site-text-2, var(--color-text-2)); font-size: 13px; font-weight: 600; }
+.wiki-portal__space-more { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; margin-top: auto; color: var(--yb-site-text-2, var(--color-text-2)); font-size: 13px; font-weight: 600; }
 .wiki-portal__recent-link { display: flex; min-width: 0; flex: 1; align-items: center; gap: 14px; justify-content: space-between; color: inherit; text-decoration: none; }
 .wiki-portal__recent-link:hover strong { color: var(--yb-site-primary, var(--color-text-1)); }
 .wiki-portal__recent-main { display: grid; min-width: 0; gap: 4px; }

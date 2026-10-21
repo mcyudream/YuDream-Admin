@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { serializeStudioPackage } from '@/utils/site-studio'
 import { isStudioEmbeddedAsset, validateStudioDocument } from '@/utils/site-studio-validation'
+import StudioContentModel from './StudioContentModel.vue'
 import StudioDataSources from './StudioDataSources.vue'
 import StudioNavigationEditor from './StudioNavigationEditor.vue'
 import StudioPublicSkin from './StudioPublicSkin.vue'
@@ -306,6 +307,8 @@ function applyThemeDraft() {
       <StudioThemeStylesheet />
 
       <StudioSiteFeatures />
+
+      <StudioContentModel />
 
       <StudioNavigationEditor />
 
