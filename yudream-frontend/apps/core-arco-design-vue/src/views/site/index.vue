@@ -9,7 +9,7 @@ import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-comp
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
-import { compileStudioPage, validateStudioDocument } from '@/utils/site-studio'
+import { buildStudioSiteHtml, validateStudioDocument } from '@/utils/site-studio'
 import SiteChrome from './site-chrome.vue'
 import { useSiteNavigation } from './site-navigation'
 import StudioFrame from './studio-frame.vue'
@@ -101,8 +101,7 @@ const studioFrameHtml = computed(() => {
   if (!document || !matched) {
     return ''
   }
-  const compiled = compileStudioPage(document, matched.id, { includeChrome: true })
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;padding:0}</style><style>${compiled.css}</style></head><body>${compiled.html}</body></html>`
+  return buildStudioSiteHtml(document, matched.id)
 })
 
 async function loadStudioDocument(seq: number) {

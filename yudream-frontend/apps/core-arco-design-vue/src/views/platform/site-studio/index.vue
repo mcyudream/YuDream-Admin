@@ -2,9 +2,10 @@
 import type { YdWorkspaceRailItem, YdWorkspaceStatusItem } from '@yudream/components'
 import type { StudioCommand } from '@/types/site-studio'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import apiTheme from '@/api/modules/platform-theme'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
+import { openStudioPreviewChannel, studioPagePathToSlug } from '@/utils/site-studio-preview'
 import CmsStudioAgentPanel from './components/CmsStudioAgentPanel.vue'
 import StudioAssetsView from './components/StudioAssetsView.vue'
 import StudioDesignView from './components/StudioDesignView.vue'
@@ -181,6 +182,40 @@ function publish() {
   })
 }
 
+// ===== 草稿预览：新标签页以公开站同一渲染查看当前页面；本页实时广播内存文档（含未保存更改） =====
+const router = useRouter()
+let previewChannel: BroadcastChannel | null = null
+let previewTimer: ReturnType<typeof setTimeout> | undefined
+function publishPreview() {
+  if (!previewChannel || !store.doc) {
+    return
+  }
+  previewChannel.postMessage({ type: 'document', themeCode: store.themeCode, documentJson: JSON.stringify(store.doc), dirty: store.dirty, revision: store.state?.revision })
+}
+watch(() => store.themeCode, (code) => {
+  previewChannel?.close()
+  previewChannel = openStudioPreviewChannel(code)
+  if (previewChannel) {
+    previewChannel.onmessage = (event: MessageEvent<{ type?: string, themeCode?: string }>) => {
+      if (event.data?.type === 'request' && event.data.themeCode === store.themeCode) {
+        publishPreview()
+      }
+    }
+  }
+}, { immediate: true })
+watch(() => [store.doc, store.dirty] as const, () => {
+  clearTimeout(previewTimer)
+  previewTimer = setTimeout(publishPreview, 250)
+})
+onBeforeUnmount(() => {
+  clearTimeout(previewTimer)
+  previewChannel?.close()
+})
+function openPreview() {
+  const slug = studioPagePathToSlug(store.activePage?.path ?? '/')
+  window.open(router.resolve({ name: 'siteStudioPreview', params: { themeCode: store.themeCode, slug } }).href, '_blank')
+}
+
 function retry() {
   void store.load()
 }
@@ -275,6 +310,11 @@ void store.load()
                 @click="store.redo()"
               >
                 <YdIcon name="morph:redo-2" />
+              </YdButton>
+            </YdTooltip>
+            <YdTooltip content="在新标签页按公开站效果预览当前页面（含未保存更改）">
+              <YdButton variant="ghost" :disabled="!store.doc" aria-label="预览站点" @click="openPreview">
+                <YdIcon name="morph:external-link" /> 预览站点
               </YdButton>
             </YdTooltip>
             <YdButton

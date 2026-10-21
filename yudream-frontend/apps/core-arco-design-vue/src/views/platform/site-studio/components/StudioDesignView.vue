@@ -15,7 +15,9 @@ import {
   compileStudioPage,
   createStudioGrapesAdapter,
   parseStudioHtml,
+  STUDIO_BASE_CSS,
 } from '@/utils/site-studio'
+import { parseStudioCanvasCss } from '@/utils/site-studio-grapes'
 
 defineOptions({ name: 'StudioDesignView' })
 
@@ -131,7 +133,8 @@ const compiled = computed(() => {
     return null
   }
   if (store.editRegion === 'page') {
-    return store.activePage ? compileStudioPage(document, store.activePage.id, { includeChrome: false }) : null
+    // 编辑页面时连同主题页头页脚一起渲染（只读），画布与公开站所见一致；解析只取 page 区域
+    return store.activePage ? compileStudioPage(document, store.activePage.id, { includeChrome: true }) : null
   }
   const output = compileStudioNodes(document.theme[store.editRegion])
   const root = `[data-studio-document="${document.id}"]`
@@ -175,7 +178,12 @@ function resyncCanvas() {
 
 const pageBuilderOptions = computed<YdPageBuilderOptions>(() => ({
   width: 'auto',
+  // 不用引擎保护样式：getCss() 会把它拼进快照并回流文档。基础样式经 canvas.styles 以样式表链接注入画布，
+  // 与公开站、草稿预览、静态导出同一份，且不属于引擎 CSS
   protectedCss: '',
+  canvas: { styles: [`data:text/css;charset=utf-8,${encodeURIComponent(STUDIO_BASE_CSS)}`] },
+  // 引擎默认 CSSOM 解析会展开简写、丢弃含 var() 的简写并回写文档（按钮背景丢失），改为按原文解析
+  parser: { parserCss: parseStudioCanvasCss } as YdPageBuilderOptions['parser'],
   undoManager: { trackSelection: false },
   panels: { defaults: [] },
   deviceManager: {
@@ -216,10 +224,24 @@ function syncCanvasSelection(nodeId: string) {
   }
 }
 
+/** 页面编辑时画布里的主题页头页脚只作展示：不可选中、编辑、拖入或删除（在“页头/页脚”区域里编辑） */
+const LOCKED_REGION = { selectable: false, hoverable: false, highlightable: false, editable: false, draggable: false, droppable: false, removable: false, copyable: false, badgable: false, layerable: false }
+function lockThemeRegions() {
+  const editor = facade.value?.editor
+  if (disposed || !ready.value || !editor || store.editRegion !== 'page') {
+    return
+  }
+  for (const region of editor.getWrapper()?.find('[data-studio-region="header"], [data-studio-region="footer"]') ?? []) {
+    region.set(LOCKED_REGION)
+    region.onAll(child => child.set(LOCKED_REGION))
+  }
+}
+
 function onBuilderReady(instance: YdPageBuilderEditorFacade) {
   facade.value = instance
   ready.value = true
   builderError.value = ''
+  lockThemeRegions()
   instance.editor.setDevice(store.breakpoint)
   readZoom()
   requestAnimationFrame(() => fitCanvasWidth())
@@ -243,6 +265,15 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
     const id = component?.getAttributes?.()['data-studio-id']
     if (typeof id === 'string' && id) {
       store.selectedNodeId = id
+    }
+  })
+  // 外部回灌会重建组件：主题页头页脚区域在创建时即锁定（区域内子节点此时已随之构建）
+  on('component:add', (payload) => {
+    const component = payload as { getAttributes?: () => Record<string, unknown>, set: (props: object) => void, onAll: (cb: (child: { set: (props: object) => void }) => void) => void } | undefined
+    const region = component?.getAttributes?.()['data-studio-region']
+    if (region === 'header' || region === 'footer') {
+      component!.set(LOCKED_REGION)
+      component!.onAll(child => child.set(LOCKED_REGION))
     }
   })
   on('component:deselected', () => {

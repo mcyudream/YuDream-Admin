@@ -5,7 +5,8 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-defineProps<{ srcdoc: string }>()
+// basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
+const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string }>(), { basePath: '/site' })
 
 const frame = ref<HTMLIFrameElement | null>(null)
 const router = useRouter()
@@ -23,11 +24,15 @@ function resolveUrl(href: string) {
   if (value.startsWith('#')) {
     return value
   }
-  // 站点文档内的根相对路径一律映射到公开站前缀，避免站内跳转落进后台
-  if (value === '/site' || value.startsWith('/site/') || ['/wiki', '/market', '/forms'].some(prefix => value === prefix || value.startsWith(`${prefix}/`))) {
+  // 站点文档内的根相对路径一律映射到站点前缀，避免站内跳转落进后台
+  const base = props.basePath
+  if (value === base || value.startsWith(`${base}/`) || ['/wiki', '/market', '/forms'].some(prefix => value === prefix || value.startsWith(`${prefix}/`))) {
     return value
   }
-  return `/site${value.startsWith('/') ? value : `/${value}`}`
+  if (base !== '/site' && (value === '/site' || value.startsWith('/site/'))) {
+    return `${base}${value.slice('/site'.length) || '/'}`
+  }
+  return `${base}${value.startsWith('/') ? value : `/${value}`}`
 }
 
 function handleClick(event: MouseEvent) {

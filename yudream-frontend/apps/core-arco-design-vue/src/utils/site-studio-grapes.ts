@@ -1,5 +1,6 @@
 import type { YdPageBuilderSetupHandler } from '@yudream/components'
 import type { StudioGrapesModel, StudioNode } from '../types/site-studio'
+import { parse } from 'postcss'
 import { escapeStudioHtml, parseStudioHtml } from './site-studio-html'
 import { studioAssert, validateStudioNodes } from './site-studio-validation'
 /** HTML content is escaped before it reaches Grapes; no engine project is persisted. */
@@ -62,4 +63,40 @@ export function createStudioGrapesAdapter() {
     }))
   }
   return { toModel: studioNodesToGrapesModel, fromModel: studioGrapesModelToNodes, parseHtml: parseStudioHtml, setup }
+}
+
+/** GrapesJS 自定义 CSS 解析结果（与引擎 ParsedCssRule 同构）。 */
+export interface StudioCanvasCssRule {
+  selectors: string
+  style: Record<string, string>
+  atRule?: string
+  params?: string
+}
+
+/**
+ * 画布 CSS 解析：引擎默认走浏览器 CSSOM，会把简写展开成长写、丢弃含 var() 的简写
+ * （如 background: var(--accent)），再经画布回流写回文档，造成按钮背景丢失等不可逆损坏。
+ * 这里改用 postcss 按原文保留每条声明；复杂选择器整串交给引擎（selectorsAdd）。
+ */
+export function parseStudioCanvasCss(css: string): StudioCanvasCssRule[] {
+  const rules: StudioCanvasCssRule[] = []
+  let root
+  try {
+    root = parse(css)
+  }
+  catch {
+    return rules
+  }
+  root.walkRules((rule) => {
+    const style: Record<string, string> = {}
+    rule.each((node) => {
+      if (node.type === 'decl') {
+        style[node.prop] = node.important ? `${node.value} !important` : node.value
+      }
+    })
+    const parent = rule.parent
+    const atRule = parent && parent.type === 'atrule' ? parent as unknown as { name: string, params: string } : null
+    rules.push({ selectors: rule.selector, style, ...(atRule ? { atRule: atRule.name, params: atRule.params } : {}) })
+  })
+  return rules
 }

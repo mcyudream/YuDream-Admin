@@ -161,6 +161,17 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    // 站点草稿预览：与公开站同一渲染，展示未发布草稿（含工作台未保存更改），需登录与 CMS 查看权限
+    path: '/site-preview/:themeCode/:slug(.*)*',
+    name: 'siteStudioPreview',
+    component: () => import('@/views/site/preview.vue'),
+    meta: {
+      title: '站点草稿预览',
+      auth: 'platform:cms:view',
+      capability: 'cms',
+    },
+  },
+  {
     path: '/:all(.*)*',
     name: 'notFound',
     component: () => import('@/views/[...all].vue'),

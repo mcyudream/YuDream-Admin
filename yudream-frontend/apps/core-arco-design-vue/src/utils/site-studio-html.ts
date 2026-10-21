@@ -63,11 +63,34 @@ export function compileStudioPage(document: SiteDocument, pageId: string, option
   const html = `<div data-studio-document="${document.id}">${chrome ? `<header data-studio-region="header">${document.theme.header.map(renderNode).join('')}</header>` : ''}<main data-studio-region="page">${page.root.map(renderNode).join('')}</main>${chrome ? `<footer data-studio-region="footer">${document.theme.footer.map(renderNode).join('')}</footer>` : ''}</div>`
   return { html, css: [`${scope}{${declarations(tokens)}}`, renderCss([...(chrome ? document.theme.header : []), ...page.root, ...(chrome ? document.theme.footer : [])], `${scope} `)].filter(Boolean).join('\n') }
 }
+/**
+ * 站点文档基础样式：编辑画布（引擎 protectedCss，不进入文档回流）、公开站、草稿预览与静态导出共用同一份，
+ * 保证四处观感一致；正文与背景颜色取自主题变量 --foreground / --background，未定义时回落中性色。
+ */
+export const STUDIO_BASE_CSS = [
+  'html,body{margin:0;padding:0}',
+  '*,*::before,*::after{box-sizing:border-box}',
+  'body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}',
+  '[data-studio-document]{color:var(--foreground,#1f2933);background:var(--background,#ffffff)}',
+  '[data-studio-document] img,[data-studio-document] video{max-width:100%;height:auto}',
+].join('\n')
+
+/** 公开站与草稿预览共用的整页 HTML（含主题页头页脚），两处渲染因此完全一致。 */
+export function buildStudioSiteHtml(document: SiteDocument, pageId: string, options: { title?: string, referrerPolicy?: boolean } = {}) {
+  const output = compileStudioPage(document, pageId, { includeChrome: true })
+  const title = options.title === undefined ? '' : `<title>${escapeStudioHtml(options.title)}</title>`
+  const referrer = options.referrerPolicy ? '<meta name="referrer" content="no-referrer">' : ''
+  return `<!doctype html>\n<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">${referrer}${title}<style>${STUDIO_BASE_CSS}</style><style>${output.css}</style></head><body>${output.html}</body></html>`
+}
+
 export function exportStudioStaticHtml(document: SiteDocument, pageId: string, options: StudioCompileOptions = {}) {
-  const output = compileStudioPage(document, pageId, options)
   const title = document.pages.find(page => page.id === pageId)!.name
   // No execution bridge, external stylesheet, or engine project JSON is exported.
-  return `<!doctype html>\n<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>${escapeStudioHtml(title)}</title><style>${output.css}</style></head><body>${output.html}</body></html>`
+  if (options.includeChrome === false) {
+    const output = compileStudioPage(document, pageId, options)
+    return `<!doctype html>\n<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>${escapeStudioHtml(title)}</title><style>${STUDIO_BASE_CSS}</style><style>${output.css}</style></head><body>${output.html}</body></html>`
+  }
+  return buildStudioSiteHtml(document, pageId, { title, referrerPolicy: true })
 }
 interface CssEntry {
   rule: Rule

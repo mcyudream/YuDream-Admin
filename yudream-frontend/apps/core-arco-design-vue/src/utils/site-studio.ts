@@ -1,7 +1,7 @@
 export type { SiteDocument, StudioAsset, StudioCommand, StudioCompileOptions, StudioContainer, StudioGrapesModel, StudioNode, StudioPackage, StudioPage } from '../types/site-studio'
 export { createStudioGrapesAdapter, studioGrapesModelToNodes, studioNodesToGrapesModel } from './site-studio-grapes'
 export type { StudioParseReport } from './site-studio-html'
-export { compileStudioNodes, compileStudioPage, escapeStudioHtml, exportStudioStaticHtml, parseStudioHtml } from './site-studio-html'
+export { buildStudioSiteHtml, compileStudioNodes, compileStudioPage, escapeStudioHtml, exportStudioStaticHtml, parseStudioHtml, STUDIO_BASE_CSS } from './site-studio-html'
 export { applyStudioCommand, createStudioDocument, createStudioNode, findStudioNode } from './site-studio-model'
 export { createStudioPackage, importStudioPackage, serializeStudioPackage } from './site-studio-package'
 export { STUDIO_BREAKPOINTS, STUDIO_LIMITS, validateStudioDocument, validateStudioNodes, validateStudioStyle, validateStudioUrl } from './site-studio-validation'
