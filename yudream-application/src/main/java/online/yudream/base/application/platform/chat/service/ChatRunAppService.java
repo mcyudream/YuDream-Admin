@@ -20,7 +20,7 @@ public class ChatRunAppService {
     private final AiRunAppService runs;
     private final HarnessAgentGateway harness;
     private final ObjectMapper json;
-    private final ChatWorkspaceStore workspaceStore;
+    private final online.yudream.base.application.platform.workspace.service.WorkspaceAppService workspaces;
     private final online.yudream.base.application.platform.ai.service.CmsStudioClientTools studioTools;
 
     public AiRunDTO start(Long userId, ChatSendCmd cmd) {
@@ -60,16 +60,15 @@ public class ChatRunAppService {
             if (cmd.getFrontendContext() != null) emitter.privateFrontendContext(cmd.getFrontendContext());
         }
         // 用户工作区只读工具：按调用方权限快照装配，每用户默认工作区随账号存在，不需要额外开关。
-        if (hasPermission(cmd, ChatWorkspaceTools.PERMISSION_CODE)) {
-            scoped.addAll(ChatWorkspaceTools.create(workspaceStore, userId));
-        }
+        var workspace = hasPermission(cmd, ChatWorkspaceTools.PERMISSION_CODE) ? workspaces.access(userId, "") : null;
+        scoped.addAll(ChatWorkspaceTools.create(workspace));
         // 工作区模式：规划只读、编码额外提供写入/删除（写入风险工具，每次调用需用户确认）
         String mode = workspaceMode(cmd);
         if ("code".equals(mode)) {
             if (!hasPermission(cmd, ChatWorkspaceTools.EDIT_PERMISSION_CODE)) {
                 throw new BizException("编码模式需要「编辑我的工作区」权限，请切换到问答或规划模式");
             }
-            scoped.addAll(ChatWorkspaceTools.createEditable(workspaceStore, userId));
+            scoped.addAll(ChatWorkspaceTools.createEditable(workspace));
         }
         cmd.setModePrompt(modePrompt(mode));
         // CMS 画布 agent：客户端工具在浏览器 GrapesJS 上真实执行，结果经本次运行的前端工具通道回流。
@@ -105,7 +104,7 @@ public class ChatRunAppService {
             case "plan" -> "\n\n【工作区模式：规划】只读：可用 workspace.list / workspace.read 了解用户工作区现有文件，不修改任何内容。"
                     + "输出编号的执行计划，每步写明要创建或修改的文件与预期结果；最后列出需要用户确认的问题。用户确认后会切换到编码模式执行。";
             case "code" -> "\n\n【工作区模式：编码】可在用户自己的工作区读写文件（不涉及服务器文件系统）。"
-                    + "先用 workspace.list / workspace.read 了解现状并用一两句话说明计划，再用 workspace.write 写入完整文件内容（覆盖前先读原文），必要时用 workspace.delete。"
+                    + "先用 workspace.list / workspace.read 了解现状并用一两句话说明计划，再用 workspace.write 写入完整文件内容（覆盖前先读原文），必要时用 workspace.move 移动/改名、workspace.delete 删除（进回收站）。临时产物放 tmp/ 目录（会定期自动清理）。"
                     + "每次写入或删除都会请用户确认；被拒绝时调整方案，不要重复提交相同内容。完成后列出改动的文件与验证建议。";
             default -> "";
         };

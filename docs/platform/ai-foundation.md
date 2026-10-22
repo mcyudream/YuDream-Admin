@@ -20,11 +20,12 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 
 ### 用户工作区（每用户一个）
 
-- 每个账号默认拥有一个工作区：助手会话与上传文件都在其中，不需要额外开通步骤。文件存在 Harness KV 命名空间 `agents/general/users/&lt;uid&gt;/workspace`（集合 `platformAgentWorkspace`，`{content, encoding}` 载荷，单文件 8 MB 上限）。
-- HTTP 端点 `/api/platform/chat/workspace`：列表/读取需 `platform:chat:workspace:view`，上传/删除需 `platform:chat:workspace:edit`；列表限 2000 个文件。
-- 模型侧只有只读工具 `workspace.list` / `workspace.read`（模块 `workspace`，常驻，权限码同 `platform:chat:workspace:view`），由 `ChatRunAppService` 按调用方权限快照装配到本次运行。单次读取超 60000 字符截断，二进制只返回大小与类型说明。
-- 工作区模式（发送请求 `mode`，缺省 `ask`）：`ask` 问答；`plan` 只读工具 + 规划提示，只给方案不改文件；`code` 额外装配 `workspace.write` / `workspace.delete`（风险 WRITE，每次调用都经原生确认卡，展示路径与内容预览），需 `platform:chat:workspace:edit`，无权限时启动即拒绝。写入单文件 1 MB 上限，路径拒绝 `..`、反斜杠、控制字符与目录结尾；删除要求文件存在。模式提示词随问题拼入，由 `ChatRunAppService.modePrompt` 维护。
-- 附件上传（`POST /api/platform/chat/attachments`）与工作区文件是两套存储：附件走 S3 + `sysFileObject`（随消息传给模型），工作区走 KV（模型按需读）；两者都受 `platform:chat:use` 与 AI 能力闸门。
+- **分层**：元数据在数据库、内容在对象存储、执行环境只看到普通文件。每账号一个 `UserWorkspace`（`platformWorkspace`，归属用户唯一索引，首次访问创建），逻辑地址 `workspace://<id>/<相对路径>`。条目 `WorkspaceFile`（`platformWorkspaceFile`：路径、FILE/DIRECTORY、大小、sha256、contentType、修订号、当前版本、来源 USER/AI、`deletedAt`）；目录是显式条目。内容按版本存对象存储 `workspaces/<wsId>/objects/<versionId>`（与附件同桶），版本行 `platformWorkspaceFileVersion` 只增不改；改名/移动只改元数据。
+- **规则**（`WorkspaceAppService`，界面与 AI 共用）：路径为相对路径，拒绝 `..`、`.`、`//`、反斜杠、控制字符，限 240 字；写入自动建父目录，同名目录/文件冲突拒绝；内容相同不产生新版本；界面保存带 `expectedRevision` 乐观并发，过期即拒；覆盖保留最近 10 个版本，可恢复历史版本（写成新版本）；删除进回收站 30 天（目录整组恢复，原位置占用时自动改名 `name (2)`）；`tmp/` 下超过配置天数未修改的文件每天 03:23 永久删除；单文件 100 MB。配额按全部版本字节（含回收站）计，默认 500 MB，管理员不限；配额与 tmp 天数在 `ai` 能力模块配置 `workspaceQuotaMb` / `workspaceTmpDays`，由 `platform:chat:quota:config` 维护。
+- **端点** `/api/platform/chat/workspace`：总览、预览（文本 2 MB 内）、下载（一律附件 + nosniff）、保存文本、上传到目录、新建目录、移动、删除、回收站（列表/恢复/彻底删除/清空）、历史版本（列表/恢复）、附件另存（经 `FileAppService` 校验调用者可读）、设置。查看需 `platform:chat:workspace:view`，修改需 `platform:chat:workspace:edit`。
+- **界面**：AI 助手抽屉的工作区面板（引用文件进下一条消息）与对话页「我的工作区」按钮都打开同一文件管理器 `WorkspaceExplorer`：目录树、文本编辑（Ctrl/⌘+S）、图片预览、上传、移动改名、删除、历史版本、回收站、对话附件另存到当前目录；AI 写入的条目标「AI」。
+- **模型工具**（`ChatWorkspaceTools`，经 `WorkspaceAccess` 只见 root 内条目，变更记为 AI）：`workspace.list`（可按目录）/ `workspace.read`（超 60000 字符截断，二进制或超 2 MB 只返回元信息）随查看权限装配；工作区模式 `code` 额外装配 `workspace.write` / `workspace.move` / `workspace.delete`（风险 WRITE，每次经原生确认卡；写入单文件 1 MB；删除进回收站）。模式（发送请求 `mode`，缺省 `ask`）：`plan` 只读 + 规划提示；`code` 需 `platform:chat:workspace:edit`，无权限启动即拒绝；提示词由 `ChatRunAppService.modePrompt` 维护。
+- **与其他存储的边界**：聊天附件走 S3 + `sysFileObject`（随消息传给模型），可在文件管理器另存进工作区；Harness 的长期记忆、技能与会话日志仍在 `platformAgentWorkspace` KV（小而高频），不属于用户工作区。
 
 ## 工具模块与按需加载
 

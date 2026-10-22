@@ -5,6 +5,8 @@ import type { AgentApplication, AgentCatalog } from '@/api/modules/platform-agen
 import type { ChatScopeType } from '@/api/modules/platform-chat'
 import apiAgent from '@/api/modules/platform-agent'
 import { uploadChatAttachment } from '@/api/modules/platform-chat'
+import WorkspaceExplorer from '@/components/WorkspaceExplorer/index.vue'
+import { useWorkspaceReferences } from '@/composables/use-workspace-references'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 
 const assistant = useAiAssistantStore()
@@ -33,6 +35,10 @@ const workspaceModes = computed(() => [
   ...(canViewWorkspace.value ? ['plan' as const] : []),
   ...(canEditWorkspace.value ? ['code' as const] : []),
 ])
+/** 工作区文件：可 @ 引用进消息；文件管理器里可编辑、整理，并把附件另存到工作区 */
+const workspaceRefs = useWorkspaceReferences(() => canViewWorkspace.value)
+const explorerOpen = ref(false)
+const conversationAttachments = computed<YdChatAttachment[]>(() => [...attachments.value, ...assistant.conversationMessages.flatMap(message => message.attachments ?? [])])
 const workspaces = computed<YdAgentWorkspace[]>(() => canViewWorkspace.value
   ? [{ id: 'default', name: '我的工作区', kind: 'remote', access: canEditWorkspace.value ? 'write' : 'read', description: '每用户默认工作区：规划与编码模式在这里读写文件' }]
   : [])
@@ -68,7 +74,8 @@ function sessionData() {
 
 async function send(request: YdAgentSendRequest) {
   if (uploading.value || !auth('platform:chat:use')) return
-  await assistant.send(request, undefined, {
+  const text = await workspaceRefs.compose(request.text.trim() || request.text)
+  await assistant.send({ ...request, text }, undefined, {
     ...sessionData(),
     contextRefs: wikiSlug.value ? [{ type: 'wiki', target: wikiSlug.value === '__all__' ? 'all' : wikiSlug.value }] : [],
   })
@@ -120,6 +127,7 @@ function openSource(source: YdChatCitation | YdChatRetrievalHit) {
 
 onMounted(() => perform(async () => {
   if (!account.isLogin || !account.userId) return
+  void workspaceRefs.load()
   await assistant.initialize(String(account.userId))
   // Agent 应用与知识库目录是可选增强：能力未启用或无权限时静默降级，不影响通用问答
   const [catalogResult, agentResult] = await Promise.allSettled([apiAgent.catalog({ skipGlobalToast: true }), apiAgent.available({ skipGlobalToast: true })])
@@ -150,6 +158,7 @@ onMounted(() => perform(async () => {
       :workspaces="workspaces"
       workspace-id="default"
       :approvals="assistant.conversationApprovals"
+      :files="canViewWorkspace ? workspaceRefs.files.value : []"
       :messages="assistant.conversationMessages"
       :harness="assistant.conversationHarness"
       :activities="assistant.conversationActivities"
@@ -163,6 +172,8 @@ onMounted(() => perform(async () => {
       @retry="message => retry(message)"
       @approval-decision="(id, approved) => assistant.activeRun && perform(() => assistant.respondInteraction(assistant.activeRun!.id, id, approved))"
       @attach="attach"
+      @file-toggle="(path, included) => workspaceRefs.toggle(path, included)"
+      @file-select="explorerOpen = true"
       @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
       @update:session-id="id => perform(() => assistant.selectSession(id))"
       @update:model-id="assistant.modelId = $event"
@@ -179,9 +190,13 @@ onMounted(() => perform(async () => {
         <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
       </template>
       <template #header-actions>
+        <YdButton v-if="canViewWorkspace" variant="outline" size="sm" @click="explorerOpen = true">
+          <YdIcon name="morph:folder-open" /> 我的工作区
+        </YdButton>
         <span v-if="assistant.quota" class="chat-page__quota">{{ assistant.quota.unlimited ? `今日已用 ${assistant.quota.usedTokens.toLocaleString()} tokens · 不限额` : `今日可用 ${assistant.quota.remainingTokens.toLocaleString()} tokens` }}</span>
       </template>
     </YdAgentWorkbench>
+    <WorkspaceExplorer v-if="canViewWorkspace" v-model="explorerOpen" :can-edit="canEditWorkspace" :attachments="conversationAttachments" @changed="workspaceRefs.load" />
     <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :confirm-button-disabled="!title.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: title.trim() }))">
       <YdInput v-model="title" aria-label="会话标题" :maxlength="100" />
     </YdModal>

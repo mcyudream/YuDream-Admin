@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import type { MenuRecordRaw } from '@fantastic-admin/types'
-import type { YdAgentSendRequest, YdAgentSession, YdAgentWorkspace, YdFilePickerInstance } from '@yudream/components'
-import type { ChatWorkspaceEntry } from '@/api/modules/chat-workspace'
+import type { YdAgentSendRequest, YdAgentSession, YdAgentWorkspace, YdChatAttachment } from '@yudream/components'
+import type { ChatWorkspaceConfig } from '@/api/modules/chat-workspace'
 import type { AiFrontendRoute, AiFrontendToolRequest } from '@/api/modules/platform-ai-runs'
-import { clearYdPersistentChatOwner, YdAgentWorkbench, YdAlert, YdButton, YdChatWindow, YdFilePicker, YdFloatBall, YdForm, YdFormItem, YdIcon, YdInput, YdModal, YdNumberField, YdSelect, YdSwitch, YdTooltip } from '@yudream/components'
+import { clearYdPersistentChatOwner, YdAgentWorkbench, YdAlert, YdButton, YdChatWindow, YdFloatBall, YdForm, YdFormItem, YdIcon, YdInput, YdModal, YdNumberField, YdSelect, YdSwitch, YdTooltip } from '@yudream/components'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiChatWorkspace from '@/api/modules/chat-workspace'
 import { fetchChatQuotaConfig, updateChatQuotaConfig } from '@/api/modules/platform-chat'
 import AiRunProgress from '@/components/AiRunProgress/index.vue'
+import WorkspaceExplorer from '@/components/WorkspaceExplorer/index.vue'
 import { useAiAssistantActions } from '@/composables/ai-assistant-actions'
+import { useWorkspaceReferences } from '@/composables/use-workspace-references'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
 import { useAiSystemRunsStore } from '@/store/modules/ai-system-runs'
 import { useTourStore } from '@/store/modules/tour'
@@ -66,6 +68,9 @@ const quotaConfigLoaded = ref(false)
 const quotaConfigSaving = ref(false)
 const quotaConfigError = ref('')
 const canConfigureQuota = computed(() => auth('platform:chat:quota:config'))
+/** 工作区全局设置（与每日预算同一权限）：每用户配额与 tmp/ 自动清理天数 */
+const workspaceConfig = ref<ChatWorkspaceConfig | null>(null)
+const workspaceConfigSaving = ref(false)
 /** 平台能力闸门：AI 能力未启用时入口与面板都不出现，也不发任何 AI 请求。 */
 const capabilityEnabled = computed(() => features.capabilityEnabled('ai'))
 const allowed = computed(() => account.isLogin && !!account.userId && capabilityEnabled.value && auth('platform:chat:use') && auth('platform:chat:session:view') && route.path !== '/setup')
@@ -175,7 +180,33 @@ watch([settingsOpen, canConfigureQuota], async ([visible, permitted]) => {
   catch (cause) {
     quotaConfigError.value = cause instanceof Error ? cause.message : '读取 AI 额度配置失败'
   }
+  try {
+    const config = await apiChatWorkspace.config()
+    if (owner === String(account.userId)) {
+      workspaceConfig.value = config
+    }
+  }
+  catch {
+    workspaceConfig.value = null
+  }
 })
+
+async function saveWorkspaceConfig() {
+  if (!workspaceConfig.value) {
+    return
+  }
+  workspaceConfigSaving.value = true
+  try {
+    workspaceConfig.value = await apiChatWorkspace.updateConfig(workspaceConfig.value)
+    useYdToast().success('工作区设置已保存')
+  }
+  catch {
+    // 错误已由全局提示展示
+  }
+  finally {
+    workspaceConfigSaving.value = false
+  }
+}
 
 async function saveQuotaConfig() {
   if (!canConfigureQuota.value || !quotaConfigLoaded.value) {
@@ -199,108 +230,28 @@ async function saveQuotaConfig() {
   }
 }
 
-/** 工作区：每用户一个默认工作区，助手会话都在其中读写。 */
+/** 工作区：每用户一个，元数据在数据库、内容在对象存储；面板用于把文件引用进对话，完整管理在文件管理器中。 */
 const workspaceOpen = panelFlag('workspace')
-const workspaceLoading = ref(false)
-const workspaceUploading = ref(false)
-const workspaceError = ref('')
-const workspaceEntries = ref<ChatWorkspaceEntry[]>([])
-const referencedPaths = ref<string[]>([])
-const uploadInput = ref<YdFilePickerInstance | null>(null)
-const workspaceFiles = computed(() => workspaceEntries.value.map(entry => ({ path: entry.path, included: referencedPaths.value.includes(entry.path) })))
+const explorerOpen = ref(false)
+const {
+  loading: workspaceLoading,
+  error: workspaceError,
+  referenced: referencedPaths,
+  fileEntries: workspaceFileEntries,
+  files: workspaceFiles,
+  load: loadWorkspace,
+  toggle: toggleReference,
+  compose: composeWithReferences,
+} = useWorkspaceReferences(() => allowed.value)
+/** 当前对话中出现过的附件：可在文件管理器里另存到工作区 */
+const conversationAttachments = computed<YdChatAttachment[]>(() => assistant.conversationMessages.flatMap(message => message.attachments ?? []))
 
-async function loadWorkspace() {
-  if (!allowed.value) {
-    return
-  }
-  workspaceLoading.value = true
-  workspaceError.value = ''
-  try {
-    workspaceEntries.value = (await apiChatWorkspace.list()).data
-  }
-  catch (cause) {
-    workspaceError.value = cause instanceof Error ? cause.message : '读取工作区失败'
-  }
-  finally {
-    workspaceLoading.value = false
-  }
-}
-
-watch(workspaceOpen, (visible) => {
-  if (visible) {
+// 抽屉打开即加载文件清单：输入框 @ 提及与上下文面板都依赖它；引用保留到消息发出
+watch([show, workspaceOpen, canViewWorkspace], ([visible, panelOpen, permitted]) => {
+  if ((visible || panelOpen) && permitted) {
     void loadWorkspace()
   }
-  else {
-    referencedPaths.value = []
-  }
 })
-
-function toggleReference(path: string, included: boolean) {
-  referencedPaths.value = included ? [...new Set([...referencedPaths.value, path])] : referencedPaths.value.filter(item => item !== path)
-}
-
-function pickUpload() {
-  uploadInput.value?.open()
-}
-
-async function onUpload(files: File[]) {
-  const file = files[0]
-  uploadInput.value?.reset()
-  if (!file) {
-    return
-  }
-  workspaceUploading.value = true
-  workspaceError.value = ''
-  try {
-    await apiChatWorkspace.upload(file.name, file)
-    useYdToast().success(`已上传到工作区：${file.name}`)
-    await loadWorkspace()
-  }
-  catch (cause) {
-    workspaceError.value = cause instanceof Error ? cause.message : '上传工作区文件失败'
-  }
-  finally {
-    workspaceUploading.value = false
-  }
-}
-
-async function removeWorkspaceFile(entry: ChatWorkspaceEntry) {
-  workspaceError.value = ''
-  try {
-    await apiChatWorkspace.remove(entry.path)
-    useYdToast().success(`已删除：${entry.path}`)
-    referencedPaths.value = referencedPaths.value.filter(item => item !== entry.path)
-    await loadWorkspace()
-  }
-  catch (cause) {
-    workspaceError.value = cause instanceof Error ? cause.message : '删除工作区文件失败'
-  }
-}
-
-/** 引用文件：小文本内联进本轮提示，其余交给助手的只读工作区工具自行读取。 */
-async function composeWithReferences(text: string) {
-  const paths = [...referencedPaths.value]
-  referencedPaths.value = []
-  if (!paths.length) {
-    return text
-  }
-  const blocks: string[] = []
-  for (const path of paths) {
-    try {
-      const response = await apiChatWorkspace.read(path)
-      if (response.data.encoding === 'text' && response.data.content.length <= 32000) {
-        blocks.push(`【工作区文件 ${path}】\n${response.data.content}`)
-      }
-      else {
-        blocks.push(`【工作区文件 ${path}】文件较大，请用工作区读取工具自行查看`)
-      }
-    }
-    catch {
-      blocks.push(`【工作区文件 ${path}】读取失败，如需要请在对话中说明`)
-    }
-  }
-  return `${blocks.join('\n\n')}\n\n${text}`
-}
 
 function formatSize(size: number) {
   const value = Number(size || 0)
@@ -487,7 +438,7 @@ async function playTour(tourCode?: string) {
     >
       <template #head-actions>
         <YdTooltip v-if="canViewWorkspace" text="我的工作区">
-          <YdButton variant="ghost" size="icon-sm" :aria-pressed="panel === 'workspace'" :aria-label="`我的工作区（${workspaceEntries.length} 个文件）`" @click="togglePanel('workspace')">
+          <YdButton variant="ghost" size="icon-sm" :aria-pressed="panel === 'workspace'" :aria-label="`我的工作区（${workspaceFileEntries.length} 个文件）`" @click="togglePanel('workspace')">
             <YdIcon name="morph:folder-open" />
           </YdButton>
         </YdTooltip>
@@ -566,38 +517,35 @@ async function playTour(tourCode?: string) {
         <div class="yd-global-ai-panel__body">
           <div v-if="panel === 'workspace'" class="yd-global-ai-workspace">
             <p class="yd-global-ai-setting-note">
-              每个账号默认拥有一个工作区：所有对话都在其中，上传的文件也能被助手按你的授权读取。文件仅你自己可见。
+              每个账号有一个工作区，文件仅你自己可见。在这里把文件引用进下一条消息；规划/编码模式下助手可按你的权限读写其中的文件。
             </p>
             <div class="yd-global-ai-workspace__bar">
+              <YdButton size="sm" @click="explorerOpen = true">
+                <YdIcon name="morph:folder-open" /> 打开文件管理器
+              </YdButton>
               <YdButton size="sm" variant="outline" :loading="workspaceLoading" @click="loadWorkspace">
                 <YdIcon name="morph:refresh-cw" /> 刷新
-              </YdButton>
-              <YdButton v-if="canEditWorkspace" size="sm" :loading="workspaceUploading" @click="pickUpload">
-                <YdIcon name="morph:upload" /> 上传文件
               </YdButton>
             </div>
             <YdAlert v-if="workspaceError" variant="destructive" :title="workspaceError" />
             <p v-if="referencedPaths.length" class="yd-global-ai-setting-note">
               已引用 {{ referencedPaths.length }} 个文件，将在下一条消息中一并发送。
             </p>
-            <ul v-if="workspaceEntries.length" class="yd-global-ai-files">
-              <li v-for="entry in workspaceEntries" :key="entry.path" class="yd-global-ai-files__item">
+            <ul v-if="workspaceFileEntries.length" class="yd-global-ai-files">
+              <li v-for="entry in workspaceFileEntries" :key="entry.path" class="yd-global-ai-files__item">
                 <span class="yd-global-ai-files__meta">
                   <span class="yd-global-ai-files__name">{{ entry.path }}</span>
-                  <span class="yd-global-ai-files__size">{{ formatSize(entry.size) }}</span>
+                  <span class="yd-global-ai-files__size">{{ formatSize(entry.size) }}{{ entry.updatedBy === 'AI' ? ' · AI 修改' : '' }}</span>
                 </span>
                 <span class="yd-global-ai-files__actions">
                   <YdButton size="sm" :variant="referencedPaths.includes(entry.path) ? 'default' : 'outline'" @click="toggleReference(entry.path, !referencedPaths.includes(entry.path))">
                     {{ referencedPaths.includes(entry.path) ? '取消引用' : '引用' }}
                   </YdButton>
-                  <YdButton v-if="canEditWorkspace" size="sm" variant="destructive" @click="removeWorkspaceFile(entry)">
-                    删除
-                  </YdButton>
                 </span>
               </li>
             </ul>
             <p v-else-if="!workspaceLoading" class="yd-global-ai-setting-note">
-              工作区还是空的，先上传一个文件吧。
+              工作区还没有文件，打开文件管理器新建或上传。
             </p>
           </div>
           <div v-else-if="panel === 'tasks'">
@@ -643,6 +591,20 @@ async function playTour(tourCode?: string) {
                 </YdButton>
               </YdForm>
             </section>
+            <section v-if="canConfigureQuota && workspaceConfig" aria-label="用户工作区设置" class="yd-global-ai-settings-section">
+              <h3>用户工作区</h3>
+              <YdForm :model="workspaceConfig" layout="vertical">
+                <YdFormItem label="每用户空间配额（MB）" description="按文件全部历史版本与回收站内容计算；管理员不限。">
+                  <YdNumberField :model-value="workspaceConfig.quotaMb" :min="1" :step="100" :disabled="workspaceConfigSaving" @update:model-value="value => { if (value !== undefined && workspaceConfig) workspaceConfig.quotaMb = value }" />
+                </YdFormItem>
+                <YdFormItem label="tmp/ 自动清理（天）" description="tmp/ 目录中超过该天数未修改的文件每天凌晨永久删除；回收站固定保留 30 天。">
+                  <YdNumberField :model-value="workspaceConfig.tmpRetentionDays" :min="1" :max="365" :disabled="workspaceConfigSaving" @update:model-value="value => { if (value !== undefined && workspaceConfig) workspaceConfig.tmpRetentionDays = value }" />
+                </YdFormItem>
+                <YdButton :loading="workspaceConfigSaving" @click="saveWorkspaceConfig">
+                  保存工作区设置
+                </YdButton>
+              </YdForm>
+            </section>
             <QuotaReconciliation v-if="settingsOpen" />
             <p class="yd-global-ai-setting-note">
               偏好按当前账号保存在此浏览器。普通助手没有宿主文件系统、Shell 或编码权限。
@@ -650,10 +612,8 @@ async function playTour(tourCode?: string) {
           </div>
         </div>
       </section>
-      <YdFilePicker ref="uploadInput" label="选择工作区文件" class="hidden" @select="onUpload">
-        <template #default />
-      </YdFilePicker>
     </YdChatWindow>
+    <WorkspaceExplorer v-if="canViewWorkspace" v-model="explorerOpen" :can-edit="canEditWorkspace" :attachments="conversationAttachments" @changed="loadWorkspace" />
     <YdModal v-model="renameOpen" title="重命名会话" show-cancel-button :z-index="2200" :confirm-button-disabled="!renameTitle.trim()" @confirm="targetSession && perform(() => assistant.updateSession(targetSession!.id, { title: renameTitle.trim() }))">
       <YdInput v-model="renameTitle" aria-label="会话标题" :maxlength="100" />
     </YdModal>
