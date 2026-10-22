@@ -1,4 +1,5 @@
 import type { ApiResponse } from './system-client'
+import type { ChatToolOptions } from '@/utils/ai-tool-selection'
 import { normalizeAiQuota, normalizeAiQuotaConfig, normalizeAiQuotaReservations, parseAiTokenCount } from '@/utils/ai-quota'
 import systemClient from './system-client'
 
@@ -108,6 +109,10 @@ export interface ChatQuota {
 export interface ChatSendPayload {
   /** 工作区模式：ask 问答、plan 只读规划、code 可写工作区（写入需逐次确认） */
   mode?: 'ask' | 'plan' | 'code'
+  /** 本条消息启用的工具模块（系统模块或 mcp:<服务>） */
+  toolModules?: string[]
+  /** 本条消息可用的技能；不传表示不限制 */
+  skillCodes?: string[]
   sessionId?: string
   scopeType?: ChatScopeType
   agentCode?: string
@@ -119,6 +124,8 @@ export interface ChatSendPayload {
   attachments?: ChatAttachment[]
 }
 
+/** 输入框可勾选的工具模块与技能（按当前用户权限与开关过滤） */
+export const fetchChatToolOptions = () => systemClient.get<unknown, ApiResponse<ChatToolOptions>>('api/platform/chat/tool-options', { skipGlobalToast: true })
 export const listChatSessions = () => systemClient.get<unknown, ApiResponse<ChatSession[]>>('api/platform/chat/sessions', { skipGlobalToast: true })
 export const createChatSession = (data: Partial<ChatSession>) => systemClient.post<unknown, ApiResponse<ChatSession>>('api/platform/chat/sessions', data)
 export const updateChatSession = (id: string, data: Partial<ChatSession>) => systemClient.patch<unknown, ApiResponse<ChatSession>>(`api/platform/chat/sessions/${id}`, data)

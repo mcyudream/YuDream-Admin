@@ -49,6 +49,7 @@ public class ChatController {
     private final ChatQuotaAppService quotaService;
     private final ChatAttachmentAppService attachmentService;
     private final ChatStreamSupport streamSupport;
+    private final online.yudream.base.application.platform.chat.service.ChatToolOptionAppService toolOptions;
 
     @GetMapping("/sessions")
     @PermissionRegister(code = "platform:chat:session:view", name = "查看 AI 助手会话", module = "平台能力", desc = "查看当前用户的 AI 助手会话列表")
@@ -84,6 +85,13 @@ public class ChatController {
     public Result<List<ChatMessageRes>> messages(@PathVariable Long id) {
         Long userId = SecurityPrincipalSupport.current().userId();
         return Result.ok(sessionService.messages(userId, id).stream().map(ChatWebAssembler::message).toList());
+    }
+
+    /** 输入框可勾选的工具模块（系统/MCP）与技能：按当前用户权限与开关过滤 */
+    @GetMapping("/tool-options")
+    @PermissionRegister(code = "platform:chat:use", name = "运行 AI 助手", module = "平台能力", desc = "创建可恢复的后台 AI 助手运行")
+    public Result<online.yudream.base.interfaces.platform.chat.res.ChatToolOptionsRes> toolOptions() {
+        return Result.ok(ChatWebAssembler.toolOptions(toolOptions.options(SecurityPrincipalSupport.current().permissions())));
     }
 
     @PostMapping("/sessions/{id}/runs")

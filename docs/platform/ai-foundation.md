@@ -25,6 +25,7 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 - **端点** `/api/platform/chat/workspace`：总览、预览（文本 2 MB 内）、下载（一律附件 + nosniff）、保存文本、上传到目录、新建目录、移动、删除、回收站（列表/恢复/彻底删除/清空）、历史版本（列表/恢复）、附件另存（经 `FileAppService` 校验调用者可读）、设置。查看需 `platform:chat:workspace:view`，修改需 `platform:chat:workspace:edit`。
 - **界面**：AI 助手抽屉的工作区面板（引用文件进下一条消息）与对话页「我的工作区」按钮都打开同一文件管理器 `WorkspaceExplorer`：目录树、文本编辑（Ctrl/⌘+S）、图片预览、上传、移动改名、删除、历史版本、回收站、对话附件另存到当前目录；AI 写入的条目标「AI」。
 - **模型工具**（`ChatWorkspaceTools`，经 `WorkspaceAccess` 只见 root 内条目，变更记为 AI）：`workspace.list`（可按目录）/ `workspace.read`（超 60000 字符截断，二进制或超 2 MB 只返回元信息）随查看权限装配；工作区模式 `code` 额外装配 `workspace.write` / `workspace.move` / `workspace.delete`（风险 WRITE，每次经原生确认卡；写入单文件 1 MB；删除进回收站）。模式（发送请求 `mode`，缺省 `ask`）：`plan` 只读 + 规划提示；`code` 需 `platform:chat:workspace:edit`，无权限启动即拒绝；提示词由 `ChatRunAppService.modePrompt` 维护。
+- **Agent 应用的工作区范围**：应用设置 `workspaceScope`（`SHARED` 默认 / `SCOPED`）。AGENT 会话中 `ChatRunAppService` 按应用范围给工作区工具定 root（SCOPED → `apps/<code>/`，AI 看不到其他文件）；工作流模型节点打开自己的工具作用域时会继承调用方的 `workspace.*` 工具（`AgentLlmNodeHandler.withCallerWorkspaceTools`，仅允许工具的节点），其他调用方工具不继承。每个用户仍只有一个工作区。
 - **与其他存储的边界**：聊天附件走 S3 + `sysFileObject`（随消息传给模型），可在文件管理器另存进工作区；Harness 的长期记忆、技能与会话日志仍在 `platformAgentWorkspace` KV（小而高频），不属于用户工作区。
 
 ## 工具模块与按需加载
@@ -34,6 +35,7 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 - **总开关 + 模块开关**：`platformAiToolSettings`（单文档）保存全局总开关与逐模块开关，默认全开；生效值 = 部署配置 `yudream.platform.agent.system-tools-enabled` **且** 持久总开关。`meta`（工具目录）不可关闭。
 - **闸门落在所有装配点**，缺一即越权：Harness 装配（`HarnessAgentRuntime.toolkit`，关闭模块的工具不注册）、工作流解析（`AgentToolExecutor.resolve`，`ensureToolAvailable`）、模型可见性（`PerCallToolFilterMiddleware` 同时校验加载状态）、管理端列表与发布校验（`AgentAppService` 的候选/授权并集）。工具页只展示开关，不绕过任何一层。
 - **按需加载（默认）**：`yudream.platform.agent.tool-loading=on-demand` 时，只有**常驻模块**的工具直接进入模型视野，其余模块由元工具 `load_tools` 加载后才可见：不带参数返回模块目录，带 `module` 返回该模块工具清单并标记加载。加载只改变 schema 可见性，**不授予权限**（执行层仍按权限快照与模块开关 fail-closed 复核）。`load_tools` 只注册在 Harness 路径的全局工具集上；调用方显式授权的 scoped 工具集（CMS 画布、前端工具、插件触发会话）与审批/恢复续跑不做按需过滤，避免把已授权工具或待确认调用挡在门外。`eager` 模式恢复旧行为（全部可见、不注册元工具）。
+- **对话中按需启用工具与技能**：通用对话默认不装配全局工具；输入框旁的「工具」选择（`GET /api/platform/chat/tool-options`，`platform:chat:use`）只列出可脱离页面/插件上下文的模块（`web`、`wiki`、`general` 与已启用的 `mcp:*`），且需「系统工具模块」能力启用、总开关与模块开关打开、调用者至少拥有其中一个工具的权限。发送请求 `toolModules` 由 `AiToolModuleAppService.chatModuleTools` 按同样条件装配为本次运行的 scoped 工具（执行层照旧复核）。技能默认全部可用；请求带 `skillCodes` 时由 `AiSkillSelectionScope` 在运行线程上限定，Harness 装配时改挂 `MongoAgentSkillRepository.selected(...)` 只读视图。选择按账号保存在浏览器（`yd.aiAssistant.tools.<uid>`）。
 - 按需模式在系统提示词末尾追加模块协议说明（`PerCallSystemPromptMiddleware`），模型不知道 `load_tools` 时会先看到模块目录提示，而不是臆造工具名。
 
 ### 管理端工具目录与工具测试

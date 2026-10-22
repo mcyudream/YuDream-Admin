@@ -245,6 +245,16 @@ public class ChatAppService {
     }
 
     private ChatDispatchResult dispatch(ChatSendCmd cmd, ChatScopeType scopeType, ChatDispatchContext context) {
+        // 用户在对话中选择了技能时，Harness 只挂载所选技能
+        if (cmd.getSkillCodes() != null) {
+            try (var ignored = online.yudream.base.domain.platform.ai.service.AiSkillSelectionScope.open(java.util.Set.copyOf(cmd.getSkillCodes()))) {
+                return dispatchWithTools(cmd, scopeType, context);
+            }
+        }
+        return dispatchWithTools(cmd, scopeType, context);
+    }
+
+    private ChatDispatchResult dispatchWithTools(ChatSendCmd cmd, ChatScopeType scopeType, ChatDispatchContext context) {
         if (cmd.getScopedTools() == null) return dispatcher(scopeType).dispatch(context);
         try (var ignored = online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(cmd.getScopedTools(), context.userId())) {
             return dispatcher(scopeType).dispatch(context);

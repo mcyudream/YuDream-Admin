@@ -8,6 +8,7 @@ import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentApplicationStatus;
+import online.yudream.base.domain.platform.agent.enumerate.AgentWorkspaceScope;
 
 import java.util.List;
 
@@ -27,6 +28,8 @@ public class AgentApplication extends BaseDomain {
     private List<String> toolCodes;
     private AgentApplicationStatus status;
     private String sourcePluginCode;
+    /** 用户工作区可见范围，缺省共享整个工作区 */
+    private AgentWorkspaceScope workspaceScope;
 
     public static AgentApplication create(String name, String code) {
         AgentApplication application = new AgentApplication();
@@ -73,6 +76,14 @@ public class AgentApplication extends BaseDomain {
         this.workflowJson = required(workflowJson, "请先完成 Agent 工作流编排");
         this.toolCodes = toolCodes == null ? List.of() : toolCodes.stream().filter(value -> value != null && !value.isBlank()).distinct().toList();
         this.status = status == null ? AgentApplicationStatus.DRAFT : status;
+    }
+
+    public void useWorkspaceScope(AgentWorkspaceScope scope) {
+        workspaceScope = scope == null ? AgentWorkspaceScope.SHARED : scope;
+    }
+
+    public AgentWorkspaceScope workspaceScopeOrDefault() {
+        return workspaceScope == null ? AgentWorkspaceScope.SHARED : workspaceScope;
     }
 
     public void publish() {

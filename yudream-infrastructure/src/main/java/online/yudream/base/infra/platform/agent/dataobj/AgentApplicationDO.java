@@ -23,4 +23,5 @@ public class AgentApplicationDO extends BaseDO {
     private List<String> toolCodes;
     private AgentApplicationStatus status;
     private String sourcePluginCode;
+    private online.yudream.base.domain.platform.agent.enumerate.AgentWorkspaceScope workspaceScope;
 }

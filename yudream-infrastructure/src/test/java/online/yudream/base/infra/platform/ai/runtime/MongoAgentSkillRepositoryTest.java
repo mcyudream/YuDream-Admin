@@ -42,6 +42,30 @@ class MongoAgentSkillRepositoryTest extends MongoStoreTestBase {
     }
 
     @Test
+    void selectedViewOnlyExposesChosenEnabledSkillsAndIsReadOnly() {
+        long id = 1;
+        for (String name : List.of("code-reviewer", "translator", "summarizer")) {
+            AgentSkillDO doc = new AgentSkillDO();
+            doc.setId(id++);
+            doc.setName(name);
+            doc.setDescription(name);
+            doc.setContent("# " + name);
+            doc.setEnabled(true);
+            mongo.save(doc);
+        }
+        var view = repository.selected(java.util.Set.of("translator", "summarizer", "missing"));
+        assertEquals(java.util.Set.of("translator", "summarizer"), java.util.Set.copyOf(view.getAllSkillNames()));
+        assertEquals(2, view.getAllSkills().size());
+        assertNull(view.getSkill("code-reviewer"));
+        assertNotNull(view.getSkill("translator"));
+        assertFalse(view.skillExists("code-reviewer"));
+        assertFalse(view.isWriteable());
+        assertFalse(view.delete("translator"));
+        assertTrue(repository.skillExists("translator"));
+        assertTrue(repository.selected(java.util.Set.of()).getAllSkills().isEmpty());
+    }
+
+    @Test
     void disabledSkillsAreInvisible() {
         repository.save(List.of(AgentSkill.builder()
                 .name("draft-skill")

@@ -109,6 +109,15 @@ function groupSourceText(group: AgentToolPickerGroup) {
       </section>
 
       <section class="form-section">
+        <h3>用户工作区</h3>
+        <div class="form-field">
+          <span id="agent-workspace-scope">AI 可见范围</span>
+          <YdSegmented :model-value="form.workspaceScope || 'SHARED'" :options="[{ label: '共享整个工作区', value: 'SHARED' }, { label: '仅本应用目录', value: 'SCOPED' }]" aria-labelledby="agent-workspace-scope" @update:model-value="emit('updateField', 'workspaceScope', $event)" />
+          <small>{{ form.workspaceScope === 'SCOPED' ? `模型节点只能读写使用者工作区中的 apps/${form.code || '<应用编码>'}/ 目录，看不到其他文件。` : '模型节点可读写使用者的整个工作区（仍受其工作区权限与编码模式逐次确认约束）。' }}</small>
+        </div>
+      </section>
+
+      <section class="form-section">
         <div class="section-title">
           <h3>应用授权摘要</h3>
           <span>{{ authorizedCount }} 项派生授权 · {{ moduleCount }} 个模块</span>

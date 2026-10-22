@@ -499,6 +499,73 @@ public class AiToolModuleAppService {
                 AiToolModules.LOAD_TOOLS, metas, entries, moduleToolNames, disabledModules);
     }
 
+    // ------------------------------------------------------------------ 对话中按需选择的工具
+
+    /** 对话可选的系统模块：需要页面或插件上下文的模块（界面、工作区、画布、插件、Python）不在此列 */
+    private static final Set<String> CHAT_SELECTABLE_PLATFORM_MODULES = Set.of(
+            AiToolModules.MODULE_WEB, AiToolModules.MODULE_WIKI, AiToolModules.MODULE_GENERAL);
+
+    /**
+     * 当前用户在对话中可以勾选的工具模块：系统工具模块能力启用、总开关与模块开关打开，
+     * 且调用者至少拥有其中一个工具的权限。能力未启用时返回空，不报错。
+     */
+    public List<online.yudream.base.application.platform.ai.dto.ChatToolOptionDTO> chatToolOptions(java.util.Collection<String> permissionCodes) {
+        if (capabilityAppService != null && !capabilityAppService.enabled("agent") || !systemToolsEnabled()) {
+            return List.of();
+        }
+        Map<String, List<AiAgentTool>> byModule = chatToolsByModule(permissionCodes);
+        Map<String, McpServer> servers = new LinkedHashMap<>();
+        mcpServerRepo.findAll().forEach(server -> servers.put(AiToolModules.mcpModuleName(server.getCode()), server));
+        List<online.yudream.base.application.platform.ai.dto.ChatToolOptionDTO> options = new ArrayList<>();
+        byModule.forEach((code, tools) -> {
+            AiToolModules.ModuleMeta meta = servers.containsKey(code)
+                    ? AiToolModules.mcpModule(servers.get(code).getCode(), servers.get(code).getName(), servers.get(code).getDescription(), false)
+                    : AiToolModules.platformModule(code);
+            options.add(new online.yudream.base.application.platform.ai.dto.ChatToolOptionDTO(code, meta.name(), meta.description(), meta.icon(),
+                    AiToolModules.mcpModuleCode(code) ? "mcp" : "system",
+                    tools.stream().map(tool -> displayName(tool.descriptor())).toList()));
+        });
+        return options;
+    }
+
+    /** 所选模块中调用者有权使用的工具（执行时仍按权限快照与模块开关复核） */
+    public List<AiAgentTool> chatModuleTools(java.util.Collection<String> moduleCodes, java.util.Collection<String> permissionCodes) {
+        if (moduleCodes == null || moduleCodes.isEmpty() || capabilityAppService != null && !capabilityAppService.enabled("agent") || !systemToolsEnabled()) {
+            return List.of();
+        }
+        Set<String> wanted = Set.copyOf(moduleCodes);
+        return chatToolsByModule(permissionCodes).entrySet().stream()
+                .filter(entry -> wanted.contains(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
+                .toList();
+    }
+
+    private Map<String, List<AiAgentTool>> chatToolsByModule(java.util.Collection<String> permissionCodes) {
+        Set<String> granted = permissionCodes == null ? Set.of() : Set.copyOf(permissionCodes);
+        AiToolSettings settings = settings();
+        Map<String, List<AiAgentTool>> byModule = new LinkedHashMap<>();
+        java.util.function.Consumer<AiAgentTool> add = tool -> {
+            if (tool == null || tool.descriptor() == null || tool.descriptor().name() == null) {
+                return;
+            }
+            String module = moduleCodeOf(tool);
+            boolean selectable = CHAT_SELECTABLE_PLATFORM_MODULES.contains(module) || AiToolModules.mcpModuleCode(module);
+            String permission = tool.descriptor().permissionCode();
+            boolean permitted = permission == null || permission.isBlank() || granted.contains("*") || granted.contains(permission);
+            if (selectable && permitted && settings.isModuleEnabled(module)) {
+                byModule.computeIfAbsent(module, ignored -> new ArrayList<>()).add(tool);
+            }
+        };
+        for (AiAgentTool tool : systemTools) {
+            add.accept(tool);
+        }
+        McpAgentToolProvider provider = mcpTools == null ? null : mcpTools.getIfAvailable();
+        if (provider != null) {
+            provider.tools().forEach(add);
+        }
+        return byModule;
+    }
+
     /** 模块闸门：关闭的模块（含总开关）不允许被应用引用或模型调用。 */
     public void ensureToolAvailable(AiAgentTool tool) {
         if (tool == null || tool.descriptor() == null) {

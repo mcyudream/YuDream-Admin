@@ -22,6 +22,10 @@ public class ChatSendRequest {
     private String modelCode;
     /** 工作区模式：ask 问答（默认）、plan 只读规划、code 可写工作区（写入需逐次确认） */
     private String mode;
+    /** 本条消息启用的工具模块（系统模块或 mcp:<服务>），缺省不启用 */
+    private List<String> toolModules;
+    /** 本条消息可用的技能名；null 表示不限制（全部已启用技能） */
+    private List<String> skillCodes;
     @Valid
     @Size(max = 10, message = "上下文不能超过 10 个")
     private List<ChatContextRefRequest> contextRefs = List.of();

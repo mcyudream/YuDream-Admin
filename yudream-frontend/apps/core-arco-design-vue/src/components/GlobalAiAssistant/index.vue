@@ -8,6 +8,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiChatWorkspace from '@/api/modules/chat-workspace'
 import { fetchChatQuotaConfig, updateChatQuotaConfig } from '@/api/modules/platform-chat'
 import AiRunProgress from '@/components/AiRunProgress/index.vue'
+import AiToolPicker from '@/components/AiToolPicker/index.vue'
 import WorkspaceExplorer from '@/components/WorkspaceExplorer/index.vue'
 import { useAiAssistantActions } from '@/composables/ai-assistant-actions'
 import { useWorkspaceReferences } from '@/composables/use-workspace-references'
@@ -471,6 +472,7 @@ async function playTour(tourCode?: string) {
           :approvals="assistant.conversationApprovals"
           :available-modes="workspaceModes"
           :files="canViewWorkspace ? workspaceFiles : []"
+          :skills="assistant.skills"
           :workspaces="workspaceDescriptor"
           workspace-id="default"
           :disabled="assistant.loading || !canEdit && !assistant.conversationSessionId"
@@ -480,6 +482,7 @@ async function playTour(tourCode?: string) {
           @stop="perform(assistant.stop)"
           @retry="message => { const text = assistant.retryText(message); if (text) send({ text, attachments: [], mode, skillCodes: [], contextPaths: [] }) }"
           @file-toggle="(path, included) => toggleReference(path, included)"
+          @skill-toggle="(code, enabled) => assistant.setSkillEnabled(code, enabled)"
           @file-select="() => { workspaceOpen = true }"
           @update:session-id="id => perform(() => assistant.selectSession(id))"
           @update:model-id="assistant.modelId = $event"
@@ -489,6 +492,9 @@ async function playTour(tourCode?: string) {
           @session-remove="remove"
           @approval-decision="(id, approved) => assistant.activeRun && perform(() => assistant.respondInteraction(assistant.activeRun!.id, id, approved))"
         >
+          <template #sender-actions>
+            <AiToolPicker :disabled="assistant.busy" />
+          </template>
           <template #header-actions>
             <YdTooltip :text="`当前页面：${currentPageTitle}（助手按需感知页面名称与已注册操作）`">
               <span class="yd-global-ai-page">

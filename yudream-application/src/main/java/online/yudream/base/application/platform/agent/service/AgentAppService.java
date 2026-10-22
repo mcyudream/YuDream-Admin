@@ -177,6 +177,10 @@ public class AgentAppService {
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
                 workflow.workflowJson(), toolCodes, savedStatus(application, creating)
         );
+        // 未携带范围的旧客户端保存不改动已有设置
+        if (cmd.getWorkspaceScope() != null) {
+            application.useWorkspaceScope(online.yudream.base.domain.platform.agent.enumerate.AgentWorkspaceScope.of(cmd.getWorkspaceScope()));
+        }
         return AgentAssembler.toDTO(applicationRepo.save(application));
     }
 

@@ -5,6 +5,7 @@ import type { AgentApplication, AgentCatalog } from '@/api/modules/platform-agen
 import type { ChatScopeType } from '@/api/modules/platform-chat'
 import apiAgent from '@/api/modules/platform-agent'
 import { uploadChatAttachment } from '@/api/modules/platform-chat'
+import AiToolPicker from '@/components/AiToolPicker/index.vue'
 import WorkspaceExplorer from '@/components/WorkspaceExplorer/index.vue'
 import { useWorkspaceReferences } from '@/composables/use-workspace-references'
 import { useAiAssistantStore } from '@/store/modules/ai-assistant'
@@ -159,6 +160,7 @@ onMounted(() => perform(async () => {
       workspace-id="default"
       :approvals="assistant.conversationApprovals"
       :files="canViewWorkspace ? workspaceRefs.files.value : []"
+      :skills="assistant.skills"
       :messages="assistant.conversationMessages"
       :harness="assistant.conversationHarness"
       :activities="assistant.conversationActivities"
@@ -173,6 +175,7 @@ onMounted(() => perform(async () => {
       @approval-decision="(id, approved) => assistant.activeRun && perform(() => assistant.respondInteraction(assistant.activeRun!.id, id, approved))"
       @attach="attach"
       @file-toggle="(path, included) => workspaceRefs.toggle(path, included)"
+      @skill-toggle="(code, enabled) => assistant.setSkillEnabled(code, enabled)"
       @file-select="explorerOpen = true"
       @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
       @update:session-id="id => perform(() => assistant.selectSession(id))"
@@ -186,6 +189,7 @@ onMounted(() => perform(async () => {
     >
       <template #sender-actions>
         <YdSelect v-model="scope" :disabled="assistant.busy" aria-label="助手范围" :options="scopeOptions" />
+        <AiToolPicker v-if="scope === 'GENERAL'" :disabled="assistant.busy" />
         <YdSelect v-if="scope === 'AGENT'" v-model="selectedAgent" :disabled="assistant.busy" aria-label="Agent 应用" :options="agents.map(item => ({ label: item.name, value: item.code }))" />
         <YdSelect v-if="auth('platform:wiki:view')" v-model="wikiSlug" :disabled="assistant.busy" aria-label="知识库上下文" :options="[{ label: '不引用知识库', value: '' }, { label: '全部知识库', value: '__all__' }, ...(catalog?.knowledgeSpaces || []).map(item => ({ label: item.name, value: item.slug }))]" />
       </template>

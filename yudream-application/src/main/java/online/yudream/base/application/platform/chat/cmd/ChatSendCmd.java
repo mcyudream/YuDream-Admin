@@ -19,6 +19,10 @@ public class ChatSendCmd {
     private String frontendContextPrompt = "";
     /** 工作区模式：ask（默认）/ plan（只读规划）/ code（可写工作区） */
     private String mode;
+    /** 用户为本条消息启用的工具模块（系统模块或 mcp:<服务>） */
+    private List<String> toolModules = List.of();
+    /** 本条消息可用的技能名；null 表示不限制 */
+    private List<String> skillCodes;
     /** 按模式附加给模型的工作说明（服务端生成，不来自请求） */
     private String modePrompt = "";
     private Long sessionId;

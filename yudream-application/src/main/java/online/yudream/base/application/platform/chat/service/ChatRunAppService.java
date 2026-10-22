@@ -21,6 +21,8 @@ public class ChatRunAppService {
     private final HarnessAgentGateway harness;
     private final ObjectMapper json;
     private final online.yudream.base.application.platform.workspace.service.WorkspaceAppService workspaces;
+    private final online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo agentApplications;
+    private final online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
     private final online.yudream.base.application.platform.ai.service.CmsStudioClientTools studioTools;
 
     public AiRunDTO start(Long userId, ChatSendCmd cmd) {
@@ -60,7 +62,7 @@ public class ChatRunAppService {
             if (cmd.getFrontendContext() != null) emitter.privateFrontendContext(cmd.getFrontendContext());
         }
         // 用户工作区只读工具：按调用方权限快照装配，每用户默认工作区随账号存在，不需要额外开关。
-        var workspace = hasPermission(cmd, ChatWorkspaceTools.PERMISSION_CODE) ? workspaces.access(userId, "") : null;
+        var workspace = hasPermission(cmd, ChatWorkspaceTools.PERMISSION_CODE) ? workspaces.access(userId, workspaceRoot(cmd)) : null;
         scoped.addAll(ChatWorkspaceTools.create(workspace));
         // 工作区模式：规划只读、编码额外提供写入/删除（写入风险工具，每次调用需用户确认）
         String mode = workspaceMode(cmd);
@@ -71,6 +73,10 @@ public class ChatRunAppService {
             scoped.addAll(ChatWorkspaceTools.createEditable(workspace));
         }
         cmd.setModePrompt(modePrompt(mode));
+        // 通用对话中用户勾选的工具模块（网页、知识库、MCP 服务…）：按调用者权限与模块开关装配，执行时再复核
+        if (cmd.getScopeType() == ChatScopeType.GENERAL && cmd.getToolModules() != null && !cmd.getToolModules().isEmpty()) {
+            scoped.addAll(toolModules.chatModuleTools(cmd.getToolModules(), cmd.getPermissionCodes()));
+        }
         // CMS 画布 agent：客户端工具在浏览器 GrapesJS 上真实执行，结果经本次运行的前端工具通道回流。
         if ("cms-canvas".equals(agentCode(cmd))) {
             scoped.addAll(online.yudream.base.application.platform.ai.service.CmsCanvasClientTools.bind(
@@ -91,6 +97,16 @@ public class ChatRunAppService {
                     + "元数据不授予工具权限，仅调用本轮实际提供的定位工具；不要点击或提交表单。\n"
                     + json.writeValueAsString(metadata));
         } catch (Exception error) { throw new BizException("页面上下文格式无效"); }
+    }
+
+    /** Agent 应用会话按应用的工作区范围限定 AI 视野（SCOPED → apps/<code>/），其他会话可见整个工作区 */
+    private String workspaceRoot(ChatSendCmd cmd) {
+        if (cmd.getScopeType() != ChatScopeType.AGENT || cmd.getAgentCode() == null || cmd.getAgentCode().isBlank()) {
+            return "";
+        }
+        return agentApplications.findByCode(cmd.getAgentCode())
+                .map(application -> application.workspaceScopeOrDefault().root(application.getCode()))
+                .orElse("");
     }
 
     /** 工作区模式：只认 plan / code，其他一律按问答处理 */

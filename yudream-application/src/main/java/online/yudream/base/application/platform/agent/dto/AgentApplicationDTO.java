@@ -20,6 +20,8 @@ public class AgentApplicationDTO {
     private List<String> toolCodes;
     private AgentApplicationStatus status;
     private String sourcePluginCode;
+    /** SHARED：整个用户工作区；SCOPED：只见 apps/<code>/ */
+    private String workspaceScope;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -4,6 +4,7 @@ import { prepareApiEncryption } from '@/utils/api-encryption'
 import systemClient from './system-client'
 
 export type AgentApplicationStatus = 'DRAFT' | 'PUBLISHED' | 'DISABLED'
+export type AgentWorkspaceScope = 'SHARED' | 'SCOPED'
 
 export interface AgentApplication {
   id: string
@@ -16,6 +17,8 @@ export interface AgentApplication {
   toolCodes: string[]
   status: AgentApplicationStatus
   sourcePluginCode?: string
+  /** 用户工作区可见范围：SHARED 整个工作区；SCOPED 只见 apps/<code>/ */
+  workspaceScope?: AgentWorkspaceScope
   createTime?: string
   updateTime?: string
 }
@@ -28,6 +31,7 @@ export interface AgentApplicationPayload {
   systemPrompt?: string
   workflowJson: string
   toolCodes: string[]
+  workspaceScope?: AgentWorkspaceScope
   status: AgentApplicationStatus
 }
 

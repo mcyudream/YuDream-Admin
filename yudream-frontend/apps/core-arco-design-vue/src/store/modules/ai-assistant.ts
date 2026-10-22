@@ -3,17 +3,19 @@ import type { AiFrontendContext, AiFrontendToolRequest, AiRunSnapshot } from '@/
 import type { ChatMessage, ChatQuota, ChatSendPayload, ChatSession } from '@/api/modules/platform-chat'
 import type { AiAssistantPreferences } from '@/utils/ai-assistant-context'
 import type { AiRunEnvelope } from '@/utils/ai-run-stream'
+import type { ChatToolOptions, ChatToolSelection } from '@/utils/ai-tool-selection'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import apiAi from '@/api/modules/platform-ai'
 import { cancelAiRun, getAiRun, listAiRuns, replyAiFrontendTool, respondAiInteraction, resumeAiRun, startAiAssistantRun, subscribeAiRun } from '@/api/modules/platform-ai-runs'
-import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession } from '@/api/modules/platform-chat'
+import { createChatSession, deleteChatSession, fetchChatToolOptions, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession } from '@/api/modules/platform-chat'
 import { aiApprovalItems } from '@/utils/ai-approval'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, parseAiAssistantPreferences, parseAiFrontendToolRequest } from '@/utils/ai-assistant-context'
 import { aiRunErrorContent } from '@/utils/ai-run-error'
 import { upsertAiRunInput } from '@/utils/ai-run-input'
 import { aiRunPhaseLabel, projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { canReconnectAiRun, isActiveAiRun, isNewAiCursor } from '@/utils/ai-run-stream'
+import { emptyToolSelection, parseToolSelection, skillItems, toggleSkill, toolPayload } from '@/utils/ai-tool-selection'
 import { hintForMessage } from '@/utils/api-error'
 
 function record(value: unknown): Record<string, unknown> {
@@ -130,6 +132,32 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     scope: '只执行本次导航或高亮，操作按钮仍由你点击',
   })))
 
+  /** 对话中可勾选的工具模块与技能，以及当前账号的选择（按账号保存在本浏览器） */
+  const toolOptions = ref<ChatToolOptions>({ modules: [], skills: [] })
+  const toolSelection = ref<ChatToolSelection>({ ...emptyToolSelection })
+  const skills = computed(() => skillItems(toolOptions.value, toolSelection.value))
+  const toolSelectionKey = () => `yd.aiAssistant.tools.${owner}`
+  function saveToolSelection(next: ChatToolSelection) {
+    toolSelection.value = next
+    if (owner) {
+      localStorage.setItem(toolSelectionKey(), JSON.stringify(next))
+    }
+  }
+  function setToolModules(codes: string[]) {
+    saveToolSelection({ ...toolSelection.value, modules: [...new Set(codes)] })
+  }
+  function setSkillEnabled(name: string, enabled: boolean) {
+    saveToolSelection(toggleSkill(toolSelection.value, toolOptions.value.skills.map(skill => skill.name), name, enabled))
+  }
+  async function loadToolOptions() {
+    try {
+      toolOptions.value = (await fetchChatToolOptions()).data
+    }
+    catch {
+      toolOptions.value = { modules: [], skills: [] }
+    }
+  }
+
   const preferenceKey = () => `yd.aiAssistant.preferences.${owner}`
   function setPreferences(patch: Partial<AiAssistantPreferences>) {
     preferences.value = parseAiAssistantPreferences({ ...preferences.value, ...patch })
@@ -196,6 +224,13 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     catch {
       preferences.value = { ...defaultAiAssistantPreferences }
     }
+    toolOptions.value = { modules: [], skills: [] }
+    try {
+      toolSelection.value = parseToolSelection(JSON.parse(localStorage.getItem(toolSelectionKey()) || 'null'))
+    }
+    catch {
+      toolSelection.value = { ...emptyToolSelection }
+    }
   }
 
   async function initializeObserver(userId: string) {
@@ -243,7 +278,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     const started = epoch
     error.value = ''
     loading.value = true
-    const results = await Promise.allSettled([listChatSessions(), initializeObserver(userId), apiAi.availableModels(), fetchMyChatQuota()])
+    const results = await Promise.allSettled([listChatSessions(), initializeObserver(userId), apiAi.availableModels(), fetchMyChatQuota(), loadToolOptions()])
     if (started !== epoch) {
       return
     }
@@ -498,6 +533,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
         spaceSlug: scope.spaceSlug ?? session?.spaceSlug,
         attachments: request.attachments,
         mode: request.mode === 'plan' || request.mode === 'code' ? request.mode : 'ask',
+        ...toolPayload(toolSelection.value, toolOptions.value),
         contextEnabled: preferences.value.routeAwareness || preferences.value.pageAwareness,
         frontendToolsEnabled: preferences.value.navigationTools || preferences.value.highlightTools || preferences.value.tourTools,
         frontendContext: frontendContext ? frontendContextForPreferences(frontendContext, preferences.value) : undefined,
@@ -953,6 +989,12 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     modelId,
     models,
     preferences,
+    toolOptions,
+    toolSelection,
+    skills,
+    setToolModules,
+    setSkillEnabled,
+    loadToolOptions,
     quota,
     messages,
     runs,

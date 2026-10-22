@@ -15,5 +15,7 @@ public class AgentApplicationSaveRequest {
     private String systemPrompt;
     @NotBlank private String workflowJson;
     private List<String> toolCodes;
+    /** SHARED（默认）或 SCOPED */
+    private String workspaceScope;
     private AgentApplicationStatus status;
 }

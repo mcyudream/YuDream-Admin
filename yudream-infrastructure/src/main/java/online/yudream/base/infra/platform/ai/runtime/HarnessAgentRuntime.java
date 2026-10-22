@@ -622,7 +622,9 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
             builder.disableMemoryHooks();
         }
         // 平台技能库（MongoDB）作为框架级统一技能源；workspace/<user>/skills 仍可按用户覆盖。
-        builder.skillRepository(skillRepository);
+        // 对话中选择了技能时（运行线程上的选择作用域）只挂载所选技能。
+        java.util.Set<String> selectedSkills = online.yudream.base.domain.platform.ai.service.AiSkillSelectionScope.current();
+        builder.skillRepository(selectedSkills == null ? skillRepository : skillRepository.selected(selectedSkills));
         if (properties.isSystemToolsEnabled()) {
             builder.toolkit(tools.toolkit());
         }

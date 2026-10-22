@@ -53,6 +53,7 @@ const form = reactive<AgentApplicationPayload>({
   systemPrompt: '',
   workflowJson: '',
   toolCodes: [],
+  workspaceScope: 'SHARED',
   status: 'DRAFT',
 })
 
@@ -143,6 +144,7 @@ async function loadApplication() {
       description: application.description || '',
       systemPrompt: application.systemPrompt || '',
       toolCodes: application.toolCodes || [],
+      workspaceScope: application.workspaceScope || 'SHARED',
     })
     const flow = application.workflowJson ? JSON.parse(application.workflowJson) : {}
     nodes.value = Array.isArray(flow.nodes) ? flow.nodes.map(normalizeNode) : []

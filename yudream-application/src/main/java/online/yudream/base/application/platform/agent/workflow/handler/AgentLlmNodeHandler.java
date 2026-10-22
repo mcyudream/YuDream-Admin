@@ -80,12 +80,13 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         }
 
         AiToolMode toolMode = toolMode(node);
-        List<AiAgentTool> tools = toolMode == AiToolMode.NONE
+        List<AiAgentTool> configuredTools = toolMode == AiToolMode.NONE
                 ? List.of()
                 : state.resolveModelTools(toolCodes(node));
-        if (toolMode == AiToolMode.REQUIRED && tools.isEmpty()) {
+        if (toolMode == AiToolMode.REQUIRED && configuredTools.isEmpty()) {
             throw new BizException(node.title() + "必须配置至少一个可调用工具");
         }
+        List<AiAgentTool> tools = withCallerWorkspaceTools(configuredTools, toolMode);
 
         String nodePrompt = values.render(values.text(node, "prompt"), context);
         String userPrompt = stringify(values.input(node, context));
@@ -508,5 +509,26 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             return requestValue;
         }
         return StringUtils.hasText(nodeValue) ? nodeValue : requestValue;
+    }
+
+    /**
+     * 节点打开自己的工具作用域会遮住调用方（对话）已授权的工具；用户工作区工具由对话按调用方权限与
+     * Agent 应用的工作区范围（SHARED / SCOPED → apps/&lt;code&gt;）装配，允许工具的节点继承它们。
+     */
+    static List<AiAgentTool> withCallerWorkspaceTools(List<AiAgentTool> nodeTools, AiToolMode toolMode) {
+        List<AiAgentTool> caller = AiAgentToolExecutionScope.currentTools();
+        if (toolMode == AiToolMode.NONE || caller == null) {
+            return nodeTools;
+        }
+        java.util.Set<String> names = nodeTools.stream().map(tool -> tool.descriptor().name()).collect(java.util.stream.Collectors.toSet());
+        List<AiAgentTool> inherited = caller.stream()
+                .filter(tool -> tool != null && tool.descriptor().name().startsWith("workspace.") && !names.contains(tool.descriptor().name()))
+                .toList();
+        if (inherited.isEmpty()) {
+            return nodeTools;
+        }
+        List<AiAgentTool> merged = new ArrayList<>(nodeTools);
+        merged.addAll(inherited);
+        return List.copyOf(merged);
     }
 }

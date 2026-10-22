@@ -51,6 +51,8 @@ public final class ChatWebAssembler {
         cmd.setContextEnabled(request.isContextEnabled());
         cmd.setFrontendToolsEnabled(request.isFrontendToolsEnabled());
         cmd.setMode(request.getMode());
+        cmd.setToolModules(request.getToolModules() == null ? List.of() : List.copyOf(request.getToolModules()));
+        cmd.setSkillCodes(request.getSkillCodes() == null ? null : List.copyOf(request.getSkillCodes()));
         cmd.setFrontendContext(frontendContext(request.getFrontendContext()));
         cmd.setConfirmDecisions(request.getConfirmDecisions());
         cmd.setScopeType(request.getScopeType());
@@ -219,5 +221,13 @@ public final class ChatWebAssembler {
                 request.getUrl(),
                 request.getExtractedText(),
                 request.getDataUrl());
+    }
+
+    public static online.yudream.base.interfaces.platform.chat.res.ChatToolOptionsRes toolOptions(online.yudream.base.application.platform.chat.dto.ChatToolOptionsDTO dto) {
+        return new online.yudream.base.interfaces.platform.chat.res.ChatToolOptionsRes(
+                dto.modules().stream().map(module -> new online.yudream.base.interfaces.platform.chat.res.ChatToolOptionsRes.Module(
+                        module.code(), module.name(), module.description(), module.icon(), module.source(), module.tools())).toList(),
+                dto.skills().stream().map(skill -> new online.yudream.base.interfaces.platform.chat.res.ChatToolOptionsRes.Skill(
+                        skill.name(), skill.description())).toList());
     }
 }

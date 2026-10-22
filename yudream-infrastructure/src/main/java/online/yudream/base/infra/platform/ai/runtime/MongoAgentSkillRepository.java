@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * AgentScope 技能仓库的 MongoDB 实现：平台「技能库」作为框架级统一技能源，
@@ -111,6 +112,65 @@ public class MongoAgentSkillRepository implements AgentSkillRepository {
     @Override
     public boolean isWriteable() {
         return writeable;
+    }
+
+    /**
+     * 只读视图：只暴露名单内的已启用技能（对话中由用户选择的技能）；Agent 装配时创建，
+     * 跨线程使用安全（不依赖线程局部状态）。
+     */
+    public AgentSkillRepository selected(Set<String> names) {
+        Set<String> allowed = names == null ? Set.of() : Set.copyOf(names);
+        MongoAgentSkillRepository source = this;
+        return new AgentSkillRepository() {
+            @Override
+            public AgentSkill getSkill(String name) {
+                return allowed.contains(name) ? source.getSkill(name) : null;
+            }
+
+            @Override
+            public List<String> getAllSkillNames() {
+                return source.getAllSkillNames().stream().filter(allowed::contains).toList();
+            }
+
+            @Override
+            public List<AgentSkill> getAllSkills() {
+                return source.allEnabled().stream().filter(data -> allowed.contains(data.getName())).map(source::toFramework).toList();
+            }
+
+            @Override
+            public boolean save(List<AgentSkill> skills, boolean overwrite) {
+                return false;
+            }
+
+            @Override
+            public boolean delete(String name) {
+                return false;
+            }
+
+            @Override
+            public boolean skillExists(String name) {
+                return allowed.contains(name) && source.skillExists(name);
+            }
+
+            @Override
+            public AgentSkillRepositoryInfo getRepositoryInfo() {
+                return new AgentSkillRepositoryInfo("mongodb", "platformAgentSkill（本次对话选择）", false);
+            }
+
+            @Override
+            public String getSource() {
+                return SOURCE;
+            }
+
+            @Override
+            public void setWriteable(boolean writeable) {
+            }
+
+            @Override
+            public boolean isWriteable() {
+                return false;
+            }
+        };
     }
 
     private List<AgentSkillDO> allEnabled() {
