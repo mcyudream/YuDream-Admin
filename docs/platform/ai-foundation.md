@@ -25,6 +25,7 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 - **端点** `/api/platform/chat/workspace`：总览、预览（文本 2 MB 内）、下载（一律附件 + nosniff）、保存文本、上传到目录、新建目录、移动、删除、回收站（列表/恢复/彻底删除/清空）、历史版本（列表/恢复）、附件另存（经 `FileAppService` 校验调用者可读）、设置。查看需 `platform:chat:workspace:view`，修改需 `platform:chat:workspace:edit`。
 - **界面**：AI 助手抽屉的工作区面板（引用文件进下一条消息）与对话页「我的工作区」按钮都打开同一文件管理器 `WorkspaceExplorer`：目录树、文本编辑（Ctrl/⌘+S）、图片预览、上传、移动改名、删除、历史版本、回收站、对话附件另存到当前目录；AI 写入的条目标「AI」。
 - **模型工具**（`ChatWorkspaceTools`，经 `WorkspaceAccess` 只见 root 内条目，变更记为 AI）：`workspace.list`（可按目录）/ `workspace.read`（超 60000 字符截断，二进制或超 2 MB 只返回元信息）随查看权限装配；工作区模式 `code` 额外装配 `workspace.write` / `workspace.move` / `workspace.delete`（风险 WRITE，每次经原生确认卡；写入单文件 1 MB；删除进回收站）。模式（发送请求 `mode`，缺省 `ask`）：`plan` 只读 + 规划提示；`code` 需 `platform:chat:workspace:edit`，无权限启动即拒绝；提示词由 `ChatRunAppService.modePrompt` 维护。
+- **代码运行**：编码模式下，有 `platform:chat:workspace:run` 且代码运行器可用时装配 `workspace.run`（风险 WRITE，确认卡展示语言、入口/代码、带入文件与输出目录）：`WorkspaceCodeRunAppService` 把 inputs 拷给运行器，产物写入输出目录（缺省 `tmp/runs/<时间>`），不覆盖原文件。运行器部署与限制见 [代码运行器](code-runner.md)。
 - **Agent 应用的工作区范围**：应用设置 `workspaceScope`（`SHARED` 默认 / `SCOPED`）。AGENT 会话中 `ChatRunAppService` 按应用范围给工作区工具定 root（SCOPED → `apps/<code>/`，AI 看不到其他文件）；工作流模型节点打开自己的工具作用域时会继承调用方的 `workspace.*` 工具（`AgentLlmNodeHandler.withCallerWorkspaceTools`，仅允许工具的节点），其他调用方工具不继承。每个用户仍只有一个工作区。
 - **与其他存储的边界**：聊天附件走 S3 + `sysFileObject`（随消息传给模型），可在文件管理器另存进工作区；Harness 的长期记忆、技能与会话日志仍在 `platformAgentWorkspace` KV（小而高频），不属于用户工作区。
 

@@ -55,6 +55,7 @@ public class ChatWorkspaceController {
     private static final String EDIT = "platform:chat:workspace:edit";
 
     private final WorkspaceAppService workspaces;
+    private final online.yudream.base.application.platform.workspace.service.WorkspaceCodeRunAppService codeRunner;
 
     @GetMapping
     @PermissionRegister(code = VIEW, name = "查看我的工作区", module = "AI 助手", desc = "查看当前用户工作区目录、文件与用量")
@@ -157,6 +158,13 @@ public class ChatWorkspaceController {
     @PermissionRegister(code = EDIT, name = "附件保存到我的工作区", module = "AI 助手", desc = "把自己上传的聊天附件保存到工作区目录")
     public Result<WorkspaceEntryRes> saveAttachment(@Valid @RequestBody WorkspaceAttachmentSaveRequest request) {
         return Result.ok(WorkspaceWebAssembler.entry(workspaces.saveAttachment(currentUserId(), request.getFileId(), request.getDirectory())));
+    }
+
+    /** 代码运行器状态：是否可在编码模式中让助手运行工作区代码 */
+    @GetMapping("/runner")
+    @PermissionRegister(code = "platform:chat:workspace:run", name = "运行我的工作区代码", module = "AI 助手", desc = "允许助手在用户确认后于隔离运行器中执行工作区代码")
+    public Result<online.yudream.base.interfaces.platform.chat.res.WorkspaceRunnerRes> runner() {
+        return Result.ok(WorkspaceWebAssembler.runner(codeRunner.unavailableReason(), codeRunner.runtimes()));
     }
 
     @GetMapping("/config")

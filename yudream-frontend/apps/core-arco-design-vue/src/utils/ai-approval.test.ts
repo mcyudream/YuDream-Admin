@@ -21,3 +21,19 @@ test('long write content is previewed, not dumped', () => {
   const [write] = aiApprovalItems([{ requestId: 'a', kind: 'confirmation', toolName: 'workspace.write', arguments: { path: 'big.txt', content: 'x'.repeat(2000) } }])
   assert.match(write!.command!, /其余 1400 字/)
 })
+
+test('move and run requests explain what will happen', () => {
+  const [move, run, entry] = aiApprovalItems([
+    { requestId: 'm', kind: 'confirmation', toolName: 'workspace.move', arguments: { from: 'a.md', to: 'docs/a.md' } },
+    { requestId: 'r', kind: 'confirmation', toolName: 'workspace.run', arguments: { language: 'python', code: 'print(1)', inputs: ['data'] } },
+    { requestId: 'e', kind: 'confirmation', toolName: 'workspace.run', arguments: { language: 'node', entry: 'src/app.js', outputDir: 'out' } },
+  ])
+  assert.equal(move!.title, '移动工作区文件：a.md → docs/a.md')
+  assert.equal(run!.title, '运行 Python 代码')
+  assert.equal(run!.command, 'print(1)')
+  assert.match(run!.description!, /带入 data/)
+  assert.match(run!.description!, /tmp\/runs/)
+  assert.equal(entry!.title, '运行 Node 代码')
+  assert.match(entry!.description!, /入口 src\/app\.js · 产物写入 out/)
+  assert.equal(entry!.command, undefined)
+})

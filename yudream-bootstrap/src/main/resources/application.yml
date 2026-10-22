@@ -223,6 +223,14 @@ yudream.platform.chat:
     max-size: ${PUBLIC_WIKI_CHAT_EXECUTOR_MAX:2}
     queue-capacity: ${PUBLIC_WIKI_CHAT_EXECUTOR_QUEUE:0}
 
+# 代码运行器（yudream-code-runner 容器）：AI 工作区「编码」模式的 workspace.run 在其中执行 Python / Node。
+# 关闭时不创建运行器端口，相关工具不出现；运行器应接入无外网的内部网络。
+yudream.platform.code-runner:
+  enabled: ${CODE_RUNNER_ENABLED:false}
+  base-url: ${CODE_RUNNER_BASE_URL:http://code-runner:8090}
+  token: ${CODE_RUNNER_TOKEN:}
+  timeout: ${CODE_RUNNER_TIMEOUT:150s}
+
 yudream.platform.render:
   base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}
   token: ${MESSAGE_RENDER_TOKEN:}

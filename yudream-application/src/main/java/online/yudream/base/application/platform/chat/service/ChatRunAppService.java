@@ -23,6 +23,7 @@ public class ChatRunAppService {
     private final online.yudream.base.application.platform.workspace.service.WorkspaceAppService workspaces;
     private final online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo agentApplications;
     private final online.yudream.base.application.platform.ai.service.AiToolModuleAppService toolModules;
+    private final online.yudream.base.application.platform.workspace.service.WorkspaceCodeRunAppService codeRunner;
     private final online.yudream.base.application.platform.ai.service.CmsStudioClientTools studioTools;
 
     public AiRunDTO start(Long userId, ChatSendCmd cmd) {
@@ -72,7 +73,12 @@ public class ChatRunAppService {
             }
             scoped.addAll(ChatWorkspaceTools.createEditable(workspace));
         }
-        cmd.setModePrompt(modePrompt(mode));
+        // 代码运行：编码模式 + 运行权限 + 运行器可用（部署闸门 + 健康检查）三者齐备才装配
+        boolean runnable = "code".equals(mode) && hasPermission(cmd, ChatWorkspaceTools.RUN_PERMISSION_CODE) && codeRunner.unavailableReason() == null;
+        if (runnable) {
+            scoped.addAll(ChatWorkspaceTools.createRunnable(workspace, codeRunner));
+        }
+        cmd.setModePrompt(modePrompt(mode) + (runnable ? RUN_PROMPT : ""));
         // 通用对话中用户勾选的工具模块（网页、知识库、MCP 服务…）：按调用者权限与模块开关装配，执行时再复核
         if (cmd.getScopeType() == ChatScopeType.GENERAL && cmd.getToolModules() != null && !cmd.getToolModules().isEmpty()) {
             scoped.addAll(toolModules.chatModuleTools(cmd.getToolModules(), cmd.getPermissionCodes()));
@@ -114,6 +120,9 @@ public class ChatRunAppService {
         String mode = cmd == null || cmd.getMode() == null ? "" : cmd.getMode().trim().toLowerCase(java.util.Locale.ROOT);
         return "plan".equals(mode) || "code".equals(mode) ? mode : "ask";
     }
+
+    static final String RUN_PROMPT = "可用 workspace.run 在隔离运行器中执行 Python / Node（无外网），用 inputs 带入需要的文件，产物写入 tmp/runs/ 下的输出目录；"
+            + "需要保留的结果再用 workspace.move 移到正式位置。";
 
     static String modePrompt(String mode) {
         return switch (mode) {

@@ -281,6 +281,12 @@ public class WorkspaceAppService {
                 file.getSize(), file.getContentType(), file.getRevision());
     }
 
+    /** 整个文件内容（运行器输入用；超过单文件上限拒绝） */
+    byte[] readBytes(UserWorkspace workspace, String path) {
+        WorkspaceFile file = requireFile(workspace, path);
+        return bytes(object(file), file.getSize());
+    }
+
     WorkspaceFile write(UserWorkspace workspace, Long userId, String path, byte[] data, String contentType,
                         Integer expectedRevision, WorkspaceActor actor) {
         if (data.length > MAX_FILE_BYTES) {

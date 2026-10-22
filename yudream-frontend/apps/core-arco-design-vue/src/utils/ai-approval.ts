@@ -29,7 +29,27 @@ export function aiApprovalItems(interactions: NativeInteraction[] | undefined): 
       }
     }
     if (item.toolName === 'workspace.delete') {
-      return { id: item.requestId, title: `删除工作区文件：${path}`, description: '批准后从我的工作区删除该文件。', scope: '仅我的工作区，仅本次删除' }
+      return { id: item.requestId, title: `删除工作区文件：${path}`, description: '批准后移入回收站，30 天内可在文件管理器中恢复。', scope: '仅我的工作区，仅本次删除' }
+    }
+    if (item.toolName === 'workspace.move') {
+      return { id: item.requestId, title: `移动工作区文件：${String(args.from ?? '')} → ${String(args.to ?? '')}`, description: '批准后移动或重命名（目录连同内容）。', scope: '仅我的工作区，仅本次移动' }
+    }
+    if (item.toolName === 'workspace.run') {
+      const language = args.language === 'node' ? 'Node' : 'Python'
+      const code = typeof args.code === 'string' ? args.code : ''
+      const inputs = Array.isArray(args.inputs) ? args.inputs.map(String) : []
+      const parts = [
+        typeof args.entry === 'string' && args.entry ? `入口 ${args.entry}` : '直接运行下方代码',
+        inputs.length ? `带入 ${inputs.join('、')}` : '',
+        `产物写入 ${typeof args.outputDir === 'string' && args.outputDir ? args.outputDir : 'tmp/runs/（自动清理）'}`,
+      ].filter(Boolean)
+      return {
+        id: item.requestId,
+        title: `运行 ${language} 代码`,
+        description: `${parts.join(' · ')}。在隔离运行器中执行（无外网、限时限内存），不会覆盖原文件。`,
+        ...(code ? { command: code.length > PREVIEW_CHARS ? `${code.slice(0, PREVIEW_CHARS)}\n…（其余 ${code.length - PREVIEW_CHARS} 字）` : code } : {}),
+        scope: '仅本次运行',
+      }
     }
     return {
       id: item.requestId,

@@ -70,6 +70,11 @@ services:
       - MESSAGE_RENDER_BASE_URL=${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       - MESSAGE_RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
       - MESSAGE_RENDER_TIMEOUT=${MESSAGE_RENDER_TIMEOUT:-45s}
+      # 代码运行器（AI 工作区「编码」模式运行 Python / Node）：启用时一并启动 code-runner profile，
+      # 两侧使用同一随机令牌：docker compose --profile code-runner up -d
+      - CODE_RUNNER_ENABLED=${CODE_RUNNER_ENABLED:-false}
+      - CODE_RUNNER_BASE_URL=${CODE_RUNNER_BASE_URL:-http://code-runner:8090}
+      - CODE_RUNNER_TOKEN=${CODE_RUNNER_TOKEN:-}
       # 文件预览（平台能力，双闸门）：部署闸门决定「平台能力」页是否出现该能力；
       # 运行闸门为管理后台「平台能力 > 文件预览」的启用开关与 kkFileView 配置
       - PLATFORM_FILE_PREVIEW_ENABLED=${PLATFORM_FILE_PREVIEW_ENABLED:-true}
@@ -110,6 +115,7 @@ services:
       # - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - yudream
+      - yudream-runner
 
   render-server:
     build:
@@ -142,6 +148,38 @@ services:
           memory: 768M
     networks:
       - yudream
+
+  # 代码运行器：每次运行使用临时目录，结束即删除；只接入无外网的内部网络，只读根文件系统，
+  # 去掉全部 capability、非 root 用户。常用 Python 包由构建参数 PY_PACKAGES 决定。
+  code-runner:
+    build:
+      context: ./yudream-code-runner
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}/code-runner:${TAG:-latest}
+    container_name: yudream-code-runner
+    profiles: ["code-runner"]
+    restart: unless-stopped
+    expose:
+      - "8090"
+    environment:
+      - RUNNER_TOKEN=${CODE_RUNNER_TOKEN:-}
+      - RUNNER_MAX_CONCURRENT=${CODE_RUNNER_CONCURRENCY:-2}
+      - RUNNER_MEMORY_MB=${CODE_RUNNER_MEMORY_MB:-512}
+      - RUNNER_MAX_TIMEOUT_SECONDS=${CODE_RUNNER_MAX_TIMEOUT_SECONDS:-120}
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+          pids: 256
+    networks:
+      - yudream-runner
 
   frontend:
     image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}/frontend:${TAG:-latest}
@@ -212,3 +250,7 @@ services:
 networks:
   yudream:
     driver: bridge
+  # 运行器专用内部网络：没有外网出口，只有后端能访问运行器
+  yudream-runner:
+    driver: bridge
+    internal: true

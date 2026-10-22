@@ -56,6 +56,21 @@ public final class WorkspaceAccess {
         return WorkspaceAssembler.entry(file, relative(file.getPath()));
     }
 
+    /** directory 内全部文件的相对路径（递归，不含目录） */
+    public List<String> files(String directory) {
+        return list(directory).stream().filter(entry -> !"DIRECTORY".equals(entry.kind())).map(WorkspaceEntryDTO::path).toList();
+    }
+
+    public byte[] readBytes(String path) {
+        return service.readBytes(workspace(), absolute(WorkspacePaths.file(path)));
+    }
+
+    public WorkspaceEntryDTO writeBytes(String path, byte[] data) {
+        String target = absolute(WorkspacePaths.file(path));
+        WorkspaceFile file = service.write(workspace(), userId, target, data, null, null, WorkspaceActor.AI);
+        return WorkspaceAssembler.entry(file, relative(file.getPath()));
+    }
+
     public WorkspaceEntryDTO move(String from, String to) {
         WorkspaceFile moved = service.move(workspace(), absolute(WorkspacePaths.directory(from)), absolute(WorkspacePaths.directory(to)), WorkspaceActor.AI);
         return WorkspaceAssembler.entry(moved, relative(moved.getPath()));

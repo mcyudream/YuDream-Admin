@@ -47,6 +47,10 @@ public final class WorkspaceWebAssembler {
                 dto.createdAt(), dto.current())).toList();
     }
 
+    public static online.yudream.base.interfaces.platform.chat.res.WorkspaceRunnerRes runner(String unavailableReason, java.util.Map<String, String> runtimes) {
+        return new online.yudream.base.interfaces.platform.chat.res.WorkspaceRunnerRes(unavailableReason == null, unavailableReason, runtimes);
+    }
+
     public static WorkspaceConfigCmd config(WorkspaceConfigRequest request) {
         WorkspaceConfigCmd cmd = new WorkspaceConfigCmd();
         cmd.setQuotaMb(request.getQuotaMb());

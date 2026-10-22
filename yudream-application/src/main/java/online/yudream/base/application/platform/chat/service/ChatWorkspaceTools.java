@@ -1,8 +1,11 @@
 package online.yudream.base.application.platform.chat.service;
 
+import online.yudream.base.application.platform.workspace.cmd.WorkspaceRunCmd;
 import online.yudream.base.application.platform.workspace.dto.WorkspaceEntryDTO;
 import online.yudream.base.application.platform.workspace.dto.WorkspaceFileContentDTO;
+import online.yudream.base.application.platform.workspace.dto.WorkspaceRunResultDTO;
 import online.yudream.base.application.platform.workspace.service.WorkspaceAccess;
+import online.yudream.base.application.platform.workspace.service.WorkspaceCodeRunAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
@@ -31,6 +34,8 @@ public final class ChatWorkspaceTools {
     public static final String MOVE_TOOL = "workspace.move";
     public static final String DELETE_TOOL = "workspace.delete";
     public static final String EDIT_PERMISSION_CODE = "platform:chat:workspace:edit";
+    public static final String RUN_TOOL = "workspace.run";
+    public static final String RUN_PERMISSION_CODE = "platform:chat:workspace:run";
     /** 模型写入的单文件上限（文本）：远小于工作区单文件上限，避免一次生成巨型文件 */
     private static final int MAX_WRITE_BYTES = 1024 * 1024;
     /** 单次读取上限：超出时截断，避免把整篇大文件塞进上下文。 */
@@ -53,6 +58,59 @@ public final class ChatWorkspaceTools {
             return List.of();
         }
         return List.of(writeTool(access), moveTool(access), deleteTool(access));
+    }
+
+    /** 「编码」模式的代码运行：在独立运行器中执行，产物写入工作区输出目录；每次运行都需用户确认 */
+    public static List<AiAgentTool> createRunnable(WorkspaceAccess access, WorkspaceCodeRunAppService runner) {
+        if (access == null || runner == null) {
+            return List.of();
+        }
+        return List.of(runTool(access, runner));
+    }
+
+    private static AiAgentTool runTool(WorkspaceAccess access, WorkspaceCodeRunAppService runner) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("language", Map.of("type", "string", "enum", List.of("python", "node"), "description", "运行时：python 或 node"));
+        schema.put("entry", Map.of("type", "string", "description", "工作区中的入口文件，如 scripts/report.py；与 code 二选一"));
+        schema.put("code", Map.of("type", "string", "description", "直接运行的代码（写为 main.py / main.js）；与 entry 二选一"));
+        schema.put("inputs", Map.of("type", "array", "items", Map.of("type", "string"), "description", "一并带入运行目录的工作区文件或目录（保持相对路径），合计不超过 20 MB"));
+        schema.put("args", Map.of("type", "array", "items", Map.of("type", "string"), "description", "命令行参数"));
+        schema.put("stdin", Map.of("type", "string", "description", "标准输入"));
+        schema.put("outputDir", Map.of("type", "string", "description", "产物写入的工作区目录，缺省 tmp/runs/<时间>"));
+        schema.put("timeoutSeconds", Map.of("type", "integer", "description", "超时秒数，1–120，缺省 30"));
+        return tool(RUN_TOOL, "运行代码",
+                "在隔离的代码运行器中执行 Python 3 或 Node 代码（无外网、内存与时间受限，预装 numpy/pandas/openpyxl/pyyaml）。"
+                        + "运行中新建或改动的文件写入工作区输出目录（不覆盖原文件），返回退出码与输出；执行前需用户确认。",
+                RUN_PERMISSION_CODE, "运行我的工作区代码", "允许助手在用户确认后在代码运行器中执行用户工作区的代码",
+                schema, AgentToolRisk.WRITE, call -> {
+                    Map<String, Object> args = call.arguments() == null ? Map.of() : call.arguments();
+                    WorkspaceRunResultDTO result = runner.run(access, new WorkspaceRunCmd(
+                            text(call, "language", true), text(call, "entry", false), args.get("code") instanceof String code ? code : null,
+                            strings(args.get("inputs")), strings(args.get("args")), args.get("stdin") instanceof String stdin ? stdin : null,
+                            text(call, "outputDir", false), args.get("timeoutSeconds") instanceof Number number ? number.intValue() : null));
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("exitCode", result.exitCode());
+                    payload.put("timedOut", result.timedOut());
+                    payload.put("durationMillis", result.durationMillis());
+                    payload.put("stdout", result.stdout());
+                    payload.put("stderr", result.stderr());
+                    payload.put("outputDir", result.outputDir());
+                    payload.put("written", result.written());
+                    if (!result.failed().isEmpty()) {
+                        payload.put("failed", result.failed());
+                    }
+                    if (result.outputsTruncated()) {
+                        payload.put("outputsTruncated", true);
+                    }
+                    String message = result.timedOut() ? "运行超时被终止"
+                            : "退出码 " + result.exitCode() + (result.written().isEmpty() ? "，没有产物" : "，产物 " + result.written().size() + " 个写入 " + result.outputDir());
+                    payload.put("message", message);
+                    return new AiAgentToolResult(RUN_TOOL, "run", RUN_PERMISSION_CODE, message, payload);
+                });
+    }
+
+    private static List<String> strings(Object value) {
+        return value instanceof List<?> items ? items.stream().filter(java.util.Objects::nonNull).map(String::valueOf).toList() : List.of();
     }
 
     private static AiAgentTool listTool(WorkspaceAccess access) {
