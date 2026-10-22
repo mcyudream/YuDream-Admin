@@ -3,6 +3,10 @@ package online.yudream.base.interfaces.system.file.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.file.dto.FileContentDTO;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.http.HttpStatus;
+import online.yudream.base.application.system.file.service.FileRangeNotSatisfiableException;
+import online.yudream.base.application.system.file.dto.FileByteRange;
 import online.yudream.base.application.system.file.query.FileObjectPageQuery;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.PageResult;
@@ -42,6 +46,8 @@ public class FileController {
             "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/avif", "image/x-icon",
             "video/mp4", "video/webm", "video/ogg",
             "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm",
+            // 浏览器给 m4a/aac/wav 报的常见变体：同为被动媒体，只按内联播放，不会执行
+            "audio/mp4", "audio/x-m4a", "audio/aac", "audio/x-wav", "audio/wave", "audio/flac",
             "application/pdf",
             "text/plain"
     );
@@ -87,16 +93,22 @@ public class FileController {
     }
 
     @GetMapping("/{id}/content")
-    public ResponseEntity<InputStreamResource> content(@PathVariable Long id) {
-        FileContentDTO content;
-        if (StpUtil.isLogin()) {
-            content = fileAppService.content(id, StpUtil.getLoginIdAsLong(),
-                    StpUtil.hasPermission(FILE_MANAGE_PERMISSION));
-        } else {
-            // 匿名仅允许读取显式公开的文件，其余一律要求登录。
-            content = fileAppService.publicContent(id);
+    public ResponseEntity<InputStreamResource> content(@PathVariable Long id,
+                                                       @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
+        FileByteRange requested = FileWebAssembler.byteRange(range);
+        try {
+            FileContentDTO content;
+            if (StpUtil.isLogin()) {
+                content = fileAppService.content(id, StpUtil.getLoginIdAsLong(),
+                        StpUtil.hasPermission(FILE_MANAGE_PERMISSION), requested);
+            } else {
+                // 匿名仅允许读取显式公开的文件，其余一律要求登录。
+                content = fileAppService.publicContent(id, requested);
+            }
+            return contentResponse(id, content);
+        } catch (FileRangeNotSatisfiableException unsatisfiable) {
+            return rangeNotSatisfiable(unsatisfiable.getSize());
         }
-        return contentResponse(id, content);
     }
 
     @GetMapping("/{id}/content/thumb")
@@ -112,8 +124,21 @@ public class FileController {
     }
 
     @GetMapping("/public/{id}/content")
-    public ResponseEntity<InputStreamResource> publicContent(@PathVariable Long id) {
-        return contentResponse(id, fileAppService.publicContent(id));
+    public ResponseEntity<InputStreamResource> publicContent(@PathVariable Long id,
+                                                             @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
+        try {
+            return contentResponse(id, fileAppService.publicContent(id, FileWebAssembler.byteRange(range)));
+        } catch (FileRangeNotSatisfiableException unsatisfiable) {
+            return rangeNotSatisfiable(unsatisfiable.getSize());
+        }
+    }
+
+    /** 范围超出文件：416 + Content-Range: bytes &#42;/总长度，播放器据此重新请求 */
+    private static ResponseEntity<InputStreamResource> rangeNotSatisfiable(long size) {
+        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header(HttpHeaders.CONTENT_RANGE, "bytes */" + size)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .build();
     }
 
     @GetMapping("/public/{id}/content/thumb")
@@ -137,7 +162,13 @@ public class FileController {
         String fileName = StringUtils.hasText(content.getOriginalName()) ? content.getOriginalName() : id.toString();
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
         // 文件 ID 对应内容不可变，长缓存避免列表封面反复打满浏览器连接。
-        return ResponseEntity.ok()
+        // 分段读取：206 + Content-Range；整文件也声明 Accept-Ranges，Safari/iOS 播放音视频依赖范围请求
+        ResponseEntity.BodyBuilder builder = content.partial()
+                ? ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes " + content.getRangeStart() + "-" + content.getRangeEnd() + "/" + content.getTotalLength())
+                : ResponseEntity.ok();
+        return builder
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .contentType(mediaType)
                 .contentLength(content.getContentLength() == null ? -1 : content.getContentLength())
                 .header(HttpHeaders.CACHE_CONTROL, "public, max-age=2592000, immutable")

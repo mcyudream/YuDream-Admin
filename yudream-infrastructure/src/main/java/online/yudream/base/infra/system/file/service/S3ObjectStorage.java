@@ -54,6 +54,26 @@ public class S3ObjectStorage implements ObjectStorage {
     }
 
     @Override
+    public StoredObject get(String objectKey, long start, long end) {
+        String bucket = storage.config().bucket();
+        try {
+            ResponseInputStream<GetObjectResponse> stream = storage.client().getObject(GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .range("bytes=" + start + "-" + end)
+                    .build());
+            GetObjectResponse response = stream.response();
+            return new StoredObject(objectKey, response.contentType(), response.contentLength(), stream);
+        }
+        catch (NoSuchKeyException e) {
+            throw new BizException("文件不存在");
+        }
+        catch (S3Exception e) {
+            throw new BizException("文件读取失败：" + e.awsErrorDetails().errorMessage());
+        }
+    }
+
+    @Override
     public StoredObject get(String objectKey) {
         String bucket = storage.config().bucket();
         try {

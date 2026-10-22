@@ -161,10 +161,28 @@ public class PluginController {
                 .hasNext() && request.getHeader(HttpHeaders.IF_NONE_MATCH).contains(asset.getEtag())) {
             return ResponseEntity.status(304).eTag(asset.getEtag()).cacheControl(cacheControl).build();
         }
+        // 范围请求：主题背景音乐/音效在 Safari/iOS 上依赖 206 分段应答才能播放
+        var range = online.yudream.base.interfaces.system.file.assembler.FileWebAssembler.byteRange(request.getHeader(HttpHeaders.RANGE));
+        byte[] body = asset.getBody();
+        if (range != null && body != null) {
+            long[] bounds = range.resolve(body.length);
+            if (bounds == null) {
+                return ResponseEntity.status(416).header(HttpHeaders.CONTENT_RANGE, "bytes */" + body.length)
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes").build();
+            }
+            return ResponseEntity.status(206)
+                    .eTag(asset.getEtag())
+                    .cacheControl(cacheControl)
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.CONTENT_RANGE, "bytes " + bounds[0] + "-" + bounds[1] + "/" + body.length)
+                    .contentType(MediaType.parseMediaType(asset.getContentType()))
+                    .body(java.util.Arrays.copyOfRange(body, (int) bounds[0], (int) bounds[1] + 1));
+        }
         return ResponseEntity.ok()
                 .eTag(asset.getEtag())
                 .cacheControl(cacheControl)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .contentType(MediaType.parseMediaType(asset.getContentType()))
-                .body(asset.getBody());
+                .body(body);
     }
 }

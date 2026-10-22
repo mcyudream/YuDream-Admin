@@ -2,6 +2,7 @@ package online.yudream.base.application.system.file.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.file.query.FileObjectPageQuery;
+import online.yudream.base.application.system.file.dto.FileByteRange;
 import online.yudream.base.application.system.file.dto.FileContentDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.support.ImageThumbnailSupport;
@@ -183,6 +184,39 @@ public class FileAppService {
     public FileContentDTO publicContent(Long id) {
         FileObject fileObject = requirePublicFile(id);
         return readContent(fileObject);
+    }
+
+    /** 调用方维度分段读取（音视频播放与拖动）；range 为空时读取整个文件 */
+    @Transactional(readOnly = true)
+    public FileContentDTO content(Long id, Long callerId, boolean privileged, FileByteRange range) {
+        FileObject fileObject = getActiveFile(id);
+        assertCanRead(fileObject, callerId, privileged);
+        return range == null ? readContent(fileObject) : readRange(fileObject, range);
+    }
+
+    /** 匿名分段读取：只允许显式公开的文件 */
+    @Transactional(readOnly = true)
+    public FileContentDTO publicContent(Long id, FileByteRange range) {
+        FileObject fileObject = requirePublicFile(id);
+        return range == null ? readContent(fileObject) : readRange(fileObject, range);
+    }
+
+    private FileContentDTO readRange(FileObject fileObject, FileByteRange range) {
+        long size = fileObject.getSize() == null ? 0 : fileObject.getSize();
+        long[] bounds = range.resolve(size);
+        if (bounds == null) {
+            throw new FileRangeNotSatisfiableException(size);
+        }
+        StoredObject storedObject = objectStorage.get(fileObject.getObjectKey(), bounds[0], bounds[1]);
+        return FileContentDTO.builder()
+                .originalName(fileObject.getOriginalName())
+                .contentType(storedObject.contentType() == null ? fileObject.getContentType() : storedObject.contentType())
+                .contentLength(bounds[1] - bounds[0] + 1)
+                .inputStream(storedObject.inputStream())
+                .totalLength(size)
+                .rangeStart(bounds[0])
+                .rangeEnd(bounds[1])
+                .build();
     }
 
     @Transactional(readOnly = true)

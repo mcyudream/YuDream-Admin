@@ -32,6 +32,38 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FileAppServiceTest {
 
     @Test
+    void rangedReadsReturnTheRequestedSliceAndRejectRangesBeyondTheFile() throws Exception {
+        InMemoryFiles files = new InMemoryFiles();
+        InMemoryStorage storage = new InMemoryStorage();
+        FileAppService service = new FileAppService(files, storage);
+        byte[] audio = new byte[1000];
+        for (int i = 0; i < audio.length; i++) {
+            audio[i] = (byte) i;
+        }
+        FileObjectDTO saved = service.upload(new ByteArrayInputStream(audio), "music.ogg", "audio/ogg", audio.length, "cms", 1L, true);
+
+        FileContentDTO middle = service.publicContent(saved.getId(), new online.yudream.base.application.system.file.dto.FileByteRange(100L, 199L));
+        assertTrue(middle.partial());
+        assertEquals(100L, middle.getContentLength());
+        assertEquals(1000L, middle.getTotalLength());
+        byte[] slice = middle.getInputStream().readAllBytes();
+        assertEquals(100, slice.length);
+        assertEquals((byte) 100, slice[0]);
+        assertEquals((byte) 199, slice[99]);
+
+        FileContentDTO tail = service.publicContent(saved.getId(), new online.yudream.base.application.system.file.dto.FileByteRange(null, 10L));
+        assertEquals(990L, tail.getRangeStart());
+        assertEquals(999L, tail.getRangeEnd());
+        FileContentDTO open = service.content(saved.getId(), 1L, false, new online.yudream.base.application.system.file.dto.FileByteRange(900L, null));
+        assertEquals(100, open.getInputStream().readAllBytes().length);
+        FileContentDTO clamped = service.publicContent(saved.getId(), new online.yudream.base.application.system.file.dto.FileByteRange(0L, 5000L));
+        assertEquals(999L, clamped.getRangeEnd());
+        assertThrows(FileRangeNotSatisfiableException.class,
+                () -> service.publicContent(saved.getId(), new online.yudream.base.application.system.file.dto.FileByteRange(1000L, null)));
+        assertTrue(!service.publicContent(saved.getId(), null).partial());
+    }
+
+    @Test
     void uploadStoresJpegThumbnailBesideOriginal() throws Exception {
         InMemoryFiles files = new InMemoryFiles();
         InMemoryStorage storage = new InMemoryStorage();
