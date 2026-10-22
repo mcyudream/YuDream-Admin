@@ -28,6 +28,8 @@ public class AiToolModuleRes {
         private Boolean lazy;
         private Integer toolCount;
         private List<Tool> tools;
+        /** 运行环境不可用的原因（如部署环境没有 Python），可用时为空 */
+        private String unavailableReason;
     }
 
     @Data

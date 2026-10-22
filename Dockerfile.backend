@@ -3,6 +3,15 @@ FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/eclipse-temurin:
 
 WORKDIR /app
 
+# 可选 Python 运行时：Agent 的 Python 工具与工作流代码节点需要解释器。默认不安装以保持镜像精简，
+# 未安装时这些工具不会交给模型、系统工具页给出提示；需要时构建传 --build-arg INSTALL_PYTHON=true
+ARG INSTALL_PYTHON=false
+RUN if [ "$INSTALL_PYTHON" = "true" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends python3 python-is-python3 \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # 插件扫描目录与市场源发布物目录必须分开；后者重建镜像后仍需通过挂载保留
 RUN mkdir -p /app/plugins /app/market-source
 

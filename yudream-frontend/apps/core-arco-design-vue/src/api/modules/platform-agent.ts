@@ -89,6 +89,8 @@ export interface AiToolModule {
   lazy?: boolean
   toolCount?: number
   tools?: AiToolModuleTool[]
+  /** 运行环境不可用的原因（如部署环境没有 Python），可用时为空 */
+  unavailableReason?: string
 }
 
 export interface AiToolModuleCatalog {

@@ -129,6 +129,8 @@ pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run t
 
 二次开发完成后可复用官方 Dockerfile 构建私有镜像：`Dockerfile.backend`（基于 `eclipse-temurin:21-jre-jammy`，复制 `yudream-bootstrap` fat jar）、`Dockerfile.frontend`（基于 `nginx:alpine3.22-slim`，复制 `apps/core-arco-design-vue/dist` 与 `docker/nginx.conf`）。将 `CI_REGISTRY_IMAGE` 指向自有 registry 即可发布，部署方式回到模式一。
 
+官方后端镜像默认**不含 Python**。Agent 的 Python 工具与工作流代码节点需要解释器：未安装时这些工具不会交给模型，「系统工具」页会提示原因；需要时构建镜像加 `--build-arg INSTALL_PYTHON=true`（安装 `python3` 并提供 `python` 命令），或在集成能力中把解释器命令指向已挂载的 Python。
+
 ::: warning 注意
 - 二次开发必须遵守 DDD 分层规范，详见 [开发环境与工程规范](/guide/development)。
 - 官方业务插件的前后端源码一律在独立仓 `yudream-admin-plugins`，不要回流主仓。

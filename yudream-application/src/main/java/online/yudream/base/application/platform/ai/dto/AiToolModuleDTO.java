@@ -32,7 +32,9 @@ public record AiToolModuleDTO(
             boolean canDisable,
             boolean lazy,
             int toolCount,
-            List<Tool> tools
+            List<Tool> tools,
+            /** 运行环境不可用的原因（如部署环境没有 Python），可用时为 null */
+            String unavailableReason
     ) {
         public Module {
             tools = tools == null ? List.of() : List.copyOf(tools);

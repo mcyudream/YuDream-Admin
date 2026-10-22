@@ -124,6 +124,7 @@ public final class AgentToolExecutor {
         return new PermissionSnapshot(permissionCodes, command != null && command.isPermissionContextExplicit());
     }
 
+    /** 解析应用授权的工具；Python 工具在运行环境没有解释器时返回 null（调用方跳过，不交给模型）。 */
     AiAgentTool resolve(String toolCode, AgentApplication application, PermissionSnapshot permissionSnapshot) {
         String code = requiredCode(toolCode);
         ensureApplicationGrant(code, application);
@@ -154,6 +155,12 @@ public final class AgentToolExecutor {
                 .orElseThrow(() -> new BizException("Tool does not exist: " + code));
         ensurePythonAvailable(pythonTool);
         ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
+        // 部署环境没有 Python（如默认 Docker 镜像）：不把该工具交给模型，运行照常进行，避免调用时才报底层进程错误
+        String unavailable = runtimeExecutor == null ? "Python 运行器不可用，请先启用集成能力" : runtimeExecutor.unavailableReason();
+        if (unavailable != null) {
+            org.slf4j.LoggerFactory.getLogger(AgentToolExecutor.class).warn("跳过 Python 工具 {}：{}", code, unavailable);
+            return null;
+        }
         return guarded(new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot));
     }
 
@@ -208,6 +215,10 @@ public final class AgentToolExecutor {
         ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
         if (runtimeExecutor == null) {
             throw new BizException("Python 运行器不可用，请先启用集成能力");
+        }
+        String unavailable = runtimeExecutor.unavailableReason();
+        if (unavailable != null) {
+            throw new BizException(unavailable);
         }
         Map<String, Object> safeArguments = arguments == null ? Map.of() : new LinkedHashMap<>(arguments);
         return executePython(pythonTool, safeArguments);

@@ -86,6 +86,7 @@ public final class AiToolModuleWebAssembler {
                         .canDisable(module.canDisable())
                         .lazy(module.lazy())
                         .toolCount(module.toolCount())
+                        .unavailableReason(module.unavailableReason())
                         .tools(module.tools().stream()
                                 .map(tool -> AiToolModuleRes.Tool.builder()
                                         .code(tool.code())

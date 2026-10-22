@@ -32,12 +32,37 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
     private volatile String pythonCommand = DEFAULT_PYTHON_COMMAND;
     /** 默认配置下探测到的可用解释器缓存；配置变更时失效，解析失败也缓存以避免每次执行都反复探测。 */
     private volatile List<String> resolvedBaseCommand;
+    /** 解释器不可用的原因缓存（null 表示可用）；配置变更时失效。 */
+    private volatile String unavailable;
+    private volatile boolean probed;
+    static final String MISSING_PYTHON = "当前部署环境没有可用的 Python 解释器（已尝试 python、python3、py -3），依赖 Python 的工具暂不可用。"
+            + "Docker 镜像默认不含 Python：构建后端镜像时传 --build-arg INSTALL_PYTHON=true，或在集成能力中配置解释器命令后重试。";
 
     public void configurePythonCommand(String pythonCommand) {
         this.pythonCommand = pythonCommand == null || pythonCommand.isBlank()
                 ? DEFAULT_PYTHON_COMMAND
                 : pythonCommand.trim();
         this.resolvedBaseCommand = null;
+        this.unavailable = null;
+        this.probed = false;
+    }
+
+    @Override
+    public String unavailableReason() {
+        if (!probed) {
+            synchronized (this) {
+                if (!probed) {
+                    RuntimeExecutionResult check = checkPythonCommand();
+                    unavailable = check.status() == ExecutionStatus.SUCCESS ? null
+                            : pythonCommand.equals(DEFAULT_PYTHON_COMMAND) ? MISSING_PYTHON
+                            : "配置的 Python 解释器命令不可用（" + pythonCommand + "）："
+                              + (check.errorMessage() == null || check.errorMessage().isBlank() ? "无法执行" : check.errorMessage().trim())
+                              + "。请在集成能力中修正解释器命令。";
+                    probed = true;
+                }
+            }
+        }
+        return unavailable;
     }
 
     public void resetPythonCommand() {
@@ -79,6 +104,10 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
     public RuntimeExecutionResult execute(RuntimeScript script, String stdin) {
         if (script.getLanguage() != RuntimeLanguage.PYTHON) {
             return new RuntimeExecutionResult("", "暂不支持该运行时", -1, 0, ExecutionStatus.FAILED, "暂不支持该运行时");
+        }
+        String reason = unavailableReason();
+        if (reason != null) {
+            return new RuntimeExecutionResult("", reason, -1, 0, ExecutionStatus.FAILED, reason);
         }
         long start = System.currentTimeMillis();
         Path workDir = null;

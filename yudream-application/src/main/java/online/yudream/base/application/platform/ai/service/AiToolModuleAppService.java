@@ -65,6 +65,13 @@ public class AiToolModuleAppService {
     private final online.yudream.base.application.platform.capability.service.CapabilityAppService capabilityAppService;
     private final boolean configEnabled;
     private final boolean onDemandLoading;
+    /** Python 运行器（集成能力提供）；用于在工具目录标出部署环境缺少解释器的情况 */
+    private online.yudream.base.domain.platform.integration.service.RuntimeExecutor runtimeExecutor;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void runtimeExecutor(online.yudream.base.domain.platform.integration.service.RuntimeExecutor runtimeExecutor) {
+        this.runtimeExecutor = runtimeExecutor;
+    }
 
     public AiToolModuleAppService(
             ObjectProvider<AiAgentTool> systemTools,
@@ -198,7 +205,9 @@ public class AiToolModuleAppService {
                     !AiToolModules.MODULE_META.equals(meta.code()),
                     onDemandLoading && !meta.alwaysOn(),
                     tools.size(),
-                    tools
+                    tools,
+                    AiToolModules.MODULE_CUSTOM.equals(meta.code()) && !tools.isEmpty() && runtimeExecutor != null
+                            ? runtimeExecutor.unavailableReason() : null
             ));
         }
         return new AiToolModuleDTO(systemToolsEnabled(), configEnabled, onDemandLoading, modules);

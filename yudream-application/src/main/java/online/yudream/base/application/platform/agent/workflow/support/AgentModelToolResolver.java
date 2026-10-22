@@ -31,6 +31,8 @@ public final class AgentModelToolResolver {
         List<AiAgentTool> resolved = new java.util.ArrayList<>(
                 orderedCodes.stream()
                         .map(code -> toolExecutor.resolve(code, application, permissionSnapshot))
+                        // 运行环境不可用的工具（如没有 Python）已在解析时剔除
+                        .filter(java.util.Objects::nonNull)
                         .toList()
         );
         if (command != null && command.isRuntimeToolCallingEnabled() && command.getRuntimeToolCodes() != null) {

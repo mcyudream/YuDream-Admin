@@ -368,6 +368,8 @@ const configEnabled = computed(() => catalog.value?.configEnabled !== false)
 const switchBusy = computed(() => busyKey.value !== '')
 
 /** 模块目录按编码索引：行内开关的权威状态、加载方式与工具数都取自目录，目录未覆盖时退回行数据 */
+// 依赖运行环境的模块（如 Python 自定义工具）在部署缺少解释器时不会交给模型，这里提示原因与处理办法
+const unavailableModules = computed(() => modules.value.filter(module => module.unavailableReason))
 const moduleCatalog = computed(() => new Map<string, AiToolModule>(modules.value.map(module => [module.code, module])))
 
 /** 总开关旁的状态说明：禁用原因优先于开关值，避免出现「点不动的开关」没有解释 */
@@ -644,6 +646,13 @@ function removeTool(row: AiToolCatalogRow) {
               <span class="tools-master__state">{{ masterSwitchState }}</span>
             </span>
           </div>
+          <YdAlert
+            v-for="module in unavailableModules"
+            :key="module.code"
+            icon="morph:triangle-alert"
+            :title="`「${module.name}」模块当前不可用，其中的工具不会交给模型`"
+            :description="module.unavailableReason"
+          />
           <YdLoadingOverlay :loading="loading" class="tools-table__body">
             <YdResponsiveEnhancedTable
               row-key="code"

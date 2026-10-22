@@ -85,6 +85,34 @@ class AgentModelToolResolverTest {
     }
 
     @Test
+    void shouldOmitPythonToolsWhenDeploymentHasNoInterpreter() {
+        AiAgentTool systemTool = systemTool();
+        AtomicReference<Boolean> executed = new AtomicReference<>(false);
+        online.yudream.base.domain.platform.integration.service.RuntimeExecutor noPython = new online.yudream.base.domain.platform.integration.service.RuntimeExecutor() {
+            @Override
+            public RuntimeExecutionResult execute(online.yudream.base.domain.platform.integration.aggregate.RuntimeScript script, String stdin) {
+                executed.set(true);
+                return failRuntime();
+            }
+
+            @Override
+            public String unavailableReason() {
+                return "当前部署环境没有可用的 Python 解释器";
+            }
+        };
+        AgentModelToolResolver resolver = resolver(toolRepo(pythonTool(true)), noPython, List.of(systemTool), permission -> true);
+
+        List<AiAgentTool> tools = resolver.resolve(
+                List.of("risk_score", "system.lookup"),
+                application("risk_score", "system.lookup"),
+                command("risk:score", "system:lookup")
+        );
+
+        assertThat(tools).containsExactly(systemTool);
+        assertThat(executed.get()).isFalse();
+    }
+
+    @Test
     void shouldRejectMissingDisabledUnauthorizedAndUngrantToolsBeforeModelExecution() {
         AgentModelToolResolver missing = resolver(emptyToolRepo(), (script, stdin) -> failRuntime(), List.of(), permission -> true);
         AgentModelToolResolver disabled = resolver(toolRepo(pythonTool(false)), (script, stdin) -> failRuntime(), List.of(), permission -> true);
