@@ -23,6 +23,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AiRunAppServiceTest {
     @Test
+    void continuationDoesNotDowngradeCapturedScopeAndInputCarriesPersistentIdentity() {
+        MemoryRepo repo = new MemoryRepo();
+        var service = service(repo);
+        service.execute(7L, "chat", "session", out -> {
+            out.persistedInput("9007199254740993", "继续");
+            out.privateProfile(new online.yudream.base.domain.platform.ai.valobj.HarnessResumeProfile(
+                    "provider", "model", "提示", true, List.of("read"), true, 7L, true));
+            out.privateProfile(new online.yudream.base.domain.platform.ai.valobj.HarnessResumeProfile(
+                    "provider", "model", "提示", true, List.of("read"), false, 7L, true));
+            return Map.of();
+        }, null);
+        var run = repo.runs.values().iterator().next();
+        assertTrue(run.getNativeProfile().exactToolScopeCaptured());
+        var input = service.events(7L, run.getId(), 0).stream().filter(event -> event.event().equals("ai.input")).findFirst().orElseThrow();
+        assertEquals("9007199254740993", input.payload().get("messageId"));
+    }
+
+    @Test
     void studioResumeRechecksCmsGateAndWritePermissionAndRestoresScopedTools() throws Exception {
         MemoryRepo repo = new MemoryRepo();
         var run = repo.create(AiRun.start(7L, "123", "chat", "dead-instance"));

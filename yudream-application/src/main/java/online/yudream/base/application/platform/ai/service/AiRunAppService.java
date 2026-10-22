@@ -568,6 +568,9 @@ public class AiRunAppService {
         public String id() { return run.getId(); }
         public boolean awaitingInteraction() { return waiting; }
         public void input(String text) { if (text != null) event("ai.input", "submitted", Map.of("content", text)); }
+        public void persistedInput(String messageId, String text) {
+            event("ai.input", "submitted", Map.of("content", text, "messageId", messageId));
+        }
         private online.yudream.base.domain.platform.ai.service.AiGenerationObserverScope.Listener generationObserver() {
             return new online.yudream.base.domain.platform.ai.service.AiGenerationObserverScope.Listener() {
                 public void content(String id, online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest request, String delta) {
@@ -602,6 +605,7 @@ public class AiRunAppService {
             repo.nativeReference(run.getId(), reference, run.isNativeResumeSupported());
         }
         public void privateProfile(online.yudream.base.domain.platform.ai.valobj.HarnessResumeProfile profile) {
+            profile = profile.retainCapturedScope(run.getNativeProfile());
             run.setNativeProfile(profile);
             repo.nativeProfile(run.getId(), profile);
             if (profile.invocationContext() != null) privateInvocationContext(profile.invocationContext());

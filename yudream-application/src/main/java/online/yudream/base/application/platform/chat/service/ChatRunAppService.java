@@ -35,11 +35,10 @@ public class ChatRunAppService {
         String nativeSession = (cmd.getScopeType() == ChatScopeType.CONSOLE ? "console-" : "chat-") + sessionId;
         String agentCode = cmd.getAgentCode() == null ? "general" : cmd.getAgentCode();
         return runs.start(userId, "chat", sessionId, emitter -> {
-            emitter.input(cmd.getQuestion());
             if (cmd.getScopeType() == ChatScopeType.GENERAL || cmd.getScopeType() == ChatScopeType.CONSOLE) emitter.allowNativeResume();
             prepareFrontend(userId, cmd, emitter);
             return chat.send(userId, cmd, emitter::content, emitter::reasoning, emitter::tool,
-                    activity -> emitter.progress(activity.phase(), activity));
+                    activity -> emitter.progress(activity.phase(), activity), emitter::persistedInput);
         }, () -> harness.interrupt(userId, nativeSession, agentCode));
     }
 
