@@ -549,7 +549,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
 
     /** 拥有文件工作区的 agent profile 前缀：工作流与 CMS 静态站点 builder。 */
     static boolean workspaceProfile(String agentCode) {
-        return agentCode != null && (agentCode.startsWith("workflow") || agentCode.startsWith("cms-builder"));
+        return agentCode != null && agentCode.startsWith("workflow");
     }
 
     /**

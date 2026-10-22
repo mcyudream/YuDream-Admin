@@ -781,6 +781,12 @@ public class MenuAppService {
     }
 
     private boolean platformCapabilityVisible(Menu menu) {
+        // 种子移除不会清理已有菜单；退役入口在运行期隐藏，保留历史记录与授权。
+        if (menu == null || "platform:cms-workspace".equals(menu.getCode())
+                || "platform:cms-workspace".equals(menu.getParentCode())
+                || (menu.getCode() != null && menu.getCode().startsWith("platform:cms-workspace:"))
+                || "/platform/cms/workspace".equals(menu.getPath())
+                || "platform/cms/workspace/index.vue".equals(menu.getComponent())) return false;
         String capabilityCode = resolvePlatformCapability(menu);
         if (capabilityCode != null) {
             return capabilityModuleRepo.findByCode(capabilityCode)

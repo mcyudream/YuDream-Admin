@@ -345,6 +345,8 @@ public class AiRunAppService {
     }
     private online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest requestFor(AiRun run, List<String> permissions, boolean execution) {
         var ref = run.getNativeReference(); var profile = run.getNativeProfile();
+        if (execution && ("cms-builder".equals(ref.agentCode()) || "cms".equals(ref.agentCode())))
+            throw new BizException("旧站点工作区已移除，不能接续其构建任务，请取消后使用网站工作台");
         if (!profile.exactToolScopeCaptured()) throw new BizException("此历史检查点未记录准确的工具授权边界，请取消后继续会话");
         if (!profile.nativeActorCaptured()) throw new BizException("此历史检查点未记录原生调用身份，请取消后继续会话");
         if ("plugin-ai".equals(run.getModule()) && profile.invocationContext() == null)

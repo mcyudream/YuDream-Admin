@@ -229,7 +229,7 @@ async function importPackage() {
     <div class="mx-auto p-4 flex flex-col gap-5 max-w-3xl sm:p-6">
       <YdAlert>
         <template #description>
-          旧版主题中心与旧 CMS 工作台完整保留。旧版 CMS 内容支持定向复制迁移：读取当前主题的首页与文章，预检通过后一次性把所选页面副本新增到工作台（不删除旧数据、不自动保存/发布）；便携包导入导出继续可用。
+          旧版主题中心与 CMS 内容支持定向复制迁移：读取当前主题的首页与文章，预检通过后一次性把所选页面副本新增到工作台（不删除旧数据、不自动保存/发布）；便携包导入导出继续可用。旧站点工作区功能已移除，页面设计请使用网站工作台。
         </template>
       </YdAlert>
 
@@ -245,13 +245,6 @@ async function importPackage() {
             <span class="flex flex-col min-w-0">
               <strong>旧版主题中心</strong>
               <span class="text-xs text-muted-foreground truncate">/platform/theme-center/legacy</span>
-            </span>
-          </RouterLink>
-          <RouterLink to="/platform/cms/workspace" class="studio-nav-card" aria-label="打开旧版 CMS 工作台">
-            <YdIcon name="morph:layout-template" class="text-lg" />
-            <span class="flex flex-col min-w-0">
-              <strong>旧版 CMS 工作台</strong>
-              <span class="text-xs text-muted-foreground truncate">/platform/cms/workspace</span>
             </span>
           </RouterLink>
         </div>

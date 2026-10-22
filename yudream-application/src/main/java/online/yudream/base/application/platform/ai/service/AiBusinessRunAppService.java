@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 内置 Agent 工作流运行出口。CMS 页面生成与画布构建不再有独立入口：
- * 统一走 AI 助手网关（chat 会话 + console profile 的 cms-canvas / cms-builder）。
+ * 统一走 AI 助手网关（chat 会话 + console profile 的 cms-canvas / cms-studio）。
  */
 @Service
 @RequiredArgsConstructor

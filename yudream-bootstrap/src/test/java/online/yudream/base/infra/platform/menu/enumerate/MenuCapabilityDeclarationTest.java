@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 菜单注解声明的能力归属：编码无法推断出能力的入口（网站工作台、站点工作区、技能库）
+ * 菜单注解声明的能力归属：编码无法推断出能力的入口（网站工作台、技能库）
  * 在能力关闭时不进入运行期菜单，其所在分组也随之无可见子节点。
  */
 class MenuCapabilityDeclarationTest {
@@ -36,7 +36,7 @@ class MenuCapabilityDeclarationTest {
     void indexesDeclaredCapabilities() {
         Map<String, String> index = MenuEnumScanner.capabilityIndex(SystemMenuModules.CLASSES);
         assertEquals("cms", index.get("platform:theme-center"));
-        assertEquals("cms", index.get("platform:cms-workspace"));
+        assertFalse(index.containsKey("platform:cms-workspace"));
         assertEquals("agent", index.get("platform:agent-skill"));
     }
 
@@ -63,8 +63,24 @@ class MenuCapabilityDeclarationTest {
         enabled.put("agent", true);
         Set<String> on = service.runtimeAvailableMenuCodes(menus);
         assertTrue(on.contains("platform:theme-center"));
-        assertTrue(on.contains("platform:cms-workspace"));
+        assertFalse(on.contains("platform:cms-workspace"));
         assertTrue(on.contains("platform:agent-skill"));
+    }
+
+    @Test
+    void persistedRetiredWorkspaceStaysHiddenEvenWithCapabilitiesEnabled() {
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        when(capabilities.findByCode(anyString())).thenReturn(Optional.of(CapabilityModule.builder().enabled(true).build()));
+        MenuAppService service = new MenuAppService(mock(MenuDomainService.class), mock(MenuRepo.class), capabilities);
+        List<Menu> menus = new ArrayList<>(flatten());
+        menus.add(Menu.builder().code("platform:cms-workspace").path("/platform/cms/workspace")
+                .type(online.yudream.base.domain.system.menu.enumerate.MenuNodeType.MENU).build());
+        menus.add(Menu.builder().code("platform:cms-workspace:view").parentCode("platform:cms-workspace")
+                .type(online.yudream.base.domain.system.menu.enumerate.MenuNodeType.BUTTON).build());
+        Set<String> available = service.runtimeAvailableMenuCodes(menus);
+        assertFalse(available.contains("platform:cms-workspace"));
+        assertFalse(available.contains("platform:cms-workspace:view"));
+        assertTrue(available.contains("platform:theme-center"));
     }
 
     private static List<Menu> flatten() {
