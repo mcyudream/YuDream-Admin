@@ -50,9 +50,9 @@ ${sources}
     title: '站点内容模型',
     body: `features.content = {sections:[{code,title,description?,fields:[...]}], values:{}}；字段类型 ${STUDIO_CONTENT_FIELD_TYPES.join('/')}，list 用 itemFields 声明条目字段（不嵌套）。
 - 运营在后台「站点内容」页填写 values；用户说“改横幅/换图/加一张卡片/改介绍”时，先 theme(section=content) 看是否已有字段，有就用 set-content 改值，不要改页面结构。
-- 页面绑定：data-yd-content="键" 写文本（img 写 src）；data-yd-content-href 写链接；data-yd-content-title 写 title；data-yd-content-bg 设背景图；data-yd-content-show="开关键" 为 false 时隐藏；列表字段作为 data-yd-source="content:键"。
+- 页面绑定：data-yd-content="键" 写文本（img/video/audio 写 src，video 字段绑定到 <video controls>）；data-yd-content-href 写链接；data-yd-content-title 写 title；data-yd-content-bg 设背景图；data-yd-content-show="开关键" 为 false 时隐藏；列表字段作为 data-yd-source="content:键"。
 - 新增可编辑内容：set-features 往内容模型加字段（保留原有 sections 与 values），再在节点上绑定；未填写时用 defaultValue，再缺省保留作者内容。
-- 值必须符合字段类型：image/link/audio 为站内路径或 https 地址；color 为 #rrggbb；select 必须是选项值。`,
+- 值必须符合字段类型：image/link/audio/video 为站内路径或 https 地址；color 为 #rrggbb；select 必须是选项值。`,
   },
   effects: {
     title: '站点功能（粒子、音乐、音效、进入提示）',

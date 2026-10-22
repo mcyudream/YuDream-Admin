@@ -142,6 +142,39 @@ async function uploadThemeAudio() {
   }
 }
 
+// ===== video：上传或填写视频地址（站内文件 URL / https），可预览；清空存空串 =====
+const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg']
+const videoUploading = ref(false)
+const videoSrc = computed(() => typeof props.modelValue === 'string' && props.modelValue ? toBackendAssetUrl(props.modelValue) : '')
+async function uploadThemeVideo() {
+  const [file] = await useYdFilePicker().open({ accept: VIDEO_TYPES.join(','), multiple: false })
+  if (!file) {
+    return
+  }
+  if (!VIDEO_TYPES.includes(file.type)) {
+    toast.error('请选择 MP4/WebM/OGG 视频文件（浏览器可直接播放的格式）')
+    return
+  }
+  videoUploading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    data.append('module', props.pluginCode ? `theme-${props.pluginCode}` : 'theme-config')
+    data.append('publicAccess', 'true')
+    const url = (await apiFiles.upload(data)).data.url
+    if (!url) {
+      throw new Error('视频上传后未返回访问地址')
+    }
+    update(url)
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '视频上传失败')
+  }
+  finally {
+    videoUploading.value = false
+  }
+}
+
 async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: (percent: number) => void }) {
   if (!file.type.startsWith('image/')) {
     toast.error('请选择图片文件')
@@ -259,6 +292,26 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         {{ emptyMeansDefault === false ? '支持 MP3/OGG/WAV/WebM；留空会关闭这项音效，可用“恢复默认”撤销覆盖。' : '支持 MP3/OGG/WAV/WebM；清空后保存即恢复主题定义的默认行为。' }}
       </p>
     </template>
+    <template v-else-if="field.type === 'video'">
+      <div class="theme-config-field__audio">
+        <YdInput
+          :model-value="modelValue ?? ''"
+          :placeholder="field.placeholder || '站内视频地址或 https 地址'"
+          class="flex-1 min-w-0"
+          @update:model-value="update"
+        />
+        <YdButton variant="outline" :loading="videoUploading" @click="uploadThemeVideo">
+          <YdIcon name="morph:upload" /> 上传
+        </YdButton>
+        <YdButton v-if="modelValue" variant="ghost" aria-label="清空视频" @click="update('')">
+          <YdIcon name="morph:x" />
+        </YdButton>
+      </div>
+      <video v-if="videoSrc" :key="videoSrc" :src="videoSrc" controls preload="metadata" playsinline class="theme-config-field__video-player" />
+      <p class="theme-config-field__hint">
+        支持 MP4（H.264）/WebM/OGG；上传进度取决于文件大小，较大的视频建议先压缩。{{ emptyMeansDefault === false ? '留空会隐藏视频。' : '清空后保存即恢复主题默认。' }}
+      </p>
+    </template>
     <YdInput
       v-else-if="field.secret"
       :model-value="modelValue ?? ''"
@@ -334,6 +387,16 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.theme-config-field__video-player {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  max-height: 240px;
+  margin-top: 8px;
+  background: #000;
+  border-radius: 6px;
 }
 
 .theme-config-field__audio-player {

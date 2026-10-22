@@ -343,6 +343,9 @@ function mediaNode(asset: StudioAsset): StudioNode | null {
     const node = createStudioNode('video')
     node.attributes.src = asset.url
     node.attributes.controls = ''
+    // iOS 需要 playsinline 才能在页内播放（否则强制全屏）；只预取元数据，不预载整段视频
+    node.attributes.playsinline = ''
+    node.attributes.preload = 'metadata'
     node.styles.width = '100%'
     return node
   }

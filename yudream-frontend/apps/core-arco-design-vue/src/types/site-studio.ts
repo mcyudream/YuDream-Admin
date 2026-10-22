@@ -144,8 +144,8 @@ export type StudioSkinRole = 'panel' | 'button' | 'control' | 'heading'
 export const STUDIO_SKIN_ROLES: StudioSkinRole[] = ['panel', 'button', 'control', 'heading']
 
 /** 站点内容字段类型（与主题配置 schema 同形）：list 为可增删的条目列表，条目字段由 itemFields 声明（不嵌套 list） */
-export type StudioContentFieldType = 'text' | 'textarea' | 'number' | 'switch' | 'select' | 'color' | 'image' | 'link' | 'list' | 'particles' | 'audio'
-export const STUDIO_CONTENT_FIELD_TYPES: StudioContentFieldType[] = ['text', 'textarea', 'number', 'switch', 'select', 'color', 'image', 'link', 'list', 'particles', 'audio']
+export type StudioContentFieldType = 'text' | 'textarea' | 'number' | 'switch' | 'select' | 'color' | 'image' | 'link' | 'list' | 'particles' | 'audio' | 'video'
+export const STUDIO_CONTENT_FIELD_TYPES: StudioContentFieldType[] = ['text', 'textarea', 'number', 'switch', 'select', 'color', 'image', 'link', 'list', 'particles', 'audio', 'video']
 
 /**
  * 站点功能（平台实现的受控效果）由内容字段驱动：字段声明 effect 即把它的值交给对应效果，每种效果最多一个字段。

@@ -144,3 +144,16 @@ test('contrast helpers follow WCAG and blend translucent text', () => {
   assert.ok(contrastRatio([119, 119, 119, 1], [255, 255, 255, 1]) > 4.4)
   assert.ok(contrastRatio([0, 0, 0, 0.2], [255, 255, 255, 1]) < 3)
 })
+
+test('video content fields accept media URLs and reject non-URL values', async () => {
+  const document = site()
+  document.features!.content!.sections[0]!.fields.push({ key: 'heroVideo', label: '宣传视频', type: 'video', defaultValue: '' })
+  const f = context(document)
+  await executeStudioAgentTool('cms.studio.apply', { ...f.args, expectedRevision: 'r1', command: { type: 'set-content', values: { heroVideo: '/api/files/123/content' } } }, () => f.state, f.execute)
+  assert.equal(f.state.document.features!.content!.values.heroVideo, '/api/files/123/content')
+  f.state.revision = 'r2'
+  await executeStudioAgentTool('cms.studio.apply', { ...f.args, expectedRevision: 'r2', command: { type: 'set-content', values: { heroVideo: 'https://cdn.example.com/intro.mp4' } } }, () => f.state, f.execute)
+  for (const bad of ['javascript:alert(1)', '#fff', 'data:video/mp4;base64,AAAA']) {
+    await assert.rejects(executeStudioAgentTool('cms.studio.apply', { ...f.args, expectedRevision: 'r2', command: { type: 'set-content', values: { heroVideo: bad } } }, () => f.state, f.execute), bad)
+  }
+})

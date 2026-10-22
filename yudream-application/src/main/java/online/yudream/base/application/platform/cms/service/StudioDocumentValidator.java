@@ -29,7 +29,7 @@ public class StudioDocumentValidator {
     private static final Pattern FONT_FAMILY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_ -]{0,63}");
     private static final Pattern KEYFRAME_KEY = Pattern.compile("from|to|(?:100|[1-9]?\\d)(?:\\.\\d{1,2})?%");
     private static final Set<String> TAGS = Set.of("a abbr address article aside audio b bdi bdo blockquote br button caption cite code col colgroup dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr track u ul var video wbr".split(" "));
-    private static final Set<String> ATTRIBUTES = Set.of("id class title lang dir role href target rel download src poster alt width height controls autoplay loop muted preload loading decoding crossorigin type media sizes datetime cite open colspan rowspan scope headers span start reversed value kind srclang label".split(" "));
+    private static final Set<String> ATTRIBUTES = Set.of("id class title lang dir role href target rel download src poster alt width height controls autoplay loop muted playsinline preload loading decoding crossorigin type media sizes datetime cite open colspan rowspan scope headers span start reversed value kind srclang label".split(" "));
     private static final Set<String> DATA_MIMES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm", "video/mp4", "video/webm", "video/ogg", "font/woff", "font/woff2", "font/ttf", "font/otf");
     private static final Set<String> CSS_FUNCTIONS = Set.of("var calc min max clamp rgb rgba hsl hsla hwb lab lch oklab oklch color color-mix linear-gradient radial-gradient conic-gradient repeating-linear-gradient repeating-radial-gradient repeating-conic-gradient cubic-bezier steps translate translatex translatey translatez translate3d scale scalex scaley scalez scale3d rotate rotatex rotatey rotatez rotate3d skew skewx skewy matrix matrix3d perspective blur brightness contrast drop-shadow grayscale hue-rotate invert opacity saturate sepia fit-content repeat minmax counter counters attr env round mod rem abs sign pow sqrt hypot log exp sin cos tan asin acos atan atan2".split(" "));
     private static final Pattern CSS_FUNCTION = Pattern.compile("[a-zA-Z_-][a-zA-Z0-9_-]*");
@@ -303,7 +303,7 @@ public class StudioDocumentValidator {
         }
     }
 
-    private static final Set<String> CONTENT_TYPES = Set.of("text", "textarea", "number", "switch", "select", "color", "image", "link", "list", "particles", "audio");
+    private static final Set<String> CONTENT_TYPES = Set.of("text", "textarea", "number", "switch", "select", "color", "image", "link", "list", "particles", "audio", "video");
     private static final Map<String, String> CONTENT_EFFECT_TYPES = Map.of(
             "particles", "particles", "music", "list", "musicVolume", "number", "effectsDefaultOn", "switch",
             "effectVolume", "number", "clickSound", "audio", "buttonSound", "audio", "toastSound", "audio", "pageEffects", "list");
@@ -432,6 +432,7 @@ public class StudioDocumentValidator {
                     case "color" -> { if (!text.matches("#[0-9a-fA-F]{6}")) fail(name + "须为#rrggbb"); }
                     case "image" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为图片地址"); safeUrl(text, false); }
                     case "audio" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为音频地址"); safeUrl(text, false); }
+                    case "video" -> { if (text.startsWith("#") || text.startsWith("data:")) fail(name + "须为视频地址"); safeUrl(text, false); }
                     case "link" -> { if (text.startsWith("data:")) fail(name + "须为链接地址"); safeUrl(text, false); }
                     case "particles" -> { if (!PARTICLE_PRESETS.contains(text)) fail(name + "不是可用的粒子效果"); }
                     case "select" -> {

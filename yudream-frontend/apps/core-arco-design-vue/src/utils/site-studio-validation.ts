@@ -10,7 +10,7 @@ const KEYFRAME_KEY = /^(?:from|to|(?:100|[1-9]?\d)(?:\.\d{1,2})?%)$/
 export const STUDIO_BREAKPOINTS = { tablet: 992, mobile: 768 } as const
 const safeTags = new Set('a abbr address article aside audio b bdi bdo blockquote br button caption cite code col colgroup dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr track u ul var video wbr'.split(' '))
 export const STUDIO_VOID_TAGS = new Set('br col hr img source track wbr'.split(' '))
-const attributes = new Set('id class title lang dir role href target rel download src poster alt width height controls autoplay loop muted preload loading decoding crossorigin type media sizes datetime cite open colspan rowspan scope headers span start reversed value kind srclang label'.split(' '))
+const attributes = new Set('id class title lang dir role href target rel download src poster alt width height controls autoplay loop muted playsinline preload loading decoding crossorigin type media sizes datetime cite open colspan rowspan scope headers span start reversed value kind srclang label'.split(' '))
 const dataMimes = new Set('image/png image/jpeg image/gif image/webp image/avif audio/mpeg audio/ogg audio/wav audio/webm video/mp4 video/webm video/ogg font/woff font/woff2 font/ttf font/otf'.split(' '))
 const cssFunctions = new Set('url var calc min max clamp rgb rgba hsl hsla hwb lab lch oklab oklch color color-mix linear-gradient radial-gradient conic-gradient repeating-linear-gradient repeating-radial-gradient repeating-conic-gradient cubic-bezier steps translate translatex translatey translatez translate3d scale scalex scaley scalez scale3d rotate rotatex rotatey rotatez rotate3d skew skewx skewy matrix matrix3d perspective blur brightness contrast drop-shadow grayscale hue-rotate invert opacity saturate sepia fit-content repeat minmax counter counters attr env round mod rem abs sign pow sqrt hypot log exp sin cos tan asin acos atan atan2'.split(' '))
 export function cloneStudioJson<T>(value: T): T {
@@ -568,6 +568,10 @@ export function validateContentValue(field: StudioContentField, value: unknown) 
       else if (field.type === 'audio') {
         validateStudioUrl(value as string)
         studioAssert(!(value as string).startsWith('#'), `${name}须为音频地址`)
+      }
+      else if (field.type === 'video') {
+        validateStudioUrl(value as string)
+        studioAssert(!(value as string).startsWith('#') && !(value as string).startsWith('data:'), `${name}须为视频地址`)
       }
       else if (field.type === 'particles') {
         studioAssert(STUDIO_PARTICLE_PRESETS.includes(value as never), `${name}不是可用的粒子效果`)

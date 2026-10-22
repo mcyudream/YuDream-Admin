@@ -129,4 +129,28 @@ class StudioDocumentValidatorTest {
         ((ObjectNode) doc.at("/pages/0")).put("path", "/activities/:id");
         assertThatCode(() -> validator.validate(doc.toString())).doesNotThrowAnyException();
     }
+
+    @Test void videoContentFieldsAcceptMediaUrlsAndRejectUnsafeValues() throws Exception {
+        java.util.function.Function<String, String> withVideo = value -> {
+            try {
+                var doc = (ObjectNode) mapper.readTree(DOCUMENT);
+                doc.set("features", mapper.readTree("""
+                        {"content":{"sections":[{"code":"home","title":"首页","fields":[{"key":"heroVideo","label":"宣传视频","type":"video","defaultValue":""}]}],"values":{"heroVideo":%s}}}
+                        """.formatted(mapper.writeValueAsString(value))));
+                return doc.toString();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        assertThatCode(() -> validator.validate(withVideo.apply("/api/files/123/content"))).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(withVideo.apply("https://cdn.example.com/intro.mp4"))).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(withVideo.apply(""))).doesNotThrowAnyException();
+        var inline = (ObjectNode) mapper.readTree(DOCUMENT);
+        ((ObjectNode) inline.at("/pages/0/root/0")).put("tag", "video").put("type", "video").remove("text");
+        ((ObjectNode) inline.at("/pages/0/root/0/attributes")).put("src", "/api/files/1/content").put("controls", "").put("playsinline", "").put("preload", "metadata");
+        assertThatCode(() -> validator.validate(inline.toString())).doesNotThrowAnyException();
+        for (String bad : new String[] {"javascript:alert(1)", "#fff", "data:video/mp4;base64,AAAA"}) {
+            assertThatThrownBy(() -> validator.validate(withVideo.apply(bad))).as(bad).isInstanceOf(BizException.class);
+        }
+    }
 }

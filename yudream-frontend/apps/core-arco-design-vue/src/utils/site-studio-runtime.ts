@@ -26,7 +26,7 @@ import { STUDIO_ADAPTER_ENDPOINT, validateStudioUrl } from './site-studio-valida
  *   条目链接可用 data-yd-link="/site/activity?id={id}" 由字段拼出（字段值逐个 URL 编码）
  * - 计数：data-yd-count="数据源" 显示该数据源的真实条数（如首页统计）；条目内 data-yd-show / data-yd-hide="字段" 按字段真假显隐
  * - 复制：按钮 data-yd-action="copy" 复制自身 title（可经 data-yd-title 绑定字段，如服务器地址）
- * - 站点内容（features.content，运营在「站点内容」页填写）：data-yd-content="字段" 写文本（img 写 src），
+ * - 站点内容（features.content，运营在「站点内容」页填写）：data-yd-content="字段" 写文本（img/video/audio/source 写 src），
  *   data-yd-content-href 写链接（按宿主路由解析，站点页写 /site/...），data-yd-content-title 写提示（复制按钮复制该值），data-yd-content-bg 设背景图，
  *   data-yd-content-show="开关字段" 为 false 时隐藏；列表字段作为数据源 content:{字段}，条目字段照常经 data-yd-text/-src/-href 绑定
  * - 数据绑定：data-yd-source 容器内 data-yd-item 为条目模板，data-yd-text/-href/-src/-title 绑定字段（$index 为序号）；
@@ -751,7 +751,9 @@ export function studioContentValue(document: SiteDocument, key: string): unknown
   return undefined
 }
 
-/** 站点内容单值绑定：文本/图片、链接、背景图与开关显隐 */
+const MEDIA_TAGS = new Set(['IMG', 'VIDEO', 'AUDIO', 'SOURCE'])
+
+/** 站点内容单值绑定：文本/图片/视频/音频、链接、背景图与开关显隐 */
 function bindContent(host: Element, document: SiteDocument) {
   const scalar = (key: string) => {
     const value = studioContentValue(document, key)
@@ -762,10 +764,14 @@ function bindContent(host: Element, document: SiteDocument) {
     if (!value) {
       continue
     }
-    if (element.tagName === 'IMG') {
+    if (MEDIA_TAGS.has(element.tagName)) {
       const src = safeUrl(value, false)
       if (src) {
         element.setAttribute('src', src)
+        // <source> 换地址后需由所属 <video>/<audio> 重新加载
+        if (element.tagName === 'SOURCE') {
+          (element.parentElement as HTMLMediaElement | null)?.load?.()
+        }
       }
     }
     else {

@@ -55,7 +55,7 @@ function setMenuRole(value: unknown) {
 const contentFields = computed(() => (store.doc?.features?.content?.sections ?? []).flatMap(section => section.fields.map(field => ({ ...field, section: section.title }))))
 const contentOptions = (types: string[]) => [{ label: '不绑定', value: '' }, ...contentFields.value.filter(field => types.includes(field.type)).map(field => ({ label: `${field.section} · ${field.label}`, value: field.key }))]
 const contentBindings = computed(() => [
-  { attr: 'data-yd-content', label: '文本 / 图片', options: contentOptions(['text', 'textarea', 'number', 'image', 'select', 'color']) },
+  { attr: 'data-yd-content', label: '文本 / 图片 / 视频 / 音频', options: contentOptions(['text', 'textarea', 'number', 'image', 'video', 'audio', 'select', 'color']) },
   { attr: 'data-yd-content-href', label: '链接地址', options: contentOptions(['link']) },
   { attr: 'data-yd-content-title', label: '提示 / 复制内容', options: contentOptions(['text', 'link']) },
   { attr: 'data-yd-content-bg', label: '背景图', options: contentOptions(['image']) },
