@@ -27,6 +27,7 @@ const inspectorOptions = computed(() => [
   ...(aiEnabled.value ? [{ label: 'AI 设计助手', value: 'assistant' }] : []),
 ])
 const toast = useYdToast()
+const { auth } = useAppAuth()
 const modal = useYdModal()
 
 const view = ref<'overview' | 'design' | 'theme' | 'assets' | 'releases' | 'legacy'>('overview')
@@ -123,7 +124,8 @@ async function loadThemes() {
     themeOptions.value = editable.map((code) => {
       const card = themes.find(theme => (theme.pluginCode || 'default') === code)
       const label = card?.name || (code === 'default' ? '默认主题' : code)
-      return { label: code === 'default' ? label : `${label}（${code}）`, value: code }
+      const name = code === 'default' ? label : `${label}（${code}）`
+      return { label: code === activeThemeCode.value ? `${name} · 公开站使用中` : name, value: code }
     })
   }
   catch {
@@ -162,6 +164,45 @@ async function saveDraft() {
   }
 }
 
+/** 当前编辑的主题是否就是公开站正在使用的主题 */
+const editingActiveTheme = computed(() => store.themeCode === activeThemeCode.value)
+const activating = ref(false)
+
+/**
+ * 设为公开站主题：插件主题即启用该主题插件（同作用域主题互斥顶替），内置默认主题即停用当前主题插件。
+ * 尚未发布过的主题先提示，否则激活后公开站为空。
+ */
+function activateTheme() {
+  const code = store.themeCode
+  const unpublished = !store.state?.publishedReleaseId
+  modal.confirm({
+    title: '设为公开站主题',
+    content: unpublished
+      ? `「${code}」还没有发布过站点文档，激活后公开站 /site 会是空的。建议先「发布」再激活。仍要激活吗？`
+      : `确认把公开站 /site 切换为「${code}」的已发布站点吗？当前主题「${activeThemeCode.value}」的内容会保留，随时可以切换回来。`,
+    confirmButtonText: '激活',
+    onConfirm: async () => {
+      activating.value = true
+      try {
+        if (code === 'default') {
+          await apiTheme.deactivate()
+        }
+        else {
+          await apiTheme.activate(code)
+        }
+        await loadThemes()
+        toast.success(`公开站已切换为「${code}」`)
+      }
+      catch {
+        // 请求错误已由全局提示展示
+      }
+      finally {
+        activating.value = false
+      }
+    },
+  })
+}
+
 function publish() {
   const activeTheme = activeThemeCode.value
   modal.confirm({
@@ -173,7 +214,16 @@ function publish() {
     onConfirm: async () => {
       try {
         await store.publish()
-        toast.success(store.themeCode === activeTheme ? '已发布到公开站 /site' : '已发布（主题未激活，/site 暂不展示）')
+        if (store.themeCode === activeTheme) {
+          toast.success('已发布到公开站 /site')
+        }
+        else if (auth('platform:theme-center:use')) {
+          // 发布了未激活的主题：顺势询问是否切换公开站，避免「发布了却看不到」
+          activateTheme()
+        }
+        else {
+          toast.success('已发布（主题未激活，/site 暂不展示；需有「切换整站主题」权限的管理员激活）')
+        }
       }
       catch {
         toast.error(store.saveError || '发布失败')
@@ -225,8 +275,13 @@ function runCommand(command: StudioCommand | StudioCommand[]) {
   return store.execute(command)
 }
 
-loadThemes()
-void store.load()
+/** 首次打开默认编辑公开站正在使用的主题（否则改了默认主题却在 /site 看不到）；本次会话已选过主题则保持 */
+async function initialize() {
+  const firstOpen = !store.doc
+  await loadThemes()
+  void store.load(firstOpen ? activeThemeCode.value : store.themeCode)
+}
+void initialize()
 </script>
 
 <template>
@@ -290,6 +345,20 @@ void store.load()
               class="w-52"
               @update:model-value="switchTheme(String($event))"
             />
+            <YdTag v-if="editingActiveTheme" variant="secondary" class="whitespace-nowrap">
+              公开站使用中
+            </YdTag>
+            <YdButton
+              v-else
+              v-auth="'platform:theme-center:use'"
+              variant="outline"
+              size="sm"
+              :loading="activating"
+              :disabled="store.busy || themeLoading"
+              @click="activateTheme"
+            >
+              <YdIcon name="morph:power" /> 设为公开站主题
+            </YdButton>
             <YdTooltip content="撤销">
               <YdButton
                 v-auth="'platform:cms:edit'"

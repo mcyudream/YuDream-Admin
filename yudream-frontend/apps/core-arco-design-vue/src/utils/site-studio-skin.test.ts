@@ -39,3 +39,10 @@ test('public skin class mapping must reference existing theme classes and known 
   ;(role.features!.publicSkin!.classes as Record<string, string>).footer = 'btn'
   assert.throws(() => validateStudioDocument(role), /未知字段/)
 })
+
+test('embedded cards get compact padding only on phone widths', () => {
+  const css = compileStudioPublicSkin(skinned())
+  assert.match(css, /@media \(max-width: 768px\)\{html \.studio-shadow-layout \[data-slot="card"\]\{padding-block:12px !important;gap:12px !important\}/)
+  assert.match(css, /html \.studio-shadow-layout :is\(\[data-slot="card-content"\],\[data-slot="card-header"\],\[data-slot="card-footer"\]\)\{padding:0 14px !important\}\}/)
+  assert.doesNotMatch(css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\}/g, ''), /card-content/)
+})

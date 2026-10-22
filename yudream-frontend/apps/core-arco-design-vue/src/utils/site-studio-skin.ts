@@ -130,6 +130,8 @@ export function compileStudioPublicSkin(document: SiteDocument): string {
     ...(skin.pixel ? pixelRules(skin) : []),
     ...themeClassRules(document, skin),
     skin.dark ? `html:has(:is(${STUDIO_PUBLIC_ROOTS.join(',')})){color-scheme:dark}` : '',
+    // 手机宽度：嵌入主题页的卡片收紧内边距（卡片 + 内容区各 24px 叠在主题外壳内会挤掉一半宽度）
+    `@media (max-width: 768px){html .studio-shadow-layout [data-slot="card"]{padding-block:12px !important;gap:12px !important}html .studio-shadow-layout :is([data-slot="card-content"],[data-slot="card-header"],[data-slot="card-footer"]){padding:0 14px !important}}`,
     // 站点外壳占用底部（如固定物品栏）时，返回顶部按钮抬到外壳之上，不压住物品栏
     skin.bottomOffset ? `html:has(.studio-shadow-layout,.studio-shadow-region) .app-back-to-top{bottom:calc(${skin.bottomOffset} + 12px) !important}` : '',
   ].filter(Boolean).join('\n')

@@ -499,7 +499,7 @@ function openPage(pageId: string) {
                 </RouterLink>
               </div>
               <p class="text-xs text-muted-foreground m-0 mt-1">
-                公开站 /site 只在「{{ store.themeCode }}」是当前激活的公开站主题时展示发布内容；主题激活请到「主题中心」操作，当前编辑的主题未激活时发布内容暂不可见。停止发布请到「发布版本」页操作。
+                公开站 /site 只在「{{ store.themeCode }}」是当前激活的公开站主题时展示发布内容；当前编辑的主题未激活时发布内容暂不可见，可用顶栏「设为公开站主题」切换（发布未激活主题后也会询问是否激活）。停止发布请到「发布版本」页操作。
               </p>
             </template>
           </YdAlert>
