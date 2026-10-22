@@ -50,6 +50,7 @@ public final class ChatWebAssembler {
         cmd.setSessionId(request.getSessionId());
         cmd.setContextEnabled(request.isContextEnabled());
         cmd.setFrontendToolsEnabled(request.isFrontendToolsEnabled());
+        cmd.setMode(request.getMode());
         cmd.setFrontendContext(frontendContext(request.getFrontendContext()));
         cmd.setConfirmDecisions(request.getConfirmDecisions());
         cmd.setScopeType(request.getScopeType());

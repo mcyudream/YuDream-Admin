@@ -106,6 +106,8 @@ export interface ChatQuota {
 }
 
 export interface ChatSendPayload {
+  /** 工作区模式：ask 问答、plan 只读规划、code 可写工作区（写入需逐次确认） */
+  mode?: 'ask' | 'plan' | 'code'
   sessionId?: string
   scopeType?: ChatScopeType
   agentCode?: string

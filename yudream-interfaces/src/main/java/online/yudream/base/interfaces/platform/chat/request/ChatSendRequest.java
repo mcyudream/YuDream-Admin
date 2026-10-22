@@ -20,6 +20,8 @@ public class ChatSendRequest {
     private String spaceSlug;
     private String providerCode;
     private String modelCode;
+    /** 工作区模式：ask 问答（默认）、plan 只读规划、code 可写工作区（写入需逐次确认） */
+    private String mode;
     @Valid
     @Size(max = 10, message = "上下文不能超过 10 个")
     private List<ChatContextRefRequest> contextRefs = List.of();

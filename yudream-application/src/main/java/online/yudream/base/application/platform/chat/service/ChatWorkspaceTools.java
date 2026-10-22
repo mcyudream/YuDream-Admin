@@ -13,14 +13,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 用户工作区只读工具：列出与读取当前用户工作区文件，权限码与 HTTP 端点同源
- * （platform:chat:workspace:view），写入与删除只经界面端点，模型侧不提供。
+ * 用户工作区工具：列出与读取（platform:chat:workspace:view）在问答/规划模式提供；
+ * 写入与删除（platform:chat:workspace:edit）只在「编码」工作区模式提供，属写入风险工具，每次调用都需用户确认。
+ * 只操作 KV 中当前用户自己的工作区，不触及主机文件系统或 shell。
  */
 public final class ChatWorkspaceTools {
 
     public static final String LIST_TOOL = "workspace.list";
     public static final String READ_TOOL = "workspace.read";
     public static final String PERMISSION_CODE = "platform:chat:workspace:view";
+    public static final String WRITE_TOOL = "workspace.write";
+    public static final String DELETE_TOOL = "workspace.delete";
+    public static final String EDIT_PERMISSION_CODE = "platform:chat:workspace:edit";
+    /** 模型写入的单文件上限（文本）：远小于工作区 8 MB 上限，避免一次生成巨型文件 */
+    private static final int MAX_WRITE_BYTES = 1024 * 1024;
     /** 单次读取上限：超出时截断并提示分段，避免把整篇大文件塞进上下文。 */
     private static final int MAX_READ_CHARS = 60000;
 
@@ -32,6 +38,108 @@ public final class ChatWorkspaceTools {
             return List.of();
         }
         return List.of(listTool(store, userId), readTool(store, userId));
+    }
+
+    /** 「编码」模式的写入工具：创建/覆盖文本文件与删除文件，均需用户逐次确认 */
+    public static List<AiAgentTool> createEditable(ChatWorkspaceStore store, Long userId) {
+        if (store == null || userId == null) {
+            return List.of();
+        }
+        return List.of(writeTool(store, userId), deleteTool(store, userId));
+    }
+
+    /** 工作区相对路径：去掉首尾空白与开头斜杠，禁止 ..、反斜杠与控制字符，限 200 字 */
+    static String safePath(Object raw) {
+        String path = raw == null ? "" : String.valueOf(raw).trim().replaceFirst("^/+", "");
+        if (path.isEmpty() || path.length() > 200 || path.contains("\\") || path.endsWith("/")
+                || java.util.Arrays.asList(path.split("/")).contains("..")
+                || path.chars().anyMatch(c -> c < 32 || c == 127)) {
+            throw new BizException("工作区文件路径无效：使用不含 .. 的相对路径，如 notes/plan.md");
+        }
+        return path;
+    }
+
+    private static AiAgentTool writeTool(ChatWorkspaceStore store, Long userId) {
+        AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
+                WRITE_TOOL,
+                "写入工作区文件",
+                "在用户工作区创建或整体覆盖一个文本文件（UTF-8，单文件最多 1 MB）。覆盖前先用 workspace.read 读原文；执行前需用户确认。",
+                EDIT_PERMISSION_CODE,
+                "编辑我的工作区",
+                "AI 助手",
+                "允许助手在用户确认后写入用户自己的工作区文件",
+                Map.of("path", Map.of("type", "string", "description", "工作区相对路径，如 notes/plan.md"),
+                        "content", Map.of("type", "string", "description", "文件完整内容")));
+        return new AiAgentTool() {
+            @Override
+            public AiAgentToolDescriptor descriptor() {
+                return descriptor;
+            }
+
+            @Override
+            public AgentToolRisk risk() {
+                return AgentToolRisk.WRITE;
+            }
+
+            @Override
+            public AiAgentToolResult execute(AiAgentToolCall call) {
+                Map<String, Object> args = call.arguments() == null ? Map.of() : call.arguments();
+                String path = safePath(args.get("path"));
+                Object content = args.get("content");
+                if (!(content instanceof String text)) {
+                    throw new BizException("content 必须是文本");
+                }
+                byte[] data = text.getBytes(StandardCharsets.UTF_8);
+                if (data.length > MAX_WRITE_BYTES) {
+                    throw new BizException("单个文件最多 1 MB，请拆分后写入");
+                }
+                boolean existed = store.list(userId).stream().anyMatch(entry -> entry.path().equals(path));
+                store.writeFile(userId, path, data);
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("path", path);
+                payload.put("size", data.length);
+                payload.put("created", !existed);
+                String message = (existed ? "已覆盖 " : "已创建 ") + path;
+                payload.put("message", message);
+                return new AiAgentToolResult(WRITE_TOOL, "write", EDIT_PERMISSION_CODE, message, payload);
+            }
+        };
+    }
+
+    private static AiAgentTool deleteTool(ChatWorkspaceStore store, Long userId) {
+        AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
+                DELETE_TOOL,
+                "删除工作区文件",
+                "删除用户工作区中的一个文件；执行前需用户确认。",
+                EDIT_PERMISSION_CODE,
+                "编辑我的工作区",
+                "AI 助手",
+                "允许助手在用户确认后删除用户自己的工作区文件",
+                Map.of("path", Map.of("type", "string", "description", "要删除的工作区文件路径，来自 workspace.list")));
+        return new AiAgentTool() {
+            @Override
+            public AiAgentToolDescriptor descriptor() {
+                return descriptor;
+            }
+
+            @Override
+            public AgentToolRisk risk() {
+                return AgentToolRisk.WRITE;
+            }
+
+            @Override
+            public AiAgentToolResult execute(AiAgentToolCall call) {
+                String path = safePath(call.arguments() == null ? null : call.arguments().get("path"));
+                if (store.list(userId).stream().noneMatch(entry -> entry.path().equals(path))) {
+                    throw new BizException("工作区中没有该文件：" + path);
+                }
+                store.delete(userId, path);
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("path", path);
+                payload.put("message", "已删除 " + path);
+                return new AiAgentToolResult(DELETE_TOOL, "delete", EDIT_PERMISSION_CODE, "已删除 " + path, payload);
+            }
+        };
     }
 
     private static AiAgentTool listTool(ChatWorkspaceStore store, Long userId) {

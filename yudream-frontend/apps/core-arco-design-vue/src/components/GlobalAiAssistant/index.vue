@@ -75,12 +75,6 @@ const canViewWorkspace = computed(() => auth('platform:chat:workspace:view'))
 const canEditWorkspace = computed(() => auth('platform:chat:workspace:edit'))
 const shortcutLabel = computed(() => assistant.preferences.shortcut === 'alt-shift-a' ? 'Alt + Shift + A' : assistant.preferences.shortcut === 'disabled' ? '快捷键已关闭' : 'Ctrl / ⌘ + Shift + Y')
 const pendingCount = computed(() => Object.keys(assistant.frontendRequests).length)
-const nativeApprovals = computed(() => (assistant.activeRun?.pendingInteractions || []).filter(interaction => interaction.kind === 'confirmation').map(interaction => ({
-  id: interaction.requestId,
-  title: `Harness 请求批准工具：${interaction.toolName}`,
-  description: JSON.stringify(interaction.arguments, null, 2),
-  scope: '仅批准本次工具操作',
-})))
 /** 页面感知：面板打开期间跟随路由变化，始终指向用户当前所在页面。 */
 const currentPageTitle = computed(() => {
   const registered = [...route.matched].reverse().find(item => typeof item.meta.title === 'string')?.meta.title
@@ -96,9 +90,16 @@ const workspaceDescriptor = computed<YdAgentWorkspace[]>(() => [{
   id: 'default',
   name: '我的工作区',
   kind: 'remote',
-  access: 'write',
+  access: canEditWorkspace.value ? 'write' : 'read',
   description: '每用户默认工作区：对话与文件都在这里',
 }])
+/** 工作区模式：问答始终可用；规划需能查看工作区；编码需能编辑工作区（写入逐次确认） */
+const mode = ref<'ask' | 'plan' | 'code'>('ask')
+const workspaceModes = computed(() => [
+  'ask' as const,
+  ...(canViewWorkspace.value ? ['plan' as const] : []),
+  ...(canEditWorkspace.value ? ['code' as const] : []),
+])
 watch([() => String(account.userId), () => account.isLogin], ([owner, loggedIn], previous) => {
   if (previous?.[0] && (!loggedIn || previous[0] !== owner)) {
     clearYdPersistentChatOwner(previous[0])
@@ -508,6 +509,7 @@ async function playTour(tourCode?: string) {
           </YdButton>
         </YdAlert>
         <YdAgentWorkbench
+          v-model:mode="mode"
           :sessions="assistant.conversationItems"
           :session-id="assistant.conversationSessionId"
           :models="assistant.models"
@@ -515,8 +517,8 @@ async function playTour(tourCode?: string) {
           :messages="assistant.conversationMessages"
           :harness="assistant.conversationHarness"
           :activities="assistant.conversationActivities"
-          :approvals="nativeApprovals"
-          :available-modes="['ask']"
+          :approvals="assistant.conversationApprovals"
+          :available-modes="workspaceModes"
           :files="canViewWorkspace ? workspaceFiles : []"
           :workspaces="workspaceDescriptor"
           workspace-id="default"
@@ -525,7 +527,7 @@ async function playTour(tourCode?: string) {
           class="yd-global-ai-workbench"
           @send="send"
           @stop="perform(assistant.stop)"
-          @retry="message => { const text = assistant.retryText(message); if (text) send({ text, attachments: [], mode: 'ask', skillCodes: [], contextPaths: [] }) }"
+          @retry="message => { const text = assistant.retryText(message); if (text) send({ text, attachments: [], mode, skillCodes: [], contextPaths: [] }) }"
           @file-toggle="(path, included) => toggleReference(path, included)"
           @file-select="() => { workspaceOpen = true }"
           @update:session-id="id => perform(() => assistant.selectSession(id))"

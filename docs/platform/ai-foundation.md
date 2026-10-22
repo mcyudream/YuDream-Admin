@@ -22,7 +22,8 @@ AI 框架版本以根 `pom.xml` 为准，当前使用 AgentScope Java `2.1.0-BET
 
 - 每个账号默认拥有一个工作区：助手会话与上传文件都在其中，不需要额外开通步骤。文件存在 Harness KV 命名空间 `agents/general/users/&lt;uid&gt;/workspace`（集合 `platformAgentWorkspace`，`{content, encoding}` 载荷，单文件 8 MB 上限）。
 - HTTP 端点 `/api/platform/chat/workspace`：列表/读取需 `platform:chat:workspace:view`，上传/删除需 `platform:chat:workspace:edit`；列表限 2000 个文件。
-- 模型侧只有只读工具 `workspace.list` / `workspace.read`（模块 `workspace`，常驻，权限码同 `platform:chat:workspace:view`），由 `ChatRunAppService` 按调用方权限快照装配到本次运行；写入与删除只经界面端点，模型侧不提供。单次读取超 60000 字符截断，二进制只返回大小与类型说明。
+- 模型侧只有只读工具 `workspace.list` / `workspace.read`（模块 `workspace`，常驻，权限码同 `platform:chat:workspace:view`），由 `ChatRunAppService` 按调用方权限快照装配到本次运行。单次读取超 60000 字符截断，二进制只返回大小与类型说明。
+- 工作区模式（发送请求 `mode`，缺省 `ask`）：`ask` 问答；`plan` 只读工具 + 规划提示，只给方案不改文件；`code` 额外装配 `workspace.write` / `workspace.delete`（风险 WRITE，每次调用都经原生确认卡，展示路径与内容预览），需 `platform:chat:workspace:edit`，无权限时启动即拒绝。写入单文件 1 MB 上限，路径拒绝 `..`、反斜杠、控制字符与目录结尾；删除要求文件存在。模式提示词随问题拼入，由 `ChatRunAppService.modePrompt` 维护。
 - 附件上传（`POST /api/platform/chat/attachments`）与工作区文件是两套存储：附件走 S3 + `sysFileObject`（随消息传给模型），工作区走 KV（模型按需读）；两者都受 `platform:chat:use` 与 AI 能力闸门。
 
 ## 工具模块与按需加载

@@ -8,6 +8,7 @@ import { computed, ref } from 'vue'
 import apiAi from '@/api/modules/platform-ai'
 import { cancelAiRun, getAiRun, listAiRuns, replyAiFrontendTool, respondAiInteraction, resumeAiRun, startAiAssistantRun, subscribeAiRun } from '@/api/modules/platform-ai-runs'
 import { createChatSession, deleteChatSession, fetchMyChatQuota, listChatMessages, listChatSessions, updateChatSession } from '@/api/modules/platform-chat'
+import { aiApprovalItems } from '@/utils/ai-approval'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, parseAiAssistantPreferences, parseAiFrontendToolRequest } from '@/utils/ai-assistant-context'
 import { aiRunErrorContent } from '@/utils/ai-run-error'
 import { upsertAiRunInput } from '@/utils/ai-run-input'
@@ -119,6 +120,8 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     detail: activity.content,
   })))
   const conversationActivities = computed(() => conversationActive.value ? activities.value : [])
+  /** 当前通用会话运行中等待用户批准的写入操作（如编码模式写工作区文件） */
+  const conversationApprovals = computed(() => conversationActive.value ? aiApprovalItems(activeRun.value?.pendingInteractions) : [])
   const conversationHarness = computed<YdAgentHarnessState>(() => conversationActive.value ? harness.value : { name: harness.value.name, status: 'idle' })
   const approvals = computed<YdAgentApproval[]>(() => Object.entries(frontendRequests.value).filter(([, item]) => item.runId === activeRun.value?.id).map(([id, item]) => ({
     id,
@@ -494,6 +497,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
         agentCode: scope.agentCode ?? session?.agentCode,
         spaceSlug: scope.spaceSlug ?? session?.spaceSlug,
         attachments: request.attachments,
+        mode: request.mode === 'plan' || request.mode === 'code' ? request.mode : 'ask',
         contextEnabled: preferences.value.routeAwareness || preferences.value.pageAwareness,
         frontendToolsEnabled: preferences.value.navigationTools || preferences.value.highlightTools || preferences.value.tourTools,
         frontendContext: frontendContext ? frontendContextForPreferences(frontendContext, preferences.value) : undefined,
@@ -963,6 +967,7 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     conversationMessages,
     conversationActivities,
     conversationHarness,
+    conversationApprovals,
     activities,
     approvals,
     frontendRequests,

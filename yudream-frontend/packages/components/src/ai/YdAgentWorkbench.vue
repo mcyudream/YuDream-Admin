@@ -94,8 +94,8 @@ const thread = ref<HTMLElement>()
 const { width } = useElementSize(root)
 const wide = computed(() => width.value >= 900)
 const mobile = computed(() => width.value > 0 && width.value <= 768)
-// 侧栏只在确有上下文（工作区、文件、技能、MCP）时默认展开；普通问答保持对话区宽敞
-const hasContext = computed(() => props.workspaces.length > 0 || props.files.length > 0 || props.skills.length > 0 || props.mcpServers.length > 0)
+// 侧栏只在确有上下文（文件、技能、MCP，或规划/编码模式下的工作区）时默认展开；普通问答保持对话区宽敞
+const hasContext = computed(() => props.files.length > 0 || props.skills.length > 0 || props.mcpServers.length > 0 || (props.workspaces.length > 0 && props.mode !== 'ask'))
 const contextVisible = ref(false)
 watch(hasContext, (value) => {
   contextVisible.value = value

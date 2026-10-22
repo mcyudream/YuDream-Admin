@@ -291,9 +291,9 @@ public class ChatAppService {
                   .map(attachment -> "【" + attachment.fileName() + "】\n" + attachment.extractedText())
                   .toList();
         if (documentTexts.isEmpty()) {
-            return cmd.getQuestion() + cmd.getFrontendContextPrompt();
+            return cmd.getQuestion() + cmd.getModePrompt() + cmd.getFrontendContextPrompt();
         }
-        return cmd.getQuestion() + cmd.getFrontendContextPrompt() + "\n\n以下是附件抽取出的文本内容，请基于这些内容回答问题：\n\n" + String.join("\n\n", documentTexts);
+        return cmd.getQuestion() + cmd.getModePrompt() + cmd.getFrontendContextPrompt() + "\n\n以下是附件抽取出的文本内容，请基于这些内容回答问题：\n\n" + String.join("\n\n", documentTexts);
     }
 
     private List<ChatCitation> mergeCitations(List<ChatCitation> first, List<ChatCitation> second) {

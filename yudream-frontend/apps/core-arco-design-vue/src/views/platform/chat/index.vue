@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { YdAgentSession, YdAgentSendRequest, YdChatAttachment, YdChatCitation, YdChatMessage, YdChatRetrievalHit } from '@yudream/components'
+import type { YdAgentSession, YdAgentSendRequest, YdAgentWorkspace, YdChatAttachment, YdChatCitation, YdChatMessage, YdChatRetrievalHit } from '@yudream/components'
 import { YdAgentWorkbench } from '@yudream/components'
 import type { AgentApplication, AgentCatalog } from '@/api/modules/platform-agent'
 import type { ChatScopeType } from '@/api/modules/platform-chat'
@@ -24,6 +24,18 @@ const renameOpen = ref(false)
 const removeOpen = ref(false)
 const targetSession = ref<YdAgentSession>()
 const title = ref('')
+/** 工作区模式：问答始终可用；规划需能查看工作区；编码需能编辑工作区（写入逐次确认） */
+const canViewWorkspace = computed(() => auth('platform:chat:workspace:view'))
+const canEditWorkspace = computed(() => auth('platform:chat:workspace:edit'))
+const mode = ref<'ask' | 'plan' | 'code'>('ask')
+const workspaceModes = computed(() => [
+  'ask' as const,
+  ...(canViewWorkspace.value ? ['plan' as const] : []),
+  ...(canEditWorkspace.value ? ['code' as const] : []),
+])
+const workspaces = computed<YdAgentWorkspace[]>(() => canViewWorkspace.value
+  ? [{ id: 'default', name: '我的工作区', kind: 'remote', access: canEditWorkspace.value ? 'write' : 'read', description: '每用户默认工作区：规划与编码模式在这里读写文件' }]
+  : [])
 const scopeOptions = computed(() => [
   { label: '通用助手', value: 'GENERAL' },
   ...(agents.value.length ? [{ label: 'Agent 应用', value: 'AGENT' }] : []),
@@ -66,7 +78,7 @@ async function send(request: YdAgentSendRequest) {
 function retry(message: YdChatMessage) {
   const text = assistant.retryText(message)
   if (text) {
-    void perform(() => send({ text, attachments: [], mode: 'ask', skillCodes: [], contextPaths: [] }))
+    void perform(() => send({ text, attachments: [], mode: mode.value, skillCodes: [], contextPaths: [] }))
   }
 }
 
@@ -129,11 +141,15 @@ onMounted(() => perform(async () => {
       <YdButton v-if="assistant.activeRun" variant="outline" size="sm" @click="perform(assistant.reconnect)">恢复后端进度</YdButton>
     </YdAlert>
     <YdAgentWorkbench
+      v-model:mode="mode"
       :sessions="assistant.conversationItems"
       :session-id="assistant.conversationSessionId"
       :models="assistant.models"
       :model-id="assistant.modelId"
-      :available-modes="['ask']"
+      :available-modes="workspaceModes"
+      :workspaces="workspaces"
+      workspace-id="default"
+      :approvals="assistant.conversationApprovals"
       :messages="assistant.conversationMessages"
       :harness="assistant.conversationHarness"
       :activities="assistant.conversationActivities"
@@ -145,6 +161,7 @@ onMounted(() => perform(async () => {
       @send="request => perform(() => send(request))"
       @stop="perform(assistant.stop)"
       @retry="message => retry(message)"
+      @approval-decision="(id, approved) => assistant.activeRun && perform(() => assistant.respondInteraction(assistant.activeRun!.id, id, approved))"
       @attach="attach"
       @remove-attachment="attachment => attachments = attachments.filter(item => item !== attachment)"
       @update:session-id="id => perform(() => assistant.selectSession(id))"
