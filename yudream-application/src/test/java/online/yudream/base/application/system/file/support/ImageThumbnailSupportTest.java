@@ -29,6 +29,17 @@ class ImageThumbnailSupportTest {
         assertFalse(ImageThumbnailSupport.rasterizable(null, null));
     }
 
+    /** GIF 交给浏览器原样渲染：缩略图端点据此回退原图，保住动画与透明。 */
+    @Test
+    void rasterizableRejectsGifByExtensionAndMime() {
+        assertFalse(ImageThumbnailSupport.rasterizable("cover.gif", "image/gif"));
+        assertFalse(ImageThumbnailSupport.rasterizable("cover.GIF", null));
+        assertFalse(ImageThumbnailSupport.rasterizable(null, "image/gif"));
+        assertFalse(ImageThumbnailSupport.rasterizable(null, "image/gif; charset=binary"));
+        assertTrue(ImageThumbnailSupport.rasterizable("photo.png", null));
+        assertTrue(ImageThumbnailSupport.rasterizable(null, "image/webp"));
+    }
+
     @Test
     void thumbnailObjectKeyAppendsStableSuffix() {
         assertEquals("timeline/2026/1.jpg.thumb.jpg", ImageThumbnailSupport.thumbnailObjectKey("timeline/2026/1.jpg"));

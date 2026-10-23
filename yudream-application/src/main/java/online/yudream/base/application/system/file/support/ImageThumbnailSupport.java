@@ -32,12 +32,16 @@ public final class ImageThumbnailSupport {
     public static final float JPEG_QUALITY = 0.82f;
 
     private static final Set<String> RASTERIZABLE = Set.of(
-            "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff");
+            "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff");
 
     private ImageThumbnailSupport() {
     }
 
     public static boolean rasterizable(String originalName, String contentType) {
+        // GIF 压成 JPEG 会丢透明（垫白底）与动画（首帧常为空帧/黑帧）；跳过后缩略图端点回退原图，交给浏览器原样渲染。
+        if (isGif(originalName, contentType)) {
+            return false;
+        }
         String ext = extension(originalName);
         if (ext != null && RASTERIZABLE.contains(ext)) {
             return true;
@@ -51,6 +55,22 @@ public final class ImageThumbnailSupport {
             type = type.substring(0, semicolon).trim();
         }
         return type.startsWith("image/") && !type.contains("svg") && !type.contains("icon");
+    }
+
+    private static boolean isGif(String originalName, String contentType) {
+        String ext = extension(originalName);
+        if ("gif".equals(ext)) {
+            return true;
+        }
+        if (contentType == null || contentType.isBlank()) {
+            return false;
+        }
+        String type = contentType.toLowerCase(Locale.ROOT);
+        int semicolon = type.indexOf(';');
+        if (semicolon >= 0) {
+            type = type.substring(0, semicolon).trim();
+        }
+        return type.equals("image/gif");
     }
 
     public static String thumbnailObjectKey(String objectKey) {

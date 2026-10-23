@@ -41,7 +41,7 @@ export interface YuDreamPluginFilesClient {
 }
 
 export interface YuDreamPluginThumbOptions {
-  /** 预留最长边，当前平台出口固定 400px JPEG。 */
+  /** 预留最长边，当前平台出口固定 400px JPEG；GIF 不做缩略图、原样回退以保留动画与透明。 */
   maxEdge?: number
 }
 
