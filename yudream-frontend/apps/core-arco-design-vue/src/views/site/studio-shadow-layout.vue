@@ -9,6 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { compileStudioPage, STUDIO_BASE_CSS } from '@/utils/site-studio-html'
 import { resolveStudioHref } from '@/utils/site-studio-links'
 import { attachStudioRuntime } from '@/utils/site-studio-runtime'
+import { useSiteAccountActions } from './use-site-account-actions'
 
 defineOptions({ name: 'StudioShadowLayout' })
 
@@ -18,6 +19,7 @@ const slots = useSlots()
 const host = ref<HTMLElement | null>(null)
 const route = useRoute()
 const router = useRouter()
+const { handleAccountAction } = useSiteAccountActions()
 let shadow: ShadowRoot | null = null
 let detach: (() => void) | undefined
 
@@ -26,6 +28,11 @@ function onClick(event: Event) {
   const anchor = (mouse.target as HTMLElement | null)?.closest?.('a')
   // 插槽内的宿主内容由宿主自身处理；这里只接管站点文档节点里的链接
   if (!anchor || mouse.defaultPrevented || mouse.button !== 0 || !anchor.closest('[data-studio-document]')) {
+    return
+  }
+  // 账号动作链接（/profile、/logout）没有宿主路由，先于路径映射转成弹窗/登出
+  if (handleAccountAction(anchor.getAttribute('href'))) {
+    event.preventDefault()
     return
   }
   const url = resolveStudioHref(anchor.getAttribute('href') || '', '/site', anchor.hasAttribute('data-yd-host-link'))

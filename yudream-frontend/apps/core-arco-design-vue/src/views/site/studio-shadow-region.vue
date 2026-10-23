@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { resolveStudioHref } from '@/utils/site-studio-links'
 import { attachStudioRuntime } from '@/utils/site-studio-runtime'
 import { compileStudioRegion } from '@/utils/site-studio-skin'
+import { useSiteAccountActions } from './use-site-account-actions'
 
 defineOptions({ name: 'StudioShadowRegion' })
 
@@ -16,6 +17,7 @@ const props = defineProps<{ document: SiteDocument, region: 'header' | 'footer' 
 const host = ref<HTMLElement | null>(null)
 const route = useRoute()
 const router = useRouter()
+const { handleAccountAction } = useSiteAccountActions()
 let shadow: ShadowRoot | null = null
 let detach: ((() => void) & { setCurrentPath?: (path: string) => void }) | undefined
 
@@ -23,6 +25,11 @@ function onClick(event: Event) {
   const mouse = event as MouseEvent
   const anchor = (mouse.target as HTMLElement | null)?.closest?.('a')
   if (!anchor || mouse.defaultPrevented || mouse.button !== 0) {
+    return
+  }
+  // 账号动作链接（/profile、/logout）没有宿主路由，先于路径映射转成弹窗/登出
+  if (handleAccountAction(anchor.getAttribute('href'))) {
+    event.preventDefault()
     return
   }
   const url = resolveStudioHref(anchor.getAttribute('href') || '', '/site', anchor.hasAttribute('data-yd-host-link'))

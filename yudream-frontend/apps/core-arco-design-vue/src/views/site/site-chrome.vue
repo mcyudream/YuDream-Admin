@@ -6,9 +6,9 @@ import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-comp
 import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runtime'
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
-import Profile from '@/components/AppAccountButton/profile.vue'
 import { usePublishedStudioDocument, useStudioHostLayout } from '@/composables/use-published-studio'
 import { useSiteNavigation } from './site-navigation'
+import { useSiteAccountActions } from './use-site-account-actions'
 import StudioShadowLayout from './studio-shadow-layout.vue'
 
 // 公开站共享页头/页脚：/site 页面与声明了 siteNav 的公开插件页共用。
@@ -28,26 +28,11 @@ const router = useRouter()
 const siteLogo = computed(() => toBackendAssetUrl(appSettingsStore.logo))
 const accountAvatar = computed(() => toBackendAssetUrl(appAccountStore.avatar))
 
-const profileModal = useYdModal().create({
-  alignCenter: true,
-  header: false,
-  footer: false,
-  closeOnClickOverlay: false,
-  closeOnPressEscape: false,
-  class: 'profile-account-modal overflow-hidden',
-  contentClass: 'min-h-full p-0 flex',
-  content: () => h(Profile),
-})
-
-function openProfile() {
-  closeMobileNav()
-  profileModal.open()
+// 账号动作与持久外壳/站点页面容器共用：个人资料开弹窗、退出登录走账号 store
+function closeMobileNav() {
+  mobileNavOpen.value = false
 }
-
-function logout() {
-  closeMobileNav()
-  appAccountStore.logout(appSettingsStore.settings.app.home.fullPath)
-}
+const { openProfile, logout } = useSiteAccountActions(closeMobileNav)
 
 const activeSiteTheme = useActivePluginTheme('SITE')
 const themeChromeMeta = computed<PluginRouteMeta | undefined>(() => {
@@ -134,10 +119,6 @@ const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, chromeC
 const footerTitle = computed(() => props.settings?.footerTitle || appSettingsStore.siteName || '')
 const footerDescription = computed(() => props.settings?.footerDescription || appSettingsStore.siteDescription || (appSettingsStore.siteName ? `由 ${appSettingsStore.siteName} 驱动的内容站点` : ''))
 const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${new Date().getFullYear()} ${appSettingsStore.siteName}. All rights reserved.`)
-
-function closeMobileNav() {
-  mobileNavOpen.value = false
-}
 
 function syncMobileNavOffset() {
   const header = headerBarRef.value?.closest('.site-layout-header') as HTMLElement | null

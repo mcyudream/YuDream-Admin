@@ -8,6 +8,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resolveStudioHref } from '@/utils/site-studio-links'
 import { attachStudioRuntime, stopStudioAudio } from '@/utils/site-studio-runtime'
+import { useSiteAccountActions } from './use-site-account-actions'
 
 // basePath：站内根相对链接映射到的前缀，公开站为 /site，草稿预览为 /site-preview/{主题}
 // height：容器高度，公开站默认占满视口；runtime：当前文档与页面，提供时挂载站点功能
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<{ srcdoc: string, basePath?: string, heig
 const frame = ref<HTMLIFrameElement | null>(null)
 const router = useRouter()
 const route = useRoute()
+const { handleAccountAction } = useSiteAccountActions()
 /** 页面查询参数（如详情页 ?id=），供插件数据适配器 {参数} 取值 */
 function currentQuery() {
   return Object.fromEntries(Object.entries(route.query).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : []))
@@ -28,6 +30,11 @@ function handleClick(event: MouseEvent) {
     return
   }
   const raw = anchor.getAttribute('href') || ''
+  // 账号动作链接（/profile、/logout）没有宿主路由，先于路径映射转成弹窗/登出
+  if (handleAccountAction(raw)) {
+    event.preventDefault()
+    return
+  }
   const url = resolveStudioHref(raw, props.basePath, anchor.hasAttribute('data-yd-host-link'))
   if (!url) {
     event.preventDefault()

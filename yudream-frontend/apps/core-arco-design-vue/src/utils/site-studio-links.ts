@@ -25,6 +25,24 @@ export function resolveStudioHref(href: string, basePath = '/site', hostLink = f
   return `${basePath}${value.startsWith('/') ? value : `/${value}`}`
 }
 
+/** 站点文档账号菜单的两个宿主动作链接（宿主没有这两个路由，点击需转成动作而非跳转）。 */
+export type SiteAccountAction = 'profile' | 'logout'
+
+/**
+ * 识别账号动作链接：/profile、/logout（容忍查询串与尾斜杠）。
+ * 各渲染容器（持久外壳、Shadow DOM 页面、srcdoc 预览桥）在 router.push 前拦截。
+ */
+export function siteAccountAction(href?: string | null): SiteAccountAction | undefined {
+  const path = (href || '').trim().split(/[?#]/, 1)[0]?.replace(/\/+$/, '') || '/'
+  if (path === '/profile') {
+    return 'profile'
+  }
+  if (path === '/logout') {
+    return 'logout'
+  }
+  return undefined
+}
+
 /**
  * 按站点路径（不含 /site 前缀）匹配文档页面：精确路径优先，其次动态页面（:参数 段），返回参数值。
  * 例：/activities/abc 匹配页面 /activities/:id，params = { id: 'abc' }。
