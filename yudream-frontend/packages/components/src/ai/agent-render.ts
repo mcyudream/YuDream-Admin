@@ -254,12 +254,21 @@ const answerSanitizerOptions: IFilterXSSOptions = {
     thead: [],
     tbody: [],
     tr: [],
-    th: ['colspan', 'rowspan'],
-    td: ['colspan', 'rowspan'],
+    th: ['colspan', 'rowspan', 'align'],
+    td: ['colspan', 'rowspan', 'align'],
     code: ['class', 'language'],
     pre: ['class'],
     span: ['class'],
     div: ['class'],
+    // GFM 任务列表复选框（仅展示：disabled）与常见行内扩展标签
+    input: ['type', 'disabled', 'checked'],
+    details: [],
+    summary: [],
+    sup: [],
+    sub: [],
+    u: [],
+    kbd: [],
+    mark: [],
   },
   css: false,
   stripIgnoreTag: true,
@@ -268,6 +277,10 @@ const answerSanitizerOptions: IFilterXSSOptions = {
     if (name === 'class') {
       const classes = value.split(/\s+/).filter(className => /^(?:hljs-[\w-]+|md-editor-[\w-]+|language-[\w-]+)$/.test(className)).join(' ')
       return classes ? `class="${escapeAttribute(classes)}"` : ''
+    }
+    if (tag === 'input' && name === 'type') {
+      // 仅放行 GFM 任务列表复选框；其余 input 一律不保留类型
+      return value === 'checkbox' ? 'type="checkbox"' : ''
     }
     if (tag === 'a' && name === 'href') {
       const id = resolveYdAgentReferenceAnchor(value)

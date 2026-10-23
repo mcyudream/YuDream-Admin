@@ -216,6 +216,61 @@ function selectTool(tool: YdAgentToolCall) {
   background: var(--color-fill-2);
 }
 
+/* 气泡内文档排版：按 14px 正文收紧文档级间距，宽表格横向滚动不撑破对话列 */
+.yd-agent-answer__markdown :deep(.md-editor-preview h1),
+.yd-agent-answer__markdown :deep(.md-editor-preview h2),
+.yd-agent-answer__markdown :deep(.md-editor-preview h3),
+.yd-agent-answer__markdown :deep(.md-editor-preview h4),
+.yd-agent-answer__markdown :deep(.md-editor-preview h5),
+.yd-agent-answer__markdown :deep(.md-editor-preview h6) {
+  margin: 1.1em 0 0.5em;
+  line-height: 1.4;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview > :first-child) {
+  margin-top: 0;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview ul),
+.yd-agent-answer__markdown :deep(.md-editor-preview ol) {
+  padding-left: 1.5em;
+  margin: 0.4em 0;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview table) {
+  display: block;
+  max-width: 100%;
+  margin: 0.75em 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview th),
+.yd-agent-answer__markdown :deep(.md-editor-preview td) {
+  border: 1px solid var(--color-border-2);
+  padding: 6px 10px;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview th) {
+  background: var(--color-fill-1);
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview input[type='checkbox']) {
+  margin: 0 6px 0 0;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview details) {
+  margin: 0.75em 0;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.yd-agent-answer__markdown :deep(.md-editor-preview summary) {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 .yd-agent-reference {
   padding: 14px 16px;
   margin: 0;

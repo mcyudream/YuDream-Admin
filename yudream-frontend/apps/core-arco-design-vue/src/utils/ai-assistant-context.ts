@@ -7,6 +7,8 @@ export interface AiAssistantPreferences {
   highlightTools: boolean
   tourTools: boolean
   shortcut: 'mod-shift-y' | 'alt-shift-a' | 'disabled'
+  /** 工作区执行模式：按账号记住，恢复时仍需通过权限校验降级 */
+  workspaceMode: 'ask' | 'plan' | 'code'
 }
 
 export const defaultAiAssistantPreferences: AiAssistantPreferences = {
@@ -16,6 +18,7 @@ export const defaultAiAssistantPreferences: AiAssistantPreferences = {
   highlightTools: false,
   tourTools: false,
   shortcut: 'mod-shift-y',
+  workspaceMode: 'ask',
 }
 
 export function parseAiAssistantPreferences(value: unknown): AiAssistantPreferences {
@@ -27,6 +30,7 @@ export function parseAiAssistantPreferences(value: unknown): AiAssistantPreferen
     highlightTools: raw.highlightTools === true,
     tourTools: raw.tourTools === true,
     shortcut: raw.shortcut === 'alt-shift-a' || raw.shortcut === 'disabled' ? raw.shortcut : 'mod-shift-y',
+    workspaceMode: raw.workspaceMode === 'plan' || raw.workspaceMode === 'code' ? raw.workspaceMode : 'ask',
   }
 }
 

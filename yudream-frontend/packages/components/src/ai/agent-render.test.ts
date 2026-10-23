@@ -70,6 +70,15 @@ it('local HTML sanitizer removes scripts, handlers and unsafe links without brea
   assert.equal(/fixed|inset-0/.test(result), false)
 })
 
+it('answer sanitizer keeps GFM task checkboxes, table alignment, details and inline extensions', () => {
+  const task = sanitizeYdAgentHtml('<li><input checked="checked" disabled="disabled" type="checkbox">已完成</li>')
+  assert.match(task, /<input checked="checked" disabled="disabled" type="checkbox">/)
+  assert.equal(sanitizeYdAgentHtml('<input type="text" value="x">').includes('type='), false)
+  assert.match(sanitizeYdAgentHtml('<table><th align="center">甲</th><td align="right">1</td></table>'), /<th align="center">甲<\/th><td align="right">1<\/td>/)
+  assert.match(sanitizeYdAgentHtml('<details><summary>展开</summary>内容</details>'), /<details><summary>展开<\/summary>内容<\/details>/)
+  assert.match(sanitizeYdAgentHtml('H<sub>2</sub>O 与 x<sup>2</sup>、<u>下划线</u>、<mark>强调</mark>'), /<sub>2<\/sub>.*<sup>2<\/sup>.*<u>下划线<\/u>.*<mark>强调<\/mark>/)
+})
+
 it('render document validates blocks and preserves string IDs without coercion', () => {
   const value = { version: 1, blocks: [
     { type: 'markdown', text: '**回答**' },

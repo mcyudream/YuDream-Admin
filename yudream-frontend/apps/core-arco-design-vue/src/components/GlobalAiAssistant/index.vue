@@ -99,12 +99,24 @@ const workspaceDescriptor = computed<YdAgentWorkspace[]>(() => [{
   access: canEditWorkspace.value ? 'write' : 'read',
   description: '每用户默认工作区：对话与文件都在这里',
 }])
-/** 工作区模式：问答始终可用；规划需能查看工作区；编码需能编辑工作区（写入逐次确认） */
-const mode = ref<'ask' | 'plan' | 'code'>('ask')
+/** 工作区模式：问答始终可用；规划需能查看工作区；编码需查看+编辑（后端缺查看权限时不装配任何工作区工具）。 */
+/** 恢复上次使用的工作区模式；权限变化时降级到可用模式 */
+function restoreMode(): 'ask' | 'plan' | 'code' {
+  const saved = assistant.preferences.workspaceMode
+  if (saved === 'plan') {
+    return canViewWorkspace.value ? 'plan' : 'ask'
+  }
+  if (saved === 'code') {
+    return canViewWorkspace.value && canEditWorkspace.value ? 'code' : 'ask'
+  }
+  return 'ask'
+}
+const mode = ref<'ask' | 'plan' | 'code'>(restoreMode())
+watch(mode, value => assistant.setPreferences({ workspaceMode: value }))
 const workspaceModes = computed(() => [
   'ask' as const,
   ...(canViewWorkspace.value ? ['plan' as const] : []),
-  ...(canEditWorkspace.value ? ['code' as const] : []),
+  ...(canViewWorkspace.value && canEditWorkspace.value ? ['code' as const] : []),
 ])
 watch([() => String(account.userId), () => account.isLogin], ([owner, loggedIn], previous) => {
   if (previous?.[0] && (!loggedIn || previous[0] !== owner)) {
