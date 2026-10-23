@@ -196,7 +196,8 @@ login_slot() { # slot
   if [ -z "$user" ] || [ -z "$pass" ]; then
     die "镜像仓库 $1（$srv）缺少凭据（Harbor: DOCKER_REGISTRY_USER/DOCKER_REGISTRY_PASSWORD；阿里云: ALIYUN_REGISTRY_USER/ALIYUN_REGISTRY_PASSWORD）"
   fi
-  if ! cap_out docker login "$srv" -u "$user" --password-stdin; then
+  # 密码必须经 stdin 传入：CI 作业 stdin 无数据，--password-stdin 读空后会回退交互式登录并在 non-TTY 下报错
+  if ! LAST_OUT=$(printf '%s\n' "$pass" | docker login "$srv" -u "$user" --password-stdin 2>&1); then
     die "docker login $srv（$1）失败：$(printf '%s' "$LAST_OUT" | tail -n 1)"
   fi
   log "已登录 $1（$srv）"

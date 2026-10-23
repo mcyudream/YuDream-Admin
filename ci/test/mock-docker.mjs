@@ -108,6 +108,14 @@ if (op === 'login') {
     console.error('Error response from daemon: unauthorized: incorrect username or password');
     process.exit(1);
   }
+  // 模拟真实 docker：--password-stdin 读到空 stdin 时回退交互式登录，non-TTY 下报错退出
+  if (argv.includes('--password-stdin')) {
+    const stdin = fs.readFileSync(0, 'utf8');
+    if (!stdin.trim()) {
+      console.error('Error: Cannot perform an interactive login from a non TTY device');
+      process.exit(1);
+    }
+  }
   state.auth[host] = true;
   saveState(state);
   console.log(`WARNING! Using --password via the CLI is insecure. Use --password-stdin. (mock ${host})`);
