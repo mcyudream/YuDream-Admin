@@ -122,3 +122,13 @@ Nexus 回读完整性值：
 Nexus 回读完整性值：SDK `1.14.0` `sha512-2uVjYKwmORSqTi9KalA429NZR/E8JET/HKC/e4jWvgpjxbk3Lriju5KYrF3TqKAGwE9vEDRc2Ub3MKdlfRNufQ==`；components `1.10.0` `sha512-JpmEF+aEuqRMAqTZkhyDkVlOwvuJPFXzXSwAS9hxGiL3gV0MQcmnuQn3JrzmJPTKmjLLq2BS1/8jAUk3HL+l1w==`。
 
 插件仓同步状态：仍**未同步**，落定后 catalog 直接升 SDK `1.14.0` / components `1.10.0`（跳过 1.13.0/1.9.0），SPI 属性 2.37.0 不变。
+
+## v1.5.1 镜像通道修复与 components 1.10.1（已发布）
+
+2026-10-23 宿主 tag `v1.5.0`（提交 `8cea74b9`）流水线契约作业通过：`@yudream/components` `1.10.1` 发布 Nexus 并回读一致（站点工作室修复、PageBuilder 引擎容器与生命周期守卫等 16 文件）；SPI 2.37.0 / SDK 1.14.0 / dataviz 无变化幂等跳过。镜像发布作业因新建发布脚本 `docker login --password-stdin` 未传 stdin 在 non-TTY 必败，tag `v1.5.0` 按「失败 tag 不可移动」保留作审计。
+
+修复后发 `v1.5.1`（提交 `0728a770`，patch：仅发布脚本登录修复 + mock 防回归）：backend/frontend 镜像已推送 Harbor 与阿里云双仓（`1.5.1` 与短 SHA 标签）；`latest` 晋升触发防倒退护栏（远端 latest 为无版本标签历史遗留），经人工明确批准后以 `ALLOW_LATEST_MIGRATION=1` 重试完成迁移。
+
+Nexus 回读完整性值：components `1.10.1` ``。
+
+插件仓同步状态：仍**未同步**，落定后 catalog 直接升 SDK `1.14.0` / components `1.10.1`，SPI 属性 2.37.0 不变。
