@@ -19,6 +19,7 @@ import {
   STUDIO_BASE_CSS,
 } from '@/utils/site-studio'
 import { parseStudioCanvasCss } from '@/utils/site-studio-grapes'
+import { fillStudioDataPreview } from '@/utils/site-studio-runtime'
 
 defineOptions({ name: 'StudioDesignView' })
 
@@ -97,13 +98,54 @@ function togglePreview() {
   if (!editor || !ready.value) {
     return
   }
+  // 部分 grapes 版本 run/stop:core:preview 事件不触发（isActive 状态仍正确）：
+  // 以命令执行 + isActive 回读为准驱动 previewMode，事件监听仅作兼容
   if (previewMode.value) {
     editor.Commands.stop('core:preview')
   }
   else {
     editor.Commands.run('core:preview')
   }
+  previewMode.value = Boolean(editor.Commands.isActive?.('core:preview'))
 }
+
+// ===== 预览态数据反馈：主题声明的数据绑定按公开站管线取真实数据画进画布 =====
+// 只发生在预览模式（编辑关闭、onCanvasChange 有守卫），展开结果不回流文档；
+// 退出预览或画布因设备切换/文档回灌重建时，回灌编译结果恢复可编辑的作者内容。
+
+let canvasDataDetach: (() => void) | null = null
+
+function detachCanvasData() {
+  canvasDataDetach?.()
+  canvasDataDetach = null
+}
+
+function fillCanvasData(attempt = 0) {
+  detachCanvasData()
+  if (!previewMode.value || disposed || !ready.value || !store.doc) {
+    return
+  }
+  const frameDocument = facade.value?.editor.Canvas.getDocument?.()
+  if (!frameDocument?.body) {
+    return
+  }
+  // 画布重建后组件可能尚未渲染进 body：数据容器未出现时短暂重试
+  if (!frameDocument.querySelector('[data-yd-source],[data-yd-count],[data-yd-content]') && attempt < 10) {
+    window.setTimeout(fillCanvasData, 120, attempt + 1)
+    return
+  }
+  canvasDataDetach = fillStudioDataPreview(frameDocument, store.doc)
+}
+
+watch(previewMode, (on) => {
+  if (on) {
+    fillCanvasData()
+  }
+  else {
+    detachCanvasData()
+    resyncCanvas()
+  }
+})
 
 const regionOptions = [
   { label: '页面内容', value: 'page' },
@@ -344,12 +386,16 @@ function setupBuilder(editor: Parameters<YdPageBuilderSetupHandler>[0]) {
     bindFrameKeydown((payload as { el?: HTMLIFrameElement }).el)
     syncCanvasThemeCss()
   })
-  on('canvas:frame:load:body', () => syncCanvasThemeCss())
+  on('canvas:frame:load:body', () => {
+    syncCanvasThemeCss()
+    fillCanvasData()
+  })
   on('load', () => syncCanvasThemeCss())
 }
 
 function onCanvasChange(snapshot: YdPageBuilderSnapshot) {
-  if (!store.doc || !ready.value || store.busy || !canEdit.value) {
+  // 预览态画布 DOM 含展开的真实数据，绝不能回流文档
+  if (!store.doc || !ready.value || store.busy || !canEdit.value || previewMode.value) {
     return
   }
   const previous = targetNodes.value

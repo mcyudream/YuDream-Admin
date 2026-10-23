@@ -755,7 +755,7 @@ export function studioContentValue(document: SiteDocument, key: string): unknown
 const MEDIA_TAGS = new Set(['IMG', 'VIDEO', 'AUDIO', 'SOURCE'])
 
 /** 站点内容单值绑定：文本/图片/视频/音频、链接、背景图与开关显隐 */
-function bindContent(host: Element, document: SiteDocument) {
+function bindContent(host: ParentNode, document: SiteDocument) {
   const scalar = (key: string) => {
     const value = studioContentValue(document, key)
     return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
@@ -809,7 +809,7 @@ function bindContent(host: Element, document: SiteDocument) {
 }
 
 /** 计数绑定：data-yd-count 元素显示数据源真实条数（接口不可用时保留作者内容） */
-function bindCounts(host: Element, isAlive: () => boolean, document: SiteDocument, query: Record<string, string>) {
+function bindCounts(host: ParentNode, isAlive: () => boolean, document: SiteDocument, query: Record<string, string>) {
   for (const element of host.querySelectorAll('[data-yd-count]')) {
     const source = element.getAttribute('data-yd-count') || ''
     void fetchSource(source, 50, document, query).then((records) => {
@@ -825,7 +825,7 @@ function ownItems(container: Element) {
   return [...container.querySelectorAll('[data-yd-item]')].filter(item => item.parentElement?.closest('[data-yd-each],[data-yd-source]') === container)
 }
 
-function bindSources(host: Element, isAlive: () => boolean, document: SiteDocument, onFilled: () => void, query: Record<string, string>, samples: boolean) {
+function bindSources(host: ParentNode, isAlive: () => boolean, document: SiteDocument, onFilled: () => void, query: Record<string, string>, samples: boolean) {
   host.querySelectorAll('[data-yd-live]').forEach(element => element.setAttribute('hidden', ''))
   host.querySelectorAll('[data-yd-empty]').forEach(element => element.setAttribute('hidden', ''))
   const containers = [...host.querySelectorAll('[data-yd-source]')]
@@ -1097,4 +1097,19 @@ export function attachStudioRuntime(options: {
       frameWindow.requestAnimationFrame(updateProgress)
     },
   })
+}
+
+/**
+ * 设计画布预览：按公开站同一数据管线在画布文档上解析数据绑定——
+ * 数据源取真实数据展开（无数据时保留作者示例条目），站点内容值与计数照常填充。
+ * 只改画布 DOM（预览态编辑关闭、不回流文档）；返回卸载函数（退出预览或画布重建时调用）。
+ */
+export function fillStudioDataPreview(root: Document | ShadowRoot, document: SiteDocument, options: { query?: Record<string, string>, onFilled?: () => void } = {}) {
+  let alive = true
+  bindSources(root, () => alive, document, options.onFilled ?? (() => undefined), options.query ?? {}, true)
+  bindContent(root, document)
+  bindCounts(root, () => alive, document, options.query ?? {})
+  return () => {
+    alive = false
+  }
 }

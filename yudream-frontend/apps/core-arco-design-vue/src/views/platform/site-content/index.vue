@@ -10,6 +10,7 @@ import { useSiteStudioStore } from '@/store/modules/site-studio'
 import { STUDIO_PARTICLE_PRESETS } from '@/types/site-studio'
 import { STUDIO_PARTICLE_LABELS } from '@/utils/site-studio-effects'
 import { openStudioPreviewChannel, studioPagePathToSlug } from '@/utils/site-studio-preview'
+import StudioContentModelEditor from '@/views/platform/site-studio/components/StudioContentModelEditor.vue'
 import StudioNavigationEditor from '@/views/platform/site-studio/components/StudioNavigationEditor.vue'
 import StudioPublicSkin from '@/views/platform/site-studio/components/StudioPublicSkin.vue'
 import ThemeConfigField from '@/views/platform/theme-center/components/ThemeConfigField.vue'
@@ -26,12 +27,14 @@ const sections = computed(() => content.value?.sections ?? [])
 const active = ref('')
 const tabs = computed(() => [
   ...sections.value.map(section => ({ label: section.title, value: section.code, icon: 'morph:file-pen' })),
+  { label: '数据模型', value: 'model', icon: 'morph:table' },
   { label: '站点导航', value: 'navigation', icon: 'morph:list-tree' },
   { label: '公开页外观', value: 'appearance', icon: 'morph:paintbrush' },
 ])
 // 文档加载后默认打开第一个内容分区；分区被移除时回落到第一个可用分区
+const FIXED_TABS = new Set(['model', 'navigation', 'appearance'])
 watch(tabs, (list, previous) => {
-  const loadedNow = !previous?.length || previous.length === 2
+  const loadedNow = !previous || previous.every(tab => FIXED_TABS.has(tab.value))
   if (!list.some(tab => tab.value === active.value) || (loadedNow && sections.value.length && !sections.value.some(section => section.code === active.value))) {
     active.value = list[0]!.value
   }
@@ -130,7 +133,7 @@ function publish() {
   }
   modal.confirm({
     title: '发布站点内容',
-    content: '确认把当前草稿（含站点内容、导航与外观）发布到公开站吗？发布后可在网站工作台的发布版本页恢复。',
+    content: '确认把当前草稿（含站点内容、数据模型、导航与外观）发布到公开站吗？发布后可在网站工作台的发布版本页恢复。',
     confirmButtonText: '发布',
     onConfirm: async () => {
       try {
@@ -201,7 +204,7 @@ onBeforeRouteLeave(() => {
 
 <template>
   <div class="settings-page-shell">
-    <YdPageHeader title="站点内容" :description="`修改公开站的横幅、首页内容、导航与外观（主题：${store.themeCode}）；保存为草稿，发布后对访客生效。`" class="mb-0">
+    <YdPageHeader title="站点内容" :description="`修改公开站的横幅、首页内容、数据模型、导航与外观（主题：${store.themeCode}）；保存为草稿，发布后对访客生效。`" class="mb-0">
       <YdButton variant="outline" :disabled="!store.doc" @click="openPreview">
         <YdIcon name="morph:eye" />
         预览
@@ -240,6 +243,9 @@ onBeforeRouteLeave(() => {
             </div>
           </YdSettingsSection>
         </template>
+        <template #model>
+          <StudioContentModelEditor />
+        </template>
         <template #navigation>
           <StudioNavigationEditor />
         </template>
@@ -247,9 +253,9 @@ onBeforeRouteLeave(() => {
           <StudioPublicSkin />
         </template>
       </YdSettingsLayout>
-      <YdEmpty v-if="store.doc && !sections.length" description="当前主题还没有声明站点内容模型">
-        <YdButton variant="outline" @click="router.push('/platform/site-studio')">
-          去网站工作台声明（主题 → 站点内容模型）
+      <YdEmpty v-if="store.doc && !sections.length" description="当前主题还没有内容分区：在「数据模型」里创建分区与字段，或先添加平台功能字段">
+        <YdButton variant="outline" @click="active = 'model'">
+          去创建数据模型
         </YdButton>
       </YdEmpty>
     </YdLoadingOverlay>
