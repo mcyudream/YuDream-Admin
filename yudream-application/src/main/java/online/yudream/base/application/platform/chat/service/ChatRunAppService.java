@@ -71,6 +71,10 @@ public class ChatRunAppService {
             if (!hasPermission(cmd, ChatWorkspaceTools.EDIT_PERMISSION_CODE)) {
                 throw new BizException("编码模式需要「编辑我的工作区」权限，请切换到问答或规划模式");
             }
+            // 缺查看权限时 workspace 为 null，写入工具会静默装配为空；必须显式拒绝而不是让编码模式空跑
+            if (workspace == null) {
+                throw new BizException("编码模式还需要「查看我的工作区」权限，请切换到问答或规划模式");
+            }
             scoped.addAll(ChatWorkspaceTools.createEditable(workspace));
         }
         // 代码运行：编码模式 + 运行权限 + 运行器可用（部署闸门 + 健康检查）三者齐备才装配
