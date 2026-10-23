@@ -8,6 +8,8 @@ import online.yudream.base.domain.platform.workspace.aggregate.WorkspaceFile;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -152,6 +154,61 @@ class WorkspaceAppServiceTest {
         assertEquals("uploads/2026/报告 (2).pdf", f.service.saveAttachment(USER, "55", "uploads/2026").path());
         when(f.fileAppService.content(eq(56L), anyLong(), eq(false))).thenThrow(new BizException("无权访问该文件"));
         assertThrows(BizException.class, () -> f.service.saveAttachment(USER, "56", ""));
+    }
+
+    @Test
+    void attachmentStreamsCloseWhenDirectoryOrFileNameValidationRejectsBeforeReading() {
+        for (String name : List.of("报告.pdf", "..")) {
+            WorkspaceTestFixture f = new WorkspaceTestFixture();
+            TrackedInputStream input = new TrackedInputStream();
+            when(f.fileAppService.content(55L, USER, false)).thenReturn(FileContentDTO.builder()
+                    .originalName(name).contentType("application/pdf").contentLength(1L)
+                    .inputStream(input).build());
+
+            assertThrows(BizException.class,
+                    () -> f.service.saveAttachment(USER, "55", name.equals("..") ? "" : "../outside"));
+
+            assertTrue(input.closed);
+            assertEquals(0, input.reads);
+            assertTrue(f.objects.isEmpty());
+        }
+    }
+
+    @Test
+    void attachmentStreamsCloseOnSuccessfulCopyAndReadFailure() {
+        WorkspaceTestFixture f = new WorkspaceTestFixture();
+        TrackedInputStream success = new TrackedInputStream();
+        when(f.fileAppService.content(55L, USER, false)).thenReturn(FileContentDTO.builder()
+                .originalName("报告.pdf").inputStream(success).build());
+        f.service.saveAttachment(USER, "55", "uploads");
+        assertTrue(success.closed);
+        assertTrue(success.reads > 0);
+
+        TrackedInputStream failure = new TrackedInputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("读取失败");
+            }
+        };
+        when(f.fileAppService.content(56L, USER, false)).thenReturn(FileContentDTO.builder()
+                .originalName("失败.pdf").inputStream(failure).build());
+        assertThrows(BizException.class, () -> f.service.saveAttachment(USER, "56", "uploads"));
+        assertTrue(failure.closed);
+    }
+
+    private static class TrackedInputStream extends InputStream {
+        boolean closed;
+        int reads;
+
+        @Override
+        public int read() throws IOException {
+            return reads++ == 0 ? 1 : -1;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
     }
 
     @Test

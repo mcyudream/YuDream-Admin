@@ -49,6 +49,13 @@
 - **规避**：不能只因 bucket head 检查受限就拒绝上传；按实际对象操作能力处理。
 - **来源**：`s3-rustfs-bucket-head`。
 
+### S3 连接池被未关闭的对象流耗尽，取图统一 500
+
+- **现象**：`/api/plugins/*/textures/...` 等对象读取请求卡死后统一 500；S3 存储（RustFS）数据完好；运行越久越严重，存储端重启后加速恶化。
+- **根因**：AWS SDK v2 `getObject` 返回的 `ResponseInputStream` 只有 `close()` 才把连接归还 ApacheHttpClient 连接池（默认 50，读完全部字节也不会归还）；任一消费路径在异常/提前返回分支漏关，连接就永久泄漏，攒满后全部 S3 调用阻塞。
+- **规避**：全部对象流消费点用 try-with-resources（含插件侧 `readAllBytes`、预览 416 分支、工作区校验失败分支、表单 ZIP 导出、备份快照）；`StorageClientProvider` 统一配 `maxConnections`、连接/请求超时、`connectionTimeToLive` 与空闲回收，把单点泄漏变成快速失败而非全站卡死。
+- **来源**：`s3-response-stream-close-all-paths`；`StorageClientProviderTest` 用超过池容量的并发读取守护连接归还。
+
 ### 大文件上传中途超时或返回 500
 
 - **现象**：地图 ZIP 等大文件上传被 60 秒客户端超时、Tomcat 截断或落成 500。

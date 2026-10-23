@@ -1,16 +1,19 @@
 package online.yudream.base.infra.system.integration;
 
+import jakarta.annotation.PreDestroy;
 import online.yudream.base.domain.system.integration.valobj.ObjectStorageConfig;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.net.URI;
+import java.time.Duration;
 
 /**
  * 对象存储客户端动态提供者：按「有效存储配置」的值哈希缓存实例，
@@ -51,6 +54,15 @@ public class StorageClientProvider {
         return settings.effectiveStorage();
     }
 
+    @PreDestroy
+    public synchronized void close() {
+        if (cached != null) {
+            cached.close();
+            cached = null;
+            cachedHash = Integer.MIN_VALUE;
+        }
+    }
+
     /**
      * 按给定配置构建独立客户端；候选配置探测与动态提供者共用，保证行为一致。
      * 校验和仅在操作要求时计算：SDK 2.30+ 默认的分块流式载荷 + 尾随 CRC 不被部分 S3 兼容存储
@@ -58,6 +70,18 @@ public class StorageClientProvider {
      */
     public static S3Client build(ObjectStorageConfig config) {
         return S3Client.builder()
+                .httpClientBuilder(ApacheHttpClient.builder()
+                        .maxConnections(100)
+                        .connectionTimeout(Duration.ofSeconds(5))
+                        .connectionAcquisitionTimeout(Duration.ofSeconds(5))
+                        .socketTimeout(Duration.ofSeconds(30))
+                        .connectionTimeToLive(Duration.ofMinutes(5))
+                        .connectionMaxIdleTime(Duration.ofSeconds(30))
+                        .useIdleConnectionReaper(true)
+                        .tcpKeepAlive(true))
+                .overrideConfiguration(builder -> builder
+                        .apiCallAttemptTimeout(Duration.ofSeconds(60))
+                        .apiCallTimeout(Duration.ofSeconds(120)))
                 .endpointOverride(URI.create(config.endpoint()))
                 .region(Region.of(config.region()))
                 .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)

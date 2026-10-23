@@ -79,8 +79,8 @@ public final class FormSubmissionExportHttpSupport {
                 ? "file-" + file.getFileId()
                 : file.getOriginalName();
         String path = uniquePath(usedPaths, ATTACHMENT_DIR + "/" + file.getSubmissionId() + "/" + sanitize(originalName));
-        zip.putNextEntry(new ZipEntry(path));
         try (InputStream input = content.getInputStream()) {
+            zip.putNextEntry(new ZipEntry(path));
             input.transferTo(zip);
         }
         zip.closeEntry();

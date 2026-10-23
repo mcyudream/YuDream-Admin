@@ -199,9 +199,9 @@ public class WorkspaceAppService {
     public WorkspaceEntryDTO saveAttachment(Long userId, String fileId, String directory) {
         UserWorkspace workspace = workspace(userId);
         FileContentDTO content = fileAppService.content(parseId(fileId), userId, false);
-        String name = StringUtils.hasText(content.getOriginalName()) ? content.getOriginalName().replace('/', '_').replace('\\', '_') : "附件";
-        String path = availablePath(workspace, WorkspacePaths.join(WorkspacePaths.directory(directory), WorkspacePaths.name(name)));
         try (InputStream input = content.getInputStream()) {
+            String name = StringUtils.hasText(content.getOriginalName()) ? content.getOriginalName().replace('/', '_').replace('\\', '_') : "附件";
+            String path = availablePath(workspace, WorkspacePaths.join(WorkspacePaths.directory(directory), WorkspacePaths.name(name)));
             return WorkspaceAssembler.entry(write(workspace, userId, path, readLimited(input), content.getContentType(), null, WorkspaceActor.USER));
         } catch (IOException e) {
             throw new BizException("读取附件失败");

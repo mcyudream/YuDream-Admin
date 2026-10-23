@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +40,7 @@ public class PublicFilePreviewController {
     @GetMapping("/file/{token}/{*filename}")
     public ResponseEntity<StreamingResponseBody> file(@PathVariable String token,
                                                       @PathVariable String filename,
-                                                      @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
+                                                      @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) throws IOException {
         Optional<PluginStoredFile> opened = previewFileOpener.openSignedFile(token);
         if (opened.isEmpty()) {
             return error(HttpStatus.NOT_FOUND, "签名无效、已过期或文件不存在");
@@ -53,10 +54,12 @@ public class PublicFilePreviewController {
 
         long[] window = resolveWindow(range, total);
         if (window == null) {
-            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    .header(HttpHeaders.CONTENT_RANGE, "bytes */" + total)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(jsonMessage("Range 不合法"));
+            try (InputStream ignored = file.inputStream()) {
+                return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes */" + total)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(jsonMessage("Range 不合法"));
+            }
         }
         long start = window[0];
         long end = window[1];

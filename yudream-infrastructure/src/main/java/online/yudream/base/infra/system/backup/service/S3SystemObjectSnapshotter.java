@@ -9,6 +9,8 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 
 /**
@@ -35,10 +37,13 @@ public class S3SystemObjectSnapshotter implements SystemObjectSnapshotter {
             if (summary.size() == 0 && key.endsWith("/")) {
                 return;
             }
-            ResponseInputStream<GetObjectResponse> stream =
-                    client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build());
-            GetObjectResponse headers = stream.response();
-            consumer.accept(new StoredObject(key, headers.contentType(), summary.size(), stream));
+            try (ResponseInputStream<GetObjectResponse> stream =
+                         client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+                GetObjectResponse headers = stream.response();
+                consumer.accept(new StoredObject(key, headers.contentType(), summary.size(), stream));
+            } catch (IOException e) {
+                throw new UncheckedIOException("关闭对象存储快照流失败", e);
+            }
         });
     }
 }
