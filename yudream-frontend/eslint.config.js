@@ -58,10 +58,11 @@ export default antfu(
       'yudream/no-brand-color-token': 'error',
     },
   },
-  // 本地规则用例使用 node:test 运行（根包无 vitest 依赖），禁止改写为 vitest 导入
+  // 本地规则与宿主单测使用 node:test（仓库无 vitest 依赖）。
   {
     files: [
       'eslint-rules/**/*.mjs',
+      'apps/core-arco-design-vue/src/**/*.test.ts',
     ],
     rules: {
       'test/no-import-node-test': 'off',

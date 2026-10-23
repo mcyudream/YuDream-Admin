@@ -13,6 +13,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AiRunProgress: typeof import('./../components/AiRunProgress/index.vue')['default']
+    AiToolPicker: typeof import('./../components/AiToolPicker/index.vue')['default']
     AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
     AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
     AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
@@ -72,6 +73,7 @@ declare module 'vue' {
     GlobalAiAssistant: typeof import('./../components/GlobalAiAssistant/index.vue')['default']
     GlobalTour: typeof import('./../components/GlobalTour/index.vue')['default']
     RelatedEntity: typeof import('./../components/RelatedEntity/index.vue')['default']
+    WorkspaceExplorer: typeof import('./../components/WorkspaceExplorer/index.vue')['default']
     YdAction: typeof import('@yudream/components')['YdAction']
     YdAgentAnswer: typeof import('@yudream/components')['YdAgentAnswer']
     YdAgentContextPanel: typeof import('@yudream/components')['YdAgentContextPanel']
@@ -249,6 +251,7 @@ declare module 'vue' {
 // For TSX support
 declare global {
   const AiRunProgress: typeof import('./../components/AiRunProgress/index.vue')['default']
+  const AiToolPicker: typeof import('./../components/AiToolPicker/index.vue')['default']
   const AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
   const AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
   const AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
@@ -308,6 +311,7 @@ declare global {
   const GlobalAiAssistant: typeof import('./../components/GlobalAiAssistant/index.vue')['default']
   const GlobalTour: typeof import('./../components/GlobalTour/index.vue')['default']
   const RelatedEntity: typeof import('./../components/RelatedEntity/index.vue')['default']
+  const WorkspaceExplorer: typeof import('./../components/WorkspaceExplorer/index.vue')['default']
   const YdAction: typeof import('@yudream/components')['YdAction']
   const YdAgentAnswer: typeof import('@yudream/components')['YdAgentAnswer']
   const YdAgentContextPanel: typeof import('@yudream/components')['YdAgentContextPanel']

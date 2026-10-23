@@ -6,8 +6,14 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const EMBEDDED_AI_AGENT_CODES: typeof import('../store/modules/ai-assistant').EMBEDDED_AI_AGENT_CODES
   const EffectScope: typeof import('vue').EffectScope
+  const STUDIO_AGENT_OBSERVE_TOOLS: typeof import('../composables/use-site-studio-agent').STUDIO_AGENT_OBSERVE_TOOLS
+  const STUDIO_AGENT_TOOLS: typeof import('../composables/use-site-studio-agent').STUDIO_AGENT_TOOLS
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
+  const bindingCodeExpired: typeof import('../composables/use-messaging-binding').bindingCodeExpired
+  const bindingProtocolLabel: typeof import('../composables/use-messaging-binding').bindingProtocolLabel
+  const bindingTargetLabel: typeof import('../composables/use-messaging-binding').bindingTargetLabel
   const clearYdPersistentChatOwner: typeof import('@yudream/components').clearYdPersistentChatOwner
   const collectBackendMatcherRoutes: typeof import('../store/modules/app/route-auth').collectBackendMatcherRoutes
   const computed: typeof import('vue').computed
@@ -31,11 +37,14 @@ declare global {
   const h: typeof import('vue').h
   const indexPluginRuntimeModules: typeof import('../store/modules/app/plugin-route-runtime').indexPluginRuntimeModules
   const inject: typeof import('vue').inject
+  const installStudioPublicSkin: typeof import('../composables/use-published-studio').installStudioPublicSkin
+  const isEmbeddedAiSession: typeof import('../store/modules/ai-assistant').isEmbeddedAiSession
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
+  const loadPublishedStudioDocument: typeof import('../composables/use-published-studio').loadPublishedStudioDocument
   const mapActions: typeof import('pinia').mapActions
   const mapGetters: typeof import('pinia').mapGetters
   const mapState: typeof import('pinia').mapState
@@ -112,15 +121,20 @@ declare global {
   const useIsMobile: typeof import('@yudream/components').useIsMobile
   const useLink: typeof import('vue-router').useLink
   const useLinkedFocus: typeof import('../composables/use-linked-focus').useLinkedFocus
+  const useMessagingBinding: typeof import('../composables/use-messaging-binding').useMessagingBinding
   const useModel: typeof import('vue').useModel
   const usePagination: typeof import('@fantastic-admin/composables').usePagination
   const usePluginDevtoolsStore: typeof import('../store/modules/app/plugin-devtools').usePluginDevtoolsStore
+  const usePublishedStudioDocument: typeof import('../composables/use-published-studio').usePublishedStudioDocument
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSiteStudioStore: typeof import('../store/modules/site-studio').useSiteStudioStore
   const useSlots: typeof import('vue').useSlots
+  const useStudioHostLayout: typeof import('../composables/use-published-studio').useStudioHostLayout
+  const useStudioPublicShell: typeof import('../composables/use-published-studio').useStudioPublicShell
   const useTemplateRef: typeof import('vue').useTemplateRef
   const useTourStore: typeof import('../store/modules/tour').useTourStore
+  const useWorkspaceReferences: typeof import('../composables/use-workspace-references').useWorkspaceReferences
   const useYdChat: typeof import('@yudream/components').useYdChat
   const useYdChatConfig: typeof import('@yudream/components').useYdChatConfig
   const useYdChatStream: typeof import('@yudream/components').useYdChatStream

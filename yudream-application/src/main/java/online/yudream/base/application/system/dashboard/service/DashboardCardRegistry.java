@@ -79,6 +79,26 @@ public class DashboardCardRegistry {
                 false
         ));
         cards.add(new DashboardCardDefinition(
+                "system.messaging-binding",
+                "消息协议绑定",
+                "按机器人连接绑定消息身份，生成绑定码并复制发送命令；官方 OpenID 不覆盖 QQ 号。",
+                "morph:bot",
+                "个人",
+                "SYSTEM",
+                null,
+                null,
+                "MESSAGING_BINDING",
+                null,
+                null,
+                "gray",
+                4,
+                3,
+                3,
+                3,
+                25,
+                false
+        ));
+        cards.add(new DashboardCardDefinition(
                 "system.monitor",
                 "运行监控",
                 "展示在线会话和 Redis 运行状态。",

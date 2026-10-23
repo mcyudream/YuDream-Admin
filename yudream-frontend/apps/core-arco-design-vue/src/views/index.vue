@@ -8,6 +8,7 @@ import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCa
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
 import DashboardGuideCard from './dashboard/DashboardGuideCard.vue'
+import DashboardMessagingBindingCard from './dashboard/DashboardMessagingBindingCard.vue'
 import DashboardMobilePairCard from './dashboard/DashboardMobilePairCard.vue'
 import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
 import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
@@ -429,6 +430,8 @@ function resolveCardComponent(card?: DashboardCard) {
       return DashboardMonitorCard
     case 'CAPABILITY_STATS':
       return DashboardCapabilityStatsCard
+    case 'MESSAGING_BINDING':
+      return DashboardMessagingBindingCard
     case 'MOBILE_PAIR':
       return DashboardMobilePairCard
     case 'PLUGIN_STATS':
@@ -475,6 +478,7 @@ function genericCardProps(card: DashboardCard) {
       }
     case 'CAPABILITY_STATS':
     case 'PLUGIN_STATS':
+    case 'MESSAGING_BINDING':
     case 'MOBILE_PAIR':
       return base
     case 'ENDPOINT_CARD':
