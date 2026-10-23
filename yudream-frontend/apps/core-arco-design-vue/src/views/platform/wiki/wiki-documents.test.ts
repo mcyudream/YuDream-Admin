@@ -13,7 +13,7 @@ function page(id: string, spaceId = '1', title = `页面 ${id}`): WikiNode {
     nodeType: 'PAGE',
     sort: 0,
     body: `正文 ${id}`,
-  } as WikiNode
+  } as unknown as WikiNode
 }
 
 test('打开多页各自持有草稿，切换标签不丢未保存内容', () => {

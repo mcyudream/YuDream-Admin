@@ -144,7 +144,7 @@ test('page path, global ids and model boundaries are strict', () => {
   assert.equal(typeof createStudioGrapesAdapter().setup, 'function')
 })
 test('shared JSON contract fixtures are accepted and rejected identically by both tiers', () => {
-  const fixture = JSON.parse(readFileSync(new URL('../../../../../tests/fixtures/site-studio-contract.json', import.meta.url), 'utf8')) as {
+  const fixture = JSON.parse(readFileSync(new URL('../../../../../yudream-bootstrap/src/test/resources/cms/site-studio-contract.json', import.meta.url), 'utf8')) as {
     valid: {
       name: string
       document: SiteDocument
@@ -181,8 +181,10 @@ test('legacy site effects migrate as one undoable batch and retain unrelated con
   assert.equal(migrated.pages[0]?.settings?.toast, undefined)
   assert.equal(migrated.features?.content?.values.heroTitle, '真实内容')
   const fields = migrated.features!.content!.sections.flatMap(section => section.fields)
-  assert.equal(fields.find(field => field.effect === 'music')?.defaultValue?.[0]?.src, '/api/files/music.ogg')
-  assert.equal(fields.find(field => field.effect === 'pageEffects')?.defaultValue?.[0]?.toastTitle, '欢迎')
+  const musicField = fields.find(field => field.effect === 'music') as { defaultValue?: { src?: string }[] } | undefined
+  const pageEffectsField = fields.find(field => field.effect === 'pageEffects') as { defaultValue?: { toastTitle?: string }[] } | undefined
+  assert.equal(musicField?.defaultValue?.[0]?.src, '/api/files/music.ogg')
+  assert.equal(pageEffectsField?.defaultValue?.[0]?.toastTitle, '欢迎')
   assert.deepEqual(migrateStudioEffects(migrated).commands, [])
   assert.ok(doc.features?.audio, '原文档保持不变，支持撤销')
 })
