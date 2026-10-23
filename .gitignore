@@ -78,3 +78,7 @@ tmp/screenshots/chrome-profile*/
 # 本地调试运行时数据，不入库
 tmp/chrome-agent-debug-profile/
 yudream-frontend/config/
+
+# AOCI agent host integration (machine-bound; do not commit)
+.codex/config.toml
+.codex/config.toml.backup.*
