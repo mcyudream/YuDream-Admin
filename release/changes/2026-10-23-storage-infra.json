@@ -1,0 +1,16 @@
+{
+  "id": "storage-infra",
+  "level": "patch",
+  "title": "对象存储与运行基础设施",
+  "commits": [
+    "02d7c5d2e",
+    "e7f9cd7e9",
+    "ee877a017",
+    "28eeb326c"
+  ],
+  "notes": [
+    "S3 客户端校验和按需计算，修复 rustfs 等兼容存储上传失败",
+    "S3 对象流全路径关闭并约束连接池，根治连接耗尽导致的取图 500",
+    "Python 运行时自动探测可用解释器；代码运行器 PY_PACKAGES 可为空"
+  ]
+}
