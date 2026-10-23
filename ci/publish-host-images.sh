@@ -2,7 +2,7 @@
 # ci/publish-host-images.sh —— 宿主 backend/frontend 镜像构建 + 双仓（Harbor/阿里云 ACR）发布脚本。
 #
 # 仅依赖 sh（POSIX/busybox ash）+ jq + docker CLI；不假定 python/node/skopeo。
-# CI 侧（docker:cli 镜像）需 `apk add --no-cache jq`；作业必须保留
+# CI 侧（docker:cli 镜像）需 `apk add --no-cache jq`（先切阿里云 apk 镜像，官方源国内不可达）；作业必须保留
 # resource_group: yudreamadmin-images（外部串行化，防多 tag 流水线竞争可变标签）。
 #
 # 输入（环境变量，无命令行参数）：

@@ -398,6 +398,8 @@ publish:host-images:
     - build:backend
     - build:frontend-main
   script:
+    # dl-cdn.alpinelinux.org 在国内 runner 上 TLS 被重置不可达：apk 切阿里云镜像后再装 jq（同 deploy:docs-ftp 的 apt 处理）
+    - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     - apk add --no-cache jq
     - sh ci/publish-host-images.sh
   artifacts:
