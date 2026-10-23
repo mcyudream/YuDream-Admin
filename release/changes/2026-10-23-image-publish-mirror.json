@@ -1,0 +1,10 @@
+{
+  "id": "image-publish-mirror",
+  "level": "patch",
+  "title": "镜像发布流水线 apk 源修复",
+  "commits": ["cb6e2e016"],
+  "notes": [
+    "publish:host-images 作业 apk 切阿里云镜像后再装 jq：官方 alpine 源在国内 runner 上 TLS 被重置不可达，导致 v1.5.2 镜像发布作业必败",
+    "v1.5.2 按发布失败处理保留失败 tag 与记录，源码修复后以 v1.5.3 重新发版"
+  ]
+}
