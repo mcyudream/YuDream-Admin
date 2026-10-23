@@ -2,7 +2,7 @@
 
 文件预览（能力 code：`file-preview`）由宿主统一提供、插件消费。插件通过 SPI `PluginFilePreviewService` 获取预览地址，不再各自实现签名、kkFileView 对接与配置存储。
 
-管理入口：**平台能力 > 文件预览**。项目闸门环境变量 `PLATFORM_FILE_PREVIEW_ENABLED`（默认 `true`）；运行闸门由管理后台启用开关决定。插件端口见 [FilePreviewSpi](/plugin/spi/v1/file-preview)。
+管理入口：**平台能力 > 文件预览**。项目闸门由内部配置承载（默认 `true`，无环境变量门控）；运行闸门由管理后台启用开关决定。插件端口见 [FilePreviewSpi](/plugin/spi/v1/file-preview)。
 
 ## 预览决策
 

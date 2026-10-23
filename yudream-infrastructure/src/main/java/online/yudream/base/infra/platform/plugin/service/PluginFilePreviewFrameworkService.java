@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 
 /**
  * 平台文件预览能力：kkFileView 配置与启停由「平台能力 &gt; 文件预览」能力模块双闸门控制
- * （部署侧 {@code PLATFORM_FILE_PREVIEW_ENABLED} 决定 {@link FilePreviewCapabilityProvider} Bean 是否存在，
+ * （项目闸门由内部配置默认开启、决定 {@link FilePreviewCapabilityProvider} Bean 是否存在，
  * 运行侧由管理后台启用开关决定），本类为插件文件签发 HMAC 短时效公开地址（{@link #PUBLIC_FILE_PATH} 端点回源），
  * 并按「大小上限 → 浏览器直读 → kkFileView」给出预览决策（图片/音视频/PDF/文本优先浏览器原生直读，
  * 避免 kk 跨域与模板兼容问题；Office/PSD 等格式才交给 kkFileView）。

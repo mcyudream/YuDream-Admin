@@ -151,7 +151,7 @@ export interface FormSubmission {
 
 与其他平台能力一致，表单能力受两道闸门约束：
 
-1. **项目闸门**：`DynamicFormCapabilityProvider` 标注 `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.form", name = "enabled")`（对应环境变量 `PLATFORM_FORM_ENABLED`，默认 `true`，见 `yudream-bootstrap/src/main/resources/application.yml`）；闸门关闭则 provider 不加载，相关菜单与端点不注册。
+1. **项目闸门**：`DynamicFormCapabilityProvider` 标注 `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.form", name = "enabled")`（内部配置默认 `true`，无环境变量门控，见 `yudream-bootstrap/src/main/resources/application.yml`）；闸门关闭则 provider 不加载，相关菜单与端点不注册。
 2. **应用闸门**：`DynamicFormAppService` 每个用例入口调用 `ensureEnabled()` 检查持久化的能力开关状态，未启用直接拒绝业务操作。
 
 ## ID 使用约定

@@ -13,28 +13,28 @@
 
 ### 平台能力（18 项）
 
-所有平台能力的项目闸门配置形如 `yudream.platform.capabilities.<code>.enabled`，多数同时支持环境变量覆盖：
+所有平台能力的项目闸门统一由内部配置 `yudream.platform.capabilities.<code>.enabled` 承载（默认全部开启，不提供部署侧环境变量门控），运行期启停经管理后台能力管理页完成：
 
-| 能力 code | 环境变量开关 | 说明 |
-|---|---|---|
-| `api-docs` | `PLATFORM_API_DOCS_ENABLED` | SpringDoc 接口文档 |
-| `sse` | `PLATFORM_SSE_ENABLED` | SSE 服务端推送 |
-| `websocket` | `PLATFORM_WEBSOCKET_ENABLED` | WebSocket 实时通信 |
-| `rabbitmq` | `PLATFORM_RABBITMQ_ENABLED` | RabbitMQ 消息能力 |
-| `neo4j` | `PLATFORM_NEO4J_ENABLED` | 单一部署级图数据库；后台逻辑图表隔离 Wiki 与插件数据 |
-| `ai` | `PLATFORM_AI_ENABLED` | 多 provider AI（OpenAI / OpenAI 兼容 / Kimi / DeepSeek），Spring AI 原生工具调用 |
-| `agent` | `PLATFORM_AGENT_ENABLED` | Agent 编排 + 执行追踪 |
-| `cms` | `PLATFORM_CMS_ENABLED` | GrapesJS 可视化建站 CMS |
-| `wiki` | `PLATFORM_WIKI_ENABLED` | Markdown 知识库 + RAG + Neo4j 图谱增强 |
-| `form` | `PLATFORM_FORM_ENABLED` | 动态表单 DynamicForm |
-| `document-template` | `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | Word 文档模板生成（POI） |
-| `integration` | `PLATFORM_INTEGRATION_ENABLED` | HTTP 集成 |
-| `dataviz` | `PLATFORM_DATAVIZ_ENABLED` | 数据可视化 |
-| `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与腾讯官方 OpenAPI v2 共用出站端口 |
-| `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
-| `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） |
-| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，管理端查看邮件详情，插件按发件域与验证码核验 |
-| `plugin-market-source` | `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` | 本机插件市场源（LOCAL）。远程源订阅不依赖本能力，也不回落 Nexus |
+| 能力 code | 说明 |
+|---|---|
+| `api-docs` | SpringDoc 接口文档 |
+| `sse` | SSE 服务端推送 |
+| `websocket` | WebSocket 实时通信 |
+| `rabbitmq` | RabbitMQ 消息能力 |
+| `neo4j` | 单一部署级图数据库；后台逻辑图表隔离 Wiki 与插件数据 |
+| `ai` | 多 provider AI（OpenAI / OpenAI 兼容 / Kimi / DeepSeek），Spring AI 原生工具调用 |
+| `agent` | Agent 编排 + 执行追踪 |
+| `cms` | GrapesJS 可视化建站 CMS |
+| `wiki` | Markdown 知识库 + RAG + Neo4j 图谱增强 |
+| `form` | 动态表单 DynamicForm |
+| `document-template` | Word 文档模板生成（POI） |
+| `integration` | HTTP 集成 |
+| `dataviz` | 数据可视化 |
+| `milky` | QQ 消息平台：Milky 与腾讯官方 OpenAPI v2 共用出站端口 |
+| `message-render` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
+| `file-preview` | kkFileView 文件预览（Office / PSD / 压缩包等） |
+| `inbound-mail` | IMAPS 入站邮箱，管理端查看邮件详情，插件按发件域与验证码核验 |
+| `plugin-market-source` | 本机插件市场源（LOCAL）。远程源订阅不依赖本能力，也不回落 Nexus |
 
 能力间依赖（如 `wiki` 依赖 `ai` 与 `neo4j`）声明在 `CapabilityDescriptor.dependencies`，禁用一个依赖会级联禁用所有依赖方。机制详解见 [平台能力](/guide/platform-capabilities)。
 

@@ -145,47 +145,49 @@ yudream.system.log.docker:
   transport: ${SYSTEM_LOG_DOCKER_TRANSPORT:auto}
   socket: ${SYSTEM_LOG_DOCKER_SOCKET:/var/run/docker.sock}
 
+# 平台能力项目闸门：由内部配置承载，默认全部开启；不提供部署侧环境变量门控。
+# 能力的启停经后台能力管理页（持久化状态 + ensureEnabled 应用闸门）完成。
 yudream.platform.capabilities:
   api-docs:
-    enabled: ${PLATFORM_API_DOCS_ENABLED:true}
+    enabled: true
   cms:
-    enabled: ${PLATFORM_CMS_ENABLED:true}
+    enabled: true
   wiki:
-    enabled: ${PLATFORM_WIKI_ENABLED:true}
+    enabled: true
   form:
-    enabled: ${PLATFORM_FORM_ENABLED:true}
+    enabled: true
   document-template:
-    enabled: ${PLATFORM_DOCUMENT_TEMPLATE_ENABLED:true}
+    enabled: true
   integration:
-    enabled: ${PLATFORM_INTEGRATION_ENABLED:true}
+    enabled: true
   sse:
-    enabled: ${PLATFORM_SSE_ENABLED:true}
+    enabled: true
   websocket:
-    enabled: ${PLATFORM_WEBSOCKET_ENABLED:true}
+    enabled: true
   rabbitmq:
-    enabled: ${PLATFORM_RABBITMQ_ENABLED:true}
+    enabled: true
   neo4j:
-    enabled: ${PLATFORM_NEO4J_ENABLED:true}
+    enabled: true
   ai:
-    enabled: ${PLATFORM_AI_ENABLED:true}
+    enabled: true
   agent:
-    enabled: ${PLATFORM_AGENT_ENABLED:true}
+    enabled: true
   mcp:
-    enabled: ${PLATFORM_MCP_ENABLED:true}
+    enabled: true
   dataviz:
-    enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
+    enabled: true
   milky:
-    enabled: ${PLATFORM_MILKY_ENABLED:true}
+    enabled: true
   message-render:
-    enabled: ${PLATFORM_MESSAGE_RENDER_ENABLED:true}
+    enabled: true
   file-preview:
-    enabled: ${PLATFORM_FILE_PREVIEW_ENABLED:true}
+    enabled: true
   inbound-mail:
-    enabled: ${PLATFORM_INBOUND_MAIL_ENABLED:true}
+    enabled: true
   plugin-market-source:
-    enabled: ${PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED:true}
+    enabled: true
   feishu:
-    enabled: ${PLATFORM_FEISHU_ENABLED:true}
+    enabled: true
 
 # 飞书开放平台出站受信主机（逗号分隔，必须 https）：官方主机 open.feishu.cn / open.larksuite.com 始终允许；
 # 自建受信网关或代理在此由部署方声明，避免能力配置管理员把应用凭据（app_id/app_secret）指向任意地址。

@@ -16,7 +16,7 @@
 | `POST /api/platform/milky/connections/{id}/test` | 连通性测试 |
 
 - 每个连接持有 `protocol`（`milky` 默认 / `official`）。Milky 连接保存平台地址与 Access Token；官方连接保存 AppID、AppSecret，默认 API 地址 `https://api.bot.qq.com`（沙箱 `https://sandbox.api.bot.qq.com`）。凭据经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库。新写入统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）及连接作用域 AAD，管理接口永不回传明文；旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（16/24/32 字节）仅可解密历史密文。
-- 能力描述符：能力码 `milky`，类型 `MESSAGING`，展示名 **QQ 消息平台**。项目闸门为 `PLATFORM_MILKY_ENABLED`（默认开启），应用层每次用例前经 `ensureEnabled("milky", "QQ 消息平台")` 二次校验。
+- 能力描述符：能力码 `milky`，类型 `MESSAGING`，展示名 **QQ 消息平台**。项目闸门为内部配置 `yudream.platform.capabilities.milky.enabled`（默认开启，无环境变量门控），应用层每次用例前经 `ensureEnabled("milky", "QQ 消息平台")` 二次校验。
 - 插件前端选择器走 SDK `sdk.messaging.connections()/groups()`，对应 `GET /api/platform/plugins/messaging/**`（登录即可，不要求 `platform:milky:view`）。不要再包一层插件 HTTP，也不要打管理端 `/api/platform/milky/**`。
 - 官方 Webhook：`POST /api/public/qqbot/{connectionId}/webhook`。回调校验（op=13）返回 `plain_token` + Ed25519 `signature`；业务事件验签后归一发布。
 
@@ -116,7 +116,6 @@ sequenceDiagram
 
 | 配置 | 说明 |
 |---|---|
-| `PLATFORM_MILKY_ENABLED` | 项目闸门开关（默认 `true`） |
 | `YUDREAM_CREDENTIAL_KEY` | 新写入的统一凭据主密钥（Base64 解码后恰为 32 字节） |
 | `YUDREAM_MILKY_CREDENTIAL_KEY` | 仅解密历史 Milky 密文的回退密钥（Base64 解码后为 16/24/32 字节） |
 

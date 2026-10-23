@@ -76,7 +76,7 @@ Assembler 归属：接口 assembler 负责 `request -> cmd`、`DTO -> res`、`Ex
 
 ### 5.2 双闸门
 
-1. **项目闸门**：配置/`@ConditionalOnProperty` 决定是否允许加载 provider（如 `yudream.platform.capabilities.rabbitmq.enabled=true`）。
+1. **项目闸门**：配置/`@ConditionalOnProperty` 决定是否允许加载 provider（如 `yudream.platform.capabilities.rabbitmq.enabled=true`）。项目闸门由后端内部配置承载、默认全部开启；**不得**为平台能力加装部署侧环境变量门控（`PLATFORM_*_ENABLED` 一类开关已废除）。
 2. **应用闸门**：应用层每次用例前 `ensureEnabled(...)` 检查持久化状态。
 
 - 项目闸门不允许的能力**不得**注册端点、**不得**启动恢复、不得以运行时可切换 provider 的形式出现。

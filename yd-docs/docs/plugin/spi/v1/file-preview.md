@@ -2,7 +2,7 @@
 
 > SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.preview`
 
-平台文件预览能力端口。能力编码 `file-preview`，项目闸门 `PLATFORM_FILE_PREVIEW_ENABLED`。默认实现表示宿主未提供该能力（`enabled()` 恒 false、预览恒为 `NONE`）。产品行为见 [文件预览](/features/file-preview)。
+平台文件预览能力端口。能力编码 `file-preview`，项目闸门为内部配置 `yudream.platform.capabilities.file-preview.enabled`（默认开启，无环境变量门控）。默认实现表示宿主未提供该能力（`enabled()` 恒 false、预览恒为 `NONE`）。产品行为见 [文件预览](/features/file-preview)。
 
 | 端口 | 获取方式 | 用途 |
 |---|---|---|

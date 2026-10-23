@@ -8,7 +8,7 @@
 
 | 闸门 | 机制 | 说明 |
 |---|---|---|
-| 项目闸门 | `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled")` | 聊天复用 **ai 能力**的项目开关（`PLATFORM_AI_ENABLED`，默认 `true`）；关闭时 `ChatController` 不注册 |
+| 项目闸门 | `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled")` | 聊天复用 **ai 能力**的项目开关（内部配置默认 `true`，无环境变量门控）；关闭时 `ChatController` 不注册 |
 | 应用闸门 | `ChatAppService` 每次问答前检查当日配额 | 配额耗尽（`remaining <= 0`）拒绝新回合，返回结构化错误而非中断连接 |
 
 聊天自身无独立能力开关；停用 AI 能力即整体停用聊天。

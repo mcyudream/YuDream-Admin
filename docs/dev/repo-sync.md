@@ -54,3 +54,4 @@
 - AI 助手统一网关与用户工作区（`docs/platform/ai-foundation.md`：每用户默认工作区 `platform:chat:workspace:view/edit` + `workspace.list`/`workspace.read` 只读工具；CMS 画布/站点工作区改走 chat 网关会话，删除 AG-UI WebSocket 与 CMS 专用生成/流式端点；新增平台工具模块 `workspace`）：本仓未发布新 SPI/SDK 契约，插件侧无需改代码，待插件仓 WIP 落定后同步 AI 消费方文档一节。
 - 主题配置 schema 新增 `audio` 字段类型（`docs/dev/plugin-system.md` 主题配置条目，a271ab48；与 image 同语义，旧宿主拒绝含 audio 的 schema）：插件仓 `docs/dev/plugin-development.md` 目前无主题配置字段类型清单，待其 WIP 落定后在主题节补一句引用；插件侧无需改代码。
 - `docs/yd-ui-guidelines.md` §7 新增 `YdFloatBall`（可拖拽圆球入口）与 `YdChatWindow` 非模态浮动窗口约定：插件仓同名副本仍有未提交改动，待其 WIP 落定后一并 `pnpm sync:ui-docs`。
+- 平台能力废除部署侧环境变量门控（`docs/dev/backend-architecture.md` §5.2 项目闸门改为「内部配置承载、默认开启、不得加装 `PLATFORM_*_ENABLED` 环境变量门控」+ `yudream-bootstrap/application.yml`、`.env.example`、`docker-compose.yml`、`yd-docs` 部署文档同步清理；SPI javadoc `PluginFilePreviewService`/`PluginFilePreviewFrameworkService` 等门控描述改为内部门控，纯 javadoc 文案随下一次 SPI 发布带出）：待同步插件仓后端规范节与 AI/文件预览消费方文档（插件仓当前有大量未提交 WIP，先保留不动）。

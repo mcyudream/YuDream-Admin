@@ -24,15 +24,6 @@ MESSAGE_RENDER_BASE_URL=http://render-server:3000
 MESSAGE_RENDER_TOKEN=
 RENDER_TOKEN=
 YUDREAM_CREDENTIAL_KEY=
-PLATFORM_RABBITMQ_ENABLED=false
-PLATFORM_NEO4J_ENABLED=false
-PLATFORM_WIKI_ENABLED=false
-PLATFORM_AI_ENABLED=false
-PLATFORM_AGENT_ENABLED=false
-PLATFORM_MILKY_ENABLED=false
-PLATFORM_MESSAGE_RENDER_ENABLED=true
-PLATFORM_FILE_PREVIEW_ENABLED=true
-PLATFORM_INBOUND_MAIL_ENABLED=false
 KKFILEVIEW_TAG=5.0.2
 KKFILEVIEW_PORT=8012
 KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012
@@ -57,15 +48,6 @@ services:
       MESSAGE_RENDER_BASE_URL: ${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       MESSAGE_RENDER_TOKEN: ${MESSAGE_RENDER_TOKEN:-}
       YUDREAM_CREDENTIAL_KEY: ${YUDREAM_CREDENTIAL_KEY:-}
-      PLATFORM_RABBITMQ_ENABLED: ${PLATFORM_RABBITMQ_ENABLED:-false}
-      PLATFORM_NEO4J_ENABLED: ${PLATFORM_NEO4J_ENABLED:-false}
-      PLATFORM_WIKI_ENABLED: ${PLATFORM_WIKI_ENABLED:-false}
-      PLATFORM_AI_ENABLED: ${PLATFORM_AI_ENABLED:-false}
-      PLATFORM_AGENT_ENABLED: ${PLATFORM_AGENT_ENABLED:-false}
-      PLATFORM_MILKY_ENABLED: ${PLATFORM_MILKY_ENABLED:-false}
-      PLATFORM_MESSAGE_RENDER_ENABLED: ${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
-      PLATFORM_FILE_PREVIEW_ENABLED: ${PLATFORM_FILE_PREVIEW_ENABLED:-true}
-      PLATFORM_INBOUND_MAIL_ENABLED: ${PLATFORM_INBOUND_MAIL_ENABLED:-false}
       FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL: ${KKFILEVIEW_INTERNAL_URL:-http://kkfileview:8012}
     networks: [yudream]
 
@@ -130,15 +112,6 @@ MESSAGE_RENDER_BASE_URL=http://render-server:3000
 MESSAGE_RENDER_TOKEN=
 RENDER_TOKEN=
 YUDREAM_CREDENTIAL_KEY=
-PLATFORM_RABBITMQ_ENABLED=false
-PLATFORM_NEO4J_ENABLED=false
-PLATFORM_WIKI_ENABLED=false
-PLATFORM_AI_ENABLED=false
-PLATFORM_AGENT_ENABLED=false
-PLATFORM_MILKY_ENABLED=false
-PLATFORM_MESSAGE_RENDER_ENABLED=true
-PLATFORM_FILE_PREVIEW_ENABLED=true
-PLATFORM_INBOUND_MAIL_ENABLED=false
 KKFILEVIEW_TAG=5.0.2
 KKFILEVIEW_PORT=8012
 KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012
@@ -188,15 +161,6 @@ services:
       MESSAGE_RENDER_BASE_URL: ${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       MESSAGE_RENDER_TOKEN: ${MESSAGE_RENDER_TOKEN:-}
       YUDREAM_CREDENTIAL_KEY: ${YUDREAM_CREDENTIAL_KEY:-}
-      PLATFORM_RABBITMQ_ENABLED: ${PLATFORM_RABBITMQ_ENABLED:-false}
-      PLATFORM_NEO4J_ENABLED: ${PLATFORM_NEO4J_ENABLED:-false}
-      PLATFORM_WIKI_ENABLED: ${PLATFORM_WIKI_ENABLED:-false}
-      PLATFORM_AI_ENABLED: ${PLATFORM_AI_ENABLED:-false}
-      PLATFORM_AGENT_ENABLED: ${PLATFORM_AGENT_ENABLED:-false}
-      PLATFORM_MILKY_ENABLED: ${PLATFORM_MILKY_ENABLED:-false}
-      PLATFORM_MESSAGE_RENDER_ENABLED: ${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
-      PLATFORM_FILE_PREVIEW_ENABLED: ${PLATFORM_FILE_PREVIEW_ENABLED:-true}
-      PLATFORM_INBOUND_MAIL_ENABLED: ${PLATFORM_INBOUND_MAIL_ENABLED:-false}
       FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL: ${KKFILEVIEW_INTERNAL_URL:-http://kkfileview:8012}
     networks: [yudream]
 
@@ -241,7 +205,7 @@ networks:
     driver: bridge
 ```
 
-B 中除 `TAG`、宿主端口、雪花编号、能力开关和渲染配置外，Mongo/Redis 连接已固定为服务 hostname `mongo`/`redis`，因此不能把 `MONGO_URI` 改成 `localhost`。MongoDB 与 Redis 没有宿主端口映射，数据分别持久化到 `mongo-data`、`redis-data`。
+B 中除 `TAG`、宿主端口、雪花编号和渲染配置外，Mongo/Redis 连接已固定为服务 hostname `mongo`/`redis`，因此不能把 `MONGO_URI` 改成 `localhost`。MongoDB 与 Redis 没有宿主端口映射，数据分别持久化到 `mongo-data`、`redis-data`。
 
 ### 模板变量逐项说明
 
@@ -267,21 +231,14 @@ B 中除 `TAG`、宿主端口、雪花编号、能力开关和渲染配置外，
 | `MESSAGE_RENDER_TOKEN` | 否 | backend 的渲染 token 配置。 | 空；与 `RENDER_TOKEN` 保持一致 |
 | `RENDER_TOKEN` | 否 | 注入 render-server 的兼容 token 配置。 | 空；取 `MESSAGE_RENDER_TOKEN` |
 | `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 统一加密 Neo4j、Milky 和插件 SecretStore；Base64 解码后必须恰为 32 字节。 | 空；可用 `openssl rand -base64 32` 生成 |
-| `PLATFORM_RABBITMQ_ENABLED` | 否 | RabbitMQ 项目闸门；模板未提供 RabbitMQ。 | `false` |
-| `PLATFORM_NEO4J_ENABLED` | 否 | Neo4j 项目闸门；模板未提供 Neo4j。 | `false` |
-| `PLATFORM_WIKI_ENABLED` | 否 | Wiki 项目闸门；模板未提供 Neo4j。 | `false` |
-| `PLATFORM_AI_ENABLED` | 否 | AI 项目闸门。 | `false` |
-| `PLATFORM_AGENT_ENABLED` | 否 | Agent 项目闸门。 | `false` |
-| `PLATFORM_MILKY_ENABLED` | 否 | QQ 消息平台项目闸门。 | `false` |
-| `PLATFORM_MESSAGE_RENDER_ENABLED` | 否 | 消息渲染项目闸门；要使用 render-server 必须开启。 | `true` |
-| `PLATFORM_FILE_PREVIEW_ENABLED` | 否 | 文件预览项目闸门；要使用 kkFileView 必须开启。 | `true` |
-| `PLATFORM_INBOUND_MAIL_ENABLED` | 否 | 入站邮箱项目闸门；启用前需配置 IMAP。 | `false` |
 
-render-server 当前源码实际提供 `GET /health` 和 `/v1/render/*`，没有读取或校验 `RENDER_TOKEN`；文档仍同时保留两个变量名，是为了与 backend 配置和现有 Compose 兼容。它只是内网服务，生产环境应删除 `ports`，只保留 `expose`。删除 render-server 时将 `PLATFORM_MESSAGE_RENDER_ENABLED=false`，并移除 backend 的 `MESSAGE_RENDER_BASE_URL`/token 配置即可；其余服务仍按模板运行。
+平台能力不提供环境变量门控：项目闸门由后端内部配置默认开启，未部署外部服务（RabbitMQ、Neo4j、render-server、kkFileView、IMAP 等）的能力在管理后台「平台能力」页保持未启用即可，不会建立外部连接。
+
+render-server 当前源码实际提供 `GET /health` 和 `/v1/render/*`，没有读取或校验 `RENDER_TOKEN`；文档仍同时保留两个变量名，是为了与 backend 配置和现有 Compose 兼容。它只是内网服务，生产环境应删除 `ports`，只保留 `expose`。删除 render-server 时在管理后台「平台能力」停用「消息渲染」，并移除 backend 的 `MESSAGE_RENDER_BASE_URL`/token 配置即可；其余服务仍按模板运行。
 
 ## 完整环境变量参考
 
-上面的两套 Compose 只提供**模板最小运行变量**：模板 A 必须补充 `MONGO_URI`、`REDIS_HOST`，模板 B 将它们固定为 Compose 服务名；其余变量用于雪花 ID、渲染服务和能力开关。下面是当前后端 `application.yml`、基础设施插件配置和 render-server 配置支持的**完整可选配置**。未出现在两套模板中的变量不会自动注入，只有启用对应能力或功能时才需要设置。
+上面的两套 Compose 只提供**模板最小运行变量**：模板 A 必须补充 `MONGO_URI`、`REDIS_HOST`，模板 B 将它们固定为 Compose 服务名；其余变量用于雪花 ID、渲染服务与各功能连接参数。下面是当前后端 `application.yml`、基础设施插件配置和 render-server 配置支持的**完整可选配置**。未出现在两套模板中的变量不会自动注入，只有启用对应能力或功能时才需要设置。
 
 Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；`${VAR}` 没有默认值，Spring 在解析配置时要求变量存在。特别是 `MAIL_USERNAME`、`MAIL_PASSWORD` 缺失时，应用会在启动配置/Bean 初始化阶段失败，而不是“使用空值继续运行”。`YUDREAM_CREDENTIAL_KEY` 缺失不会阻止无凭据功能启动，但不能写入 Neo4j、Milky 或插件 SecretStore 的新凭据。`MAIL_FROM` 未设置时继承 `MAIL_USERNAME`，因此邮件配置仍要求提供用户名和密码。
 
@@ -333,27 +290,10 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 
 ### 平台能力与连接参数
 
-以下 `PLATFORM_*_ENABLED` 是项目闸门；值为 `false` 时对应 provider/端点不应加载。能力还可能需要在管理端完成应用闸门启用，并提供下表中的连接参数。
+平台能力**没有** `PLATFORM_*_ENABLED` 环境变量门控：项目闸门由后端内部配置 `yudream.platform.capabilities.<code>.enabled` 承载、默认开启；运行期在管理后台「平台能力」页启用（应用闸门），并配置下表中的连接参数。
 
 | 变量 | 默认值 | 必填 | 作用 | 适用条件 | 安全与部署注意事项 |
 |---|---|---:|---|---|---|
-| `PLATFORM_API_DOCS_ENABLED` | `true` | 否 | API 文档能力开关。 | Swagger/OpenAPI | 生产按需开放并限制访问。 |
-| `PLATFORM_CMS_ENABLED` | `true` | 否 | CMS 能力开关。 | CMS | 关闭会隐藏/停用相关能力。 |
-| `PLATFORM_WIKI_ENABLED` | `true` | 否 | Wiki 能力开关。 | Wiki | 使用 Wiki 知识图谱时还需 Neo4j 参数。 |
-| `PLATFORM_FORM_ENABLED` | `true` | 否 | 表单能力开关。 | 动态表单 | 关闭后不注册对应能力。 |
-| `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | `true` | 否 | 文档模板能力开关。 | 文档生成 | 处理模板文件时限制文件来源和大小。 |
-| `PLATFORM_INTEGRATION_ENABLED` | `true` | 否 | 外部集成能力开关。 | HTTP/Python 等集成 | 外部请求和进程执行应限制权限。 |
-| `PLATFORM_SSE_ENABLED` | `true` | 否 | SSE 能力开关。 | SSE | 按代理和超时策略配置。 |
-| `PLATFORM_WEBSOCKET_ENABLED` | `true` | 否 | WebSocket 能力开关。 | WebSocket | 反向代理必须正确转发 Upgrade。 |
-| `PLATFORM_RABBITMQ_ENABLED` | `true` | 否 | RabbitMQ 项目闸门。 | RabbitMQ | 未部署 RabbitMQ 时设为 `false`。 |
-| `PLATFORM_NEO4J_ENABLED` | `true` | 否 | Neo4j 项目闸门。 | Neo4j/Wiki 图谱 | 未部署 Neo4j 时设为 `false`。 |
-| `PLATFORM_AI_ENABLED` | `true` | 否 | AI 能力项目闸门。 | AI | 还需在应用层启用并配置 provider。 |
-| `PLATFORM_AGENT_ENABLED` | `true` | 否 | Agent 能力项目闸门。 | Agent | 依赖的 AI/工具不可用时不能启用。 |
-| `PLATFORM_DATAVIZ_ENABLED` | `true` | 否 | 数据可视化能力开关。 | 数据可视化 | 按需关闭。 |
-| `PLATFORM_MILKY_ENABLED` | `true` | 否 | QQ 消息平台项目闸门。 | Milky / 官方 OpenAPI | 启用并实际保存凭据时必须配置密钥。 |
-| `PLATFORM_MESSAGE_RENDER_ENABLED` | `true` | 否 | 消息渲染能力项目闸门。 | backend 调用 render-server | Compose 最小模板保持开启；不部署渲染服务时设为 `false`。 |
-| `PLATFORM_FILE_PREVIEW_ENABLED` | `true` | 否 | 文件预览项目闸门。 | kkFileView | 关闭后「平台能力」页不出现该能力；Office 等格式不可预览。 |
-| `PLATFORM_INBOUND_MAIL_ENABLED` | `true` | 否 | 入站邮箱项目闸门。 | IMAP 核验 | 启用前需配置 IMAP 主机、用户名与密码。 |
 | `PLATFORM_AI_CONNECT_TIMEOUT` | `30s` | 否 | AI provider 建连超时。 | AI | 按网络环境调整。 |
 | `PLATFORM_AI_READ_TIMEOUT` | `30m` | 否 | AI 普通读取超时。 | AI | 长超时会占用连接和线程资源。 |
 | `PLATFORM_AI_SSE_TIMEOUT` | `30m` | 否 | AI SSE 读取超时。 | AI 流式请求 | 需与反向代理超时一致。 |

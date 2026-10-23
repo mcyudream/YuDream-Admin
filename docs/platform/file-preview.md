@@ -4,8 +4,8 @@
 （`online.yudream.base.plugin.spi.system.preview`）获取预览地址，不再各自实现签名、kkFileView 对接与设置存储。
 
 - 管理入口：**平台能力 > 文件预览**（能力编码 `file-preview`，权限 `platform:capability:view/config/enable/disable/test`）。
-- 双闸门控制：部署侧环境变量 `PLATFORM_FILE_PREVIEW_ENABLED`（默认 `true`）决定能力是否出现；
-  运行侧由管理后台启用开关决定运行时是否生效，配置随能力入库（`capability_module`）。
+- 双闸门控制：项目闸门由后端内部配置 `yudream.platform.capabilities.file-preview.enabled` 承载（默认开启，
+  不提供部署侧环境变量门控）；运行侧由管理后台启用开关决定运行时是否生效，配置随能力入库（`capability_module`）。
 - 能力配置键：`baseUrl`（kkFileView 浏览器可达地址）、`callbackBaseUrl`（回源基址，留空按请求推导）、
   `officePreviewType`（默认 `pdf`）、`tokenTtlSeconds`（默认 `1800`）、`maxPreviewSizeMb`（默认 `200`）。
 - 运行时实现：`PluginFilePreviewFrameworkService`（yudream-infrastructure）经能力 Provider

@@ -72,7 +72,7 @@ flowchart TB
 
 ### 项目闸门
 
-- 通过 Spring 的 `@ConditionalOnProperty`（或等价的环境变量判断，如 `PLATFORM_AI_ENABLED`）控制 Provider Bean 是否装配；
+- 通过 Spring 的 `@ConditionalOnProperty` 绑定内部配置（如 `yudream.platform.capabilities.ai.enabled`）控制 Provider Bean 是否装配；平台能力不提供部署侧环境变量门控；
 - 未放行的能力：不注册端点、不启动消息恢复、不出现在管理页可启用列表之外。
 
 ### 应用闸门

@@ -21,7 +21,7 @@ default PluginFeishuService feishu();   // 默认实现 enabled() 恒 false，�
 ### 能力与双闸门
 
 - 能力编码 `PluginFeishuService.CAPABILITY_CODE = "feishu"`（「平台能力 > 飞书开放平台」）。
-- 部署侧闸门：`yudream.platform.capabilities.feishu.enabled`（环境变量 `PLATFORM_FEISHU_ENABLED`），关闭时宿主不装配能力 Provider。
+- 项目闸门：`yudream.platform.capabilities.feishu.enabled`（后端内部配置，默认开启，不提供部署侧环境变量门控），关闭时宿主不装配能力 Provider。
 - 运行侧闸门：管理员在能力页启用并维护配置（App ID、App Secret 加密入库、开放平台地址与超时），
   默认每用户每分钟/每日额度可在能力页与「飞书集成」页调整。
 - `enabled()` 为 true 要求能力启用 **且** 应用凭据已配置；false 时插件应隐藏入口/给出提示，禁止尝试其他写入通道。

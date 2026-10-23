@@ -56,10 +56,10 @@ render-server 是独立的 Headless Chromium 服务，把 HTML、Markdown 或外
 
 两个能力都遵守项目闸门 + 应用闸门双闸门约定：
 
-| 能力码 | 项目闸门开关 | 说明 |
-|---|---|---|
-| `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与官方 OpenAPI（默认开启） |
-| `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | 富文本渲染服务 |
+| 能力码 | 说明 |
+|---|---|
+| `milky` | QQ 消息平台：Milky 与官方 OpenAPI（默认开启） |
+| `message-render` | 富文本渲染服务 |
 
 ::: info 源码位置
 - Milky / 官方适配：`yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/`、`.../milky/official/`

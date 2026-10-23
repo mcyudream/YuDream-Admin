@@ -74,7 +74,7 @@ sequenceDiagram
 
 `ApiDocCapabilityProvider` 遵循平台能力的标准形态（`yudream-infrastructure/.../docs/service/ApiDocCapabilityProvider.java`）：
 
-- 项目闸门：`@ConditionalOnProperty(prefix = "yudream.platform.capabilities.api-docs", name = "enabled")`，对应环境变量 `PLATFORM_API_DOCS_ENABLED`（默认 `true`）；
+- 项目闸门：`@ConditionalOnProperty(prefix = "yudream.platform.capabilities.api-docs", name = "enabled")`，由内部配置承载（默认 `true`，无环境变量门控）；
 - 描述符：类型 `DOCUMENTATION`，默认元数据给出 `openApiPath=/v3/api-docs`、`swaggerUiPath=/swagger-ui/index.html`；
 - `health()` 反映启用状态与当前入口路径；`enable(config)`/`disable()` 只更新持久化设置，不建立任何外部连接。
 
@@ -102,7 +102,7 @@ springdoc:
 
 | 层级 | 配置 | 默认 | 说明 |
 |---|---|---|---|
-| 环境变量 | `PLATFORM_API_DOCS_ENABLED` | `true` | 项目闸门，决定 provider 是否装配 |
+| 内部配置 | `yudream.platform.capabilities.api-docs.enabled` | `true` | 项目闸门，决定 provider 是否装配 |
 | 持久化设置 | `enabled` | — | 应用闸门，运行时可开关文档 |
 | 持久化设置 | `apiKeyAccessEnabled` | — | 允许 API Key 直接访问 `/v3/api-docs` |
 | 持久化设置 | `openApiPath` / `swaggerUiPath` | 见 descriptor 默认值 | 文档入口路径 |
@@ -140,7 +140,7 @@ springdoc:
 
 ## 使用方式
 
-1. 管理员确认能力已启用（`PLATFORM_API_DOCS_ENABLED` 与后台能力开关）；
+1. 管理员确认后台「平台能力」页已启用该能力；
 2. 已登录且具备 `platform:docs:view` 权限的用户请求 `GET /api/platform/docs/access-ticket`，浏览器获得 10 分钟有效的访问 Cookie；
 3. 直接打开 `{swaggerUiPath}`（默认 `/swagger-ui/index.html`）浏览宿主与插件的全量接口；
 4. 需要 API 化拉取时，开启 `apiKeyAccessEnabled` 并以 API Key 调用 `/v3/api-docs`。

@@ -54,7 +54,7 @@ CI 投开放站点：插件仓配置受保护 `YUDREAM_MARKET_URL`（站点 orig
 
 ## 4. 路径二：自托管市场源
 
-自己部署后打开项目闸门 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` 和应用闸门，即得到内置 LOCAL 源 `default`，对外基址 `{origin}/api/public/plugin-market`。
+自己部署后在管理后台「平台能力」启用「插件市场源」（应用闸门；项目闸门由内部配置默认开启），即得到内置 LOCAL 源 `default`，对外基址 `{origin}/api/public/plugin-market`。
 
 1. 给发布账号 `upload`（按需再给 `accept` / `publish`）。
 2. 界面或 API Key 发到本机 LOCAL，流程与路径一相同。

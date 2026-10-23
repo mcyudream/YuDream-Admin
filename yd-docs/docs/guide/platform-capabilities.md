@@ -44,28 +44,28 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 
 ## 能力清单
 
-| 能力 code | 配置开关（`yudream.platform.capabilities.<code>.enabled`）* | 说明 |
-|---|---|---|
-| api-docs | `PLATFORM_API_DOCS_ENABLED` | SpringDoc 接口文档 |
-| sse | `PLATFORM_SSE_ENABLED` | SSE 服务端推送 |
-| websocket | `PLATFORM_WEBSOCKET_ENABLED` | WebSocket |
-| rabbitmq | `PLATFORM_RABBITMQ_ENABLED` | RabbitMQ 消息能力 |
-| neo4j | `PLATFORM_NEO4J_ENABLED` | 单一部署连接上的逻辑图表图数据库 |
-| ai | `PLATFORM_AI_ENABLED` | 多 provider AI（OpenAI/OpenAI 兼容/Kimi/DeepSeek），Spring AI 原生工具调用 |
-| agent | `PLATFORM_AGENT_ENABLED` | Agent 编排 + 执行追踪 |
-| cms | `PLATFORM_CMS_ENABLED` | GrapesJS 可视化建站 CMS |
-| wiki | `PLATFORM_WIKI_ENABLED` | Markdown 知识库 + RAG + Neo4j 图谱增强 |
-| form | `PLATFORM_FORM_ENABLED` | 动态表单 DynamicForm |
-| document-template | `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | Word 文档模板生成（POI） |
-| integration | `PLATFORM_INTEGRATION_ENABLED` | HTTP 集成 |
-| dataviz | `PLATFORM_DATAVIZ_ENABLED` | 数据可视化 |
-| message-render | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
-| milky | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
-| file-preview | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览：浏览器直读优先，Office/PSD/压缩包等走 iframe |
-| inbound-mail | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 只读入站邮箱：管理端浏览列表与详情，插件按发件域、验证码与关键词匹配 |
-| plugin-market-source | `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` | 本机插件市场源（LOCAL 发布/审核/公开 v2）。远程 `V2_API`/`STATIC_INDEX` 订阅不依赖本能力，也不回落 Nexus |
+| 能力 code | 说明 |
+|---|---|
+| api-docs | SpringDoc 接口文档 |
+| sse | SSE 服务端推送 |
+| websocket | WebSocket |
+| rabbitmq | RabbitMQ 消息能力 |
+| neo4j | 单一部署连接上的逻辑图表图数据库 |
+| ai | 多 provider AI（OpenAI/OpenAI 兼容/Kimi/DeepSeek），Spring AI 原生工具调用 |
+| agent | Agent 编排 + 执行追踪 |
+| cms | GrapesJS 可视化建站 CMS |
+| wiki | Markdown 知识库 + RAG + Neo4j 图谱增强 |
+| form | 动态表单 DynamicForm |
+| document-template | Word 文档模板生成（POI） |
+| integration | HTTP 集成 |
+| dataviz | 数据可视化 |
+| message-render | 对接 render-server 的 HTML/Markdown → 图片渲染 |
+| milky | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
+| file-preview | kkFileView 文件预览：浏览器直读优先，Office/PSD/压缩包等走 iframe |
+| inbound-mail | IMAPS 只读入站邮箱：管理端浏览列表与详情，插件按发件域、验证码与关键词匹配 |
+| plugin-market-source | 本机插件市场源（LOCAL 发布/审核/公开 v2）。远程 `V2_API`/`STATIC_INDEX` 订阅不依赖本能力，也不回落 Nexus |
 
-\* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
+\* 项目闸门统一由 `yudream.platform.capabilities.<code>.enabled` 内部配置承载，默认全部开启；平台能力不提供部署侧环境变量门控（`PLATFORM_*_ENABLED` 已废除），能力的启停经管理后台能力管理页（应用闸门）完成。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
 Milky 能力（展示名「QQ 消息平台」）的连接凭据经 AES-GCM 加密落库；新写入使用 Base64 解码后恰为 32 字节的统一主密钥 `YUDREAM_CREDENTIAL_KEY` 与连接作用域 AAD。旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（Base64，长度 16/24/32 字节）仅用于解密历史密文。一条连接可选 `protocol=milky` 或 `protocol=official`；协议与连接管理详见 [QQ 协议详解](/protocol/milky)。插件前端选择器走 SDK `sdk.messaging`，不要打管理端 `/api/platform/milky/**`。
 

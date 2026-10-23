@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 文件预览能力 Provider：双闸门控制 —— 部署侧由环境变量
- * {@code PLATFORM_FILE_PREVIEW_ENABLED}（{@code yudream.platform.capabilities.file-preview.enabled}）
+ * 文件预览能力 Provider：双闸门控制 —— 项目闸门由内部配置
+ * {@code yudream.platform.capabilities.file-preview.enabled}（默认开启，不提供部署侧环境变量门控）
  * 决定本 Bean 是否存在，运行侧由管理后台「平台能力 &gt; 文件预览」的启用开关与配置（入库）决定运行时是否生效。
  * 统一持有 kkFileView 配置，启用状态供 {@code PluginFilePreviewFrameworkService}（SPI 实现）经
  * {@link ObjectProvider} 读取；连通性探测在 {@link #test(String)} 中执行。

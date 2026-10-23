@@ -7,12 +7,12 @@
 
 它是 platform 动态能力，运行必须同时通过两道闸门（详见 [平台能力](/guide/platform-capabilities)）：
 
-1. **项目闸门**：`yudream.platform.capabilities.integration.enabled`（环境变量 `PLATFORM_INTEGRATION_ENABLED`，默认 `true`）决定 `IntegrationCapabilityProvider` 是否被 Spring 加载；
+1. **项目闸门**：`yudream.platform.capabilities.integration.enabled`（内部配置，默认 `true`，无环境变量门控）决定 `IntegrationCapabilityProvider` 是否被 Spring 加载；
 2. **应用闸门**：应用层每个用例前调用 `ensureIntegrationEnabled()` 检查持久化启用状态，未启用一律抛 `集成调用能力未启用`。
 
 ```mermaid
 flowchart LR
-    A[管理端请求] --> B{项目闸门<br/>PLATFORM_INTEGRATION_ENABLED}
+    A[管理端请求] --> B{项目闸门<br/>capabilities.integration.enabled}
     B -->|false| X[provider 不加载<br/>能力不可见]
     B -->|true| C{应用闸门<br/>capability enabled?}
     C -->|未启用| Y[BizException<br/>集成调用能力未启用]

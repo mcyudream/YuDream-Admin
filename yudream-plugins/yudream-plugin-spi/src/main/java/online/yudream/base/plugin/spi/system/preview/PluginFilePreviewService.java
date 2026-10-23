@@ -4,7 +4,7 @@ package online.yudream.base.plugin.spi.system.preview;
  * 平台文件预览能力端口。
  * <p>
  * 文件预览是平台「双闸门」能力模块（能力编码 {@value #CAPABILITY_CODE}）：
- * 部署侧由环境变量 {@code PLATFORM_FILE_PREVIEW_ENABLED} 决定是否提供该能力，
+ * 项目闸门由宿主内部配置（默认开启，不提供部署侧环境变量门控）决定是否装配该能力，
  * 运行侧由管理员在管理后台「平台能力 &gt; 文件预览」启用并维护 kkFileView 配置（入库、可改）。
  * 平台为插件文件签发短时效公开访问地址，并给出 KKFILE / DIRECT / NONE 预览决策；
  * 插件不再各自维护预览引擎配置与签名端点。

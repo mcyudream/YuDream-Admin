@@ -45,7 +45,6 @@ Docker Compose 部署时在 `.env` 中设置：
 ```env
 MESSAGE_RENDER_TOKEN=<internal-shared-token>
 MESSAGE_RENDER_BASE_URL=http://render-server:3000
-PLATFORM_MESSAGE_RENDER_ENABLED=true
 ```
 
 渲染服务本身内网部署、不对外发布端口，部署方式见 `docs/platform/message-render-server.md` 与 `yd-docs` 之外的仓库根 `docker/` 配置。

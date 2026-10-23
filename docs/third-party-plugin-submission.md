@@ -40,7 +40,7 @@
 
 ## 路径二：自托管市场源
 
-自己部署 YuDream 后，打开项目闸门 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` 和应用闸门，本机即成为供给方：内置 LOCAL 源 `default`，对外基址 `{origin}/api/public/plugin-market`。
+自己部署 YuDream 后，在管理后台「平台能力」启用「插件市场源」（应用闸门；项目闸门由后端内部配置默认开启），本机即成为供给方：内置 LOCAL 源 `default`，对外基址 `{origin}/api/public/plugin-market`。
 
 1. 给发布账号 `upload`（以及按需 `accept` / `publish`）。
 2. 用「插件发布」或 API Key 把 JAR 发到本机 LOCAL，流程与路径一相同。

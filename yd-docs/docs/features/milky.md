@@ -12,7 +12,7 @@ new CapabilityDescriptor("milky", "QQ 消息平台", CapabilityType.MESSAGING,
     "Milky 与官方 QQ 机器人连接、WebQQ 与插件消息通道", "i-ri:chat-3-line", 75, Map.of(), List.of())
 ```
 
-- **项目闸门**：`PLATFORM_MILKY_ENABLED`（默认 `true`），决定 provider 是否装配、端点是否注册；
+- **项目闸门**：内部配置 `yudream.platform.capabilities.milky.enabled`（默认 `true`，无环境变量门控），决定 provider 是否装配、端点是否注册；
 - **应用闸门**：每次用例前 `ensureEnabled("milky", "QQ 消息平台")` 校验持久化开关；
 - 连接凭据经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库：Milky 使用 Access Token，官方机器人使用 AppSecret；统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）。旧 `YUDREAM_MILKY_CREDENTIAL_KEY` 仅用于读取历史密文；后续保存会使用统一主密钥重加密。
 
@@ -59,14 +59,14 @@ flowchart LR
 ```
 
 - 入站事件经宿主事件总线（`MilkyEventPublished`）同时驱动**插件分发**与**WebQQ 管理界面实时展示**；
-- 出站 MARKDOWN/HTML 内容在消息渲染能力（`PLATFORM_MESSAGE_RENDER_ENABLED`）开启时先渲染为图片再发送，即**富文本降级**；`PluginMessageResult.rendered` / `degraded` 标记是否发生；
+- 出站 MARKDOWN/HTML 内容在「消息渲染」能力启用时先渲染为图片再发送，即**富文本降级**；`PluginMessageResult.rendered` / `degraded` 标记是否发生；
 - 需要调用未封装的对端方法时走 `PluginMessagingRawService.invoke(connectionId, method, payload)`：Milky 用方法名（如 `get_friend_list`）；官方连接可用共享方法名（自动映射）或特异化入口 `GET /v2/groups/{openid}/info`、`POST /v2/groups/{openid}/files` 这类 OpenAPI 路径。管理端原生工作台已列出官方 sitemap 全部 REST。调用同步记录到开发者工具沙盒时间线。
 
 ## 相关配置
 
 | 配置 | 说明 |
 |---|---|
-| `PLATFORM_MILKY_ENABLED` | 项目闸门（默认 `true`） |
+| `yudream.platform.capabilities.milky.enabled` | 项目闸门（内部配置，默认 `true`） |
 | `YUDREAM_CREDENTIAL_KEY` | 连接凭据加密主密钥（Base64 编码、解码后恰为 32 字节） |
 
 ::: warning ID 类型

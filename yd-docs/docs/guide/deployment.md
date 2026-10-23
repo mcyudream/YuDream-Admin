@@ -104,29 +104,12 @@ flowchart LR
 | `SYSTEM_LOG_DOCKER_TRANSPORT` | 否 | Docker 传输方式，默认 `auto`；可选 `auto`、`cli`、`socket`。 |
 | `SYSTEM_LOG_DOCKER_SOCKET` | 否 | Docker API socket 路径，默认 `/var/run/docker.sock`。启用 socket 时还需挂载该 socket。 |
 
-#### 平台开关
+#### 平台能力
 
-这些变量是平台能力的项目闸门，默认均为 `true`；模板 A/B 为未提供外部服务的能力显式关闭，并保留消息渲染开启。
+平台能力**不提供环境变量门控**：项目闸门由后端内部配置 `yudream.platform.capabilities.<code>.enabled` 承载、默认全部开启，能力的启停经管理后台「平台能力」页（应用闸门）完成。未部署对应外部服务（RabbitMQ、Neo4j、render-server、kkFileView、IMAP 等）的能力保持能力页上的未启用状态即可，不会建立外部连接。
 
 | 变量 | 必填 | 作用与源码默认值 |
 |---|---:|---|
-| `PLATFORM_API_DOCS_ENABLED` | 否 | API 文档能力，默认 `true`。 |
-| `PLATFORM_CMS_ENABLED` | 否 | CMS 能力，默认 `true`。 |
-| `PLATFORM_WIKI_ENABLED` | 否 | Wiki 能力，默认 `true`。 |
-| `PLATFORM_FORM_ENABLED` | 否 | 表单能力，默认 `true`。 |
-| `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | 否 | 文档模板能力，默认 `true`。 |
-| `PLATFORM_INTEGRATION_ENABLED` | 否 | 外部集成能力，默认 `true`。 |
-| `PLATFORM_SSE_ENABLED` | 否 | SSE 能力，默认 `true`。 |
-| `PLATFORM_WEBSOCKET_ENABLED` | 否 | WebSocket 能力，默认 `true`。 |
-| `PLATFORM_RABBITMQ_ENABLED` | 否 | RabbitMQ 能力，默认 `true`；启用需外部 RabbitMQ。 |
-| `PLATFORM_NEO4J_ENABLED` | 否 | Neo4j 能力，默认 `true`；启用需外部 Neo4j。 |
-| `PLATFORM_AI_ENABLED` | 否 | AI 能力，默认 `true`。 |
-| `PLATFORM_AGENT_ENABLED` | 否 | Agent 能力，默认 `true`。 |
-| `PLATFORM_DATAVIZ_ENABLED` | 否 | 数据可视化能力，默认 `true`。 |
-| `PLATFORM_MILKY_ENABLED` | 否 | QQ 消息平台能力，默认 `true`。 |
-| `PLATFORM_MESSAGE_RENDER_ENABLED` | 否 | 消息渲染能力，默认 `true`；启用需 render-server。 |
-| `PLATFORM_FILE_PREVIEW_ENABLED` | 否 | 文件预览能力，默认 `true`；启用需 kkFileView。 |
-| `PLATFORM_INBOUND_MAIL_ENABLED` | 否 | 入站邮箱能力，默认 `true`；启用需 IMAP 配置。 |
 | `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 部署级 AES-256-GCM 主密钥，统一加密 Neo4j、Milky 与插件 SecretStore；必须为 Base64 编码且解码后恰为 32 字节。旧的三个专用变量仅用于历史密文解密，不用于新写入。 |
 
 #### AI、Wiki、Chat 与渲染
@@ -186,7 +169,7 @@ flowchart LR
 
 根目录 Compose 中的 `RENDER_CONCURRENCY`、`RENDER_TIMEOUT_MS` 不是当前 render-server 源码读取的变量，不列入实际运行时参考；需要调整队列/并发时使用上表变量。
 
-生产至少应安全注入并备份 `YUDREAM_CREDENTIAL_KEY`、替换 S3 凭据（启用对象存储时）与邮件账号密码（启用邮件时）。切勿随意更换主密钥：否则历史密文必须临时通过其对应旧变量解密，并在保存后迁移。管理员随后在能力管理中保存 Neo4j 物理凭据；不要通过 `PLATFORM_NEO4J_URI`、`PLATFORM_NEO4J_USERNAME`、`PLATFORM_NEO4J_PASSWORD` 或 `PLATFORM_NEO4J_DATABASE` 部署变量配置它们。两套 Compose 模板仍见[快速启动：Docker Compose 模板](/guide/getting-started#方式一docker-compose-部署推荐)：模板 A 使用已有 MongoDB/Redis，模板 B 在 Compose 内创建并持久化 MongoDB/Redis；未使用的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky 应保持模板中的关闭开关。
+生产至少应安全注入并备份 `YUDREAM_CREDENTIAL_KEY`、替换 S3 凭据（启用对象存储时）与邮件账号密码（启用邮件时）。切勿随意更换主密钥：否则历史密文必须临时通过其对应旧变量解密，并在保存后迁移。管理员随后在能力管理中保存 Neo4j 物理凭据；不要通过 `PLATFORM_NEO4J_URI`、`PLATFORM_NEO4J_USERNAME`、`PLATFORM_NEO4J_PASSWORD` 或 `PLATFORM_NEO4J_DATABASE` 部署变量配置它们。两套 Compose 模板仍见[快速启动：Docker Compose 模板](/guide/getting-started#方式一docker-compose-部署推荐)：模板 A 使用已有 MongoDB/Redis，模板 B 在 Compose 内创建并持久化 MongoDB/Redis；未部署外部服务的平台能力（RabbitMQ、Neo4j、Wiki、AI、Agent、Milky 等）在管理后台「平台能力」页保持未启用即可。
 
 ### 启动、停止与检查
 

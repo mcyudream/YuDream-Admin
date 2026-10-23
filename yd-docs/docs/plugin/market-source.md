@@ -9,7 +9,7 @@
 
 ## 1. 启用能力
 
-- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2/legacy 端点；远程源订阅端点仍注册。
+- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（内部配置，默认开，无环境变量门控）。关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2/legacy 端点；远程源订阅端点仍注册。
 - 应用闸门：在「平台 → 能力管理」中启用。关闭后 LOCAL 不进入目录，公开 `/market` 停止服务；远程源增删改、同步、安装仍可用。
 - 公开社区开关：能力配置键 `publicEnabled`（读取处默认回落 true）。关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布、审核与订阅源不受影响。开关在「平台 → 插件中心 → 市场源管理」顶部（能力开启时可见）。
 - 存储目录：`yudream.platform.plugin.market-source.directory`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_DIRECTORY`，默认 `market-source`），必须独立于插件扫描目录（`directories`），否则发布物会被当作已安装插件发现。Docker 镜像默认 `/app/market-source`，compose 挂载宿主机 `./market-source`；不挂载则镜像重建后 JAR 丢失，目录元数据仍在 Mongo，下载会 404。丢失后 `{code}@{pluginVersion}` 不可覆盖，需把原文件拷回 `{directory}/{code}/{version}/plugin.jar`，或发布新版本。

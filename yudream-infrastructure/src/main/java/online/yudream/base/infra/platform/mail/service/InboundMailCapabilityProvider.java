@@ -20,8 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 入站邮箱能力 Provider：为插件提供只读收件箱匹配（核验邮件、通知回调等场景）。
- * 部署侧由环境变量 {@code PLATFORM_INBOUND_MAIL_ENABLED}
- * （{@code yudream.platform.capabilities.inbound-mail.enabled}）决定本 Bean 是否存在，
+ * 项目闸门由内部配置 {@code yudream.platform.capabilities.inbound-mail.enabled}（默认开启，无环境变量门控）
+ * 决定本 Bean 是否存在，
  * 运行侧由管理后台「平台能力 &gt; 入站邮箱」的启用开关与配置（入库，password 加密）决定运行时是否生效。
  * 环境变量 {@code MAIL_INBOUND_*} 仅作为首次保存配置前的默认值兜底。
  */

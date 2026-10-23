@@ -8,7 +8,7 @@ Agent 能力（`agent`）在 [AI 能力](/features/ai) 之上提供**可编排�
 
 | 闸门 | 机制 | 说明 |
 |---|---|---|
-| 项目闸门 | `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.agent", name = "enabled")` | 环境变量 `PLATFORM_AGENT_ENABLED`（默认 `true`）；关闭时 `AgentController` 不注册 |
+| 项目闸门 | `@ConditionalOnProperty(prefix = "yudream.platform.capabilities.agent", name = "enabled")` | 内部配置承载（默认 `true`，无环境变量门控）；关闭时 `AgentController` 不注册 |
 | 应用闸门 | 运行链路依赖 AI 能力的 `ensureEnabled("ai", ...)` | Agent 执行最终走 AI 网关，受 AI 应用闸门约束 |
 
 | 配置 | 默认 | 说明 |

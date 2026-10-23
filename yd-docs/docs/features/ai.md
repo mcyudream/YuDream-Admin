@@ -79,7 +79,7 @@ sequenceDiagram
 
 | 配置 | 默认 | 说明 |
 |---|---|---|
-| `PLATFORM_AI_ENABLED` | `true` | 项目闸门 |
+| `yudream.platform.capabilities.ai.enabled` | `true` | 项目闸门（内部配置，无环境变量门控） |
 | `PLATFORM_AI_CONNECT_TIMEOUT` | `30s` | 连接超时 |
 | `PLATFORM_AI_READ_TIMEOUT` | `10m` | 读超时（长回答） |
 | `PLATFORM_AI_SSE_TIMEOUT` | `10m` | SSE 流超时 |
