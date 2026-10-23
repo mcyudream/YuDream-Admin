@@ -365,161 +365,164 @@ function openPublicMarket() {
 </script>
 
 <template>
-  <YdTablePageLayout
-    title="市场源管理"
-    :actions="pageActions"
-    :actions-threshold="3"
-    :show-stats="localSourceEnabled"
-    stats-title="对外入口"
-    :stats-default-expanded="true"
-  >
-    <!-- 页头只放只读情报：按钮一律走 actions -->
-    <template #page-title>
-      <span class="text-sm text-muted-foreground">{{ summaryText }}</span>
-    </template>
+  <div>
+    <!-- 单根页面容器：路由 out-in 过渡要求页面组件有元素根。多根模板（YdModal 等与布局并列）在 dev 下编译成 fragment，
+         离开页面时 afterLeave 丢失、isLeaving 卡死，之后所有导航白屏 -->
+    <YdTablePageLayout
+      title="市场源管理"
+      :actions="pageActions"
+      :actions-threshold="3"
+      :show-stats="localSourceEnabled"
+      stats-title="对外入口"
+      :stats-default-expanded="true"
+    >
+      <!-- 页头只放只读情报：按钮一律走 actions -->
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">{{ summaryText }}</span>
+      </template>
 
-    <template #stats>
-      <div class="external-panel">
-        <div class="external-item">
-          <div class="external-item__body">
-            <strong>公开插件市场</strong>
-            <p>开启后对外提供 /market 社区页与 v2 源协议；关闭后公开入口与协议停止服务，后台发布、审核与订阅源不受影响。</p>
+      <template #stats>
+        <div class="external-panel">
+          <div class="external-item">
+            <div class="external-item__body">
+              <strong>公开插件市场</strong>
+              <p>开启后对外提供 /market 社区页与 v2 源协议；关闭后公开入口与协议停止服务，后台发布、审核与订阅源不受影响。</p>
+            </div>
+            <div class="external-item__action">
+              <YdTag :variant="publicEnabled ? 'default' : 'secondary'">
+                {{ publicEnabled ? '已开启' : '已关闭' }}
+              </YdTag>
+              <YdSwitch
+                v-auth="'platform:plugin-market-source:edit'"
+                :model-value="publicEnabled"
+                :disabled="publicSaving"
+                aria-label="公开插件市场开关"
+                @update:model-value="togglePublicEnabled"
+              />
+            </div>
           </div>
-          <div class="external-item__action">
-            <YdTag :variant="publicEnabled ? 'default' : 'secondary'">
-              {{ publicEnabled ? '已开启' : '已关闭' }}
-            </YdTag>
-            <YdSwitch
-              v-auth="'platform:plugin-market-source:edit'"
-              :model-value="publicEnabled"
-              :disabled="publicSaving"
-              aria-label="公开插件市场开关"
-              @update:model-value="togglePublicEnabled"
-            />
+
+          <div class="external-item">
+            <div class="external-item__body">
+              <strong>对外 v2 源基址</strong>
+              <p>其他实例添加源时类型选「v2 协议源」，地址填该基址。</p>
+              <code>{{ publicV2Url }}</code>
+            </div>
+            <div class="external-item__action">
+              <YdCopyButton :text="publicV2Url" label="复制" />
+              <YdButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
+                <YdIcon name="morph:external-link" />
+                公开社区
+              </YdButton>
+            </div>
+          </div>
+
+          <div class="external-item">
+            <div class="external-item__body">
+              <strong>legacy 静态索引</strong>
+              <p>仍可用的 index.json 完整地址，仅供旧客户端订阅。</p>
+              <code>{{ publicIndexUrl }}</code>
+            </div>
+            <div class="external-item__action">
+              <YdCopyButton :text="publicIndexUrl" label="复制" />
+            </div>
           </div>
         </div>
+      </template>
 
-        <div class="external-item">
-          <div class="external-item__body">
-            <strong>对外 v2 源基址</strong>
-            <p>其他实例添加源时类型选「v2 协议源」，地址填该基址。</p>
-            <code>{{ publicV2Url }}</code>
-          </div>
-          <div class="external-item__action">
-            <YdCopyButton :text="publicV2Url" label="复制" />
-            <YdButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
-              <YdIcon name="morph:external-link" />
-              公开社区
+      <template #search>
+        <!-- 有界小集合：本地过滤，控件与表格页筛选行同版式 -->
+        <div class="source-search">
+          <label class="source-search__field">
+            <span>关键词</span>
+            <YdInput v-model="keyword" placeholder="名称 / 标识 / 地址" clearable />
+          </label>
+          <label class="source-search__field">
+            <span>状态</span>
+            <YdFilterSelect v-model="statusFilter" :options="statusFilterOptions" width="100%" placeholder="全部状态" />
+          </label>
+          <label class="source-search__field">
+            <span>类型</span>
+            <YdFilterSelect v-model="typeFilter" :options="typeFilterOptions" width="100%" placeholder="全部类型" />
+          </label>
+          <div class="source-search__actions">
+            <YdButton v-if="hasFilters" variant="outline" @click="resetFilters">
+              重置
             </YdButton>
           </div>
         </div>
+      </template>
 
-        <div class="external-item">
-          <div class="external-item__body">
-            <strong>legacy 静态索引</strong>
-            <p>仍可用的 index.json 完整地址，仅供旧客户端订阅。</p>
-            <code>{{ publicIndexUrl }}</code>
-          </div>
-          <div class="external-item__action">
-            <YdCopyButton :text="publicIndexUrl" label="复制" />
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <template #search>
-      <!-- 有界小集合：本地过滤，控件与表格页筛选行同版式 -->
-      <div class="source-search">
-        <label class="source-search__field">
-          <span>关键词</span>
-          <YdInput v-model="keyword" placeholder="名称 / 标识 / 地址" clearable />
-        </label>
-        <label class="source-search__field">
-          <span>状态</span>
-          <YdFilterSelect v-model="statusFilter" :options="statusFilterOptions" width="100%" placeholder="全部状态" />
-        </label>
-        <label class="source-search__field">
-          <span>类型</span>
-          <YdFilterSelect v-model="typeFilter" :options="typeFilterOptions" width="100%" placeholder="全部类型" />
-        </label>
-        <div class="source-search__actions">
-          <YdButton v-if="hasFilters" variant="outline" @click="resetFilters">
-            重置
-          </YdButton>
-        </div>
-      </div>
-    </template>
-
-    <template #table>
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1040px]"
-          column-visibility
-          :actions="sourceActions"
-          :columns="tableColumns"
-          :data="filteredRows"
-        >
-          <template #empty>
-            <span class="text-muted-foreground">
-              {{ hasFilters ? '没有匹配的市场源，试试调整筛选条件' : (loadFailed ? '市场源加载失败，请稍后重试' : '还没有市场源，添加订阅源后可同步插件目录') }}
-            </span>
-          </template>
-
-          <template #cell-source="{ row }">
-            <div class="source-identity">
-              <span class="source-identity__name">{{ row.original.name }}</span>
-              <span class="source-identity__meta">
-                <YdTag v-if="row.original.builtIn" variant="secondary">
-                  内置
-                </YdTag>
-                <YdTag variant="secondary">
-                  {{ sourceTypeText(row.original) }}
-                </YdTag>
-                <code>{{ row.original.code }}</code>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1040px]"
+            column-visibility
+            :actions="sourceActions"
+            :columns="tableColumns"
+            :data="filteredRows"
+          >
+            <template #empty>
+              <span class="text-muted-foreground">
+                {{ hasFilters ? '没有匹配的市场源，试试调整筛选条件' : (loadFailed ? '市场源加载失败，请稍后重试' : '还没有市场源，添加订阅源后可同步插件目录') }}
               </span>
-            </div>
-          </template>
+            </template>
 
-          <template #cell-rootUrl="{ row }">
-            <div class="source-address">
-              <span>{{ sourceAddress(row.original) }}</span>
-              <span v-if="row.original.tokenConfigured" class="source-address__token">
-                <YdIcon name="morph:key-round" />
-                已配置访问令牌
-              </span>
-            </div>
-          </template>
+            <template #cell-source="{ row }">
+              <div class="source-identity">
+                <span class="source-identity__name">{{ row.original.name }}</span>
+                <span class="source-identity__meta">
+                  <YdTag v-if="row.original.builtIn" variant="secondary">
+                    内置
+                  </YdTag>
+                  <YdTag variant="secondary">
+                    {{ sourceTypeText(row.original) }}
+                  </YdTag>
+                  <code>{{ row.original.code }}</code>
+                </span>
+              </div>
+            </template>
 
-          <template #cell-enabled="{ row }">
-            <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
-              {{ row.original.enabled ? '启用' : '禁用' }}
-            </YdTag>
-          </template>
+            <template #cell-rootUrl="{ row }">
+              <div class="source-address">
+                <span>{{ sourceAddress(row.original) }}</span>
+                <span v-if="row.original.tokenConfigured" class="source-address__token">
+                  <YdIcon name="morph:key-round" />
+                  已配置访问令牌
+                </span>
+              </div>
+            </template>
 
-          <template #cell-sync="{ row }">
-            <div class="source-sync">
-              <YdTag :variant="syncVariant(row.original)">
-                {{ syncText(row.original) }}
+            <template #cell-enabled="{ row }">
+              <YdTag :variant="row.original.enabled ? 'default' : 'secondary'">
+                {{ row.original.enabled ? '启用' : '禁用' }}
               </YdTag>
-              <span
-                v-if="row.original.syncErrorMessage"
-                class="source-sync__error"
-                :title="row.original.syncErrorMessage"
-              >{{ row.original.syncErrorMessage }}</span>
-            </div>
-          </template>
+            </template>
 
-          <template #cell-syncedAt="{ row }">
-            {{ formatTime(row.original.syncedAt) }}
-          </template>
-        </YdResponsiveEnhancedTable>
-      </YdLoadingOverlay>
-    </template>
-  </YdTablePageLayout>
+            <template #cell-sync="{ row }">
+              <div class="source-sync">
+                <YdTag :variant="syncVariant(row.original)">
+                  {{ syncText(row.original) }}
+                </YdTag>
+                <span
+                  v-if="row.original.syncErrorMessage"
+                  class="source-sync__error"
+                  :title="row.original.syncErrorMessage"
+                >{{ row.original.syncErrorMessage }}</span>
+              </div>
+            </template>
 
-  <YdModal
+            <template #cell-syncedAt="{ row }">
+              {{ formatTime(row.original.syncedAt) }}
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
+    </YdTablePageLayout>
+
+    <YdModal
       v-model="formVisible"
       :title="editing ? '编辑市场源' : '添加市场源'"
       show-cancel-button
@@ -573,6 +576,7 @@ function openPublicMarket() {
         </div>
       </YdForm>
     </YdModal>
+  </div>
 </template>
 
 <style scoped>

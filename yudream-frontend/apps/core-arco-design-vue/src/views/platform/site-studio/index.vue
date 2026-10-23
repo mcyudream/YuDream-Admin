@@ -285,9 +285,10 @@ void initialize()
 </script>
 
 <template>
-  <!-- data-yd-fullheight：宿主布局据此把容器固定为视口高，工作台各栏自行内滚 -->
-  <!-- data-yd-own-ai：工作台自带 AI 面板，全局 AI 悬浮球让位，避免压住属性栏与输入框 -->
   <div class="site-studio h-full min-h-0" data-yd-fullheight data-yd-own-ai>
+    <!-- 模板根不能以注释开头：dev 下注释根渲染成 fragment，路由 out-in 过渡离开本页后 afterLeave 丢失、后续导航白屏。
+         data-yd-fullheight：宿主布局据此把容器固定为视口高，工作台各栏自行内滚；
+         data-yd-own-ai：工作台自带 AI 面板，全局 AI 悬浮球让位，避免压住属性栏与输入框 -->
     <!-- 单行 grid（minmax(0,1fr)）：内容包装层固定为整高、不被内容撑高，各栏自行内滚；遮罩为绝对定位，不占轨道 -->
     <YdLoadingOverlay :loading="store.loading" block-interaction class="grid grid-rows-[minmax(0,1fr)] h-full">
       <YdResult

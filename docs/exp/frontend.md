@@ -140,6 +140,13 @@
 - **规避**：二选一——整幅白底（舞台底色随分区切白 + 区域/面板 `flex: 1; min-height: 0` 铺满），或去掉 `surface` 与兄弟分区同底色；两种都要实测白底/灰底铺到舞台四边。
 - **来源**：`settings-sheet-fullbleed`。
 
+### 离开某几个页面后，点任何菜单都白屏且控制台无报错
+
+- **现象**：点击插件发布/发布审核有概率白屏，之后插件管理、插件市场乃至系统页全部白屏，刷新才恢复；控制台零报错。DOM 特征是内容区只剩 `<!---->` 占位注释。
+- **根因**：布局用 `<Transition mode="out-in">` 包路由组件。多根模板页面（如 `YdModal` 与布局并列，或模板根以注释开头）在 dev 下编译成 fragment 根；Vue 对 fragment 的卸载路径（`removeFragment`/逐子节点移除）不会触发 `afterLeave`，`isLeaving` 永久为 true，Transition 从此只渲染空占位。生产构建剥掉注释所以偏「概率」，dev 里离开 fragment 根页面必现。
+- **规避**：路由级页面组件必须有单一元素根——多根内容包一层 `<div>`，模板注释一律放根元素内部而不是 `<template>` 顶层（参考 `plugin-market-source`、`plugin-publish`、`site-studio` 内的约束注释）。复现/验证：`router.push` 在页面间轮换后断言 `#app-content` 非空且不以 `<!---->` 开头；开发时见到 "Component inside <Transition> renders non-element root node" 警告即为同款前兆。
+- **来源**：`route-transition-fragment-root-whiteout`。
+
 ## 3. 主题与登录
 
 ### 深色 SITE 主题下登录页文字不可读

@@ -366,94 +366,97 @@ async function copyAllCiTemplates() {
 </script>
 
 <template>
-  <YdTablePageLayout
-    title="插件发布"
-    :actions="pageActions"
-    :actions-threshold="3"
-  >
-    <!-- 页头只放只读情报：审核口径与版本不可覆盖说明 -->
-    <template #page-title>
-      <span class="text-sm text-muted-foreground">{{ uploadHint }} 同一插件版本不可覆盖。</span>
-    </template>
+  <div>
+    <!-- 单根页面容器：路由 out-in 过渡要求页面组件有元素根。多根模板（YdModal 等与布局并列）在 dev 下编译成 fragment，
+         离开页面时 afterLeave 丢失、isLeaving 卡死，之后所有导航白屏 -->
+    <YdTablePageLayout
+      title="插件发布"
+      :actions="pageActions"
+      :actions-threshold="3"
+    >
+      <!-- 页头只放只读情报：审核口径与版本不可覆盖说明 -->
+      <template #page-title>
+        <span class="text-sm text-muted-foreground">{{ uploadHint }} 同一插件版本不可覆盖。</span>
+      </template>
 
-    <template #search>
-      <YdDynamicSearchForm
-        v-model="searchQuery"
-        :config="searchConfig"
-        :options-sources="optionsSources"
-        @search="search"
-        @reset="resetSearch"
-      />
-    </template>
+      <template #search>
+        <YdDynamicSearchForm
+          v-model="searchQuery"
+          :config="searchConfig"
+          :options-sources="optionsSources"
+          @search="search"
+          @reset="resetSearch"
+        />
+      </template>
 
-    <template #table>
-      <YdLoadingOverlay :loading="loading">
-        <YdResponsiveEnhancedTable
-          row-key="id"
-          table-root-class="rounded-lg overflow-hidden"
-          table-class="min-w-[1040px]"
-          column-visibility
-          :actions="publicationActions"
-          :columns="tableColumns"
-          :data="rows"
-        >
-          <template #empty>
-            <span class="text-muted-foreground">
-              {{ searchQuery.keyword || searchQuery.status ? '当前条件下没有发布记录，试试调整筛选' : '还没有发布物，上传插件 JAR 开始发布第一个版本' }}
-            </span>
-          </template>
+      <template #table>
+        <YdLoadingOverlay :loading="loading">
+          <YdResponsiveEnhancedTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1040px]"
+            column-visibility
+            :actions="publicationActions"
+            :columns="tableColumns"
+            :data="rows"
+          >
+            <template #empty>
+              <span class="text-muted-foreground">
+                {{ searchQuery.keyword || searchQuery.status ? '当前条件下没有发布记录，试试调整筛选' : '还没有发布物，上传插件 JAR 开始发布第一个版本' }}
+              </span>
+            </template>
 
-          <template #cell-publication="{ row }">
-            <div class="publication-identity">
-              <span class="publication-identity__name">{{ publicationTitle(row.original) }}</span>
-              <span class="publication-identity__meta">{{ row.original.code }}</span>
-            </div>
-          </template>
+            <template #cell-publication="{ row }">
+              <div class="publication-identity">
+                <span class="publication-identity__name">{{ publicationTitle(row.original) }}</span>
+                <span class="publication-identity__meta">{{ row.original.code }}</span>
+              </div>
+            </template>
 
-          <template #cell-tags="{ row }">
-            <div class="publication-tags">
-              <YdTag v-for="tag in row.original.tags || []" :key="tag" variant="secondary">
-                {{ tag }}
-              </YdTag>
-              <span v-if="!row.original.tags?.length" class="text-muted-foreground">—</span>
-            </div>
-          </template>
+            <template #cell-tags="{ row }">
+              <div class="publication-tags">
+                <YdTag v-for="tag in row.original.tags || []" :key="tag" variant="secondary">
+                  {{ tag }}
+                </YdTag>
+                <span v-if="!row.original.tags?.length" class="text-muted-foreground">—</span>
+              </div>
+            </template>
 
-          <template #cell-pubStatus="{ row }">
-            <div class="publication-status">
-              <YdTag :variant="publicationStatusVariant(row.original.status)">
-                {{ publicationStatusText(row.original.status) }}
-              </YdTag>
-              <span
-                v-if="row.original.reviewNote"
-                class="publication-status__note"
-                :title="row.original.reviewNote"
-              >{{ row.original.reviewNote }}</span>
-            </div>
-          </template>
+            <template #cell-pubStatus="{ row }">
+              <div class="publication-status">
+                <YdTag :variant="publicationStatusVariant(row.original.status)">
+                  {{ publicationStatusText(row.original.status) }}
+                </YdTag>
+                <span
+                  v-if="row.original.reviewNote"
+                  class="publication-status__note"
+                  :title="row.original.reviewNote"
+                >{{ row.original.reviewNote }}</span>
+              </div>
+            </template>
 
-          <template #cell-size="{ row }">
-            {{ formatPublicationSize(row.original.sizeBytes) }}
-          </template>
+            <template #cell-size="{ row }">
+              {{ formatPublicationSize(row.original.sizeBytes) }}
+            </template>
 
-          <template #cell-createTime="{ row }">
-            {{ formatPublicationTime(row.original.createTime) }}
-          </template>
-        </YdResponsiveEnhancedTable>
-      </YdLoadingOverlay>
-    </template>
+            <template #cell-createTime="{ row }">
+              {{ formatPublicationTime(row.original.createTime) }}
+            </template>
+          </YdResponsiveEnhancedTable>
+        </YdLoadingOverlay>
+      </template>
 
-    <template #footer>
-      <YdPagination
-        v-model:page="pagination.page"
-        v-model:size="pagination.size"
-        :total="pagination.total"
-        :sizes="[10, 20, 50]"
-        @page-change="onPageChange"
-        @size-change="onSizeChange"
-      />
-    </template>
-  </YdTablePageLayout>
+      <template #footer>
+        <YdPagination
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          :sizes="[10, 20, 50]"
+          @page-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </template>
+    </YdTablePageLayout>
 
     <!-- 流水线发布说明：不常用，收在操作栏的「更多」里 -->
     <YdModal
@@ -586,6 +589,7 @@ async function copyAllCiTemplates() {
         </YdTabs>
       </div>
     </YdModal>
+  </div>
 </template>
 
 <style scoped>

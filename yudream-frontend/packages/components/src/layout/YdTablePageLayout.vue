@@ -154,8 +154,9 @@ const foldedActions = computed(() => {
 </script>
 
 <template>
-  <!-- data-yd-fullheight：宿主布局据此把外层容器切为固定视口高，滚动交给页面内部 -->
   <div class="yd-table-page-layout" data-yd-fullheight>
+    <!-- 根必须是元素（模板根不能以注释开头；data-yd-fullheight：宿主布局据此把外层容器切为固定视口高，滚动交给页面内部）。
+         dev 下注释根会渲染成 fragment，路由 out-in 过渡离开 fragment 根页面时 afterLeave 丢失，之后所有导航白屏 -->
     <!-- 页面标题区:只放标题 -->
     <YdPageHeader v-if="title" :title="title" class="mb-0">
       <template v-if="$slots['page-title']" #default>

@@ -693,8 +693,8 @@ async function saveDockerSettings() {
 </script>
 
 <template>
-  <!-- 单根页面容器：路由过渡要求页面组件有元素根，抽屉放同一根下 -->
   <div class="runtime-log-page">
+    <!-- 单根页面容器：路由过渡要求页面组件有元素根（模板根不能以注释开头，否则 dev 下渲染成 fragment，out-in 过渡离开后白屏），抽屉放同一根下 -->
     <YdTablePageLayout title="系统日志" :show-search="false">
       <template #page-title>
         <YdButton v-if="auth('system:runtime-log:config')" variant="outline" @click="openSettings">
