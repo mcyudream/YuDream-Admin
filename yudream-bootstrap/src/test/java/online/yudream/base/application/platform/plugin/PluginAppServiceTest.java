@@ -28,9 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -110,6 +112,63 @@ class PluginAppServiceTest {
         assertThat(module.getBackupSha256()).isEqualTo(sha256(backup));
         verify(pluginRuntimeGateway).describe(staged);
         verify(pluginRuntimeGateway).discover();
+    }
+
+    @Test
+    void uploadOverInstalledPluginRestoresPreviouslyEnabledPlugins() throws IOException {
+        Path active = writeJar("demo-plugin.jar", OLD_BYTES);
+        Path dependentJar = writeJar("dependent-plugin.jar", OLD_BYTES);
+        PluginModule module = module(active, "1.0.0", "Old plugin");
+        module.markEnabled();
+        PluginModule dependent = PluginModule.builder()
+                .code("dependent-plugin")
+                .name("Dependent")
+                .pluginVersion("1.0.0")
+                .jarPath(dependentJar.toAbsolutePath().normalize().toString())
+                .dependencies(List.of(PLUGIN_CODE))
+                .status(PluginStatus.ENABLED)
+                .build();
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module, dependent);
+        stubDescriptors(Map.of(
+                OLD_BYTES, descriptor("1.0.0", "Old plugin", active),
+                NEW_BYTES, descriptor("2.0.0", "New plugin", active)
+        ));
+        // 网关运行态用有状态模型：级联停机与恢复的调用次数随内部重试变化，
+        // 状态随生命周期调用演进，避免对 enabled/loaded 的消费顺序做脆弱计数
+        Set<String> runtimeEnabled = new HashSet<>(Set.of(PLUGIN_CODE, "dependent-plugin"));
+        Set<String> runtimeLoaded = new HashSet<>(Set.of(PLUGIN_CODE, "dependent-plugin"));
+        when(pluginRuntimeGateway.enabled(anyString())).thenAnswer(invocation -> runtimeEnabled.contains(invocation.getArgument(0)));
+        when(pluginRuntimeGateway.loaded(anyString())).thenAnswer(invocation -> runtimeLoaded.contains(invocation.getArgument(0)));
+        org.mockito.Mockito.doAnswer(invocation -> runtimeEnabled.remove(invocation.getArgument(0)))
+                .when(pluginRuntimeGateway).disable(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> runtimeLoaded.remove(invocation.getArgument(0)))
+                .when(pluginRuntimeGateway).unload(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeLoaded.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).load(any(PluginModule.class));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeEnabled.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).enable(any(PluginModule.class));
+
+        service.upload(new java.io.ByteArrayInputStream(NEW_BYTES.getBytes(StandardCharsets.UTF_8)),
+                "demo-plugin-2.0.0.jar", NEW_BYTES.length());
+
+        InOrder lifecycle = org.mockito.Mockito.inOrder(pluginRuntimeGateway);
+        lifecycle.verify(pluginRuntimeGateway).disable("dependent-plugin");
+        lifecycle.verify(pluginRuntimeGateway).unload("dependent-plugin");
+        lifecycle.verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        lifecycle.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
+        lifecycle.verify(pluginRuntimeGateway).enable(dependent);
+        assertThat(Files.readString(active)).isEqualTo(NEW_BYTES);
+        assertThat(Files.readString(Path.of(module.getBackupJarPath()))).isEqualTo(OLD_BYTES);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(dependent.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(module.getRestoreIntentActive()).isFalse();
+        assertThat(dependent.getRestoreIntentActive()).isFalse();
     }
 
     @Test

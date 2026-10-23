@@ -281,16 +281,25 @@ public class PluginAppService {
                 .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
         validateStoreDescriptor(descriptor, expectedCode, expectedVersion, expectedMain);
         PluginModule existing = pluginModuleRepo.findByCode(descriptor.code()).orElse(null);
-        Path target = targetJarPath(uploadDirectory(), descriptorJarFilename(descriptor), existing);
-        try {
-            stopExistingPlugin(existing);
-            moveUploadedJar(stagedJar, target);
-            deleteOldJarIfChanged(existing, target);
-            syncPluginRegistry();
-            return modules();
-        } catch (IOException e) {
-            throw new BizException("插件 JAR 上传失败：" + e.getMessage());
+        boolean replaceableFile = existing != null && StringUtils.hasText(existing.getJarPath())
+                && Files.isRegularFile(Path.of(existing.getJarPath()));
+        if (!replaceableFile) {
+            Path target = targetJarPath(uploadDirectory(), descriptorJarFilename(descriptor), existing);
+            try {
+                stopExistingPlugin(existing);
+                moveUploadedJar(stagedJar, target);
+                deleteOldJarIfChanged(existing, target);
+                syncPluginRegistry();
+                return modules();
+            } catch (IOException e) {
+                throw new BizException("插件 JAR 上传失败：" + e.getMessage());
+            }
         }
+        // 覆盖已安装插件：与市场更新同一条级联链路——受控停机目标与全部依赖方（记录恢复意图，
+        // 避免 unload 撞上“存在已加载依赖方”被拒）、备份当前 JAR、替换后按依赖顺序自动恢复
+        // 原先启用的插件。手动上传不再要求先手动卸载/停用。
+        installMarketplaceJar(stagedJar, descriptor);
+        return restoreEnabledPlugins();
     }
 
     private List<PluginModuleDTO> installMarketplaceJar(Path stagedJar, PluginDescriptorInfo descriptor) {
@@ -613,6 +622,12 @@ public class PluginAppService {
         } else {
             module.setRestoreIntentActive(true);
             result = toDTO(enableOwnRuntime(module));
+            if (!pluginRuntimeGateway.enabled(code)) {
+                // 恢复依赖方前必须确保目标运行时确实已启用：观察到的失败是目标只完成了 load、
+                // enable 被静默跳过，依赖方带着“提供方类不可见/服务缺失”的状态恢复
+                log.warn("Dev-mode reload of {} did not reach enabled state, retrying enable", code);
+                result = toDTO(enableOwnRuntime(module));
+            }
         }
         markReloaded(code);
         if (!toRestore.isEmpty()) {

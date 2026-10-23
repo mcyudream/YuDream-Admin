@@ -1116,7 +1116,12 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
         for (String dependencyCode : descriptor.softDependencies()) {
             PluginRuntimeHolder dependency = holders.get(dependencyCode);
-            if (dependency != null && dependency.isEnabled()) {
+            // 软依赖类可见性按“已加载”接线：热重载/级联恢复期间提供方常处于已加载未启用窗口，
+            // 若此时才创建消费方 ClassLoader 会导致其永远解析不到提供方 API 类（端点注册反射
+            // 方法签名即抛 NoClassDefFoundError）。类可解析而服务未暴露时，消费方请求路径的
+            // dependencyAvailable/service 守卫负责优雅降级。卸载安全由 ensureNoLoadedDependents
+            // 保证：消费方仍在加载时提供方无法卸载，接线不会悬空。
+            if (dependency != null) {
                 classLoaders.add(dependency.getClassLoader());
             }
         }
