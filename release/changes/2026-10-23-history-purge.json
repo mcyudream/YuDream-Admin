@@ -1,0 +1,10 @@
+{
+  "id": "history-purge",
+  "level": "patch",
+  "title": "仓库历史垃圾清理",
+  "commits": ["9eefb275a"],
+  "notes": [
+    "从全部历史移除 tmp/（含 257MB 运行时 jar 与日志）、.pixso-replica/、.idea/、散落日志与 install.cmd/served-shop7.js 误提交文件",
+    "补齐 .gitignore 整段忽略规则防止复发；发布 tag 迁移到重写后等价提交，历史对象经 bundle 与 commit-map 保留审计"
+  ]
+}
