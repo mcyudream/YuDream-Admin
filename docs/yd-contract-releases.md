@@ -127,7 +127,7 @@ Nexus 回读完整性值：SDK `1.14.0` `sha512-2uVjYKwmORSqTi9KalA429NZR/E8JET/
 
 2026-10-23 宿主 tag `v1.5.0`（提交 `8cea74b9`）流水线契约作业通过：`@yudream/components` `1.10.1` 发布 Nexus 并回读一致（站点工作室修复、PageBuilder 引擎容器与生命周期守卫等 16 文件）；SPI 2.37.0 / SDK 1.14.0 / dataviz 无变化幂等跳过。镜像发布作业因新建发布脚本 `docker login --password-stdin` 未传 stdin 在 non-TTY 必败，tag `v1.5.0` 按「失败 tag 不可移动」保留作审计。
 
-修复后发 `v1.5.1`（提交 `0728a770`，patch：仅发布脚本登录修复 + mock 防回归）：backend/frontend 镜像已推送 Harbor 与阿里云双仓（`1.5.1` 与短 SHA 标签）；`latest` 晋升触发防倒退护栏（远端 latest 为无版本标签历史遗留），经人工明确批准后以 `ALLOW_LATEST_MIGRATION=1` 重试完成迁移。
+修复后发 `v1.5.1`（提交 `0728a770`，patch：仅发布脚本登录修复 + mock 防回归）：CI 已推送 backend/frontend 镜像至 Harbor 与阿里云双仓（`1.5.1` 与短 SHA 标签，双仓摘要一致）；`latest` 晋升触发防倒退护栏（远端 latest 为无版本标签历史遗留），经用户明确批准后由本机以 `ALLOW_LATEST_MIGRATION=1` 执行脚本完成四仓晋升（发布证据 status=complete）。GitLab CI 变量 `DOCKER_REGISTRY_USER/PASSWORD` 尚未补配 Harbor robot（`robot$push`，凭据在 `docs/local.md`），补配前镜像发布需按同方式本机执行。
 
 Nexus 回读完整性值：components `1.10.1` ``。
 
