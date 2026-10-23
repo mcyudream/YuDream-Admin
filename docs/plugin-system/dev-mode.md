@@ -92,7 +92,7 @@ yudream:
 
 ## 4. 开发者工具 API
 
-统一挂载 `/api/platform/plugin-devtools/**`，仅管理员：
+统一挂载 `/api/platform/plugin-devtools/**`，仅管理员；所有 manage 操作端点与 SSE 流均受开发模式闸门约束：`yudream.platform.plugin.dev-mode.enabled` 为 `false`（或缺省且 JAR 运行自动判定关闭）时一律返回「插件开发模式未启用」，仅 view 查询保留供前端判定浮窗可见性，`PluginDevModeReloadListener` 对关闭态的重载请求也直接跳过：
 
 | 方法与路径 | 权限码 | 说明 |
 | --- | --- | --- |

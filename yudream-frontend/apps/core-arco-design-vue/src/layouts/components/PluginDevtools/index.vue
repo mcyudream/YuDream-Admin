@@ -20,11 +20,14 @@ const store = usePluginDevtoolsStore()
 const permitted = computed(() => auth('platform:plugin-devtools:view'))
 const visible = computed(() => permitted.value && store.status?.devModeEnabled === true)
 
-function togglePanel() {
+/** 打开前重取状态：开发模式开关只随宿主启动生效，后端重启成关闭态时立即隐藏而不是打开后逐个操作报错 */
+async function togglePanel() {
   if (store.drawerOpen) {
     store.closeDrawer()
+    return
   }
-  else {
+  await store.loadStatus(true)
+  if (visible.value) {
     store.openDrawer()
   }
 }
@@ -47,11 +50,14 @@ const {
 
 provide('pluginDevtoolsFabReset', resetFab)
 
-/** 边缘条点击：展开回完整按钮并直接打开浮窗 */
+/** 边缘条点击：展开回完整按钮并直接打开浮窗（同样先重取状态对齐开发模式开关） */
 function handleStripActivate() {
-  undock().then(() => {
+  undock().then(async () => {
     if (!store.drawerOpen) {
-      store.openDrawer()
+      await store.loadStatus(true)
+      if (visible.value) {
+        store.openDrawer()
+      }
     }
   })
 }

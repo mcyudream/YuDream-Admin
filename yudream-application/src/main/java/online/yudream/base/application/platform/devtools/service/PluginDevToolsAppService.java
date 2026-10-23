@@ -227,7 +227,7 @@ public class PluginDevToolsAppService {
         return runtimeGateway.testCommand(code.trim(), cmd.getCommand(), cmd.getArguments(), cmd.getContent());
     }
 
-    /** 开发项目管理视图：不受启用开关过滤，开发模式关闭时也可预登记。 */
+    /** 开发项目管理只读视图：登记/移除/重载等操作端点由开发模式闸门约束，此查询仅返回清单供状态展示。 */
     public List<PluginDevProjectInfo> devProjects() {
         return runtimeGateway.managedDevProjects();
     }

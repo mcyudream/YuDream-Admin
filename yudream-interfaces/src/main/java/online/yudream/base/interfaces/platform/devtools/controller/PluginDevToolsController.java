@@ -41,6 +41,9 @@ import java.util.List;
 
 /**
  * 插件开发者工具接口：为全局悬浮调试抽屉提供状态、资产、追踪、事件流与指令模拟。
+ * 开发模式关闭（yudream.platform.plugin.dev-mode.enabled 为 false 或按运行形态自动判定关闭）时，
+ * 全部操作端点（重载、指令模拟、开发项目登记/移除、骨架、目录浏览、事件流）一律拒绝，
+ * 仅保留状态与只读查询供前端判定浮窗可见性。
  */
 @RestController
 @RequestMapping("/api/platform/plugin-devtools")
@@ -78,6 +81,7 @@ public class PluginDevToolsController {
     @PostMapping("/plugins/{code}/reload")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "重载开发插件", module = "开发者工具", desc = "手动触发开发模式插件的回收、目录加载与启用")
     public Result<PluginModuleRes> reload(@PathVariable String code) {
+        devToolsAppService.requireDevMode();
         return Result.ok(PluginWebAssembler.toRes(devToolsAppService.reload(code)));
     }
 
@@ -92,6 +96,7 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "模拟插件指令", module = "开发者工具", desc = "在指定插件作用域内模拟触发 QQ 指令处理器")
     public Result<PluginCommandTestRes> commandTest(@PathVariable String code,
                                                     @Valid @RequestBody PluginCommandTestRequest request) {
+        devToolsAppService.requireDevMode();
         return Result.ok(PluginDevToolsWebAssembler.toRes(
                 devToolsAppService.commandTest(code, PluginDevToolsWebAssembler.toCmd(request))));
     }
@@ -112,12 +117,14 @@ public class PluginDevToolsController {
     @PostMapping("/dev-projects")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "登记开发模式项目", module = "开发者工具", desc = "将插件源码目录登记到面板清单并持久化，已启用插件立即切换源码加载")
     public Result<PluginDevProjectInfo> addDevProject(@Valid @RequestBody PluginDevProjectSaveRequest request) {
+        devToolsAppService.requireDevMode();
         return Result.ok(devToolsAppService.addDevProject(PluginDevToolsWebAssembler.toCmd(request)));
     }
 
     @PostMapping("/dev-projects/batch")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "批量登记开发模式项目", module = "开发者工具", desc = "扫描父目录下的插件模块并去重登记到面板清单，已启用插件立即切换源码加载")
     public Result<PluginDevProjectScanResult> addDevProjects(@Valid @RequestBody PluginDevProjectBatchRequest request) {
+        devToolsAppService.requireDevMode();
         return Result.ok(devToolsAppService.addDevProjects(PluginDevToolsWebAssembler.toCmd(request)));
     }
 
@@ -133,6 +140,7 @@ public class PluginDevToolsController {
     @DeleteMapping("/dev-projects/{code}")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "移除开发模式项目", module = "开发者工具", desc = "从面板清单移除开发模式项目登记")
     public Result<Void> removeDevProject(@PathVariable String code) {
+        devToolsAppService.requireDevMode();
         devToolsAppService.removeDevProject(code);
         return Result.ok();
     }

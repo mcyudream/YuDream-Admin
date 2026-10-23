@@ -29,6 +29,11 @@ public class PluginDevModeReloadListener {
 
     @EventListener
     public void onReloadRequested(PluginDevReloadRequested request) {
+        // 开发模式关闭时不得执行任何源码切换重载：登记等入口虽已有闸门，这里兜底对齐环境开关
+        if (!runtimeGateway.devModeEnabled()) {
+            log.info("Skip dev-mode reload for {} because dev mode is disabled", request.pluginCode());
+            return;
+        }
         if (request.trigger() == PluginDevReloadTrigger.REGISTER
                 && pluginAppService.shouldSuppressRegisterReload(request.pluginCode())) {
             log.info("Skip register-triggered reload for {} because it was just reloaded or cascade-restored",

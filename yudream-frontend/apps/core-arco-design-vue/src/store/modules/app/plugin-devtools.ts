@@ -83,8 +83,11 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
       status.value = res.data
     }
     catch (error: any) {
-      status.value = null
+      // 刷新失败保留上一次状态：瞬时网络抖动不应隐藏浮窗，且浮窗隐藏后没有自动恢复入口
       statusError.value = error?.message || '开发者工具状态接口不可用'
+      if (!status.value) {
+        status.value = null
+      }
     }
   }
 
@@ -296,14 +299,16 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
           return
         }
         // 登录失效或开发模式未开启时继续重连只会空转刷错：停流并复位 started，
-        // 重新登录或开发模式恢复后布局重新挂载 connect() 会再次启动双流
+        // 重取状态让浮窗显隐立即跟随后端开发模式开关（如后端重启成关闭态）
         if (shouldStopSseReconnect(error?.status)) {
           started = false
+          void loadStatus(true)
           return
         }
         transientFailures += 1
         if (transientFailures > MAX_TRANSIENT_RETRIES) {
           started = false
+          void loadStatus(true)
           return
         }
       }
