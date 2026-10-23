@@ -1,0 +1,10 @@
+{
+  "id": "contract-fixture-consolidation",
+  "level": "patch",
+  "title": "测试夹具归位与遗留文件清理",
+  "commits": ["14bead308", "e73980eaf"],
+  "notes": [
+    "根目录 tests/ 契约夹具并入 bootstrap 测试资源，双端引用与既有类型错误一并修正",
+    "移除 Temp 走查快照与根目录设计预览等遗留文件，补齐忽略规则"
+  ]
+}

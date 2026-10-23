@@ -1,0 +1,11 @@
+{
+  "id": "plugin-runtime-cascade",
+  "level": "patch",
+  "title": "插件运行时软依赖接线与上传覆盖级联恢复",
+  "commits": ["110948aaa"],
+  "notes": [
+    "dependencyClassLoaders 软依赖分支从「已启用」放宽为「已加载」，热重载/级联恢复窗口内消费方不再永久缺失提供方 API 类（修复 minecraft-server 恢复时端点注册抛 NoClassDefFoundError）",
+    "dev 插件重载增加启用防御：enable 被跳过时恢复依赖方前重试 enableOwnRuntime 并告警",
+    "手动上传覆盖已安装插件改走市场更新级联链路：受控停机目标与依赖方、备份替换后按依赖顺序自动恢复，不再要求先手动卸载/停用"
+  ]
+}

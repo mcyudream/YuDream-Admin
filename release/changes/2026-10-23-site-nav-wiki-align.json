@@ -1,0 +1,12 @@
+{
+  "id": "site-nav-wiki-align",
+  "level": "patch",
+  "title": "站点导航删除失效修复与知识库子菜单自动对齐",
+  "commits": ["3131de3cf"],
+  "notes": [
+    "修复站点导航编辑器 structuredClone 作用于响应式代理抛 DataCloneError 导致删除/改名/移动静默失败的问题",
+    "导航条目支持 visible=false 显式隐藏：不渲染但地址参与去重，可压制插件页面/插件市场/知识库/首页等 appendAuto 自动追加条目；编辑器删除这类地址时引导改为隐藏",
+    "知识库导航条目支持 autoChildren：子菜单自动同步公开知识空间，手动子菜单优先、按地址去重；mc-terrain-theme 预设同步迁移",
+    "TS/Java 双端校验器放行 visible/autoChildren 布尔字段，共享契约夹具补有效与无效用例"
+  ]
+}
