@@ -287,8 +287,10 @@ public class StudioDocumentValidator {
         array(items);
         if (items.size() > 30) fail("每级导航最多30项");
         for (JsonNode item : items) {
-            object(item); keys(item, "id", "label", "url", "iconAssetId", "requires", "children");
+            object(item); keys(item, "id", "label", "url", "iconAssetId", "requires", "children", "visible", "autoChildren");
             if (item.has("requires")) requires(item.get("requires"));
+            if (item.has("visible") && !item.get("visible").isBoolean()) fail("导航可见性须为布尔值");
+            if (item.has("autoChildren") && !item.get("autoChildren").isBoolean()) fail("导航自动子菜单须为布尔值");
             String id = text(item, "id");
             if (!id.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}") || !ids.add(id)) fail("导航ID须唯一且安全");
             boundedText(item, "label", 40, false);

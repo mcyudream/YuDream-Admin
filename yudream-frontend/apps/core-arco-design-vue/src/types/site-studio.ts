@@ -86,6 +86,10 @@ export interface StudioNavItem {
   iconAssetId?: string
   /** 条目依赖，未满足时隐藏（格式同页面 requires） */
   requires?: string[]
+  /** 显式隐藏：不渲染，但地址仍参与去重，用于压制同地址的自动追加条目（插件页面/市场/知识库/首页） */
+  visible?: boolean
+  /** 子菜单自动同步知识库公开空间（仅知识库入口有意义）；手动子菜单优先、按地址去重 */
+  autoChildren?: boolean
   children?: StudioNavItem[]
 }
 

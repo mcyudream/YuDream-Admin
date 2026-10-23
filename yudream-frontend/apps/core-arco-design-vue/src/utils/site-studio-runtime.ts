@@ -5,7 +5,7 @@ import apiPublicTheme from '@/api/modules/public-theme'
 import systemClient from '@/api/modules/system-client'
 import { useAppAccountStore } from '@/store/modules/app/account'
 import { useAppSettingsStore } from '@/store/modules/app/settings'
-import { buildNavigationTree, loadSiteCapabilities, loadSiteNavigation, studioRequirementsMet } from '@/views/site/site-navigation'
+import { loadSiteCapabilities, loadSiteNavigation, studioRequirementsMet } from '@/views/site/site-navigation'
 import { STUDIO_PARTICLE_PRESETS } from '../types/site-studio'
 import { toBackendAssetUrl } from './backend-url'
 import { resolveStudioHref } from './site-studio-links'
@@ -400,12 +400,13 @@ async function loadNavigation(document: SiteDocument): Promise<DataRecord[]> {
   const open = (item: { url: string, requires?: string[] }) => studioRequirementsMet(item.requires, available) && !closedPages.has(item.url.replace(/\/+$/, '') || '/site')
   let tree: { label: string, url: string, icon?: string, children?: unknown[] }[]
   if (own) {
-    // 站点文档自带导航（工作台「站点导航」）：为准；可选按 URL 去重追加插件页面与市场/知识库入口
+    // 站点文档自带导航（工作台「站点导航」）：为准；可选按 URL 去重追加插件页面与市场/知识库入口。
+    // 显式隐藏（visible=false）的条目保留在清单里参与地址去重（压制同地址自动追加），由合并层负责不渲染。
     const flat = own.items.filter(open).flatMap((item, index) => [
-      { id: item.id, label: item.label, url: item.url, icon: assetUrl(item.iconAssetId), visible: true, sort: index },
-      ...(item.children ?? []).filter(open).map((child, childIndex) => ({ id: child.id, parentId: item.id, label: child.label, url: child.url, icon: assetUrl(child.iconAssetId), visible: true, sort: childIndex })),
+      { id: item.id, label: item.label, url: item.url, icon: assetUrl(item.iconAssetId), visible: item.visible !== false, autoChildren: item.autoChildren, sort: index },
+      ...(item.children ?? []).filter(open).map((child, childIndex) => ({ id: child.id, parentId: item.id, label: child.label, url: child.url, icon: assetUrl(child.iconAssetId), visible: child.visible !== false, sort: childIndex })),
     ])
-    tree = own.appendAuto ? await loadSiteNavigation(JSON.stringify(flat)) : buildNavigationTree(flat)
+    tree = await loadSiteNavigation(JSON.stringify(flat), [], { appendAuto: !!own.appendAuto })
     // 合并后保留条目自带图标
     const iconByUrl = new Map(flat.filter(item => item.icon).map(item => [item.url, item.icon]))
     const withIcons = (items: typeof tree): typeof tree => items.map(item => ({ ...item, icon: iconByUrl.get(item.url) ?? '', children: withIcons((item.children ?? []) as typeof tree) }))

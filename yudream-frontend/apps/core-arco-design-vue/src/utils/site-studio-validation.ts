@@ -417,9 +417,15 @@ function validateNavigation(value: unknown, assetRef: AssetRef) {
     studioAssert(Array.isArray(list) && list.length <= 30, '每级导航最多 30 项')
     for (const item of list) {
       studioRecord(item)
-      studioKeys(item, ['id', 'label', 'url', 'iconAssetId', 'requires', 'children'])
+      studioKeys(item, ['id', 'label', 'url', 'iconAssetId', 'requires', 'children', 'visible', 'autoChildren'])
       if (item.requires !== undefined) {
         validateRequires(item.requires)
+      }
+      if (item.visible !== undefined) {
+        studioAssert(typeof item.visible === 'boolean', '导航可见性须为布尔值')
+      }
+      if (item.autoChildren !== undefined) {
+        studioAssert(typeof item.autoChildren === 'boolean', '导航自动子菜单须为布尔值')
       }
       string(item.id, '导航 ID')
       studioAssert(/^[a-z0-9][\w-]{0,63}$/i.test(item.id) && !ids.has(item.id), '导航 ID 须唯一且安全')

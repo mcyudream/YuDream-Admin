@@ -1,95 +1,12 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { SiteNavigationItem, WikiSpaceEntry } from './site-navigation-merge'
+import { computed, ref, toValue, watch } from 'vue'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { hasPublicPluginMarket } from '@/api/modules/plugin-market-public'
+import { buildNavigationTree, flattenNavigation, manualNavigationItems, mergeSiteNavigation, parseNavigationItems } from './site-navigation-merge'
 
-export interface SiteNavigationItem {
-  id?: string
-  label: string
-  url: string
-  parentId?: string
-  visible?: boolean
-  sort?: number
-  /** 外链在公开站内容区 iframe 嵌入，而不是新窗口打开 */
-  embed?: boolean
-  /** 图标地址（站点文档导航带入；CMS 旧导航无此字段） */
-  icon?: string
-  children?: SiteNavigationItem[]
-}
-
-export function parseNavigationItems(value?: string): SiteNavigationItem[] {
-  if (!value) {
-    return []
-  }
-  try {
-    const parsed = JSON.parse(value) as SiteNavigationItem[]
-    return Array.isArray(parsed)
-      ? parsed.filter(item => item.visible !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0))
-      : []
-  }
-  catch {
-    return []
-  }
-}
-
-export function buildNavigationTree(items: SiteNavigationItem[]) {
-  const itemMap = new Map<string, SiteNavigationItem>()
-  const roots: SiteNavigationItem[] = []
-  items.forEach((item) => {
-    const cloned = { ...item, children: [] }
-    if (cloned.id) {
-      itemMap.set(cloned.id, cloned)
-    }
-  })
-  items.forEach((item) => {
-    const current = item.id ? itemMap.get(item.id) : { ...item, children: [] }
-    if (!current) {
-      return
-    }
-    const parent = item.parentId ? itemMap.get(item.parentId) : undefined
-    if (item.parentId && !parent) {
-      // 父级被隐藏/删除（如登录等认证项被公开导航过滤）时，二级菜单整体隐藏，禁止平铺成一级
-      return
-    }
-    if (parent) {
-      parent.children = [...(parent.children || []), current]
-    }
-    else {
-      roots.push(current)
-    }
-  })
-  const sortItems = (list: SiteNavigationItem[]) => {
-    list.sort((a, b) => (a.sort || 0) - (b.sort || 0))
-    list.forEach(item => item.children?.sort((a, b) => (a.sort || 0) - (b.sort || 0)))
-    return list
-  }
-  return sortItems(roots)
-}
-
-export function flattenNavigation(items: SiteNavigationItem[]) {
-  return items.flatMap(item => [item, ...(item.children || [])])
-}
-
-export function isAuthNavigationUrl(url?: string) {
-  const normalized = (url || '').trim().toLowerCase()
-  return normalized === '/login' || normalized === '/register' || normalized === '/signup'
-}
-
-export function isHttpNavigationUrl(url?: string) {
-  return /^https?:\/\//i.test((url || '').trim())
-}
-
-/** 勾选了站内嵌入的 http(s) 外链改写为 /embed，chrome 按站内路由无感跳转。 */
-export function navigationHref(item: Pick<SiteNavigationItem, 'url' | 'label' | 'embed'>) {
-  const url = (item.url || '').trim()
-  if (!item.embed || !isHttpNavigationUrl(url)) {
-    return url
-  }
-  const params = new URLSearchParams({ url })
-  if (item.label) {
-    params.set('title', item.label)
-  }
-  return `/embed?${params.toString()}`
-}
+export type { SiteNavigationItem, WikiSpaceEntry } from './site-navigation-merge'
+export { buildNavigationTree, flattenNavigation, isAuthNavigationUrl, isHttpNavigationUrl, isWikiNavigationUrl, manualNavigationItems, mergeSiteNavigation, navigationHref, parseNavigationItems } from './site-navigation-merge'
 
 // 插件声明的站点导航项（@PluginRoute siteNav）：经公开 frontend-manifest 下发，
 // 模块级 memo 让站点页与站点 chrome 共享一次请求；devtools 热重载时复位。
@@ -97,12 +14,14 @@ let wikiEnabledPromise: Promise<boolean> | null = null
 let marketEnabledPromise: Promise<boolean> | null = null
 let pluginSiteNavPromise: Promise<SiteNavigationItem[]> | null = null
 let enabledPluginsPromise: Promise<string[]> | null = null
+let wikiSpacesPromise: Promise<WikiSpaceEntry[]> | null = null
 
 export function resetSiteNavigationCache() {
   enabledPluginsPromise = null
   wikiEnabledPromise = null
   marketEnabledPromise = null
   pluginSiteNavPromise = null
+  wikiSpacesPromise = null
 }
 
 function loadWikiEnabled(): Promise<boolean> {
@@ -113,6 +32,19 @@ function loadWikiEnabled(): Promise<boolean> {
 function loadMarketEnabled(): Promise<boolean> {
   marketEnabledPromise ??= hasPublicPluginMarket().catch(() => false)
   return marketEnabledPromise
+}
+
+/** 公开知识空间：知识库条目「自动同步子菜单」的数据来源，失败时按无空间处理 */
+function loadWikiSpaceEntries(): Promise<WikiSpaceEntry[]> {
+  wikiSpacesPromise ??= import('@/api/modules/platform-wiki')
+    .then(({ fetchPublicWikiSpaces }) => fetchPublicWikiSpaces())
+    .then((res) => {
+      return (res.data || [])
+        .map(space => ({ name: space.name, slug: String(space.slug || '') }))
+        .filter(space => space.slug)
+    })
+    .catch(() => [])
+  return wikiSpacesPromise
 }
 
 function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
@@ -143,6 +75,12 @@ function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
   return pluginSiteNavPromise
 }
 
+/** 手动导航里是否声明了「自动同步知识空间」子菜单：据此决定是否拉取公开空间列表 */
+function needsWikiSpaces(navigationJson: string | undefined, extra: SiteNavigationItem[]) {
+  const parsed = parseNavigationItems(navigationJson, { keepHidden: true })
+  return [...parsed, ...extra].some(item => item.autoChildren)
+}
+
 /**
  * 公开站可见的已启用能力：已启用插件（前端清单中的插件编码）与知识库、插件市场公开能力。
  * 站点文档的页面/导航依赖（requires）据此判定是否开放。
@@ -161,44 +99,45 @@ export function studioRequirementsMet(requires: string[] | undefined, available:
   return (requires ?? []).every(item => available.has(item))
 }
 
-function isHomeNavigationUrl(url?: string) {
-  const normalized = (url || '').trim()
-  return normalized === '/site' || normalized === '/'
-}
-
-/** 公开站导航必须含首页：CMS/插件清单经常只有内页，品牌链接不能替代导航项。 */
-function withHomeNavigationItem(items: SiteNavigationItem[]) {
-  if (items.some(item => isHomeNavigationUrl(item.url))) {
-    return items
+/**
+ * 自动追加来源的地址集合（首页、插件 siteNav 页面、插件市场与知识库入口）：
+ * 导航编辑器据此判断「删除后会自动重新出现」的条目，引导改为显式隐藏。
+ */
+export async function loadAutoNavigationUrls(): Promise<Set<string>> {
+  const [plugins, market, wiki] = await Promise.all([loadPluginSiteNavItems(), loadMarketEnabled(), loadWikiEnabled()])
+  const urls = new Set<string>(['/', '/site'])
+  plugins.forEach((item) => {
+    const url = (item.url || '').trim().replace(/\/+$/, '')
+    if (url) {
+      urls.add(url)
+    }
+  })
+  if (market) {
+    urls.add('/market')
   }
-  return [
-    { id: 'site-home', label: '首页', url: '/site', visible: true, sort: Number.MIN_SAFE_INTEGER },
-    ...items,
-  ]
-}
-
-function mergeSiteNavigation(navigationJson: string | undefined, pluginNavItems: SiteNavigationItem[], marketEnabled: boolean, wikiEnabled: boolean) {
-  const items = parseNavigationItems(navigationJson)
-    .filter(item => !isAuthNavigationUrl(item.url))
-    .map(item => ({ ...item, url: navigationHref(item) }))
-  const knownUrls = new Set(items.map(item => item.url))
-  const merged = [...items, ...pluginNavItems.filter(item => !knownUrls.has(item.url) && !isAuthNavigationUrl(item.url))]
-  const withMarket = marketEnabled && !merged.some(item => item.url === '/market')
-    ? [...merged, { id: 'capability-market', label: '插件市场', url: '/market', visible: true, sort: Number.MAX_SAFE_INTEGER - 1 }]
-    : merged
-  const withWiki = wikiEnabled && !withMarket.some(item => item.url === '/wiki')
-    ? [...withMarket, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
-    : withMarket
-  return withHomeNavigationItem(withWiki)
+  if (wiki) {
+    urls.add('/wiki')
+  }
+  return urls
 }
 
 /**
- * 非组件场景（站点文档运行时）一次性读取合并后的公开导航：与 useSiteNavigation 同一合并规则，
- * 额外条目（如站点文档自身页面）按 URL 去重后排在 CMS 导航之后。
+ * 非组件场景（站点文档运行时）读取合并后的公开导航：与 useSiteNavigation 同一合并规则。
+ * appendAuto 为 true 时按 URL 去重追加额外条目、插件 siteNav 页面与市场/知识库入口；
+ * 关闭时仅手动清单（隐藏条目不渲染），仍展开知识空间自动子菜单。
  */
-export async function loadSiteNavigation(navigationJson?: string, extra: SiteNavigationItem[] = []) {
-  const [plugins, market, wiki] = await Promise.all([loadPluginSiteNavItems(), loadMarketEnabled(), loadWikiEnabled()])
-  const base = mergeSiteNavigation(navigationJson, [...extra, ...plugins], market, wiki)
+export async function loadSiteNavigation(navigationJson?: string, extra: SiteNavigationItem[] = [], options: { appendAuto?: boolean } = {}) {
+  const appendAuto = options.appendAuto !== false
+  const needsSpaces = needsWikiSpaces(navigationJson, extra)
+  const [plugins, market, wiki, spaces] = await Promise.all([
+    appendAuto ? loadPluginSiteNavItems() : Promise.resolve([] as SiteNavigationItem[]),
+    appendAuto ? loadMarketEnabled() : Promise.resolve(false),
+    appendAuto ? loadWikiEnabled() : Promise.resolve(false),
+    needsSpaces ? loadWikiSpaceEntries() : Promise.resolve([] as WikiSpaceEntry[]),
+  ])
+  const base = appendAuto
+    ? mergeSiteNavigation(navigationJson, [...extra, ...plugins], market, wiki, spaces)
+    : manualNavigationItems(navigationJson, spaces)
   return buildNavigationTree(base)
 }
 
@@ -210,12 +149,24 @@ export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | unde
   const wikiEnabled = ref(false)
   const marketEnabled = ref(false)
   const pluginNavItems = ref<SiteNavigationItem[]>([])
+  const wikiSpaces = ref<WikiSpaceEntry[]>([])
 
   loadWikiEnabled().then(enabled => wikiEnabled.value = enabled)
   loadMarketEnabled().then(enabled => marketEnabled.value = enabled)
   loadPluginSiteNavItems().then(items => pluginNavItems.value = items)
+  // 仅当导航声明了自动子菜单且知识库开放时才拉取空间列表；草稿异步加载完成后会重新求值
+  watch([() => toValue(navigationJson), wikiEnabled], ([value, enabled]) => {
+    if (enabled && needsWikiSpaces(value, [])) {
+      void loadWikiSpaceEntries().then((spaces) => {
+        wikiSpaces.value = spaces
+      })
+    }
+    else {
+      wikiSpaces.value = []
+    }
+  }, { immediate: true })
 
-  const navigationItems = computed(() => mergeSiteNavigation(toValue(navigationJson), pluginNavItems.value, marketEnabled.value, wikiEnabled.value))
+  const navigationItems = computed(() => mergeSiteNavigation(toValue(navigationJson), pluginNavItems.value, marketEnabled.value, wikiEnabled.value, wikiSpaces.value))
   const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
   const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
 

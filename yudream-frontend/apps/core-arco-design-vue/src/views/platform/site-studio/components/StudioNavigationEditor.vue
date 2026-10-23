@@ -1,19 +1,29 @@
 <script setup lang="ts">
 // 站点导航编辑：两级导航（名称、地址、图标），随站点草稿保存与发布。页面里绑定 site:navigation 的列表
 // （如底部物品栏）据此渲染，二级条目用条目内 data-yd-each="children" 展开。所有修改经 set-features 命令。
+// 插件页面/市场/知识库/首页地址会被自动追加：删除这类条目时引导改为「隐藏」（地址保留去重、不再渲染）。
 import type { StudioNavigation, StudioNavItem } from '@/types/site-studio'
-import { computed } from 'vue'
+import { computed, onMounted, ref, toRaw } from 'vue'
 import { useSiteStudioStore } from '@/store/modules/site-studio'
+import { isWikiNavigationUrl, loadAutoNavigationUrls } from '@/views/site/site-navigation'
 
 defineOptions({ name: 'StudioNavigationEditor' })
 
 const store = useSiteStudioStore()
 const toast = useYdToast()
+const modal = useYdModal()
 
 const navigation = computed<StudioNavigation | undefined>(() => store.doc?.features?.navigation)
 const items = computed(() => navigation.value?.items ?? [])
 const iconOptions = computed(() => [{ label: '无（用页面图标或默认图标）', value: '' }, ...(store.doc?.assets ?? []).filter(asset => asset.kind === 'image').map(asset => ({ label: asset.name, value: asset.id }))])
 const pageOptions = computed(() => (store.doc?.pages ?? []).map(page => ({ label: `站点页面：${page.name}`, value: page.path === '/' ? '/site' : `/site${page.path}` })))
+// 自动追加来源地址（首页、插件 siteNav 页面、插件市场与知识库入口）：删除这类条目会原样重现
+const autoUrls = ref<Set<string>>(new Set())
+onMounted(() => {
+  void loadAutoNavigationUrls().then((urls) => {
+    autoUrls.value = urls
+  })
+})
 
 function apply(next: StudioNavigation | undefined) {
   const features = { ...store.doc?.features }
@@ -39,7 +49,7 @@ function initialize() {
 }
 
 function update(path: number[], patch: Partial<StudioNavItem> | null) {
-  const next = structuredClone(items.value) as StudioNavItem[]
+  const next = structuredClone(toRaw(items.value)) as StudioNavItem[]
   const [top, child] = path
   const list = child === undefined ? next : (next[top!]!.children ??= [])
   const index = child === undefined ? top! : child
@@ -54,6 +64,13 @@ function update(path: number[], patch: Partial<StudioNavItem> | null) {
     if (!merged.requires?.length) {
       delete merged.requires
     }
+    // 默认值不落草稿：保持文档精简
+    if (merged.visible !== false) {
+      delete merged.visible
+    }
+    if (!merged.autoChildren) {
+      delete merged.autoChildren
+    }
     list[index] = merged
   }
   if (child !== undefined && !next[top!]!.children!.length) {
@@ -62,8 +79,32 @@ function update(path: number[], patch: Partial<StudioNavItem> | null) {
   apply({ appendAuto: navigation.value?.appendAuto ?? true, items: next })
 }
 
+/** 该地址是否会被自动追加（插件页面/市场/知识库/首页，或知识空间自动子菜单） */
+function autoBacked(url: string | undefined, parentAutoChildren?: boolean) {
+  const normalized = (url || '').trim().replace(/\/+$/, '') || '/'
+  if (autoUrls.value.has(normalized)) {
+    return true
+  }
+  return !!parentAutoChildren && normalized.startsWith('/wiki/')
+}
+
+function removeItem(path: number[], url: string | undefined, parentAutoChildren?: boolean) {
+  if (!autoBacked(url, parentAutoChildren)) {
+    update(path, null)
+    return
+  }
+  modal.confirm({
+    title: '删除后会自动重新出现',
+    content: '该地址由插件页面、站点能力或知识空间自动追加，直接删除后公开导航会重新出现同地址条目。改为「隐藏」可保留配置且不再显示。',
+    confirmButtonText: '改为隐藏',
+    cancelButtonText: '仍然删除',
+    onConfirm: () => update(path, { visible: false }),
+    onCancel: () => update(path, null),
+  })
+}
+
 function move(path: number[], offset: number) {
-  const next = structuredClone(items.value) as StudioNavItem[]
+  const next = structuredClone(toRaw(items.value)) as StudioNavItem[]
   const [top, child] = path
   const list = child === undefined ? next : next[top!]!.children!
   const index = child === undefined ? top! : child
@@ -80,7 +121,7 @@ function addTop() {
 }
 
 function addChild(top: number) {
-  const next = structuredClone(items.value) as StudioNavItem[]
+  const next = structuredClone(toRaw(items.value)) as StudioNavItem[]
   ;(next[top]!.children ??= []).push(newItem('子菜单', next[top]!.url))
   apply({ appendAuto: navigation.value?.appendAuto ?? true, items: next })
 }
@@ -104,7 +145,7 @@ function text(event: Event) {
     <p class="text-xs text-muted-foreground m-0">
       页面中绑定「站点导航」数据源的列表据此显示（如底部物品栏），二级条目以子菜单展开。地址可填站点页面（/site/...）、宿主页面（/wiki、/market、插件页）或 http(s) 外链。
       未设置时使用「主题中心 → 导航」与站点页面自动生成。条目可填依赖（plugin:插件编码、capability:wiki / plugin-market），未启用时自动隐藏；
-      指向已关闭页面的条目同样隐藏。
+      指向已关闭页面的条目同样隐藏。插件页面、插件市场、知识库与首页地址会被自动追加：删除后会原样重现，需要隐藏时用条目的「显示」开关。
     </p>
     <div v-if="!navigation" class="flex flex-wrap gap-2">
       <YdButton v-auth="'platform:cms:edit'" variant="outline" :disabled="!store.doc" @click="initialize">
@@ -116,12 +157,16 @@ function text(event: Event) {
         <YdSwitch :model-value="navigation.appendAuto" aria-label="自动追加插件页面" @update:model-value="(value: unknown) => apply({ ...navigation!, appendAuto: Boolean(value) })" />
         <span>在后面自动追加插件页面、插件市场与知识库入口（按地址去重）</span>
       </label>
-      <div v-for="(item, top) in items" :key="item.id" class="p-2 border rounded flex flex-col gap-2">
+      <div v-for="(item, top) in items" :key="item.id" class="p-2 border rounded flex flex-col gap-2" :class="{ 'opacity-60': item.visible === false }">
         <div class="flex flex-wrap gap-2 items-center">
           <YdInput :model-value="item.label" class="w-32" aria-label="导航名称" @change="(event: Event) => text(event) && update([top], { label: text(event) })" />
           <YdInput :model-value="item.url" class="flex-1 min-w-40" aria-label="导航地址" @change="(event: Event) => text(event) && update([top], { url: text(event) })" />
           <YdSelect class="w-44" :model-value="item.iconAssetId ?? ''" :options="iconOptions" aria-label="导航图标" @update:model-value="(value: unknown) => update([top], { iconAssetId: String(value || '') })" />
           <YdInput :model-value="(item.requires ?? []).join(', ')" class="w-56" placeholder="依赖，如 plugin:timeline" aria-label="导航依赖" @change="(event: Event) => update([top], { requires: requiresOf(event) })" />
+          <label class="text-xs flex gap-1 items-center" title="隐藏后不渲染，但地址保留用于压制同地址的自动追加条目">
+            <YdSwitch :model-value="item.visible !== false" aria-label="显示导航" @update:model-value="(value: unknown) => update([top], { visible: Boolean(value) })" />
+            <span>显示</span>
+          </label>
           <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="上移" :disabled="top === 0" @click="move([top], -1)">
             <YdIcon name="morph:arrow-up" />
           </YdButton>
@@ -131,18 +176,34 @@ function text(event: Event) {
           <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="添加子菜单" @click="addChild(top)">
             <YdIcon name="morph:list-plus" />
           </YdButton>
-          <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="删除导航" @click="update([top], null)">
+          <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="删除导航" @click="removeItem([top], item.url)">
             <YdIcon name="morph:trash-2" />
           </YdButton>
         </div>
-        <div v-for="(child, index) in item.children ?? []" :key="child.id" class="pl-6 flex flex-wrap gap-2 items-center">
+        <label v-if="isWikiNavigationUrl(item.url)" class="text-xs flex gap-2 items-center">
+          <YdSwitch :model-value="!!item.autoChildren" aria-label="自动同步知识空间子菜单" @update:model-value="(value: unknown) => update([top], { autoChildren: Boolean(value) })" />
+          <span>子菜单自动同步公开知识空间（手动子菜单优先，按地址去重）</span>
+        </label>
+        <template v-if="item.autoChildren && isWikiNavigationUrl(item.url)">
+          <p v-if="item.children?.length" class="text-xs text-muted-foreground m-0">
+            已开启自动同步：下方手动子菜单显示在前，公开知识空间自动追加在后。
+          </p>
+          <p v-else class="text-xs text-muted-foreground m-0">
+            已开启自动同步：公开知识空间将作为子菜单自动显示，无需手动维护。
+          </p>
+        </template>
+        <div v-for="(child, index) in item.children ?? []" :key="child.id" class="pl-6 flex flex-wrap gap-2 items-center" :class="{ 'opacity-60': child.visible === false }">
           <YdInput :model-value="child.label" class="w-32" aria-label="子菜单名称" @change="(event: Event) => text(event) && update([top, index], { label: text(event) })" />
           <YdInput :model-value="child.url" class="flex-1 min-w-40" aria-label="子菜单地址" @change="(event: Event) => text(event) && update([top, index], { url: text(event) })" />
           <YdInput :model-value="(child.requires ?? []).join(', ')" class="w-56" placeholder="依赖" aria-label="子菜单依赖" @change="(event: Event) => update([top, index], { requires: requiresOf(event) })" />
+          <label class="text-xs flex gap-1 items-center" title="隐藏后不渲染，但地址保留用于压制自动同步的同地址子菜单">
+            <YdSwitch :model-value="child.visible !== false" aria-label="显示子菜单" @update:model-value="(value: unknown) => update([top, index], { visible: Boolean(value) })" />
+            <span>显示</span>
+          </label>
           <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="上移子菜单" :disabled="index === 0" @click="move([top, index], -1)">
             <YdIcon name="morph:arrow-up" />
           </YdButton>
-          <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="删除子菜单" @click="update([top, index], null)">
+          <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="删除子菜单" @click="removeItem([top, index], child.url, item.autoChildren)">
             <YdIcon name="morph:trash-2" />
           </YdButton>
         </div>

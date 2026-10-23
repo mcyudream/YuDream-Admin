@@ -1,6 +1,10 @@
 {
   "valid": [
     {
+      "name": "navigation-hidden-and-auto-children",
+      "document": {"schemaVersion":1,"id":"nav-flags-site","name":"导航标志契约","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"navigation":{"appendAuto":true,"items":[{"id":"nav-home","label":"首页","url":"/site"},{"id":"nav-servers","label":"服务器","url":"/servers","visible":false,"requires":["plugin:minecraft-server"]},{"id":"nav-wiki","label":"知识库","url":"/wiki","autoChildren":true,"requires":["capability:wiki"],"children":[{"id":"nav-wiki-newbie","label":"新手指南","url":"/wiki/newbie","visible":false}]}]}}}
+    },
+    {
       "name": "content-declared-site-effects",
       "document": {"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"atmosphere","title":"氛围","fields":[{"key":"particles","label":"粒子","type":"particles","effect":"particles","defaultValue":"dust"},{"key":"music","label":"背景音乐","type":"list","effect":"music","itemFields":[{"key":"src","label":"音频","type":"audio"},{"key":"title","label":"曲名","type":"text"}]},{"key":"volume","label":"音量","type":"number","effect":"musicVolume","defaultValue":18},{"key":"pages","label":"页面","type":"list","effect":"pageEffects","itemFields":[{"key":"path","label":"地址","type":"text"},{"key":"particles","label":"粒子","type":"particles"},{"key":"toastTitle","label":"标题","type":"text"}]}]}],"values":{"music":[{"src":"/api/files/song.ogg","title":"主题曲"}],"pages":[{"path":"/timeline","particles":"snow","toastTitle":"欢迎"}]}}}}
     },
@@ -613,6 +617,10 @@
     }
   ],
   "invalid": [
+    {
+      "name": "navigation-visible-not-boolean",
+      "document": {"schemaVersion":1,"id":"nav-flags-bad","name":"导航标志坏例","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"navigation":{"appendAuto":true,"items":[{"id":"nav-x","label":"甲","url":"/x","visible":"yes"}]}}}
+    },
     {"name":"content-effect-duplicate","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"a","label":"甲","type":"particles","effect":"particles"},{"key":"b","label":"乙","type":"particles","effect":"particles"}]}],"values":{}}}}},
     {"name":"content-effect-wrong-type","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"volume","label":"音量","type":"text","effect":"musicVolume"}]}],"values":{}}}}},
     {"name":"content-effect-volume-range","document":{"schemaVersion":1,"id":"effects-site","name":"效果","theme":{"tokens":{},"header":[],"footer":[]},"pages":[{"id":"home","name":"首页","path":"/","root":[]}],"assets":[],"features":{"content":{"sections":[{"code":"effects","title":"效果","fields":[{"key":"volume","label":"音量","type":"number","effect":"musicVolume","defaultValue":101}]}],"values":{}}}}},
