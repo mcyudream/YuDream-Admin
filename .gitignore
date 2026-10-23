@@ -93,3 +93,7 @@ install.cmd
 served-shop7.js
 AGENTS.md.backup.*
 
+
+# 历史清理后禁止复发：临时走查快照与设计预览文件
+Temp/
+wiki-new-design-preview.html
