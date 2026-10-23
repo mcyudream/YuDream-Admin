@@ -37,7 +37,7 @@
 
 ## 4. 待同步
 
-- 关联实体卡 SDK 化（components 1.11.0 共享注册表 + `YdRelatedEntity`；SDK 1.15.0 `install(sdk)` 注入与 `relatedEntity.register`；主仓 `docs/dev/frontend.md` §6、`docs/yd-components.md`、`docs/dev/plugin-system.md` §3 与插件仓 `docs/dev/plugin-development.md` §5 文档已同工作项同步）：插件仓代码消费（skin/feedback/todo 用户列切 `YdRelatedEntity`、skin 注册自有实体类型演示跨插件调用）待契约发布验签后落插件仓并升 catalog。
+- 关联实体卡 SDK 化（components 1.11.1 共享注册表 + `YdRelatedEntity`；SDK 1.15.1 `install(sdk)` 注入与 `relatedEntity.register`；主仓 `docs/dev/frontend.md` §6、`docs/yd-components.md`、`docs/dev/plugin-system.md` §3 与插件仓 `docs/dev/plugin-development.md` §5 文档已同工作项同步）：插件仓代码消费（skin/feedback/todo 用户列切 `YdRelatedEntity`、skin 注册自有实体类型演示跨插件调用）待契约发布验签后落插件仓并升 catalog。
 - `docs/dev/backend-architecture.md` §5.5 能力菜单过滤改为声明式（`@MenuNode(capability)` 优先 + 能力未启用不展示入口 + 前端 `meta.capability` 路由守卫）：插件菜单的能力归属不变，待同步插件仓后端规范节（插件仓当前有大量未提交 WIP，先保留不动）。
 
 - 权限动作词表新增 `purge`（危险组，永久删除不可恢复；`docs/dev/permission-codes.md` §2、`docs/system/permission-management.md` 动作分类、`permission-catalog.ts` 三处已同步）：插件仓 `docs/dev/conventions.md` 按引用跟随主仓词表，本仓暂无插件注册 `purge`，待插件仓 WIP 落定后随下一次规范同步一并核对。

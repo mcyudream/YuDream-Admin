@@ -35,7 +35,7 @@
 - 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设 UnoCSS，关 reset，只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；**禁止** `styles.css?inline` + `install()` 手写 `<style>` 注入。级联隔离：SDK ≥1.6.0 产物全部降入 `@layer yudream-plugin`，宿主层序固定 `yudream-base`（宿主 preflight）< `yudream-plugin` < 宿主未分层工具类——插件可覆写宿主 preflight 与原生元素样式，但永远不能覆盖宿主同名工具类/响应式变体；旧未分层产物仍会顶掉宿主工具类，**必须**随 SDK ≥1.6.0 重建。
 - 宿主不扫插件包的 UnoCSS：插件产物工具类必须在构建期自带，不依赖宿主运行时补齐。
 - 受保护的插件下载不能 `window.open` 裸 URL（Sa-Token 只读请求头），走宿主 SDK blob 请求并从 Content-Disposition 解析文件名。
-- 关联实体预览卡：SDK 1.15.0 起 `install(sdk)` 注入插件作用域 sdk 实例；插件经 `sdk.relatedEntity?.register(type, provider)` 注册自有实体类型（键 `${pluginCode}:${type}`，`dispose()` 对称注销，宿主卸载时按插件码兜底回收），宿主与其他插件页面用 `YdRelatedEntity entity-type="..."` 引用（components 1.11.0 起，未注册类型降级纯文本）。
+- 关联实体预览卡：SDK 1.15.1 起 `install(sdk)` 注入插件作用域 sdk 实例；插件经 `sdk.relatedEntity?.register(type, provider)` 注册自有实体类型（键 `${pluginCode}:${type}`，`dispose()` 对称注销，宿主卸载时按插件码兜底回收），宿主与其他插件页面用 `YdRelatedEntity entity-type="..."` 引用（components 1.11.1 起，未注册类型降级纯文本）。
 - 插件 `PluginDocumentStore` 页大小上限 200：全量扫描/跨插件聚合必须按 ≤200 分页循环；插件前端 bundle 改后**必须**重建（dist 被 gitignore 但打进 JAR）。
 - 人员/部门/服务器等选择器**禁止**让用户手输内部 ID：用后端 picker API 搜索解析，以姓名/用户名/邮箱/服务器名等业务标签展示；历史 ID 只允许作搜索兼容入口。
 

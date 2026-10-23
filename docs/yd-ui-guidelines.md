@@ -227,7 +227,7 @@ Harness、Skills、MCP、工作区、记忆、检查点与 diff 均是运行状�
 | 层级与专用选择 | `YdTree`、`YdTreeSelect`、`YdSortableTree`、`YdTablePicker`、`YdIconPicker` |
 | 日期与时间 | `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdDate`、`YdCalendarDate`、`YdCalendarDateRange`、`YdCalendarMonth`、`YdCalendarMonthRange`、`YdCalendarYear`、`YdCalendarYearRange`、`YdTimeAgo` |
 | 查询与分页 | `YdListToolbar`、`YdFilterSelect`、`YdSearchBar`、`YdDynamicSearchForm`、`YdPagination` |
-| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll`、`YdEntityPeek` |
+| 数据与关系展示 | `YdTable`、`YdResponsiveTable`、`YdEnhancedTable`、`YdResponsiveEnhancedTable`、`YdList`、`YdListRow`、`YdDescriptions`、`YdStats`、`YdStat`、`YdDigitalCard`、`YdTrend`、`YdSparkline`、`YdGraphCanvas`、`YdInfiniteScroll`、`YdEntityPeek`、`YdRelatedEntity` |
 | 技术工作流画布 | `YdWorkflowCanvas`、`YdWorkflowHandle` |
 | 信息与辅助标识 | `YdAvatar`、`YdBadge`、`YdTag`、`YdIcon`、`YdLabel`、`YdKbd`、`YdKbdGroup` |
 | 浮层、菜单与预览 | `YdModal`、`YdDrawer`、`YdPopover`、`YdTooltip`、`YdHoverCard`、`YdDropdown`、`YdContextMenu`、`YdLinkPreview`、`YdMockupBrowser`、`YdMockupWindow`、`YdTour`、`YdPopconfirm` |

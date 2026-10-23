@@ -408,7 +408,7 @@ const filters = ref({ keyword: '', status: 'enabled' })
 
 组件只负责卡片外观与「查看↔编辑」状态机：细节加载、权限判定、保存动作全部由使用方在 `#editor` 与 `actions` 里提供，因此同一外壳既能用于用户，也能用于部门、插件等实体。
 
-「实体类型 → 预览卡」注册表与调度入口都在共享包（components 1.11.0 起）：宿主内置 `user/dept/role` 在应用启动时经 `src/components/RelatedEntity/register.ts` 登记，页面用 `<YdRelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件经 `install(sdk)`（SDK 1.15.0 起注入 sdk 实例）调 `sdk.relatedEntity?.register(type, provider)` 注册自有实体类型，实际登记键为 `${pluginCode}:${type}`——只能在本插件命名空间下注册，不能遮蔽宿主内置类型；插件 `dispose()` 对称注销，宿主在模块卸载时按插件码兜底回收。注册表全平台共享同一实例，其他插件页面直接 `YdRelatedEntity` 引用该类型即可弹出对应卡片。
+「实体类型 → 预览卡」注册表与调度入口都在共享包（components 1.11.1 起）：宿主内置 `user/dept/role` 在应用启动时经 `src/components/RelatedEntity/register.ts` 登记，页面用 `<YdRelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件经 `install(sdk)`（SDK 1.15.1 起注入 sdk 实例）调 `sdk.relatedEntity?.register(type, provider)` 注册自有实体类型，实际登记键为 `${pluginCode}:${type}`——只能在本插件命名空间下注册，不能遮蔽宿主内置类型；插件 `dispose()` 对称注销，宿主在模块卸载时按插件码兜底回收。注册表全平台共享同一实例，其他插件页面直接 `YdRelatedEntity` 引用该类型即可弹出对应卡片。
 
 触发器的默认形态是「头像/图标 + 名称（+ 次行标识）」，悬停给底色；需要沿用本页色彩体系时（部门色标签、角色色标签等）把自定义元素写进 `YdEntityPeek` 的默认插槽（`YdRelatedEntity` 亦然），并给该元素加 `yd-entity-trigger` 类获得同样的指针与悬停语义。
 
