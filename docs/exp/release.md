@@ -55,3 +55,19 @@
 - **根因**：漏改 SPI 模块版本与主仓 `yudream.plugin.spi.version` 双点之一，或版本来自陈旧记忆。
 - **规避**：每次从真实源文件读取；SPI 两处同步；tag 规则与实际变更包匹配；等待 verify 通过后再同步插件仓。
 - **来源**：`docs/dev/contract-release.md`。
+
+## 3. 仓库历史与发版基线
+
+### 历史重写后发版窗口断裂与 tag 迁移
+
+- **现象**：filter-repo 清理历史后，已发布 tag 留在旧线，`check-changes` 的窗口 `v1.5.1..HEAD` 变成全部重写提交（上千笔“未覆盖”）；手改 `release/host-release.json` 的 baseline.commit 指到重写提交会触发 `E-BASELINE-INTEGRITY`（工具强制校验 baseline.commit 与 tag 实际指向一致）。
+- **根因**：发版工具的增量窗口锚定 tag 名解析提交；重写产生互不相交的 DAG，旧 tag 与新 master 无共同祖先。
+- **规避**：重写必须连 tag 一起迁移——用 `filter-repo/commit-map` 把每个 tag 重建到内容等价的新提交（annotated tag 保留原 message），强推后窗口自动恢复；重写前先 `git bundle create --all` 留审计备份，映射表与 bundle 成对保存。镜像仓（GitHub）被历史大文件（>100MB）拦截时，只有剔除该 blob 的重写历史能推上去。
+- **来源**：`history-purge-tag-migration-20261023`、`gh001-large-file-mirror-block`。
+
+### 历史垃圾与误提交凭据
+
+- **现象**：`tmp/`（含 257MB 运行时 jar、日志、浏览器 Profile）、`.pixso-replica/`、`.idea/ApifoxUploaderProjectSetting.xml`（真实 Apifox 令牌）、`.pixso-replica/husky-password-backup.txt`（明文口令）等曾被跟踪提交。
+- **根因**：忽略规则缺失（tmp/ 曾被跟踪导致整体无法简单忽略）+ 调试产物随手入库。
+- **规避**：filter-repo 以 `--invert-paths` 清除后，`.gitignore` 补 `tmp/`、`.pixso-replica/`、`.idea/`、`*.log`、`node_modules/` 等整段规则；被清除的令牌/口令视为已泄露必须轮换（历史对象仍存在于旧 bundle、旧服务端对象库与本地 reflog）。
+- **来源**：`history-purge-junk-paths-20261023`；AOCI 凭据产物备忘。

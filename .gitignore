@@ -82,3 +82,14 @@ yudream-frontend/config/
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml
 .codex/config.toml.backup.*
+
+# 历史清理（2026-10-23）后禁止复发的垃圾路径：临时调试产物、IDE 配置、日志、误提交文件
+tmp/
+.pixso-replica/
+.idea/
+*.log
+node_modules/
+install.cmd
+served-shop7.js
+AGENTS.md.backup.*
+
