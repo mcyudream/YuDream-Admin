@@ -3,8 +3,6 @@ package online.yudream.base.interfaces.system.excel.controller;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.service.AgentTraceAppService;
-import online.yudream.base.application.system.template.dto.SystemTemplateExportDTO;
-import online.yudream.base.application.system.template.dto.SystemTemplateImportResultDTO;
 import online.yudream.base.application.system.template.service.SystemTemplateAppService;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.application.system.menu.service.MenuAppService;
@@ -12,17 +10,12 @@ import online.yudream.base.application.system.monitor.service.SystemMonitorAppSe
 import online.yudream.base.application.system.user.query.DeptTreeQuery;
 import online.yudream.base.application.system.user.query.RolePageQuery;
 import online.yudream.base.application.system.user.query.UserPageQuery;
-import online.yudream.base.application.system.user.service.DeptManageAppService;
-import online.yudream.base.application.system.user.service.RoleManageAppService;
-import online.yudream.base.application.system.user.service.TemplateUserAppService;
-import online.yudream.base.application.system.user.service.UserManageAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.excel.assembler.SystemExcelAssembler;
-import online.yudream.base.interfaces.system.excel.assembler.SystemTemplateExcelAssembler;
 import online.yudream.base.interfaces.system.excel.res.ExcelImportResultRes;
 import online.yudream.base.interfaces.platform.agent.assembler.AgentWebAssembler;
 import online.yudream.base.interfaces.system.excel.row.AgentTraceExcelRow;
@@ -32,7 +25,6 @@ import online.yudream.base.interfaces.system.excel.row.LoginLogExcelRow;
 import online.yudream.base.interfaces.system.excel.row.MenuExcelRow;
 import online.yudream.base.interfaces.system.excel.row.OnlineUserExcelRow;
 import online.yudream.base.interfaces.system.excel.row.RoleExcelRow;
-import online.yudream.base.interfaces.system.excel.row.SystemTemplateMetaExcelRow;
 import online.yudream.base.interfaces.system.excel.row.UserExcelRow;
 import online.yudream.base.interfaces.system.excel.support.ExcelHttpSupport;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,53 +44,14 @@ public class SystemExcelController {
 
     private static final int EXPORT_LIMIT = 10_000;
 
-    private final UserManageAppService userManageAppService;
-    private final TemplateUserAppService templateUserAppService;
-    private final RoleManageAppService roleManageAppService;
-    private final DeptManageAppService deptManageAppService;
-    private final MenuAppService menuAppService;
+    private final SystemTemplateAppService systemTemplateAppService;
     private final SystemMonitorAppService systemMonitorAppService;
     private final AgentTraceAppService agentTraceAppService;
-    private final SystemTemplateAppService systemTemplateAppService;
-
-    @GetMapping("/template-package/blank")
-    @PermissionRegister(code = "system:template:export", name = "下载数据模板", module = "系统管理", desc = "下载系统数据模板包")
-    public void downloadTemplatePackage(HttpServletResponse response) throws IOException {
-        ExcelHttpSupport.writeWorkbook(response, "系统数据模板-空白", SystemTemplateExcelAssembler.blankWorkbook());
-    }
-
-    @GetMapping("/template-package/export")
-    @PermissionRegister(code = "system:template:export", name = "导出数据模板", module = "系统管理", desc = "导出系统数据模板包")
-    public void exportTemplatePackage(HttpServletResponse response) throws IOException {
-        SystemTemplateExportDTO export = systemTemplateAppService.exportCurrent();
-        ExcelHttpSupport.writeWorkbook(response, "系统数据模板-当前数据", SystemTemplateExcelAssembler.exportWorkbook(export));
-    }
-
-    @PostMapping("/template-package/import")
-    @PermissionRegister(code = "system:template:import", name = "导入数据模板", module = "系统管理", desc = "导入系统数据模板包")
-    public Result<ExcelImportResultRes> importTemplatePackage(@RequestParam("file") MultipartFile file) throws IOException {
-        java.util.Map<String, List<?>> workbook = ExcelHttpSupport.readWorkbook(file, SystemTemplateExcelAssembler.workbookDefinition());
-        @SuppressWarnings("unchecked")
-        List<SystemTemplateMetaExcelRow> meta = (List<SystemTemplateMetaExcelRow>) workbook.get(SystemTemplateExcelAssembler.META_SHEET);
-        @SuppressWarnings("unchecked")
-        List<DeptExcelRow> departments = (List<DeptExcelRow>) workbook.get(SystemTemplateExcelAssembler.DEPT_SHEET);
-        @SuppressWarnings("unchecked")
-        List<RoleExcelRow> roles = (List<RoleExcelRow>) workbook.get(SystemTemplateExcelAssembler.ROLE_SHEET);
-        @SuppressWarnings("unchecked")
-        List<UserExcelRow> users = (List<UserExcelRow>) workbook.get(SystemTemplateExcelAssembler.USER_SHEET);
-        @SuppressWarnings("unchecked")
-        List<MenuExcelRow> menus = (List<MenuExcelRow>) workbook.get(SystemTemplateExcelAssembler.MENU_SHEET);
-        SystemTemplateImportResultDTO result = systemTemplateAppService.importTemplate(
-                SystemTemplateExcelAssembler.toCommand(meta, departments, roles, users, menus));
-        return Result.ok(SystemTemplateExcelAssembler.toRes(result));
-    }
 
     @GetMapping("/users/export")
     @PermissionRegister(code = "system:user:export", name = "导出用户", module = "系统管理", desc = "导出用户 Excel")
     public void exportUsers(UserPageQuery query, HttpServletResponse response) throws IOException {
-        query.setPage(1);
-        query.setSize(EXPORT_LIMIT);
-        List<UserExcelRow> rows = userManageAppService.page(query).getRecords().stream()
+        List<UserExcelRow> rows = systemTemplateAppService.exportUsers().stream()
                 .map(SystemExcelAssembler::toUserRow)
                 .toList();
         ExcelHttpSupport.write(response, "用户管理", "用户", UserExcelRow.class, rows);
@@ -113,32 +66,15 @@ public class SystemExcelController {
     @PostMapping("/users/import")
     @PermissionRegister(code = "system:user:import", name = "导入用户", module = "系统管理", desc = "导入用户 Excel")
     public Result<ExcelImportResultRes> importUsers(@RequestParam("file") MultipartFile file) throws IOException {
-        return Result.ok(ExcelHttpSupport.importRows(file, UserExcelRow.class,
-                row -> {
-                    var result = templateUserAppService.upsert(SystemExcelAssembler.toUserImportCmd(row));
-                    if (result.isCreated() && result.isNeedsInitialPasswordEmail()) {
-                        try {
-                            templateUserAppService.sendInitialPasswordSetupEmail(result.getUserId());
-                            return online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created(
-                                    "新用户的密码初始化邮件已进入发送队列，不代表邮件已送达");
-                        }
-                        catch (RuntimeException ignored) {
-                            return online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created(
-                                    "新用户已创建，但密码初始化邮件未能提交，请管理员重发");
-                        }
-                    }
-                    return result.isCreated()
-                            ? online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created()
-                            : online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.updated();
-                }));
+        return Result.ok(ExcelHttpSupport.importBatch(file, UserExcelRow.class,
+                SystemExcelAssembler::toPortableUserImportCmd,
+                commands -> SystemExcelAssembler.toImportResult(systemTemplateAppService.importUsers(commands))));
     }
 
     @GetMapping("/roles/export")
     @PermissionRegister(code = "system:role:export", name = "导出角色", module = "系统管理", desc = "导出角色 Excel")
     public void exportRoles(RolePageQuery query, HttpServletResponse response) throws IOException {
-        query.setPage(1);
-        query.setSize(EXPORT_LIMIT);
-        List<RoleExcelRow> rows = roleManageAppService.page(query).getRecords().stream()
+        List<RoleExcelRow> rows = systemTemplateAppService.exportRoles().stream()
                 .map(SystemExcelAssembler::toRoleRow)
                 .toList();
         ExcelHttpSupport.write(response, "角色管理", "角色", RoleExcelRow.class, rows);
@@ -153,19 +89,15 @@ public class SystemExcelController {
     @PostMapping("/roles/import")
     @PermissionRegister(code = "system:role:import", name = "导入角色", module = "系统管理", desc = "导入角色 Excel")
     public Result<ExcelImportResultRes> importRoles(@RequestParam("file") MultipartFile file) throws IOException {
-        return Result.ok(ExcelHttpSupport.importRows(file, RoleExcelRow.class,
-                row -> {
-                    var result = roleManageAppService.importTemplateRow(SystemExcelAssembler.toRoleImportCmd(row));
-                    return result.isCreated()
-                            ? online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created()
-                            : online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.updated();
-                }));
+        return Result.ok(ExcelHttpSupport.importBatch(file, RoleExcelRow.class,
+                SystemExcelAssembler::toPortableRoleImportCmd,
+                commands -> SystemExcelAssembler.toImportResult(systemTemplateAppService.importRoles(commands))));
     }
 
     @GetMapping("/depts/export")
     @PermissionRegister(code = "system:dept:export", name = "导出部门", module = "系统管理", desc = "导出部门 Excel")
     public void exportDepts(DeptTreeQuery query, HttpServletResponse response) throws IOException {
-        List<DeptExcelRow> rows = SystemExcelAssembler.flattenDepts(deptManageAppService.tree(query)).stream()
+        List<DeptExcelRow> rows = systemTemplateAppService.exportDepartments().stream()
                 .map(SystemExcelAssembler::toDeptRow)
                 .toList();
         ExcelHttpSupport.write(response, "部门管理", "部门", DeptExcelRow.class, rows);
@@ -180,19 +112,15 @@ public class SystemExcelController {
     @PostMapping("/depts/import")
     @PermissionRegister(code = "system:dept:import", name = "导入部门", module = "系统管理", desc = "导入部门 Excel")
     public Result<ExcelImportResultRes> importDepts(@RequestParam("file") MultipartFile file) throws IOException {
-        return Result.ok(ExcelHttpSupport.importRows(file, DeptExcelRow.class,
-                row -> {
-                    var result = deptManageAppService.importTemplateRow(SystemExcelAssembler.toDeptImportCmd(row));
-                    return result.isCreated()
-                            ? online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created()
-                            : online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.updated();
-                }));
+        return Result.ok(ExcelHttpSupport.importBatch(file, DeptExcelRow.class,
+                SystemExcelAssembler::toPortableDeptImportCmd,
+                commands -> SystemExcelAssembler.toImportResult(systemTemplateAppService.importDepartments(commands))));
     }
 
     @GetMapping("/menus/export")
     @PermissionRegister(code = "system:menu:export", name = "导出菜单", module = "系统管理", desc = "导出菜单 Excel")
     public void exportMenus(MenuTreeQuery query, HttpServletResponse response) throws IOException {
-        List<MenuExcelRow> rows = SystemExcelAssembler.flattenMenus(menuAppService.tree(query)).stream()
+        List<MenuExcelRow> rows = systemTemplateAppService.exportMenus().stream()
                 .map(SystemExcelAssembler::toMenuRow)
                 .toList();
         ExcelHttpSupport.write(response, "菜单管理", "菜单", MenuExcelRow.class, rows);
@@ -207,13 +135,9 @@ public class SystemExcelController {
     @PostMapping("/menus/import")
     @PermissionRegister(code = "system:menu:import", name = "导入菜单", module = "系统管理", desc = "导入菜单 Excel")
     public Result<ExcelImportResultRes> importMenus(@RequestParam("file") MultipartFile file) throws IOException {
-        return Result.ok(ExcelHttpSupport.importRows(file, MenuExcelRow.class,
-                row -> {
-                    var result = menuAppService.importMenu(SystemExcelAssembler.toMenuImportCmd(row));
-                    return Boolean.TRUE.equals(result.getCreated())
-                            ? online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.created()
-                            : online.yudream.base.interfaces.system.excel.res.ExcelImportRowResult.updated();
-                }));
+        return Result.ok(ExcelHttpSupport.importBatch(file, MenuExcelRow.class,
+                SystemExcelAssembler::toPortableMenuImportCmd,
+                commands -> SystemExcelAssembler.toImportResult(systemTemplateAppService.importMenus(commands))));
     }
 
     @GetMapping("/api-logs/export")

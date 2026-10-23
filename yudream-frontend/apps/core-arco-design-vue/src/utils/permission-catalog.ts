@@ -31,7 +31,6 @@ const resourceLabels: Record<string, string> = {
   'system:runtime-log': '运行日志',
   'system:setting': '系统配置',
   'system:setting:theme': '后台主题配置',
-  'system:template': '数据模板',
   'system:security': '安全设置',
   'system:security:api-key': 'API Key',
   'system:security:external-login': '外部登录',

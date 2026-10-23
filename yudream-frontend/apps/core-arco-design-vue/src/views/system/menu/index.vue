@@ -557,6 +557,8 @@ function importMenus() {
     else {
       toast.success(importResultMessage(res.data))
     }
+    // 导入可能新增或调整菜单，动态路由需按最新菜单树重建
+    await refreshDynamicRoutes(router)
     await load()
   })
 }

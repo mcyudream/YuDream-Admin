@@ -124,16 +124,6 @@ public class DeptRepoImpl implements DeptRepo {
     }
 
     @Override
-    public Optional<Dept> findByNameAndParent(String name, Long parentId) {
-        if (!StringUtils.hasText(name)) {
-            return Optional.empty();
-        }
-        Query query = Query.query(Criteria.where("name").is(name));
-        query.addCriteria(parentId == null ? Criteria.where("parentId").is(null) : Criteria.where("parentId").is(parentId));
-        return Optional.ofNullable(DeptInfraMapper.toDomain(mongoTemplate.findOne(query, DeptDO.class)));
-    }
-
-    @Override
     public long countActiveChildren(Long parentId) {
         if (parentId == null) {
             return 0;

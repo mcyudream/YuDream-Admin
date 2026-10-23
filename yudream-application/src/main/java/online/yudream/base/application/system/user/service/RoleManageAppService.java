@@ -218,21 +218,6 @@ public class RoleManageAppService {
                 .build();
     }
 
-    /** 单资源 Excel 回导：来源 ID 优先，角色编码回退；新建记录仍由目标系统生成 ID。 */
-    @Transactional
-    public TemplateRoleUpsertResult importTemplateRow(TemplateRoleUpsertCmd cmd) {
-        if (cmd == null || !StringUtils.hasText(cmd.getCode())) {
-            throw new BizException("角色编码不能为空");
-        }
-        Role byId = cmd.getSourceId() == null ? null : roleRepo.findById(cmd.getSourceId()).orElse(null);
-        Role byCode = roleRepo.findByCode(cmd.getCode()).orElse(null);
-        Role target = byCode != null ? byCode : byId;
-        if (target != null && target.isSystemRole()) {
-            throw new BizException("系统角色不允许通过模板导入修改");
-        }
-        return target == null ? createFromTemplate(cmd) : applyTemplateUpdate(target.getId(), cmd);
-    }
-
     private Role getRole(Long id) {
         return roleRepo.findById(id).orElseThrow(() -> new BizException("角色不存在"));
     }

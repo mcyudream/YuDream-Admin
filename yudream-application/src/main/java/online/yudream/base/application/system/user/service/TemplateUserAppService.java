@@ -179,8 +179,14 @@ public class TemplateUserAppService {
 
     private TemplateUserUpsertResult updateUser(TemplateUserUpsertCmd cmd, User user) {
         ensureUpdateConflicts(cmd, user);
-        user.updateProfile(cmd.getNickname(), toEmail(cmd.getEmail()), toPhone(cmd.getPhone()),
-                toQQ(cmd.getQq()), cmd.getEmailVerified());
+        String nickname = cmd.isTemplateSnapshot() || cmd.getNickname() != null ? cmd.getNickname() : user.getNickname();
+        Email email = cmd.isTemplateSnapshot() || StringUtils.hasText(cmd.getEmail())
+                ? toEmail(cmd.getEmail()) : user.getEmail();
+        Phone phone = cmd.isTemplateSnapshot() || StringUtils.hasText(cmd.getPhone())
+                ? toPhone(cmd.getPhone()) : user.getPhone();
+        QQ qq = cmd.isTemplateSnapshot() || StringUtils.hasText(cmd.getQq())
+                ? toQQ(cmd.getQq()) : user.getQq();
+        user.updateProfile(nickname, email, phone, qq, cmd.getEmailVerified());
         applyStatus(cmd, user);
         boolean deptsProvided = cmd.isTemplateSnapshot() || (cmd.getDeptIds() != null && !cmd.getDeptIds().isEmpty());
         boolean rolesProvided = cmd.isTemplateSnapshot() || (cmd.getRoleIds() != null && !cmd.getRoleIds().isEmpty());
@@ -196,7 +202,7 @@ public class TemplateUserAppService {
         }
         ensureRolesBelongToUserDepts(user);
         User saved = userRepo.save(user);
-        messagingIdentityAppService.syncMilkyQq(user.getId(), cmd.getQq());
+        messagingIdentityAppService.syncMilkyQq(user.getId(), qq == null ? null : qq.getValue());
         deleteSameEmailUnverifiedUsers(saved);
         log.info("模板导入更新用户: sourceId={}, id={}, username={}", cmd.getSourceId(), user.getId(), user.getUsername());
         return TemplateUserUpsertResult.builder()

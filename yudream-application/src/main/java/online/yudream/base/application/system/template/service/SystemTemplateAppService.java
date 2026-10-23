@@ -4,12 +4,10 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.menu.cmd.MenuImportCmd;
 import online.yudream.base.application.system.menu.dto.MenuImportDTO;
 import online.yudream.base.application.system.menu.service.MenuAppService;
-import online.yudream.base.application.system.template.cmd.SystemTemplateImportCmd;
 import online.yudream.base.application.system.template.cmd.TemplateDeptImportCmd;
 import online.yudream.base.application.system.template.cmd.TemplateMenuImportCmd;
 import online.yudream.base.application.system.template.cmd.TemplateRoleImportCmd;
 import online.yudream.base.application.system.template.cmd.TemplateUserImportCmd;
-import online.yudream.base.application.system.template.dto.SystemTemplateExportDTO;
 import online.yudream.base.application.system.template.dto.SystemTemplateImportResultDTO;
 import online.yudream.base.application.system.template.dto.SystemTemplateIssueDTO;
 import online.yudream.base.application.system.template.dto.TemplateDeptDTO;
@@ -34,7 +32,6 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.DeptStatus;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
-import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
@@ -60,17 +57,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 系统数据模板包的跨资源导入用例。
+ * 系统资源 Excel 导入导出应用服务。
  * <p>
- * 这是可移植的“配置模板”通道，而不是全库备份恢复：只创建或覆盖四类资源的白名单字段，
+ * 这是资源页所属的可移植配置导入通道，而不是全库备份恢复：只创建或覆盖四类资源的白名单字段，
  * 不删除目标端独有记录，也不导入密码、令牌、文件、头像、身份凭据或审计数据。
  * 需要全实例无损恢复时使用 YDBA 备份中心。
  */
 @Service
 @RequiredArgsConstructor
 public class SystemTemplateAppService {
-    public static final String FORMAT = "yudream-system-template";
-    public static final int SCHEMA_VERSION = 1;
 
     private final DeptRepo deptRepo;
     private final RoleRepo roleRepo;
@@ -82,7 +77,7 @@ public class SystemTemplateAppService {
     private final MenuAppService menuAppService;
 
     @Transactional(readOnly = true)
-    public SystemTemplateExportDTO exportCurrent() {
+    public List<TemplateDeptDTO> exportDepartments() {
         List<Dept> departments = deptRepo.findAll();
         Map<Long, Dept> departmentMap = departments.stream()
                 .filter(item -> item.getId() != null)
@@ -110,10 +105,17 @@ public class SystemTemplateAppService {
                         dept.isSystem() || dept.isRoot(), dept.getStatus()))
                 .toList();
 
+        return deptRows;
+    }
+
+    /** 供角色管理页导出可回导的角色模板。 */
+    @Transactional(readOnly = true)
+    public List<TemplateRoleDTO> exportRoles() {
+        Map<Long, String> deptPaths = departmentPaths(deptRepo.findAll().stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(Dept::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new)));
         List<Role> roles = roleRepo.findAll();
-        Map<Long, Role> roleMap = roles.stream().filter(item -> item.getId() != null)
-                .collect(Collectors.toMap(Role::getId, Function.identity(), (left, right) -> left));
-        List<TemplateRoleDTO> roleRows = roles.stream()
+        return roles.stream()
                 .sorted(Comparator.comparing(Role::getCode, Comparator.nullsLast(String::compareTo)))
                 .map(role -> new TemplateRoleDTO(
                         id(role.getId()), role.getCode(), role.getName(),
@@ -122,9 +124,17 @@ public class SystemTemplateAppService {
                                 : role.getPermissions().stream().map(permission -> permission.getCode()).toList(),
                         role.getIcon(), role.getColor(), role.isSystemRole(), role.getStatus()))
                 .toList();
+    }
 
-        List<User> usersForTemplate = usersForTemplate();
-        List<TemplateUserDTO> userRows = usersForTemplate.stream()
+    /** 供用户管理页导出可回导的用户模板，永不包含密码或其他凭据。 */
+    @Transactional(readOnly = true)
+    public List<TemplateUserDTO> exportUsers() {
+        Map<Long, String> deptPaths = departmentPaths(deptRepo.findAll().stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(Dept::getId, Function.identity(), (left, right) -> left, LinkedHashMap::new)));
+        Map<Long, Role> roleMap = roleRepo.findAll().stream().filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(Role::getId, Function.identity(), (left, right) -> left));
+        return usersForTemplate().stream()
                 .sorted(Comparator.comparing(User::getUsername, Comparator.nullsLast(String::compareTo)))
                 .map(user -> new TemplateUserDTO(
                         id(user.getId()), user.getUsername(), user.getNickname(),
@@ -138,29 +148,59 @@ public class SystemTemplateAppService {
                         user.getRoles() == null ? List.of() : user.getRoles().stream()
                                 .map(RoleID::getValue).map(roleMap::get).filter(Objects::nonNull).map(Role::getCode).toList()))
                 .toList();
+    }
 
-        List<TemplateMenuDTO> menuRows = menuRepo.findAll().stream()
+    /** 供菜单管理页导出可回导的 SYSTEM 菜单模板，不包含插件菜单。 */
+    @Transactional(readOnly = true)
+    public List<TemplateMenuDTO> exportMenus() {
+        return menuRepo.findAll().stream()
                 .filter(menu -> menu.getSource() != MenuSource.PLUGIN)
                 .sorted(Comparator.comparing(Menu::getCode, Comparator.nullsLast(String::compareTo)))
                 .map(menu -> new TemplateMenuDTO(id(menu.getId()), menu.getCode(), menu.getName(), menu.getType(),
                         menu.getParentCode(), menu.getModule(), menu.getIcon(), menu.getPath(), menu.getComponent(),
                         menu.getLink(), menu.getSort(), menu.getVisible(), menu.getPermission(), menu.getStatus()))
                 .toList();
-        return new SystemTemplateExportDTO(deptRows, roleRows, userRows, menuRows);
+    }
+
+    /** 资源级部门导入：允许父子乱序，按路径解析跨系统关联。 */
+    public SystemTemplateImportResultDTO importDepartments(List<TemplateDeptImportCmd> departments) {
+        return importResources(departments, List.of(), List.of(), List.of());
+    }
+
+    /** 资源级角色导入：按角色编码覆盖，并按部门路径解析归属。 */
+    public SystemTemplateImportResultDTO importRoles(List<TemplateRoleImportCmd> roles) {
+        return importResources(List.of(), roles, List.of(), List.of());
+    }
+
+    /** 资源级用户导入：按用户名覆盖，并按部门路径、角色编码解析关联。 */
+    public SystemTemplateImportResultDTO importUsers(List<TemplateUserImportCmd> users) {
+        return importResources(List.of(), List.of(), users, List.of());
+    }
+
+    /** 资源级菜单导入：允许父子乱序，最后再同步菜单权限目录。 */
+    public SystemTemplateImportResultDTO importMenus(List<TemplateMenuImportCmd> menus) {
+        return importResources(List.of(), List.of(), List.of(), menus);
     }
 
     /**
-     * 多阶段导入：先完整预检，再按部门 → 角色 → 用户 → 负责人 → 菜单顺序写入。
+     * 资源级批量导入：先完整预检，再依赖顺序写入。
      * Mongo 单机部署当前不提供多集合事务，故结果明确按行报告并可安全重试，绝不假称全量原子恢复。
      */
-    public SystemTemplateImportResultDTO importTemplate(SystemTemplateImportCmd cmd) {
-        ImportState state = new ImportState(totalRows(cmd));
-        validateEnvelope(cmd, state);
+    public SystemTemplateImportResultDTO importResources(List<TemplateDeptImportCmd> departments,
+                                                  List<TemplateRoleImportCmd> roles,
+                                                  List<TemplateUserImportCmd> users,
+                                                  List<TemplateMenuImportCmd> menus) {
+        List<TemplateDeptImportCmd> deptRows = list(departments);
+        List<TemplateRoleImportCmd> roleRows = list(roles);
+        List<TemplateUserImportCmd> userRows = list(users);
+        List<TemplateMenuImportCmd> menuRows = list(menus);
+        ImportState state = new ImportState(deptRows.size() + roleRows.size() + userRows.size() + menuRows.size());
+        validateDuplicates(deptRows, roleRows, userRows, menuRows, state);
         if (!state.errors.isEmpty()) {
             state.skipUnprocessed();
             return state.result();
         }
-        Preflight preflight = preflight(cmd, state);
+        Preflight preflight = preflight(deptRows, roleRows, userRows, menuRows, state);
         if (!state.errors.isEmpty()) {
             state.skipUnprocessed();
             return state.result();
@@ -180,31 +220,22 @@ public class SystemTemplateAppService {
         return state.result();
     }
 
-    private void validateEnvelope(SystemTemplateImportCmd cmd, ImportState state) {
-        if (cmd == null) {
-            state.error("说明", 2, "模板内容不能为空");
-            return;
-        }
-        if (!FORMAT.equals(cmd.format())) {
-            state.error("说明", 2, "模板格式不受支持");
-        }
-        if (cmd.schemaVersion() > SCHEMA_VERSION) {
-            state.error("说明", 2, "模板协议版本过新，请先升级系统");
-        }
-        if (cmd.schemaVersion() < 1) {
-            state.error("说明", 2, "模板协议版本无效");
-        }
-        checkDuplicates(cmd.departments(), TemplateDeptImportCmd::path, "部门", state, "部门路径");
-        checkDuplicates(cmd.roles(), TemplateRoleImportCmd::code, "角色", state, "角色编码");
-        checkDuplicates(cmd.users(), TemplateUserImportCmd::username, "用户", state, "用户名");
-        checkDuplicates(cmd.menus(), TemplateMenuImportCmd::code, "菜单", state, "菜单编码");
+    private void validateDuplicates(List<TemplateDeptImportCmd> departments,
+                                    List<TemplateRoleImportCmd> roles,
+                                    List<TemplateUserImportCmd> users,
+                                    List<TemplateMenuImportCmd> menus,
+                                    ImportState state) {
+        checkDuplicates(departments, TemplateDeptImportCmd::path, "部门", state, "部门路径");
+        checkDuplicates(roles, TemplateRoleImportCmd::code, "角色", state, "角色编码");
+        checkDuplicates(users, TemplateUserImportCmd::username, "用户", state, "用户名");
+        checkDuplicates(menus, TemplateMenuImportCmd::code, "菜单", state, "菜单编码");
     }
 
-    private Preflight preflight(SystemTemplateImportCmd cmd, ImportState state) {
-        List<TemplateDeptImportCmd> deptRows = list(cmd.departments());
-        List<TemplateRoleImportCmd> roleRows = list(cmd.roles());
-        List<TemplateUserImportCmd> userRows = list(cmd.users());
-        List<TemplateMenuImportCmd> menuRows = list(cmd.menus());
+    private Preflight preflight(List<TemplateDeptImportCmd> deptRows,
+                                List<TemplateRoleImportCmd> roleRows,
+                                List<TemplateUserImportCmd> userRows,
+                                List<TemplateMenuImportCmd> menuRows,
+                                ImportState state) {
 
         Map<Long, Dept> existingDeptsById = deptRepo.findAll().stream().filter(item -> item.getId() != null)
                 .collect(Collectors.toMap(Dept::getId, Function.identity(), (left, right) -> left));
@@ -413,8 +444,12 @@ public class SystemTemplateAppService {
                 DeptStatus writeStatus = target == null && row.status() == DeptStatus.DEPRECATED
                         ? DeptStatus.ACTIVE
                         : target != null && row.status() == DeptStatus.DEPRECATED ? null : row.status();
-                TemplateDeptUpsertCmd upsert = deptUpsert(row, parentId, null, writeStatus);
-                upsert.setLeaderSpecified(!hasText(row.leaderUsername()));
+                TemplateDeptUpsertCmd upsert = deptUpsert(row, parentId, null, writeStatus, false);
+                if (target != null && !hasText(row.parentPath())) {
+                    upsert.setParentSpecified(false);
+                }
+                // 用户页未随本批导入时由第二阶段按目标端既有用户名解析；首阶段绝不清空负责人。
+                upsert.setLeaderSpecified(false);
                 TemplateDeptUpsertResult result = target == null
                         ? deptManageAppService.createFromTemplate(upsert)
                         : deptManageAppService.applyTemplateUpdate(target.getId(), upsert);
@@ -447,7 +482,7 @@ public class SystemTemplateAppService {
                 RoleStatus writeStatus = target == null && row.status() == RoleStatus.DEPRECATED
                         ? RoleStatus.ACTIVE
                         : target != null && row.status() == RoleStatus.DEPRECATED ? null : row.status();
-                TemplateRoleUpsertCmd upsert = roleUpsert(row, deptId, writeStatus);
+                TemplateRoleUpsertCmd upsert = roleUpsert(row, deptId, writeStatus, false);
                 TemplateRoleUpsertResult result = target == null
                         ? roleManageAppService.createFromTemplate(upsert)
                         : roleManageAppService.applyTemplateUpdate(target.getId(), upsert);
@@ -462,7 +497,9 @@ public class SystemTemplateAppService {
     }
 
     private void applyUsers(Preflight preflight, ImportState state) {
-        Map<String, Long> localUserIds = new LinkedHashMap<>();
+        Map<String, Long> localUserIds = usersForTemplate().stream()
+                .filter(user -> hasText(user.getUsername()) && user.getId() != null)
+                .collect(Collectors.toMap(User::getUsername, User::getId, (left, right) -> left, LinkedHashMap::new));
         for (TemplateUserImportCmd row : preflight.users) {
             try {
                 TemplateUserUpsertCmd upsert = userUpsert(row, preflight.localDeptIdsByPath, preflight.localRoleIdsByCode);
@@ -484,6 +521,10 @@ public class SystemTemplateAppService {
             if (!hasText(row.leaderUsername())) continue;
             Long deptId = preflight.localDeptIdsByPath.get(normalizePath(row.path()));
             Long leaderId = users.get(row.leaderUsername().trim());
+            if (leaderId == null) {
+                leaderId = userRepo.findByUsernameAll(row.leaderUsername().trim()).stream()
+                        .map(User::getId).filter(Objects::nonNull).findFirst().orElse(null);
+            }
             if (deptId == null || leaderId == null) {
                 state.warning("部门", rowNumber(preflight.departments, row), "负责人未能解析，保留原负责人");
                 continue;
@@ -492,7 +533,7 @@ public class SystemTemplateAppService {
             if (target == null || target.isSystem() || target.isRoot()) continue;
             try {
                 TemplateDeptUpsertCmd update = deptUpsert(row,
-                        target.getParentId() == null ? null : target.getParentId().getValue(), leaderId, null);
+                        target.getParentId() == null ? null : target.getParentId().getValue(), leaderId, null, false);
                 update.setLeaderSpecified(true);
                 deptManageAppService.applyTemplateUpdate(deptId, update);
             }
@@ -510,7 +551,7 @@ public class SystemTemplateAppService {
             if (target == null || target.isSystemRole() || target.getStatus() == RoleStatus.DEPRECATED) continue;
             try {
                 roleManageAppService.applyTemplateUpdate(roleId,
-                        roleUpsert(row, target.getDeptId() == null ? null : target.getDeptId().getValue(), RoleStatus.DEPRECATED));
+                        roleUpsert(row, target.getDeptId() == null ? null : target.getDeptId().getValue(), RoleStatus.DEPRECATED, false));
             }
             catch (RuntimeException e) {
                 state.warning("角色", rowNumber(preflight.roles, row), "状态未同步：" + message(e));
@@ -529,7 +570,7 @@ public class SystemTemplateAppService {
             try {
                 TemplateDeptUpsertCmd update = deptUpsert(row,
                         target.getParentId() == null ? null : target.getParentId().getValue(),
-                        target.getLeader() == null ? null : target.getLeader().getValue(), DeptStatus.DEPRECATED);
+                        target.getLeader() == null ? null : target.getLeader().getValue(), DeptStatus.DEPRECATED, false);
                 update.setLeaderSpecified(target.getLeader() != null);
                 deptManageAppService.applyTemplateUpdate(deptId, update);
             }
@@ -634,10 +675,11 @@ public class SystemTemplateAppService {
         return null;
     }
 
-    private TemplateDeptUpsertCmd deptUpsert(TemplateDeptImportCmd row, Long parentId, Long leaderId, DeptStatus status) {
+    private TemplateDeptUpsertCmd deptUpsert(TemplateDeptImportCmd row, Long parentId, Long leaderId,
+                                             DeptStatus status, boolean templateSnapshot) {
         TemplateDeptUpsertCmd cmd = new TemplateDeptUpsertCmd();
         cmd.setSourceId(row.sourceId());
-        cmd.setTemplateSnapshot(true);
+        cmd.setTemplateSnapshot(templateSnapshot);
         cmd.setName(row.name());
         cmd.setDescription(row.description());
         cmd.setParentSpecified(true);
@@ -651,10 +693,11 @@ public class SystemTemplateAppService {
         return cmd;
     }
 
-    private TemplateRoleUpsertCmd roleUpsert(TemplateRoleImportCmd row, Long deptId, RoleStatus status) {
+    private TemplateRoleUpsertCmd roleUpsert(TemplateRoleImportCmd row, Long deptId,
+                                             RoleStatus status, boolean templateSnapshot) {
         TemplateRoleUpsertCmd cmd = new TemplateRoleUpsertCmd();
         cmd.setSourceId(row.sourceId());
-        cmd.setTemplateSnapshot(true);
+        cmd.setTemplateSnapshot(templateSnapshot);
         cmd.setCode(row.code());
         cmd.setName(row.name());
         cmd.setDeptId(deptId);
@@ -680,7 +723,7 @@ public class SystemTemplateAppService {
             throw new BizException("用户默认部门未能导入");
         }
         TemplateUserUpsertCmd cmd = new TemplateUserUpsertCmd();
-        cmd.setTemplateSnapshot(true);
+        cmd.setTemplateSnapshot(false);
         cmd.setSourceId(row.sourceId() == null ? null : String.valueOf(row.sourceId()));
         cmd.setUsername(row.username());
         cmd.setNickname(row.nickname());
@@ -821,14 +864,6 @@ public class SystemTemplateAppService {
             if (batch.getRecords().size() < 200 || users.size() >= batch.getTotal()) break;
         }
         return users;
-    }
-
-    private int totalRows(SystemTemplateImportCmd cmd) {
-        if (cmd == null) {
-            return 0;
-        }
-        return list(cmd.departments()).size() + list(cmd.roles()).size()
-                + list(cmd.users()).size() + list(cmd.menus()).size();
     }
 
     private <T> void checkDuplicates(List<T> rows, Function<T, String> identity, String sheet, ImportState state, String label) {

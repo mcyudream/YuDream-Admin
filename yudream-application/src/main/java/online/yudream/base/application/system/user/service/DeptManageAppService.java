@@ -241,22 +241,6 @@ public class DeptManageAppService {
                 .build();
     }
 
-    /** 单资源 Excel 回导：来源 ID 优先；同父同名作为本地业务键兜底。 */
-    @Transactional
-    public TemplateDeptUpsertResult importTemplateRow(TemplateDeptUpsertCmd cmd) {
-        if (cmd == null || !StringUtils.hasText(cmd.getName())) {
-            throw new BizException("部门名称不能为空");
-        }
-        Dept byId = cmd.getSourceId() == null ? null : deptRepo.findById(cmd.getSourceId()).orElse(null);
-        Long parentId = cmd.isParentSpecified() ? cmd.getParentId() : null;
-        Dept byBusinessKey = deptRepo.findByNameAndParent(cmd.getName(), parentId).orElse(null);
-        Dept target = byBusinessKey != null ? byBusinessKey : byId;
-        if (target != null && (target.isSystem() || target.isRoot())) {
-            throw new BizException("系统部门或根部门不允许通过模板导入修改");
-        }
-        return target == null ? createFromTemplate(cmd) : applyTemplateUpdate(target.getId(), cmd);
-    }
-
     private Dept getDept(Long id) {
         return deptRepo.findById(id).orElseThrow(() -> new BizException("部门不存在"));
     }

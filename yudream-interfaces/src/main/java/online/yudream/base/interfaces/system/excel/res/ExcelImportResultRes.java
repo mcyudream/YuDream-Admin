@@ -26,22 +26,4 @@ public class ExcelImportResultRes {
     private List<String> errors = new ArrayList<>();
     @Builder.Default
     private List<String> warnings = new ArrayList<>();
-
-    public void record(ExcelImportRowResult rowResult) {
-        ExcelImportRowResult result = rowResult == null ? ExcelImportRowResult.updated() : rowResult;
-        switch (result.getAction()) {
-            case CREATED -> {
-                created++;
-                success++;
-            }
-            case UPDATED -> {
-                updated++;
-                success++;
-            }
-            case SKIPPED -> skipped++;
-        }
-        if (result.getWarnings() != null) {
-            warnings.addAll(result.getWarnings());
-        }
-    }
 }
