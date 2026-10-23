@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { SearchOptionsSource, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { ApiLog } from '@/api/modules/system-monitor'
-import { useTablePage } from '@yudream/components'
+import { useTablePage, YdRelatedEntity } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { saveExcelResponse } from '@/utils/excel'
 
 const { auth } = useAppAuth()
@@ -199,7 +198,7 @@ async function clearApiLogs() {
             </template>
             <!-- 操作用户：头像 + 就地预览/编辑，未登录调用没有 loginId 时退化为纯文本 -->
             <template #cell-user="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 v-if="row.original.loginId"
                 entity-type="user"
                 :entity-id="row.original.loginId"

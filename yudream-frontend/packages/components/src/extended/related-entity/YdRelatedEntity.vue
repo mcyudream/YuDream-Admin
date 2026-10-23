@@ -5,7 +5,7 @@ import { resolveRelatedEntity } from './registry'
 
 /**
  * 关联实体入口：按 entityType 解析已注册的预览卡提供者。
- * 未注册的类型（插件尚未提供实现）降级为纯文本，不阻断列表渲染。
+ * 未注册的类型（宿主未内置或提供者插件未装载）降级为纯文本，不阻断列表渲染。
  */
 const props = defineProps<RelatedEntityRef>()
 

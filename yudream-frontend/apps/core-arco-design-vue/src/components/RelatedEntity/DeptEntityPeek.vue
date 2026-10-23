@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { EntityPeekAction, EntityPeekChip, EntityPeekFact } from '@yudream/components'
-import type { RelatedEntityRef } from './registry'
+import type { EntityPeekAction, EntityPeekChip, EntityPeekFact, RelatedEntityRef } from '@yudream/components'
 import type { DeptManageItem, DeptPayload } from '@/api/modules/system-dept'
 import { YdEntityPeek } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'

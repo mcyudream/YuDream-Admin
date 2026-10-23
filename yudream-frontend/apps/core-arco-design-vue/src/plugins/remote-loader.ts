@@ -1,5 +1,6 @@
 import type { PluginFrontendAssetLease } from './frontend-assets'
 import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
+import { unregisterRelatedEntitiesByOwner } from '@yudream/components'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { disposePluginAiActions } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -69,6 +70,8 @@ export async function acquirePluginRemoteModule(manifest: RemoteManifest, option
           record!.assets?.release()
           if (![...remoteRegistry.keys()].some(item => item.startsWith(`${pluginCode}\u0000`))) {
             disposePluginAiActions(pluginCode)
+            // 插件 dispose 漏注销实体卡时的兜底回收（与 AI 页面操作同一回收点）
+            unregisterRelatedEntitiesByOwner(pluginCode)
           }
         }
       },
@@ -109,13 +112,14 @@ export function resolvePluginRemoteEntry(pluginCode: string, entry?: string, ass
 }
 
 function createRemoteRecord(manifest: RemoteManifest, entryUrl: string): RemoteRecord {
+  const pluginCode = normalizePluginCode(manifest.pluginCode)
   const record = {} as RemoteRecord
   record.promise = (async () => {
     const assets = await acquirePluginFrontendAssets(manifest)
     record.assets = assets
     try {
       const module = await import(/* @vite-ignore */ entryUrl) as RemoteModule
-      await installPluginModule(module)
+      await installPluginModule(module, pluginCode)
       record.module = module
       return module
     }
@@ -127,13 +131,15 @@ function createRemoteRecord(manifest: RemoteManifest, entryUrl: string): RemoteR
   return record
 }
 
-async function installPluginModule(module: RemoteModule) {
+async function installPluginModule(module: RemoteModule, pluginCode: string) {
   const installable = resolveInstallableModule(module)
   if (!installable || installedModules.has(installable)) {
     return
   }
   if (typeof installable.install === 'function') {
-    await installable.install()
+    // 懒加载 sdk 注入 install 上下文：sdk 模块带 router/store 重依赖，不能随 remote-loader 在启动期求值
+    const { createPluginSdk } = await import('./sdk')
+    await installable.install(createPluginSdk(pluginCode))
   }
   installedModules.add(installable)
 }

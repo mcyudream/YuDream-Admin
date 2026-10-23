@@ -126,6 +126,7 @@ const YD_COMPONENT_NAMES = [
   'YdPopover',
   'YdProgress',
   'YdRadioGroup',
+  'YdRelatedEntity',
   'YdResponsiveTable',
   'YdScrollArea',
   'YdSearchBar',

@@ -4,13 +4,12 @@ import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { PermissionOverview, PermissionOverviewQuery, PermissionRoleChange } from '@/api/modules/system-permission'
 import type { PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
 import type { UserManageItem } from '@/api/modules/system-user'
-import { useTablePage, useYdModal, useYdToast } from '@yudream/components'
+import { useTablePage, useYdModal, useYdToast, YdRelatedEntity } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiPermission from '@/api/modules/system-permission'
 import apiRole, { ROLE_COLOR_PRESETS } from '@/api/modules/system-role'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
@@ -547,7 +546,7 @@ function importRoles() {
                 <span v-else class="text-muted-foreground/40">-</span>
               </template>
               <template #cell-name="{ row }">
-                <RelatedEntity
+                <YdRelatedEntity
                   entity-type="role"
                   :entity-id="row.original.id"
                   :label="row.original.name"
@@ -556,7 +555,7 @@ function importRoles() {
                 />
               </template>
               <template #cell-deptName="{ row }">
-                <RelatedEntity
+                <YdRelatedEntity
                   v-if="row.original.deptId"
                   entity-type="dept"
                   :entity-id="row.original.deptId"

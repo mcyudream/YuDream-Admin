@@ -2,12 +2,11 @@
 import type { ActionMenuItem, SearchOptionsSource, StatusColumn, TableColumn, YdTablePageAction, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { DeptManageItem, DeptPayload, DeptStatus } from '@/api/modules/system-dept'
 import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
-import { useTablePage } from '@yudream/components'
+import { useTablePage, YdRelatedEntity } from '@yudream/components'
 import apiDept, { DEPT_COLOR_PRESETS } from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
 import { entityTintStyle, normalizeEntityColor } from '@/utils/entity-visual'
@@ -382,7 +381,7 @@ function importDepts() {
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-name="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 entity-type="dept"
                 :entity-id="row.original.id"
                 :label="row.original.name"
@@ -402,10 +401,10 @@ function importDepts() {
                   </span>
                   <span class="font-medium truncate">{{ row.original.name }}</span>
                 </div>
-              </RelatedEntity>
+              </YdRelatedEntity>
             </template>
             <template #cell-leaderName="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 v-if="row.original.leaderId"
                 entity-type="user"
                 :entity-id="row.original.leaderId"

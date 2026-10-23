@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { SearchConfig, SearchOptionsSource, TableColumn, YdTablePageAction } from '@yudream/components'
-import { useYdToast, YdEntityPeek, YdInput, YdResponsiveEnhancedTable, YdTablePageLayout } from '@yudream/components'
+import { registerRelatedEntity, useYdToast, YdEntityPeek, YdInput, YdRelatedEntity, YdResponsiveEnhancedTable, YdTablePageLayout } from '@yudream/components'
 import { computed, ref } from 'vue'
 import DemoCard from '@/components/DemoCard.vue'
+import DemoUserPeekCard from '@/components/DemoUserPeekCard.vue'
+
+// 注册演示实体类型：同 owner 重复注册按热重载覆盖；真实页面在应用启动时登记内置类型
+registerRelatedEntity('showcase-user', DemoUserPeekCard, 'showcase')
 
 const toast = useYdToast()
 
@@ -243,6 +247,13 @@ const entityPeekCode = `<YdEntityPeek
     <!-- 业务自己的编辑表单：字段、校验、保存动作都由使用方决定 -->
   </template>
 </YdEntityPeek>`
+
+const relatedEntityCode = `// 注册本域实体类型的预览卡提供者（宿主内置 user/dept/role，插件经 sdk.relatedEntity.register 注册）
+registerRelatedEntity('showcase-user', DemoUserPeekCard, 'showcase')
+
+<YdRelatedEntity entity-type="showcase-user" entity-id="1" label="演示用户" />
+<!-- 未注册类型自动降级为纯文本 -->
+<YdRelatedEntity entity-type="nobody" entity-id="42" label="未注册类型" />`
 </script>
 
 <template>
@@ -429,9 +440,25 @@ const entityPeekCode = `<YdEntityPeek
     <ul class="text-xs text-muted-foreground mt-3 space-y-1">
       <li>外壳只管卡片外观与「查看 ↔ 编辑」状态机；细节加载、权限、保存动作由使用方通过 <code>facts</code> / <code>actions</code> / <code>#editor</code> 提供。</li>
       <li><code>actions[].danger</code> 自动渲染为红色，排在低位；<code>detailLabel</code> 给「完整管理」这类逃生入口。</li>
-      <li>宿主用 <code>&lt;RelatedEntity entity-type="user" /&gt;</code> 按实体类型解析预览卡，未注册类型降级为纯文本，插件可注册自己的实体类型。</li>
+      <li>宿主用 <code>&lt;YdRelatedEntity entity-type="user" /&gt;</code> 按实体类型解析预览卡，未注册类型降级为纯文本；插件经 <code>sdk.relatedEntity.register</code> 注册自己的实体类型。</li>
       <li>沿用本页色彩体系时把自定义标签写进默认插槽并加 <code>yd-entity-trigger</code>（部门/角色色标签即此用法）。</li>
       <li>跨页定位：跳转前 <code>requestEntityFocus</code> 移交意图，目标页 <code>useLinkedFocus</code> 写入检索词并给命中行打 <code>data-yd-highlight</code>（约 5 秒呼吸提亮后自动移除）。</li>
+    </ul>
+  </DemoCard>
+
+  <DemoCard
+    title="YdRelatedEntity 关联实体调度入口"
+    description="按实体类型解析已注册的预览卡提供者：宿主内置 user/dept/role，插件经 SDK 注册自有类型；未注册类型降级为纯文本"
+    :code="relatedEntityCode"
+  >
+    <div class="flex flex-wrap gap-6 items-center">
+      <YdRelatedEntity entity-type="showcase-user" entity-id="1" label="演示用户" secondary="demo@yudream.online" />
+      <YdRelatedEntity entity-type="nobody" entity-id="42" label="未注册类型" />
+      <span class="text-xs text-muted-foreground">左边点击弹出已注册提供者的卡片；右边类型未注册，降级为纯文本</span>
+    </div>
+    <ul class="text-xs text-muted-foreground mt-3 space-y-1">
+      <li>提供者组件接收 <code>RelatedEntityRef</code>（entityType/entityId/label/secondary/avatar/avatarOnly），自取细节、改动后 emit <code>changed</code>。</li>
+      <li>同 owner 重复注册按热重载覆盖；跨 owner 冲突拒绝并告警；插件卸载时宿主按插件码兜底注销。</li>
     </ul>
   </DemoCard>
 </template>

@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { ActionMenuItem, TableColumn, YdTablePageAction } from '@yudream/components'
 import type { OnlineUser } from '@/api/modules/system-monitor'
-import { useTablePage } from '@yudream/components'
+import { useTablePage, YdRelatedEntity } from '@yudream/components'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { saveExcelResponse } from '@/utils/excel'
 
 const modal = useYdModal()
@@ -166,7 +165,7 @@ async function exportOnlineUsers() {
             </template>
             <!-- 会话用户：头像 + 就地预览/编辑（同一用户多会话时复用详情缓存） -->
             <template #cell-sessionUser="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 v-if="row.original.userId"
                 entity-type="user"
                 :entity-id="row.original.userId"

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { ActionMenuItem, StatusColumn, TableColumn, UserColumn, YdCodeEditorInstance, YdSegmentedOption, YdTablePageAction } from '@yudream/components'
 import type { DocumentPageParams, GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
-import { useTablePage } from '@yudream/components'
+import { useTablePage, YdRelatedEntity } from '@yudream/components'
 import apiDocument from '@/api/modules/platform-document'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 
 const modal = useYdModal()
 const toast = useYdToast()
@@ -646,7 +645,7 @@ function tabIcon(value: string | number) {
             </template>
             <!-- 操作人是已登记的用户实体：头像 + 名称，就地查看/编辑；没有 id 的行退化为纯文本 -->
             <template #cell-operatorId="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 v-if="row.original.operatorId"
                 entity-type="user"
                 :entity-id="row.original.operatorId"

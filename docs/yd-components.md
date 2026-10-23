@@ -401,13 +401,16 @@ const filters = ref({ keyword: '', status: 'enabled' })
 | 入口 | 参数与输出 |
 | --- | --- |
 | `YdEntityPeek` | title、subtitle、avatar、avatarFallback、status、facts、chips、loading、error、actions、editable、`v-model:editing`、saving、width、detailLabel、align、side；emit `open`、`save`、`cancel`、`detail`；槽 `#trigger`（触发器，默认头像+名称+箭头）、`#editor`（编辑态表单）、`#extra`；`actions[].danger` 自动红色 |
+| `YdRelatedEntity` | entityType、entityId、label、secondary、avatar、avatarOnly（`RelatedEntityRef`）；emit `changed`；默认插槽承接自定义触发器。按 entityType 解析已注册提供者，未注册类型降级为纯文本 |
+| `registerRelatedEntity(type, provider, owner?)` | 注册「实体类型 → 预览卡」提供者，返回注销函数；同 owner 重复注册按热重载覆盖，跨 owner 冲突拒绝并告警 |
+| `unregisterRelatedEntitiesByOwner(owner)` / `registeredRelatedEntityTypes()` / `resolveRelatedEntity(type)` | 按属主批量注销（宿主内置 `host`，插件为插件码）/ 调试列举 / 解析 |
 | `EntityPeekFact` / `EntityPeekChip` / `EntityPeekAction` | 事实清单（label/value/tone/mono）、芯片分组（label/items）、操作（label/icon/variant/danger/disabled/loading/onClick） |
 
 组件只负责卡片外观与「查看↔编辑」状态机：细节加载、权限判定、保存动作全部由使用方在 `#editor` 与 `actions` 里提供，因此同一外壳既能用于用户，也能用于部门、插件等实体。
 
-宿主把「实体类型 → 预览卡」注册在 `src/components/RelatedEntity/registry.ts`，页面用 `<RelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件侧沿用同一个入口注册自己的实体类型（SDK 导出同名注册函数后生效），宿主不硬编码插件实体。
+「实体类型 → 预览卡」注册表与调度入口都在共享包（components 1.11.0 起）：宿主内置 `user/dept/role` 在应用启动时经 `src/components/RelatedEntity/register.ts` 登记，页面用 `<YdRelatedEntity entity-type="user" :entity-id="row.userId" :label="row.username" :avatar="row.avatarUrl" />` 引用，未注册类型自动降级为纯文本。插件经 `install(sdk)`（SDK 1.15.0 起注入 sdk 实例）调 `sdk.relatedEntity?.register(type, provider)` 注册自有实体类型，实际登记键为 `${pluginCode}:${type}`——只能在本插件命名空间下注册，不能遮蔽宿主内置类型；插件 `dispose()` 对称注销，宿主在模块卸载时按插件码兜底回收。注册表全平台共享同一实例，其他插件页面直接 `YdRelatedEntity` 引用该类型即可弹出对应卡片。
 
-触发器的默认形态是「头像/图标 + 名称（+ 次行标识）」，悬停给底色；需要沿用本页色彩体系时（部门色标签、角色色标签等）把自定义元素写进 `YdEntityPeek` 的默认插槽（`RelatedEntity` 亦然），并给该元素加 `yd-entity-trigger` 类获得同样的指针与悬停语义。
+触发器的默认形态是「头像/图标 + 名称（+ 次行标识）」，悬停给底色；需要沿用本页色彩体系时（部门色标签、角色色标签等）把自定义元素写进 `YdEntityPeek` 的默认插槽（`YdRelatedEntity` 亦然），并给该元素加 `yd-entity-trigger` 类获得同样的指针与悬停语义。
 
 配套的两个 DOM 约定（跨页定位用）：表格行渲染 `data-row-key="<行主键>"`，定位高亮给目标行打 `data-yd-highlight` 属性（属性不参与行上的 `:class` 绑定，重渲染不会丢），样式由 `adapters.css` 的定位行令牌提供。
 

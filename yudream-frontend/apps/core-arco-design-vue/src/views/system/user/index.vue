@@ -4,13 +4,12 @@ import type { MessagingIdentity } from '@/api/modules/profile'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
 import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStats, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
-import { useTablePage } from '@yudream/components'
+import { useTablePage, YdRelatedEntity } from '@yudream/components'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
 import { fetchSearchConfig } from '@/api/modules/system-search-config'
 import apiUser from '@/api/modules/system-user'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
 import { useAiAssistantAction } from '@/composables/ai-assistant-actions'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { deptFallbackIcon } from '@/utils/dept-visual'
@@ -761,7 +760,7 @@ function importUsers() {
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-user="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 entity-type="user"
                 :entity-id="row.original.id"
                 :label="row.original.username"
@@ -806,7 +805,7 @@ function importUsers() {
             <template #cell-deptNames="{ row }">
               <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
                 <!-- 部门是关联实体：保留部门色标签的视觉，点击就地开卡（查看/编辑/停用）并可就地跳完整管理 -->
-                <RelatedEntity
+                <YdRelatedEntity
                   v-for="(deptId, index) in row.original.deptIds"
                   :key="deptId"
                   entity-type="dept"
@@ -831,13 +830,13 @@ function importUsers() {
                     </span>
                     {{ row.original.deptNames?.[index] || deptId }}{{ sameId(deptId, row.original.defaultDeptId) ? '（默认）' : '' }}
                   </YdTag>
-                </RelatedEntity>
+                </YdRelatedEntity>
               </div>
               <span v-else class="text-muted-foreground/40">-</span>
             </template>
             <template #cell-roleNames="{ row }">
               <div v-if="row.original.roleNames?.length" class="flex flex-wrap gap-1 items-center">
-                <RelatedEntity
+                <YdRelatedEntity
                   v-if="row.original.roleIds?.[0]"
                   entity-type="role"
                   :entity-id="row.original.roleIds[0]"
@@ -847,7 +846,7 @@ function importUsers() {
                   <YdTag class="yd-entity-trigger" :style="roleTagStyle(row.original.roleNames[0])">
                     {{ row.original.roleNames[0] }}
                   </YdTag>
-                </RelatedEntity>
+                </YdRelatedEntity>
                 <YdTag v-else :style="roleTagStyle(row.original.roleNames[0])">
                   {{ row.original.roleNames[0] }}
                 </YdTag>

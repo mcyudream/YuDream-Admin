@@ -18,7 +18,7 @@ import type {
 } from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
 import apiSecurity from '@/api/modules/system-security'
-import RelatedEntity from '@/components/RelatedEntity/index.vue'
+import { YdRelatedEntity } from '@yudream/components'
 import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
 type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'external' | 'passkey'
@@ -1084,7 +1084,7 @@ function normalizeDateTime(value?: string) {
             :data="passkeyRows"
           >
             <template #cell-userId="{ row }">
-              <RelatedEntity
+              <YdRelatedEntity
                 v-if="row.original.userId"
                 entity-type="user"
                 :entity-id="row.original.userId"

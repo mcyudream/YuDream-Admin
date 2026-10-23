@@ -171,6 +171,16 @@ export interface YuDreamPluginBackupClient {
   targets: () => Promise<YuDreamPluginBackupTargetOption[]>
 }
 
+/**
+ * 关联实体预览卡注册：登记本插件自有实体类型的摘要卡（键为 `${pluginCode}:${type}`），
+ * 任何插件/宿主页面用 `YdRelatedEntity` 引用该类型即可弹出；插件卸载时宿主按插件码兜底注销。
+ * 提供者组件接收 `RelatedEntityRef` props（自 `@yudream/components` 导入类型），改动后 emit `changed`。
+ */
+export interface YuDreamPluginRelatedEntityClient {
+  /** 返回注销函数；同类型重复注册按热重载覆盖，跨插件冲突被拒绝 */
+  register: (type: string, provider: Component) => () => void
+}
+
 export interface YuDreamPluginAccount {
   userId: string
   username: string
@@ -231,6 +241,8 @@ export interface YuDreamPluginSdk {
   ai: YuDreamPluginAiClient
   /** 1.8.0 起提供；旧宿主注入的 sdk 无此属性，插件需可选链降级 */
   backup?: YuDreamPluginBackupClient
+  /** 1.15.0 起提供；旧宿主注入的 sdk 无此属性，插件需可选链降级 */
+  relatedEntity?: YuDreamPluginRelatedEntityClient
   site: YuDreamPluginSiteClient
 }
 
@@ -242,8 +254,11 @@ export interface YuDreamPluginPageProps {
 export interface YuDreamPluginFrontendModule {
   routes?: Record<string, Component>
   default?: Component | YuDreamPluginFrontendModule
-  /** Called at most once for each loaded remote-module revision; implementations must be idempotent. */
-  install?: () => void | Promise<void>
+  /**
+   * Called at most once for each loaded remote-module revision; implementations must be idempotent.
+   * SDK 1.15.0 起宿主注入本插件作用域的 sdk 实例（旧宿主不传参，插件不得依赖实参存在）。
+   */
+  install?: (sdk: YuDreamPluginSdk) => void | Promise<void>
   /** Optional cleanup hook invoked when the host releases this remote-module revision. */
   dispose?: () => void | Promise<void>
 }
