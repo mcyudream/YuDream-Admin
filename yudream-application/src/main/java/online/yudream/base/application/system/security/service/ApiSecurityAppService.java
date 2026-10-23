@@ -58,7 +58,8 @@ public class ApiSecurityAppService {
                 cmd.isApiKeyEnabled(),
                 cmd.isPasskeyEnabled(),
                 cmd.isOauthServerEnabled(),
-                cmd.isOauthClientEnabled()
+                cmd.isOauthClientEnabled(),
+                cmd.isRegistrationEnabled()
         );
         policy.updateTokenPolicy(new TokenPolicy(
                 cmd.getAccessTokenTtlSeconds(),

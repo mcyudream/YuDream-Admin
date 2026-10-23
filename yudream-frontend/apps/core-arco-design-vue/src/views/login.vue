@@ -8,6 +8,7 @@ import Register from '@/components/AppAccountForm/register.vue'
 import ResetPassword from '@/components/AppAccountForm/reset-password.vue'
 import ColorScheme from '@/layouts/components/Topbar/Toolbar/ColorScheme/index.vue'
 import settingsDefault from '@/settings'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import { sanitizeRedirect, stashExternalLoginRedirect } from '@/utils/login-redirect'
 import StudioHostWrapper from './site/studio-host-wrapper.vue'
 
@@ -18,6 +19,7 @@ defineOptions({
 const route = useRoute()
 const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
+const appFeatureStore = useAppFeatureStore()
 
 const loginBanner = computed(() => appSettingsStore.loginBanner || new URL('@/assets/images/login-banner.png', import.meta.url).href)
 const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
@@ -32,6 +34,12 @@ const bindingToken = typeof route.query.externalLoginBindingToken === 'string' &
   ? route.query.externalLoginBindingToken
   : undefined
 const formType = ref<'binding' | 'login' | 'register' | 'resetPassword'>(bindingToken && route.query.form !== 'register' ? 'binding' : route.query.form === 'register' ? 'register' : 'login')
+// 关闭开放注册时不允许以注册表单落地（后端同样硬拒绝，这里只是入口收敛）
+watch(() => appFeatureStore.registerEnabled, (enabled) => {
+  if (!enabled && formType.value === 'register') {
+    formType.value = bindingToken ? 'binding' : 'login'
+  }
+}, { immediate: true })
 const externalProviders = ref<{ code: string, name?: string, supportedTypes: string, icon?: string, presentation?: string, sort?: number }[]>([])
 const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'morph:folder-git-2' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
 const externalEntries = computed<ExternalLoginEntry[]>(() => externalProviders.value.flatMap((provider) => {
@@ -75,6 +83,7 @@ async function loginWithExternal(entry: ExternalLoginEntry) {
 }
 
 onMounted(async () => {
+  appFeatureStore.load()
   try {
     externalProviders.value = (await apiSecurity.publicExternalLoginProviders()).data
   }
@@ -134,13 +143,15 @@ onMounted(async () => {
                 <YdButton size="lg" class="w-full" @click="formType = 'login'">
                   登录已有账号
                 </YdButton>
-                <YdButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
+                <YdButton v-if="appFeatureStore.registerEnabled" variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
                   注册新账号
                 </YdButton>
               </div>
             </template>
             <div v-if="bindingToken && formType !== 'binding'" class="binding-notice" role="status">
-              该第三方账号尚未绑定。请登录已有账号完成绑定，或注册新账号后绑定。
+              {{ appFeatureStore.registerEnabled
+                ? '该第三方账号尚未绑定。请登录已有账号完成绑定，或注册新账号后绑定。'
+                : '该第三方账号尚未绑定。本站已关闭开放注册，请登录已有账号完成绑定；如无账号请联系管理员开通。' }}
             </div>
             <template v-if="formType === 'login'">
               <Login
@@ -156,7 +167,7 @@ onMounted(async () => {
               />
             </template>
             <Register
-              v-if="formType === 'register'"
+              v-if="formType === 'register' && appFeatureStore.registerEnabled"
               :account
               :binding-token="bindingToken"
               @on-register="(val) => { formType = 'login'; account = val }"

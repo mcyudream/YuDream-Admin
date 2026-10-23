@@ -18,5 +18,6 @@ public class FrontendFeatureRes {
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
     private boolean publicPluginMarketEnabled;
+    private boolean registerEnabled;
     private Map<String, Boolean> capabilities;
 }

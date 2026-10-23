@@ -23,6 +23,8 @@ public class ApiSecurityPolicyDO extends BaseDO {
     private boolean passkeyEnabled;
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
+    /** 包装类型：存量文档缺字段时为 null，加载侧按 true（开放注册）处理。 */
+    private Boolean registrationEnabled;
     private long accessTokenTtlSeconds;
     private long refreshTokenTtlSeconds;
     private boolean refreshRotationEnabled;

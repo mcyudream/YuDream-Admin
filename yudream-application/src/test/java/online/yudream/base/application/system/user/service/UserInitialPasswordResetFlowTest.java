@@ -218,7 +218,7 @@ class UserInitialPasswordResetFlowTest {
                 return null;
             });
             return new UserAppService(userRepo, null, null, null, null, null, null, encoder,
-                    emailVerifyTokens, resetTokens, mailer, null, null, null, initialTokens);
+                    emailVerifyTokens, resetTokens, mailer, null, null, null, initialTokens, null);
         }
     }
 }

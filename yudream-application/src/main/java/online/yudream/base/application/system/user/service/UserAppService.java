@@ -17,6 +17,8 @@ import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.security.service.ExternalLoginBindingAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.common.service.PasswordEncoder;
+import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
+import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
@@ -90,6 +92,7 @@ public class UserAppService {
     private final ExternalLoginBindingAppService externalLoginBindingAppService;
     private final ApplicationEventPublisher eventPublisher;
     private final InitialPasswordSetupTokenProvider initialPasswordSetupTokenProvider;
+    private final ApiSecurityPolicyRepo apiSecurityPolicyRepo;
 
     @Transactional
     public User login(UserLoginCmd cmd) {
@@ -111,6 +114,7 @@ public class UserAppService {
 
     @Transactional
     public UserRegisterDTO register(UserRegisterCmd cmd) {
+        ensureOpenRegistration();
         ensureRegisterAllowed(cmd);
         boolean identityVerified = ensureRequiredVerifications(cmd) || optionalVerificationPassed(cmd);
         if (userRepo.existsVerifiedByUsername(cmd.getUsername())) {
@@ -391,6 +395,14 @@ public class UserAppService {
             if (veto != null && !veto.allowed()) {
                 throw new BizException(StringUtils.hasText(veto.reason()) ? veto.reason() : "当前账号不允许登录");
             }
+        }
+    }
+
+    /** 宿主级开放注册硬门禁：优先于插件注册拦截器；关闭后仅管理员开户或第三方绑定已有账号。 */
+    private void ensureOpenRegistration() {
+        ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElseGet(ApiSecurityPolicy::createDefault);
+        if (!policy.isRegistrationEnabled()) {
+            throw new BizException("本站已关闭开放注册，请联系管理员开通账号");
         }
     }
 

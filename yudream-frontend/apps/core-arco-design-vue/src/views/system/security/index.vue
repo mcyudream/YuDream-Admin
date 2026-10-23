@@ -66,6 +66,7 @@ const policy = reactive<ApiSecurityPolicy>({
   passkeyEnabled: false,
   oauthServerEnabled: false,
   oauthClientEnabled: false,
+  registrationEnabled: true,
   accessTokenTtlSeconds: 7200,
   refreshTokenTtlSeconds: 604800,
   refreshRotationEnabled: true,
@@ -172,6 +173,7 @@ const policyCards = computed(() => [
   { key: 'passkeyEnabled', label: 'Passkey', desc: '无密码登录扩展入口', icon: 'morph:fingerprint' },
   { key: 'oauthServerEnabled', label: 'OAuth 服务端', desc: '向第三方应用签发授权', icon: 'morph:server' },
   { key: 'oauthClientEnabled', label: 'OAuth 客户端', desc: '接入外部身份提供商', icon: 'morph:log-in' },
+  { key: 'registrationEnabled', label: '开放注册', desc: '关闭后新用户无法自行注册，仅可由管理员开户或经第三方登录绑定已有账号', icon: 'morph:user-plus' },
 ] as const)
 
 const permissionGroups = computed(() => {

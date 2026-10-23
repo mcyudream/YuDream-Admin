@@ -12,6 +12,8 @@ public class ApiSecurityPolicyUpdateRequest {
     private boolean passkeyEnabled;
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
+    /** 缺省视为 true：旧前端不传该字段时不会误关注册。 */
+    private Boolean registrationEnabled;
 
     @Min(value = 1, message = "访问令牌有效期必须大于 0")
     private long accessTokenTtlSeconds;

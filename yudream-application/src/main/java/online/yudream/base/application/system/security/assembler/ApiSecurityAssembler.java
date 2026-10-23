@@ -32,6 +32,7 @@ public class ApiSecurityAssembler {
                 .passkeyEnabled(policy.isPasskeyEnabled())
                 .oauthServerEnabled(policy.isOauthServerEnabled())
                 .oauthClientEnabled(policy.isOauthClientEnabled())
+                .registrationEnabled(policy.isRegistrationEnabled())
                 .accessTokenTtlSeconds(tokenPolicy.accessTokenTtlSeconds())
                 .refreshTokenTtlSeconds(tokenPolicy.refreshTokenTtlSeconds())
                 .refreshRotationEnabled(tokenPolicy.refreshRotationEnabled())

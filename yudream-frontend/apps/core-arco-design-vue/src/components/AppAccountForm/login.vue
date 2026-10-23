@@ -268,7 +268,7 @@ function rememberAccount(account: string, remember?: boolean) {
         <YdIcon :name="activeExternalIcon" />
         使用 {{ activeExternalLabel }}
       </YdButton>
-      <div class="text-sm mt-4 flex-center gap-2">
+      <div v-if="appFeatureStore.registerEnabled" class="text-sm mt-4 flex-center gap-2">
         <span class="text-secondary-foreground op-50">还没有账号？</span>
         <YdButton variant="link" class="p-0 h-auto" type="button" @click="emits('onRegister', form.values.account)">
           注册新账号

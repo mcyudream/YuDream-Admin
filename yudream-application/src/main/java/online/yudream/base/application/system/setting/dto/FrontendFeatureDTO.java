@@ -23,5 +23,7 @@ public class FrontendFeatureDTO implements Serializable {
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
     private boolean publicPluginMarketEnabled;
+    /** 开放注册开关：登录页据此隐藏注册入口；缺省 true。 */
+    private boolean registerEnabled = true;
     private Map<String, Boolean> capabilities;
 }

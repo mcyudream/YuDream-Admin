@@ -56,7 +56,7 @@ class OAuthExplicitEnableTest {
                 passkeyCeremonyGateway
         );
         ApiSecurityPolicy policy = ApiSecurityPolicy.createDefault();
-        policy.updateSwitches(false, false, false, false, true, true);
+        policy.updateSwitches(false, false, false, false, true, true, true);
         when(policyRepo.findDefault()).thenReturn(Optional.of(policy));
     }
 

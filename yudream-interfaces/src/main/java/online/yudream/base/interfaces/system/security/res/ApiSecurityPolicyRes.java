@@ -15,6 +15,7 @@ public class ApiSecurityPolicyRes {
     private boolean passkeyEnabled;
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
+    private boolean registrationEnabled;
     private long accessTokenTtlSeconds;
     private long refreshTokenTtlSeconds;
     private boolean refreshRotationEnabled;

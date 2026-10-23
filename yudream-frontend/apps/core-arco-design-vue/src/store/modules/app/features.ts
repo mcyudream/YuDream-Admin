@@ -8,6 +8,7 @@ function defaultFeatures(): FrontendFeature {
     oauthServerEnabled: false,
     oauthClientEnabled: false,
     publicPluginMarketEnabled: true,
+    registerEnabled: true,
     capabilities: {},
   }
 }
@@ -58,6 +59,8 @@ export const useAppFeatureStore = defineStore('appFeature', () => {
   const formEnabled = computed(() => capabilityEnabled('form'))
   const publicPluginMarketEnabled = computed(() =>
     capabilityEnabled('plugin-market-source') && features.value.publicPluginMarketEnabled !== false)
+  // 后端缺省/加载失败时保持开放注册，只有显式 false 才关闭
+  const registerEnabled = computed(() => features.value.registerEnabled !== false)
 
   return {
     features,
@@ -70,6 +73,7 @@ export const useAppFeatureStore = defineStore('appFeature', () => {
     cmsEnabled,
     formEnabled,
     publicPluginMarketEnabled,
+    registerEnabled,
     capabilityEnabled,
     load,
   }

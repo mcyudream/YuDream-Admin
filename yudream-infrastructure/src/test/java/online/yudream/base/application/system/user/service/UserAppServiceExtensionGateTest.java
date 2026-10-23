@@ -4,6 +4,7 @@ import online.yudream.base.application.system.user.cmd.UserLoginCmd;
 import online.yudream.base.application.system.user.cmd.UserRegisterCmd;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
+import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.plugin.spi.system.auth.ExtensionVeto;
 import online.yudream.base.plugin.spi.system.auth.IdentityVerificationMethod;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.lang.reflect.Proxy;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -150,7 +152,14 @@ class UserAppServiceExtensionGateTest {
             }
         };
         SettingRepo settings = settingRepo == null ? emptySettings() : settingRepo;
-        return new UserAppService(null, settings, null, null, query, null, null, null, null, null, null, null, null, null, null);
+        return new UserAppService(null, settings, null, null, query, null, null, null, null, null, null, null, null, null, null, openRegistrationRepo());
+    }
+
+    /** 注册门禁按缺省（开放）放行，让拦截器用例继续只测拦截器本身。 */
+    private ApiSecurityPolicyRepo openRegistrationRepo() {
+        return (ApiSecurityPolicyRepo) Proxy.newProxyInstance(ApiSecurityPolicyRepo.class.getClassLoader(),
+                new Class<?>[] { ApiSecurityPolicyRepo.class },
+                (proxy, method, args) -> method.getName().equals("findDefault") ? Optional.empty() : (args == null || args.length == 0 ? null : args[0]));
     }
 
     private SettingRepo settingsWithRequiredVerifications(String codes) {

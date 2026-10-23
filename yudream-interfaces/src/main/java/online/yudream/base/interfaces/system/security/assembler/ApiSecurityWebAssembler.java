@@ -79,6 +79,7 @@ public class ApiSecurityWebAssembler {
         cmd.setPasskeyEnabled(request.isPasskeyEnabled());
         cmd.setOauthServerEnabled(request.isOauthServerEnabled());
         cmd.setOauthClientEnabled(request.isOauthClientEnabled());
+        cmd.setRegistrationEnabled(request.getRegistrationEnabled() == null || request.getRegistrationEnabled());
         cmd.setAccessTokenTtlSeconds(request.getAccessTokenTtlSeconds());
         cmd.setRefreshTokenTtlSeconds(request.getRefreshTokenTtlSeconds());
         cmd.setRefreshRotationEnabled(request.isRefreshRotationEnabled());
@@ -292,6 +293,7 @@ public class ApiSecurityWebAssembler {
                 .passkeyEnabled(dto.isPasskeyEnabled())
                 .oauthServerEnabled(dto.isOauthServerEnabled())
                 .oauthClientEnabled(dto.isOauthClientEnabled())
+                .registrationEnabled(dto.isRegistrationEnabled())
                 .accessTokenTtlSeconds(dto.getAccessTokenTtlSeconds())
                 .refreshTokenTtlSeconds(dto.getRefreshTokenTtlSeconds())
                 .refreshRotationEnabled(dto.isRefreshRotationEnabled())

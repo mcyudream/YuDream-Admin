@@ -25,6 +25,8 @@ public class ApiSecurityPolicy extends BaseDomain {
     private boolean passkeyEnabled;
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
+    /** 开放注册总开关：关闭后 /register 一律拒绝，账号仅能由管理员开户或经第三方登录绑定已有账号。 */
+    private boolean registrationEnabled = true;
     private TokenPolicy tokenPolicy;
 
     public static ApiSecurityPolicy createDefault() {
@@ -36,6 +38,7 @@ public class ApiSecurityPolicy extends BaseDomain {
                 .passkeyEnabled(false)
                 .oauthServerEnabled(false)
                 .oauthClientEnabled(false)
+                .registrationEnabled(true)
                 .tokenPolicy(TokenPolicy.defaultPolicy())
                 .build();
     }
@@ -45,13 +48,15 @@ public class ApiSecurityPolicy extends BaseDomain {
                                boolean apiKeyEnabled,
                                boolean passkeyEnabled,
                                boolean oauthServerEnabled,
-                               boolean oauthClientEnabled) {
+                               boolean oauthClientEnabled,
+                               boolean registrationEnabled) {
         this.apiEncryptionEnabled = apiEncryptionEnabled;
         this.dualTokenEnabled = dualTokenEnabled;
         this.apiKeyEnabled = apiKeyEnabled;
         this.passkeyEnabled = passkeyEnabled;
         this.oauthServerEnabled = oauthServerEnabled;
         this.oauthClientEnabled = oauthClientEnabled;
+        this.registrationEnabled = registrationEnabled;
     }
 
     public void updateTokenPolicy(TokenPolicy tokenPolicy) {

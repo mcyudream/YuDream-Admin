@@ -90,6 +90,7 @@ public class SettingAppService {
                 .passkeyEnabled(policy.isPasskeyEnabled())
                 .oauthServerEnabled(policy.isOauthServerEnabled())
                 .oauthClientEnabled(policy.isOauthClientEnabled())
+                .registerEnabled(policy.isRegistrationEnabled())
                 .publicPluginMarketEnabled(publicPluginMarketEnabled())
                 .capabilities(capabilityStatusMap())
                 .build();

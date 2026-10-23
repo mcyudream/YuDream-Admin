@@ -14,6 +14,7 @@ export interface ApiSecurityPolicy {
   passkeyEnabled: boolean
   oauthServerEnabled: boolean
   oauthClientEnabled: boolean
+  registrationEnabled: boolean
   accessTokenTtlSeconds: number
   refreshTokenTtlSeconds: number
   refreshRotationEnabled: boolean

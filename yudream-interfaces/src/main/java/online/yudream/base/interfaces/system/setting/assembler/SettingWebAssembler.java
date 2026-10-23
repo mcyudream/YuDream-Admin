@@ -57,6 +57,7 @@ public class SettingWebAssembler {
                 .oauthServerEnabled(dto.isOauthServerEnabled())
                 .oauthClientEnabled(dto.isOauthClientEnabled())
                 .publicPluginMarketEnabled(dto.isPublicPluginMarketEnabled())
+                .registerEnabled(dto.isRegisterEnabled())
                 .capabilities(dto.getCapabilities())
                 .build();
     }

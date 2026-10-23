@@ -68,7 +68,7 @@ class OAuthServerAppServiceTest {
                 permissionAppService
         );
         ApiSecurityPolicy policy = ApiSecurityPolicy.createDefault();
-        policy.updateSwitches(false, false, false, false, true, false);
+        policy.updateSwitches(false, false, false, false, true, false, true);
         when(policyRepo.findDefault()).thenReturn(Optional.of(policy));
         when(clientRepo.findByClientId(CLIENT_ID)).thenReturn(Optional.of(ymclClient()));
         lenient().when(authorizationCodeRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

@@ -19,6 +19,7 @@ public class ApiSecurityPolicyInfraMapper {
         dataObj.setPasskeyEnabled(policy.isPasskeyEnabled());
         dataObj.setOauthServerEnabled(policy.isOauthServerEnabled());
         dataObj.setOauthClientEnabled(policy.isOauthClientEnabled());
+        dataObj.setRegistrationEnabled(policy.isRegistrationEnabled());
         TokenPolicy tokenPolicy = policy.getTokenPolicy() == null ? TokenPolicy.defaultPolicy() : policy.getTokenPolicy();
         dataObj.setAccessTokenTtlSeconds(tokenPolicy.accessTokenTtlSeconds());
         dataObj.setRefreshTokenTtlSeconds(tokenPolicy.refreshTokenTtlSeconds());
@@ -42,6 +43,7 @@ public class ApiSecurityPolicyInfraMapper {
                 .passkeyEnabled(dataObj.isPasskeyEnabled())
                 .oauthServerEnabled(dataObj.isOauthServerEnabled())
                 .oauthClientEnabled(dataObj.isOauthClientEnabled())
+                .registrationEnabled(dataObj.getRegistrationEnabled() == null || dataObj.getRegistrationEnabled())
                 .tokenPolicy(new TokenPolicy(
                         dataObj.getAccessTokenTtlSeconds(),
                         dataObj.getRefreshTokenTtlSeconds(),
