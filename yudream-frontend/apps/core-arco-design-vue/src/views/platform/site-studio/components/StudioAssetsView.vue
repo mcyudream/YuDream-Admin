@@ -458,7 +458,7 @@ function insertAsset(asset: StudioAsset) {
             >
               <YdIcon name="morph:arrow-down-to-line" /> 插入
             </YdButton>
-            <YdTooltip v-else content="仅图片/视频/音频可直接插入；文件类资源可在设计里把它的地址填入链接引用">
+            <YdTooltip v-else text="仅图片/视频/音频可直接插入；文件类资源可在设计里把它的地址填入链接引用">
               <YdButton variant="ghost" size="sm" disabled aria-label="该类型不支持直接插入">
                 <YdIcon name="morph:arrow-down-to-line" /> 插入
               </YdButton>

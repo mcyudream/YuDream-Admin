@@ -614,7 +614,7 @@ function crumbLabel(node: StudioNode) {
       <span class="flex-1" />
       <YdSegmented v-model="store.breakpoint" :options="breakpointOptions" aria-label="画布断点" />
       <div class="flex gap-0.5 items-center">
-        <YdTooltip content="缩小">
+        <YdTooltip text="缩小">
           <YdButton
             variant="ghost"
             size="sm"
@@ -635,7 +635,7 @@ function crumbLabel(node: StudioNode) {
         >
           {{ zoom }}%
         </YdButton>
-        <YdTooltip content="放大">
+        <YdTooltip text="放大">
           <YdButton
             variant="ghost"
             size="sm"
@@ -646,7 +646,7 @@ function crumbLabel(node: StudioNode) {
             <YdIcon name="morph:zoom-in" />
           </YdButton>
         </YdTooltip>
-        <YdTooltip content="适配宽度">
+        <YdTooltip text="适配宽度">
           <YdButton
             variant="ghost"
             size="sm"

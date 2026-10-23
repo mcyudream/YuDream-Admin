@@ -311,7 +311,7 @@ void initialize()
         v-model:pane="pane"
         :rail-items="railItems"
         storage-key="site-studio"
-        :aside="{ defaultSize: 26, minSize: 20, maxSize: 45 }"
+        :aside="{ defaultSize: 340, minSize: 280, maxSize: 560, sizeUnit: 'px' }"
         sidebar-label="结构与页面"
         main-label="站点内容"
         aside-label="属性"
@@ -359,7 +359,7 @@ void initialize()
             >
               <YdIcon name="morph:power" /> 设为公开站主题
             </YdButton>
-            <YdTooltip content="撤销">
+            <YdTooltip text="撤销">
               <YdButton
                 v-auth="'platform:cms:edit'"
                 variant="ghost"
@@ -371,7 +371,7 @@ void initialize()
                 <YdIcon name="morph:undo-2" />
               </YdButton>
             </YdTooltip>
-            <YdTooltip content="重做">
+            <YdTooltip text="重做">
               <YdButton
                 v-auth="'platform:cms:edit'"
                 variant="ghost"
@@ -383,7 +383,7 @@ void initialize()
                 <YdIcon name="morph:redo-2" />
               </YdButton>
             </YdTooltip>
-            <YdTooltip content="在新标签页按公开站效果预览当前页面（含未保存更改）">
+            <YdTooltip text="在新标签页按公开站效果预览当前页面（含未保存更改）">
               <YdButton variant="ghost" :disabled="!store.doc" aria-label="预览站点" @click="openPreview">
                 <YdIcon name="morph:external-link" /> 预览站点
               </YdButton>

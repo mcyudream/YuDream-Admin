@@ -318,22 +318,22 @@ function removeSelected() {
           <span class="text-xs text-muted-foreground">&lt;{{ node.tag }}&gt;</span>
         </div>
         <div class="studio-inspector-head__actions">
-          <YdTooltip content="选中父级">
+          <YdTooltip text="选中父级">
             <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="选中父级" :disabled="!locateSibling(node.id)?.parentId" @click="selectParent">
               <YdIcon name="morph:corner-left-up" />
             </YdButton>
           </YdTooltip>
-          <YdTooltip content="上移">
+          <YdTooltip text="上移">
             <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="上移" @click="moveSelected(-1)">
               <YdIcon name="morph:arrow-up" />
             </YdButton>
           </YdTooltip>
-          <YdTooltip content="下移">
+          <YdTooltip text="下移">
             <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="下移" @click="moveSelected(1)">
               <YdIcon name="morph:arrow-down" />
             </YdButton>
           </YdTooltip>
-          <YdTooltip content="复制">
+          <YdTooltip text="复制">
             <YdButton v-auth="'platform:cms:edit'" variant="ghost" size="sm" aria-label="复制" @click="duplicateSelected">
               <YdIcon name="morph:copy" />
             </YdButton>
