@@ -72,8 +72,8 @@ public class McInteropWellKnownAppService {
             if (cached != null && System.currentTimeMillis() - cached.at() < CACHE_TTL_MILLIS) {
                 return cached;
             }
+            // 互采合并已下沉 mc-interop 插件出口（含命名空间化冲突规避），宿主纯透传
             Map<String, Object> document = fetchLocalDocument();
-            mergePeers(document);
             // 以插件/聚合 Map 直接序列化为 JSON 文本返回：宿主全局 ObjectMapper 的
             // Long→String 定制会破坏协议要求的 size/revision 整数类型。
             String json;
