@@ -566,6 +566,13 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
   function queueFrontendRequest(runId: string, raw: unknown) {
     const request = parseAiFrontendToolRequest(raw)
     if (!request) {
+      // 原生挂起没有超时：无法识别的请求也必须显式拒绝，静默丢弃会让运行永远卡在等待。
+      const shape = record(raw)
+      const toolCallId = typeof shape.toolCallId === 'string' ? shape.toolCallId : ''
+      const name = typeof shape.name === 'string' ? shape.name : ''
+      if (toolCallId && name) {
+        void replyAiFrontendTool(runId, toolCallId, { ok: false, error: `当前页面没有可执行 ${name} 的前端组件，请提示用户先打开对应页面再重试` }, { skipGlobalToast: true }).catch(() => { })
+      }
       return
     }
     if (typeof request.expiresAt === 'number' && request.expiresAt <= Date.now()) {

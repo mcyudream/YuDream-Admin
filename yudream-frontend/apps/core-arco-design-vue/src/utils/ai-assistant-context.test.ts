@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { STUDIO_AGENT_TOOLS } from '../composables/use-site-studio-agent.ts'
 import { defaultAiAssistantPreferences, frontendContextForPreferences, isSafeAiRoute, matchesAiAssistantShortcut, parseAiAssistantPreferences, parseAiFrontendToolRequest } from './ai-assistant-context.ts'
 
 test('studio tools use an exact whitelist and never trust a model supplied run identity', () => {
-  for (const name of ['cms.studio.read', 'cms.studio.apply', 'cms.studio.validate']) {
+  // 注册器与解析器必须同源收敛：漏一个名字，设计器的原生挂起就会永久等待（cms.studio.theme 教训）。
+  for (const name of STUDIO_AGENT_TOOLS) {
     const request = parseAiFrontendToolRequest({ toolCallId: 'cms-1', name, runId: 'forged', arguments: { contextKey: 'draft' } })
     assert.equal(request?.name, name)
     assert.equal(request?.runId, undefined)

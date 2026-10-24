@@ -30,7 +30,10 @@ export interface AiFrontendContext {
 
 export interface AiFrontendToolRequest {
   toolCallId: string
-  name: 'ui.navigate' | 'ui.highlight' | 'ui.tour' | 'cms.studio.read' | 'cms.studio.apply' | 'cms.studio.validate'
+  /** 与后端 CmsStudioClientTools.NAMES / 前端 STUDIO_AGENT_TOOLS 保持一致，漏名单的请求会被静默丢弃。 */
+  name: 'ui.navigate' | 'ui.highlight' | 'ui.tour'
+    | 'cms.studio.outline' | 'cms.studio.find' | 'cms.studio.inspect' | 'cms.studio.theme' | 'cms.studio.guide'
+    | 'cms.studio.read' | 'cms.studio.apply' | 'cms.studio.validate' | 'cms.studio.check'
   arguments: { routeName?: string, actionCode?: string, tourCode?: string, [key: string]: unknown }
   /** 仅由宿主运行观察器注入，模型参数不能指定。 */
   runId?: string
@@ -73,7 +76,7 @@ export const getAiRun = (id: string) => systemClient.get<unknown, ApiResponse<Ai
 export const cancelAiRun = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id)}/cancel`)
 export const resumeAiRun = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id)}/resume`)
 export const respondAiInteraction = (id: string, requestId: string, response: { approved?: boolean, output?: Record<string, unknown> }) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id)}/interactions/${encodeURIComponent(requestId)}`, response)
-export const replyAiFrontendTool = (runId: string, toolCallId: string, reply: { ok: boolean, result?: Record<string, unknown>, error?: string }) => systemClient.post<unknown, ApiResponse<void>>(`${runPath(runId)}/frontend-tools/${encodeURIComponent(toolCallId)}`, reply)
+export const replyAiFrontendTool = (runId: string, toolCallId: string, reply: { ok: boolean, result?: Record<string, unknown>, error?: string }, config?: { skipGlobalToast?: boolean }) => systemClient.post<unknown, ApiResponse<void>>(`${runPath(runId)}/frontend-tools/${encodeURIComponent(toolCallId)}`, reply, config)
 export const listAiSystemRuns = (activeOnly = true) => systemClient.get<unknown, ApiResponse<AiRunSnapshot[]>>('api/platform/ai/system-runs', { params: { activeOnly } })
 export const getAiSystemRun = (id: string) => systemClient.get<unknown, ApiResponse<AiRunSnapshot>>(runPath(id, 'system'))
 export const cancelAiSystemRun = (id: string) => systemClient.post<unknown, ApiResponse<AiRunSnapshot>>(`${runPath(id, 'system')}/cancel`)

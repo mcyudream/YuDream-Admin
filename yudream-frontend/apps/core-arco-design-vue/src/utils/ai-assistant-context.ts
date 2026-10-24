@@ -54,7 +54,9 @@ export function parseAiFrontendToolRequest(value: unknown): AiFrontendToolReques
   if (typeof raw.toolCallId !== 'string' || !raw.toolCallId || raw.toolCallId.length > 200) {
     return undefined
   }
-  const studioNames = ['cms.studio.read', 'cms.studio.apply', 'cms.studio.validate'] as const
+  // Must mirror CmsStudioClientTools.NAMES / STUDIO_AGENT_TOOLS exactly: a missing name is dropped
+  // here and the run's native suspension then waits forever (cms.studio.theme once stalled every design run).
+  const studioNames = ['cms.studio.outline', 'cms.studio.find', 'cms.studio.inspect', 'cms.studio.theme', 'cms.studio.guide', 'cms.studio.read', 'cms.studio.apply', 'cms.studio.validate', 'cms.studio.check'] as const
   if (studioNames.includes(raw.name as typeof studioNames[number])) {
     // Only exact AST tool names enter the registered executor. The executor validates command/model/context.
     if (!raw.arguments || typeof raw.arguments !== 'object' || Array.isArray(raw.arguments)) {
