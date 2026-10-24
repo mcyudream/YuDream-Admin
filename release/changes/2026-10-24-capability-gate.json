@@ -1,0 +1,10 @@
+{
+  "id": "capability-gate",
+  "level": "minor",
+  "title": "平台能力门控收敛为内部双闸门",
+  "commits": ["8dc11b3fd"],
+  "notes": [
+    "废除部署侧 PLATFORM_*_ENABLED 环境变量门控，能力配置改为内部字面量默认开启，启停统一经管理后台能力管理页（项目配置闸门 + 应用闸门）",
+    "docker-compose 与 .env.example 同步移除对应变量；存量部署如依赖环境变量关能力，升级后需改在能力管理页操作"
+  ]
+}

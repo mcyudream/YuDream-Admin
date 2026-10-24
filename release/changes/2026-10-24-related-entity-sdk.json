@@ -1,0 +1,11 @@
+{
+  "id": "related-entity-sdk",
+  "level": "minor",
+  "title": "关联实体卡下沉共享包并开放插件实体类型注册",
+  "commits": ["3f6a965a3", "9e61dc469"],
+  "notes": [
+    "components 1.11.1 新增 related-entity 注册表与 YdRelatedEntity 调度组件，plugin-sdk 1.15.1 开放 relatedEntity.register（插件作用域、不能遮蔽宿主内置类型）",
+    "宿主内置 user/dept/role 改为宿主属主注册，8 个视图页切 YdRelatedEntity，插件引用归零时按插件码兜底注销实体类型",
+    "ui-guidelines §7 补登记 YdRelatedEntity 后按失败重发纪律重发契约版本"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "hardening-fixes",
+  "level": "patch",
+  "title": "公开站接管与前端稳定性修复",
+  "commits": ["35416f8d9", "3096e3d32", "c5166c317"],
+  "notes": [
+    "公开站外壳、Shadow DOM 页面与草稿预览桥接管 /profile、/logout 账号菜单链接：个人资料弹窗与登出行为与宿主 chrome 一致，不再落「找不到页面」",
+    "修复路由页模板根为 fragment 时 out-in 过渡永久卡死导致全站导航白屏的问题（插件发布/发布审核页面即此因）",
+    "GIF 文件不再生成 JPEG 缩略图，透明与动图封面原样回退"
+  ]
+}

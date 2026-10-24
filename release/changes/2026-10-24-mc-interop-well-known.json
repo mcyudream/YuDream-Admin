@@ -1,0 +1,10 @@
+{
+  "id": "mc-interop-well-known",
+  "level": "minor",
+  "title": "mc-interop v1 well-known 聚合出口",
+  "commits": ["d251540b4", "36dc7af16"],
+  "notes": [
+    "新增 /.well-known/mc-interop-v1.json 根级端点：按协议互采合并 peers 友站清单，聚合缓存 5 分钟并支持 ETag/304 条件请求",
+    "互采合并下沉 mc-interop 插件出口完成，宿主纯透传合并结果，消除双层合并的重复拉取"
+  ]
+}

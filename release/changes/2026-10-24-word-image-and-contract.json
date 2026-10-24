@@ -1,0 +1,10 @@
+{
+  "id": "word-image-and-contract",
+  "level": "minor",
+  "title": "Word 模板嵌图与契约升版（SPI 2.38.0）",
+  "commits": ["786df6add"],
+  "notes": [
+    "SPI system/document 新增 PluginWordTemplateImage（格式白名单与可选宽度），契约按纪律 2.37.0 升 2.38.0",
+    "Word 模板渲染器支持占位符嵌图：独立段落与行循环内生效，高度按比例、超宽收缩到 6 英寸内；图片值出现在文本上下文时降级为「[图片]」文字"
+  ]
+}
