@@ -1,0 +1,10 @@
+{
+  "id": "studio-agent-tool-whitelist",
+  "level": "patch",
+  "title": "站点设计器 AI 观察工具不再卡死",
+  "commits": ["99a6b1d97"],
+  "notes": [
+    "修复设计器 AI 助手永久卡在「等待设计器真实执行结果」：前端工具请求白名单漏了 outline/find/inspect/theme/guide/check 六个观察工具，请求被静默丢弃且原生挂起无超时",
+    "白名单与九个 studio 工具全集对齐并新增单测交叉断言；未识别的工具请求改为显式回执拒绝，模型可见错误、运行必然闭环"
+  ]
+}
