@@ -3,6 +3,9 @@ package online.yudream.base.infra.platform.document.service;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.document.service.WordTemplateRenderer;
 import online.yudream.base.domain.platform.document.valobj.RenderedDocument;
+import online.yudream.base.plugin.spi.system.document.PluginWordTemplateImage;
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.xwpf.usermodel.Document;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFFooter;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
@@ -14,7 +17,11 @@ import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
 import org.springframework.stereotype.Service;
 
+import java.awt.Dimension;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
@@ -24,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 
 @Service
 public class DocxWordTemplateRenderer implements WordTemplateRenderer {
@@ -89,11 +97,97 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
         if (text == null || text.isEmpty()) {
             return;
         }
+        // 图片通道优先：段落仅为一个占位符且值是图片类型时整段嵌图，不做文本替换
+        if (embedParagraphImage(paragraph, text, data)) {
+            return;
+        }
         String replaced = replacePlaceholders(replaceInlineLoops(text, data), data);
         if (text.equals(replaced)) {
             return;
         }
         setParagraphText(paragraph, replaced);
+    }
+
+    /** 段落内容（去首尾空白后）恰好是一个占位符、且解析值是图片类型时，清空段落并嵌入图片。 */
+    private boolean embedParagraphImage(XWPFParagraph paragraph, String text, Map<String, Object> data) {
+        String key = imageVariableKey(text);
+        if (key == null) {
+            return false;
+        }
+        if (!(resolve(data, key) instanceof PluginWordTemplateImage image)) {
+            return false;
+        }
+        embedImage(paragraph, image);
+        return true;
+    }
+
+    private String imageVariableKey(String text) {
+        String trimmed = text.trim();
+        Matcher mustache = MUSTACHE_VARIABLE.matcher(trimmed);
+        if (mustache.matches()) {
+            return mustache.group(1);
+        }
+        Matcher dollar = DOLLAR_VARIABLE.matcher(trimmed);
+        if (dollar.matches()) {
+            return dollar.group(1);
+        }
+        return null;
+    }
+
+    private void embedImage(XWPFParagraph paragraph, PluginWordTemplateImage image) {
+        for (int index = paragraph.getRuns().size() - 1; index >= 0; index--) {
+            paragraph.removeRun(index);
+        }
+        Dimension natural = naturalSize(image.content());
+        int widthEmu;
+        int heightEmu;
+        if (image.widthEmu() != null) {
+            widthEmu = image.widthEmu();
+        }
+        else if (natural != null) {
+            widthEmu = (int) Math.min((long) natural.width * 9525, PluginWordTemplateImage.maxDefaultWidthEmu());
+        }
+        else {
+            widthEmu = 4_114_800;
+        }
+        heightEmu = natural != null
+                ? (int) Math.max(1, (long) widthEmu * natural.height / natural.width)
+                : (int) ((long) widthEmu * 3 / 4);
+        XWPFRun run = paragraph.createRun();
+        try {
+            run.addPicture(new ByteArrayInputStream(image.content()), pictureType(image.format()),
+                    "template-image." + image.format(), widthEmu, heightEmu);
+        }
+        catch (InvalidFormatException e) {
+            throw new BizException("DOCX 模板图片格式无效：" + image.format());
+        }
+        catch (IOException e) {
+            throw new BizException("DOCX 模板图片写入失败：" + e.getMessage());
+        }
+    }
+
+    private int pictureType(String format) {
+        return switch (format) {
+            case "png" -> Document.PICTURE_TYPE_PNG;
+            case "jpeg", "jpg" -> Document.PICTURE_TYPE_JPEG;
+            case "gif" -> Document.PICTURE_TYPE_GIF;
+            case "bmp" -> Document.PICTURE_TYPE_BMP;
+            default -> throw new BizException("不支持的模板图片格式：" + format);
+        };
+    }
+
+    /** 读取图片自然尺寸；无法识别时返回 null（按默认宽高比嵌入）。 */
+    private Dimension naturalSize(byte[] content) {
+        try {
+            BufferedImage read = ImageIO.read(new ByteArrayInputStream(content));
+            if (read != null && read.getWidth() > 0 && read.getHeight() > 0) {
+                return new Dimension(read.getWidth(), read.getHeight());
+            }
+        }
+        catch (Exception ignored) {
+            // 无法识别尺寸时按默认宽高比嵌入
+        }
+        return null;
     }
 
     private void renderTableRowLoops(XWPFTable table, Map<String, Object> data) {
@@ -219,7 +313,11 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
         StringBuffer buffer = new StringBuffer();
         while (matcher.find()) {
             Object value = resolve(data, matcher.group(1));
-            matcher.appendReplacement(buffer, Matcher.quoteReplacement(value == null ? "" : String.valueOf(value)));
+            // 图片类型出现在文本上下文（如行内循环）时以占位文字呈现，避免对象 toString 垃圾串
+            String replacement = value instanceof PluginWordTemplateImage
+                    ? "[图片]"
+                    : value == null ? "" : String.valueOf(value);
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(buffer);
         return buffer.toString();

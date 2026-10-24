@@ -27,7 +27,7 @@
         <yudream.host.version>1.5.3</yudream.host.version>
         <!-- 运行时构建版本：默认开发版本（不冒充正式版）；CI 发布构建以 D 参数覆盖注入精确版本 -->
         <yudream.host.build-version>${yudream.host.version}-dev.local</yudream.host.build-version>
-        <yudream.plugin.spi.version>2.37.0</yudream.plugin.spi.version>
+        <yudream.plugin.spi.version>2.38.0</yudream.plugin.spi.version>
         <spring-boot.version>3.5.15</spring-boot.version>
         <lombok.version>1.18.32</lombok.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
