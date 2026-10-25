@@ -1,0 +1,10 @@
+{
+  "id": "wiki-image-endpoint-rollback",
+  "level": "patch",
+  "title": "回滚重复的 Wiki 公开图片端点（修复启动失败）",
+  "commits": ["rollback"],
+  "notes": [
+    "v1.6.2 误在 WikiPublicController 重复注册 /api/public/wiki/{空间}/nodes/{节点}/images/{文件}（WikiPublicImageController 早已存在同路由），导致生产启动 Ambiguous mapping 失败；本版回滚该重复端点，保留既有 WikiPublicImageController 通道",
+    "保留 v1.6.2 中有效部分：原文档与已发布节点正文渲染前剥离飞书导出残留 figure/figcaption 标签"
+  ]
+}
