@@ -256,9 +256,21 @@ public class WikiAppService {
             throw new BizException("请先删除目录下的子节点");
         }
         if (n.getPublishedVersionId() != null) {
-            indexGateway.remove(space(n.getSpaceId()), n.getId(), n.getPublishedVersionId());
+            // 图数据库不可达时降级：主数据照常删除，残留索引由「重建索引」清空兜底
+            removeIndexQuietly(space(n.getSpaceId()), n.getId(), n.getPublishedVersionId());
         }
         nodeRepo.deleteById(id);
+    }
+
+    /** 索引清理降级：Neo4j 等图库不可达不应阻断主数据删除；残留索引由重建索引兜底。 */
+    private void removeIndexQuietly(WikiSpace space, Long nodeId, Long versionId) {
+        try {
+            indexGateway.remove(space, nodeId, versionId);
+        }
+        catch (Exception error) {
+            log.warn("Wiki 页面 {} 的图谱索引清理失败（版本 {}），已跳过并保留主数据删除：{}",
+                    nodeId, versionId, error.getMessage());
+        }
     }
 
     @Transactional
@@ -268,7 +280,7 @@ public class WikiAppService {
         // 级联清理：页面检索索引 -> 目录/页面 -> 资料源（含文件对象）-> 摄入任务/审核项 -> 知识库
         for (WikiNode node : nodeRepo.findBySpaceId(id)) {
             if (node.getPublishedVersionId() != null) {
-                indexGateway.remove(space, node.getId(), node.getPublishedVersionId());
+                removeIndexQuietly(space, node.getId(), node.getPublishedVersionId());
             }
             nodeRepo.deleteById(node.getId());
         }

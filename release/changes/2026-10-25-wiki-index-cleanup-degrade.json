@@ -1,0 +1,10 @@
+{
+  "id": "wiki-index-cleanup-degrade",
+  "level": "patch",
+  "title": "知识库索引清理降级——图数据库不可达不再阻断删除",
+  "commits": ["pending"],
+  "notes": [
+    "删除页面/知识库、取消发布时同步清理 Neo4j 图谱索引，图库不可达（如未部署 Neo4j）会以 ServiceUnavailableException 阻断删除并回滚主数据",
+    "现改为降级语义：索引清理失败记录告警并继续删除/取消发布，残留索引由既有「重建索引」清空兜底"
+  ]
+}

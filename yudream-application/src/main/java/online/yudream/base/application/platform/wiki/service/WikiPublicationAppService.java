@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiNodePaths;
 import online.yudream.base.domain.platform.wiki.service.WikiPublicationProgressGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiPublicationProgress;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.security.MessageDigest;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WikiPublicationAppService {
     private final CapabilityAppService capabilities;
     private final WikiSpaceRepo spaces;
@@ -64,7 +66,14 @@ public class WikiPublicationAppService {
     public void unpublish(Long nodeId) {
         WikiNode node = nodes.findById(nodeId).orElseThrow(() -> new BizException("节点不存在"));
         if (node.getPublishedVersionId() != null) {
-            indexes.remove(spaces.findById(node.getSpaceId()).orElseThrow(() -> new BizException("知识库不存在")), nodeId, node.getPublishedVersionId());
+            WikiSpace space = spaces.findById(node.getSpaceId()).orElseThrow(() -> new BizException("知识库不存在"));
+            try {
+                indexes.remove(space, nodeId, node.getPublishedVersionId());
+            }
+            catch (Exception error) {
+                // 图数据库不可达时降级：取消发布照常生效，残留索引由「重建索引」清空兜底
+                log.warn("Wiki 页面 {} 取消发布的图谱索引清理失败（版本 {}）：{}", nodeId, node.getPublishedVersionId(), error.getMessage());
+            }
             node.setPublishedVersionId(null);
             nodes.save(node);
         }
