@@ -45,7 +45,7 @@ const pages = computed(() => flatten(tree.value).filter(node => node.nodeType ==
 const active = computed(() => pages.value.find(node => matchesPath(node)) || null)
 const activePathKey = computed(() => active.value?.path || active.value?.slug || '')
 // 已发布节点的正文图片改写到发布态代理；代理地址由服务端按“文件被该发布版本正文引用”复核
-const activeMarkdown = computed(() => rewritePublishedWikiImages(wikilinksToMarkdown(active.value?.body ?? active.value?.markdown ?? ''), spaceSlug.value, active.value?.id ?? ''))
+const activeMarkdown = computed(() => rewritePublishedWikiImages(stripFeishuFigureResidue(wikilinksToMarkdown(active.value?.body ?? active.value?.markdown ?? '')), spaceSlug.value, active.value?.id ?? ''))
 const relatedPages = computed(() => (active.value?.related || [])
   .map(title => pages.value.find(node => node.title === title))
   .filter((node): node is WikiNode => Boolean(node)))
@@ -57,9 +57,15 @@ const documentDetail = ref<WikiPublicDocumentDetail | null>(null)
 const documentLoading = ref(false)
 const documentError = ref('')
 const documentId = computed(() => String(route.query.doc || ''))
+// 飞书导出残留的 <figure data-line>…<figcaption> 不是白名单 HTML，渲染时会被转义成字面文本；
+// 其信息（图片名说明）已由图片 Markdown 语法承载，渲染前剥离整段
+function stripFeishuFigureResidue(markdown: string): string {
+  return markdown ? markdown.replace(/<figure[^>]*>[\s\S]*?<\/figure>/g, '').replace(/\n{3,}/g, '\n\n') : markdown
+}
+
 // 原文档没有“已发布节点”锚点：正文图片地址不改写，DTO 的 images 列表也不渲染，
 // 私有文件一律保持匿名不可读，不把裸 /api/files/{id}/content 当作公开图片使用
-const documentMarkdown = computed(() => rewriteApiFileUrls(documentDetail.value?.content ?? ''))
+const documentMarkdown = computed(() => stripFeishuFigureResidue(rewriteApiFileUrls(documentDetail.value?.content ?? '')))
 
 // 请求代际：切空间/切文档后落地的旧响应直接丢弃，避免目录与正文串台
 let treeRequestId = 0
