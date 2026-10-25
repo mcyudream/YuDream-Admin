@@ -69,6 +69,8 @@ import java.util.stream.Collectors;
 public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     private static final int SOURCE_CONTEXT_LIMIT = 60_000;
+    /** 飞书/网页导出残留的图片占位标签：非白名单 HTML，渲染会被转义成字面文本，生成页与原文档页一律剥离 */
+    private static final java.util.regex.Pattern FIGURE_RESIDUE = java.util.regex.Pattern.compile("<figure[^>]*>[\\s\\S]*?</figure>\\s*|<figure[^>]*>\\s*");
     private static final int FALLBACK_BODY_LIMIT = 8_000;
     /** 进入生成上下文与原文档页的图片证据条数上限。 */
     private static final int MAX_EVIDENCE_IMAGES = 40;
@@ -438,6 +440,14 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     // ---------- 两步思维链 ----------
 
+    /** 剥离资料正文/生成正文中的 figure 残留标签并收敛空行：生成输入与写库正文共用同一归一 */
+    public static String stripFigureResidue(String markdown) {
+        if (markdown == null || markdown.isBlank()) {
+            return markdown == null ? "" : markdown;
+        }
+        return FIGURE_RESIDUE.matcher(markdown).replaceAll("").replaceAll("\n{3,}", "\n\n");
+    }
+
     private JsonNode analyze(WikiSpace space, WikiSource source) {
         String system = "你是知识库维护引擎的分析器。你只输出 JSON，不输出任何解释或 Markdown。";
         String user = "知识库目的(purpose)：\n" + blankToEmpty(space.getPurpose()) + "\n\n"
@@ -446,7 +456,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 + "原始资料标题：" + source.getTitle() + "\n"
                 + "原始资料路径：" + source.displayPath() + "\n\n"
                 + "原始资料图片证据（页码/图序 caption，可作为事实依据）：\n" + imageEvidence(source) + "\n\n"
-                + "原始资料内容(节选)：\n" + truncate(source.getExtractedText(), SOURCE_CONTEXT_LIMIT) + "\n\n"
+                + "原始资料内容(节选)：\n" + truncate(stripFigureResidue(source.getExtractedText()), SOURCE_CONTEXT_LIMIT) + "\n\n"
                 + "请分析该资料并输出如下 JSON：\n"
                 + "{\"entities\":[\"关键实体\"],\"concepts\":[\"关键概念\"],\"contradictions\":[\"与现有知识的矛盾或张力\"],"
                 + "\"structureSuggestions\":[\"Wiki 结构建议\"],"
@@ -546,7 +556,8 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                     hasSourceSummary = true;
                 }
                 Long nodeId = saveGeneratedPage(space, source, title, type, stringList(page, "sources"),
-                        stringList(page, "related"), stringList(page, "tags"), text(page, "summary"), text(page, "body"));
+                        stringList(page, "related"), stringList(page, "tags"), text(page, "summary"),
+                        stripFigureResidue(text(page, "body")));
                 if (nodeId != null) {
                     touched.add(nodeId);
                 }
@@ -595,7 +606,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     /** 原文档页正文：原文 + 图片证据（页码/图序/caption），保证 caption 出现在原始资料页。 */
     private String sourceDocumentBody(WikiSource source) {
-        String text = source.getExtractedText() == null ? "" : source.getExtractedText();
+        String text = stripFigureResidue(source.getExtractedText());
         String evidence = imageEvidenceLines(source);
         if (evidence.isBlank()) {
             return text;
