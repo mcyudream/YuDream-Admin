@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { WikiNode, WikiPublicDocument } from '@/api/modules/platform-wiki'
 import { computed } from 'vue'
+import { groupWikiNavTree } from './wiki-nav-tree'
 import WikiPublicTreeNode from './WikiPublicTreeNode.vue'
 
 // 公开阅读站的左侧导航：已发布文档树 + 可阅读的原文档。
@@ -21,6 +22,16 @@ const emit = defineEmits<{
   openDocument: [document: WikiPublicDocument]
 }>()
 
+// 原文档镜像页（path=source-{id}）从首屏树摘出：首屏第一展示目标是生成的可读内容，
+// 原始资料统一归到「原文档」区（镜像与原文档条目同源，有原文档条目时镜像不再单列）。
+const navTree = computed(() => groupWikiNavTree(props.tree))
+const mirrorFallback = computed(() => {
+  if (props.documents.length) {
+    return []
+  }
+  return navTree.value.mirrors.map(node => ({ id: node.path || node.slug || node.id, title: node.title, to: `/wiki/${encodeURIComponent(props.spaceSlug)}/${encodeURI(node.path || node.slug)}` }))
+})
+
 const documentGroups = computed(() => {
   const groups = new Map<string, WikiPublicDocument[]>()
   for (const doc of props.documents) {
@@ -36,19 +47,46 @@ const documentGroups = computed(() => {
 
 <template>
   <div class="wiki-nav">
-    <div class="wiki-nav__title"><YdIcon name="morph:folder" /> 文档目录</div>
-    <div v-if="treeLoading" class="wiki-nav__skeleton"><YdSkeleton variant="text" :count="4" /></div>
-    <p v-else-if="treeError" class="wiki-nav__hint">目录暂不可用</p>
-    <p v-else-if="!tree.length" class="wiki-nav__hint">暂无已发布页面</p>
+    <div class="wiki-nav__title">
+      <YdIcon name="morph:folder" /> 文档目录
+    </div>
+    <div v-if="treeLoading" class="wiki-nav__skeleton">
+      <YdSkeleton variant="text" :count="4" />
+    </div>
+    <p v-else-if="treeError" class="wiki-nav__hint">
+      目录暂不可用
+    </p>
+    <p v-else-if="!tree.length" class="wiki-nav__hint">
+      暂无已发布页面
+    </p>
     <nav v-else class="wiki-nav__group" aria-label="文档目录">
-      <WikiPublicTreeNode :nodes="tree" :active-path="activePath" :space-slug="spaceSlug" @select="emit('select', $event)" />
+      <WikiPublicTreeNode
+        :nodes="[navTree.group]"
+        :active-path="activePath"
+        :space-slug="spaceSlug"
+        :default-expanded-ids="[navTree.group.id]"
+        @select="emit('select', $event)"
+      />
+      <WikiPublicTreeNode
+        v-if="navTree.rest.length"
+        :nodes="navTree.rest"
+        :active-path="activePath"
+        :space-slug="spaceSlug"
+        @select="emit('select', $event)"
+      />
     </nav>
-    <template v-if="documentsLoading || documents.length">
-      <div class="wiki-nav__title wiki-nav__title--sub"><YdIcon name="morph:file-text" /> 原文档</div>
-      <div v-if="documentsLoading" class="wiki-nav__skeleton"><YdSkeleton variant="text" :count="3" /></div>
+    <template v-if="documentsLoading || documents.length || mirrorFallback.length">
+      <div class="wiki-nav__title wiki-nav__title--sub">
+        <YdIcon name="morph:file-text" /> 原文档
+      </div>
+      <div v-if="documentsLoading" class="wiki-nav__skeleton">
+        <YdSkeleton variant="text" :count="3" />
+      </div>
       <nav v-else class="wiki-nav__group wiki-nav__group--documents" aria-label="原文档目录">
         <template v-for="group in documentGroups" :key="group.folder">
-          <div v-if="group.folder !== '/'" class="wiki-nav__folder">{{ group.folder }}</div>
+          <div v-if="group.folder !== '/'" class="wiki-nav__folder">
+            {{ group.folder }}
+          </div>
           <RouterLink
             v-for="doc in group.items"
             :key="doc.id"
@@ -60,6 +98,14 @@ const documentGroups = computed(() => {
             {{ doc.title }}
           </RouterLink>
         </template>
+        <RouterLink
+          v-for="mirror in mirrorFallback"
+          :key="mirror.id"
+          class="wiki-nav__doc"
+          :to="mirror.to"
+        >
+          {{ mirror.title }}
+        </RouterLink>
       </nav>
     </template>
   </div>

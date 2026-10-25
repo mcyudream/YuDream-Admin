@@ -2,18 +2,23 @@
 import type { WikiNode } from '@/api/modules/platform-wiki'
 import { computed, ref, watch } from 'vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   nodes: WikiNode[]
   activePath: string
   spaceSlug: string
   depth?: number
-}>()
+  /** 默认展开的目录节点 ID：顶层分组（如「LLM 生成」）作为第一展示层级时直接展开 */
+  defaultExpandedIds?: string[]
+}>(), {
+  depth: 0,
+  defaultExpandedIds: () => [],
+})
 
 const emit = defineEmits<{
   select: [node: WikiNode]
 }>()
 
-const expanded = ref(new Set<string>())
+const expanded = ref(new Set<string>(props.defaultExpandedIds))
 // 空目录（无页面且无子目录）在公开端不渲染，避免出现点不开的死节点
 const visibleNodes = computed(() => props.nodes.filter(node => node.nodeType === 'PAGE' || node.children?.length))
 // 目录与页面都按嵌套层级缩进：同级对齐，进入子层级整体右移
