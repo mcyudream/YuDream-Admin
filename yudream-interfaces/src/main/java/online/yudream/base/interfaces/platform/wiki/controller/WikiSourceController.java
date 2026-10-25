@@ -12,6 +12,7 @@ import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.interfaces.platform.wiki.assembler.WikiKnowledgeWebAssembler;
+import online.yudream.base.interfaces.platform.wiki.request.WikiSourceFromDocumentRequest;
 import online.yudream.base.interfaces.platform.wiki.request.WikiTextSourceRequest;
 import online.yudream.base.interfaces.platform.wiki.request.WikiUrlImportRequest;
 import online.yudream.base.interfaces.platform.wiki.res.WikiSourceRes;
@@ -60,6 +61,18 @@ public class WikiSourceController {
         try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
             return Result.ok(WikiKnowledgeWebAssembler.toSourceResList(
                     service.importUrls(spaceId, request.getFolderPath(), request.getUrls())));
+        }
+    }
+
+    /** 把编辑器手动创建的文档一键收录为资料：内容取文档当前草稿正文，收录后进入摄入管道 */
+    @PostMapping("/spaces/{spaceId}/sources/from-document")
+    @PermissionRegister(code = "platform:wiki:manage", name = "收录编辑器文档为资料", module = "平台能力", desc = "把编辑器文档的当前正文收录为原始资料并摄入知识库")
+    @WikiSpaceAccess(action = WikiSpaceAclAction.EDIT, permission = "platform:wiki:manage")
+    public Result<WikiSourceRes> createFromDocument(@PathVariable Long spaceId,
+                                                    @Valid @RequestBody WikiSourceFromDocumentRequest request) {
+        try (AiUsageExecutionScope ignored = AiUsageExecutionScope.open(SecurityPrincipalSupport.current().userId())) {
+            return Result.ok(WikiKnowledgeWebAssembler.toRes(
+                    service.createFromDocument(spaceId, request.nodeIdAsLong(), StpUtil.getLoginIdAsLong())));
         }
     }
 

@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { ActionMenuItem, TableColumn, YdFilePickerInstance } from '@yudream/components'
-import type { WikiSource } from '@/api/modules/platform-wiki'
+import type { WikiNode, WikiSource } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
   captionWikiSourceImages,
+  createWikiSourceFromDocument,
   createWikiTextSource,
   deleteWikiSource,
   enqueueWikiIngest,
   fetchWikiSources,
+  fetchWikiTree,
   importWikiUrls,
   updateWikiTextSource,
   uploadWikiSource,
@@ -28,6 +30,67 @@ const captionProgressOpen = ref(false)
 
 const sources = ref<WikiSource[]>([])
 const loading = ref(false)
+// 收录编辑器文档：勾选知识库文档（排除原文档镜像），把当前正文一键收录为资料
+const docPickerVisible = ref(false)
+const docPickerLoading = ref(false)
+const docPickerSaving = ref(false)
+const docPickerOptions = ref<{ id: string, title: string, checked: boolean }[]>([])
+
+async function onDocPickerChange(ids: unknown) {
+  const set = new Set((ids as string[]))
+  docPickerOptions.value = docPickerOptions.value.map(option => ({ ...option, checked: set.has(option.id) }))
+}
+
+async function openDocumentPicker() {
+  docPickerVisible.value = true
+  docPickerLoading.value = true
+  try {
+    const tree = (await fetchWikiTree(store.spaceId.value)).data || []
+    const pages: { id: string, title: string }[] = []
+    const walk = (nodes: WikiNode[]) => nodes.forEach((node) => {
+      if (node.nodeType === 'PAGE' && !/^source-\d+$/.test(node.path || node.slug || '')) {
+        pages.push({ id: node.id, title: node.title })
+      }
+      walk(node.children || [])
+    })
+    walk(tree)
+    docPickerOptions.value = pages.map(page => ({ ...page, checked: false }))
+  }
+  finally {
+    docPickerLoading.value = false
+  }
+}
+
+async function addCheckedDocuments() {
+  const ids = docPickerOptions.value.filter(option => option.checked).map(option => option.id)
+  if (!ids.length) {
+    toast.warning('请先勾选要收录的文档')
+    return
+  }
+  docPickerSaving.value = true
+  let failed = 0
+  try {
+    for (const id of ids) {
+      try {
+        await createWikiSourceFromDocument(store.spaceId.value, id)
+      }
+      catch {
+        failed++
+      }
+    }
+    if (failed) {
+      toast.warning(`已收录 ${ids.length - failed} 篇，${failed} 篇失败（可能是空正文）`)
+    }
+    else {
+      toast.success(`已收录 ${ids.length} 篇文档，开始摄入`)
+    }
+    docPickerVisible.value = false
+    await load()
+  }
+  finally {
+    docPickerSaving.value = false
+  }
+}
 const loadError = ref('')
 const folderPath = ref('/')
 const urlsText = ref('')
@@ -261,6 +324,12 @@ watch(() => store.spaceId.value, load)
                 <YdIcon name="morph:feather" /> 新建 Markdown 文档
               </YdButton>
             </div>
+            <div class="src-field">
+              <span><YdIcon name="morph:file-add" /> 从知识库收录</span>
+              <YdButton variant="outline" @click="openDocumentPicker">
+                <YdIcon name="morph:playlist-plus" /> 勾选收录编辑器文档
+              </YdButton>
+            </div>
           </div>
           <div class="src-import__row src-import__row--urls">
             <label class="src-field src-field--urls">
@@ -272,6 +341,26 @@ watch(() => store.spaceId.value, load)
             </YdButton>
           </div>
         </section>
+        <YdModal v-model="docPickerVisible" title="勾选收录编辑器文档" :show-confirm-button="true" confirm-button-text="收录勾选项" :confirm-button-loading="docPickerSaving" @confirm="addCheckedDocuments">
+          <div class="flex flex-col gap-2">
+            <p class="text-xs text-muted-foreground m-0">
+              勾选知识库文档，把当前正文收录为原始资料（收录的是副本，文档本身不动），收录后自动进入摄入管道。
+            </p>
+            <div v-if="docPickerLoading" class="wiki-nav__skeleton">
+              <YdSkeleton variant="text" :count="3" />
+            </div>
+            <p v-else-if="!docPickerOptions.length" class="text-sm text-muted-foreground m-0">
+              知识库里还没有可收录的文档页面。
+            </p>
+            <YdCheckboxGroup
+              v-else
+              :model-value="docPickerOptions.filter(o => o.checked).map(o => o.id)"
+              :options="docPickerOptions.map(o => ({ label: o.title, value: o.id }))"
+              aria-label="勾选要收录的文档"
+              @update:model-value="onDocPickerChange"
+            />
+          </div>
+        </YdModal>
 
         <!-- 资料表：自适应表格，状态与图片直接进列，行尾菜单收细节动作 -->
         <div v-if="loadError" class="src-error">
@@ -292,9 +381,8 @@ watch(() => store.spaceId.value, load)
         <template v-else-if="sortedSources.length">
           <YdResponsiveEnhancedTable
             row-key="id"
-            stripe
-            border
-            column-visibility
+
+            stripe column-visibility border
             table-class="min-w-[860px]"
             :columns="columns"
             :actions="actions"

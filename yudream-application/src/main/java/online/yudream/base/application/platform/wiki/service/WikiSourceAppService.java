@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.wiki.aggregate.WikiSource;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiCaptionStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSourceFormat;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
@@ -155,6 +156,25 @@ public class WikiSourceAppService {
         WikiSource saved = sourceRepo.save(source);
         ingestAppService.enqueueIngest(spaceId, saved.getId());
         return WikiKnowledgeAssembler.source(saved);
+    }
+
+    /**
+     * 把编辑器里手动创建的文档一键收录为资料：内容取该节点的当前草稿正文（去 frontmatter），
+     * 文档内引用的远程/私有图片同样走 ingestMarkdownImages 入库登记；收录后进入正常摄入管道
+     * （生成图片描述、LLM 分析与页面生成）。文档本身保持不动，收录的是它的一份资料副本。
+     */
+    @Transactional
+    public WikiSourceDTO createFromDocument(Long spaceId, Long nodeId, Long callerId) {
+        enabled();
+        WikiNode node = nodeRepo.findById(nodeId).orElseThrow(() -> new BizException("文档不存在"));
+        if (!spaceId.equals(node.getSpaceId()) || node.getNodeType() != WikiNodeType.PAGE) {
+            throw new BizException("只能收录文档页面");
+        }
+        String content = node.bodyMarkdown();
+        if (content == null || content.isBlank()) {
+            throw new BizException("该文档还没有正文，无法收录为资料");
+        }
+        return createText(spaceId, "/", node.getTitle(), content, callerId);
     }
 
     @Transactional

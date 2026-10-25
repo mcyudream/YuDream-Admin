@@ -316,6 +316,12 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
             else if (node.getSources() != null && node.getSources().contains(path)) {
                 List<String> sources = new ArrayList<>(node.getSources());
                 sources.remove(path);
+                // 级联删除：页面唯一来源就是被删除资料时，失去出处后一并删除（特殊页与原文档页除外）
+                if (sources.isEmpty() && !SPECIAL_TYPES.contains(node.getPageType())
+                        && node.getPageType() != WikiPageType.SOURCE_DOCUMENT) {
+                    nodeRepo.deleteById(node.getId());
+                    continue;
+                }
                 node.setSources(sources);
                 // 只移除已删除资料的来源引用，保留原 frontmatter 的其他内容与生成来源标记
                 String fullMarkdown = WikiFrontmatter.of(node.getTitle(), node.getPageType(), sources, node.getRelated(),

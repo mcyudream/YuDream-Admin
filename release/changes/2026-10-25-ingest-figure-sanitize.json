@@ -1,6 +1,6 @@
 {
  "id": "ingest-figure-sanitize",
- "level": "minor",
+ "level": "patch",
  "title": "知识库生成管道剥离 figure 残留——生成侧归一",
  "commits": [
   "e0a35c499"
