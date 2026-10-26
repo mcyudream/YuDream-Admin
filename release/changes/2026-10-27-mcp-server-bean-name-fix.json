@@ -1,0 +1,11 @@
+{
+ "id": "mcp-server-bean-name-fix",
+ "level": "patch",
+ "title": "修复 MCP 服务器应用服务与旧 MCP 客户端服务 bean 名冲突导致启动失败",
+ "commits": [
+  "7392c5a218"
+ ],
+ "notes": [
+  "McpServerAppService 显式指定 bean 名 mcpServerExposeAppService:与既有旧 MCP 服务接入的 mcp.service.McpServerAppService 同 simple name,Spring 默认派生名冲突致 ApplicationContext 启动失败(ConflictingBeanDefinitionException),生产容器崩溃循环;全仓 bean 重名扫描确认仅此一处"
+ ]
+}
