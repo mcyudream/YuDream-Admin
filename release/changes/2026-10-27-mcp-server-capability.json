@@ -4,7 +4,8 @@
  "title": "平台 MCP 服务器能力(mcp-server)",
  "commits": [
   "5c89ab7f027d",
-  "d5ce63ab01d1"
+  "d5ce63ab01d1",
+  "c71a075772c77a6b1255107f4806a88efc09f38f"
  ],
  "notes": [
   "新增平台 MCP 服务器能力:宿主作为 MCP 服务端把插件注册的 AI 工具按调用者权限暴露为 MCP 工具,完整端点 /api/mcp 聚合全部模块,模块端点 /api/mcp/{module} 只含单模块(模块=插件 code,首个模块为 mcpanel)",
