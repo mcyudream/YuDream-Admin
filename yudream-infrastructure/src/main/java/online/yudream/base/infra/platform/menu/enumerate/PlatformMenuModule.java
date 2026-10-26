@@ -425,6 +425,15 @@ public enum PlatformMenuModule {
             parentName = "MCP", permission = "platform:mcp:server:use")
     MCP_SERVER_USE,
 
+    @MenuNode(code = "platform:mcpserver", name = "MCP 服务器", type = MenuNodeType.MENU,
+            parentName = "APP_HUB", path = "/platform/mcpserver", component = "platform/mcpserver/index.vue",
+            icon = "i-ri:server-line", sort = 58, permission = "platform:mcpserver:view")
+    MCP_SERVER,
+
+    @MenuNode(code = "platform:mcpserver:view", name = "查看 MCP 服务器", type = MenuNodeType.BUTTON,
+            parentName = "MCP_SERVER", permission = "platform:mcpserver:view")
+    MCP_SERVER_OVERVIEW,
+
     @MenuNode(code = "platform:mobile-config", name = "移动端配置", type = MenuNodeType.MENU,
             parentName = "OPS_HUB", path = "/platform/mobile-config", component = "platform/mobile-config/index.vue",
             icon = "i-ri:smartphone-line", sort = 45, permission = "platform:mobile-config:view")

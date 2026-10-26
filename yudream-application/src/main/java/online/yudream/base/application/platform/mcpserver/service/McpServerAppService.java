@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,6 +99,42 @@ public class McpServerAppService {
 
     private boolean permitted(McpExposedTool tool, List<String> permissions) {
         return new McpToolPrincipal(null, permissions).hasPermission(tool.permissionCode());
+    }
+
+    /**
+     * 管理端总览（接入引导页用）：不做调用者权限过滤（管理员要看全量并按
+     * permissionCode 自行授权），返回能力启停、完整端点与逐模块工具清单。
+     */
+    public Map<String, Object> adminOverview() {
+        boolean enabled = capabilityAppService.enabled(CAPABILITY);
+        List<Map<String, Object>> modules = new ArrayList<>();
+        int toolCount = 0;
+        if (enabled) {
+            for (McpToolSource.McpToolModuleRef ref : toolSource.modules()) {
+                List<Map<String, Object>> tools = new ArrayList<>();
+                for (McpExposedTool tool : toolSource.exposedTools(ref.code())) {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("name", tool.name());
+                    item.put("title", tool.title() == null ? "" : tool.title());
+                    item.put("description", tool.description() == null ? "" : tool.description());
+                    item.put("permissionCode", tool.permissionCode() == null ? "" : tool.permissionCode());
+                    item.put("write", tool.write());
+                    tools.add(item);
+                }
+                toolCount += tools.size();
+                modules.add(Map.of(
+                        "code", ref.code(),
+                        "displayName", ref.displayName(),
+                        "endpoint", "/api/mcp/" + ref.code(),
+                        "toolCount", tools.size(),
+                        "tools", tools));
+            }
+        }
+        return Map.of(
+                "enabled", enabled,
+                "endpointFull", "/api/mcp",
+                "toolCount", toolCount,
+                "modules", modules);
     }
 
     private void ensureEnabled() {

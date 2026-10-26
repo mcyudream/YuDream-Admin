@@ -55,10 +55,8 @@ class McpServerAppServiceTest {
     private static McpServerAppService service(FakeSource source, boolean enabled) {
         CapabilityAppService capability = new CapabilityAppService(null, List.of()) {
             @Override
-            public void ensureEnabled(String code, String name) {
-                if (!enabled) {
-                    throw new BizException(name + "能力未启用，请先在平台能力中启用");
-                }
+            public boolean enabled(String code) {
+                return enabled;
             }
         };
         return new McpServerAppService(capability, source);
@@ -137,6 +135,37 @@ class McpServerAppServiceTest {
         BizException ex = assertThrows(BizException.class, () -> svc.catalog(null, ADMIN.permissions()));
         assertTrue(ex.getMessage().contains("MCP 服务器"));
         assertThrows(BizException.class, () -> svc.callTool(null, "x", Map.of(), ADMIN));
+    }
+
+    @Test
+    void adminOverviewReportsEnabledStateAndFullInventory() {
+        FakeSource source = new FakeSource(
+                List.of(new McpToolSource.McpToolModuleRef("mcpanel", "MC 面板")),
+                Map.of("mcpanel", List.of(
+                        tool("mcpanel", "mcpanel_list", "plugin:mcpanel:view"),
+                        tool("mcpanel", "mcpanel_manage", "plugin:mcpanel:manage"))));
+        McpServerAppService svc = service(source, true);
+
+        Map<String, Object> overview = svc.adminOverview();
+        assertEquals(Boolean.TRUE, overview.get("enabled"));
+        assertEquals("/api/mcp", overview.get("endpointFull"));
+        assertEquals(2, ((Number) overview.get("toolCount")).intValue());
+        List<Map<String, Object>> modules = (List<Map<String, Object>>) (List<?>) overview.get("modules");
+        assertEquals(1, modules.size());
+        assertEquals("/api/mcp/mcpanel", modules.get(0).get("endpoint"));
+        assertEquals("MC 面板", modules.get(0).get("displayName"));
+        assertEquals(2, ((Number) modules.get(0).get("toolCount")).intValue());
+    }
+
+    @Test
+    void adminOverviewDisabledIsEmpty() {
+        McpServerAppService svc = service(new FakeSource(
+                List.of(new McpToolSource.McpToolModuleRef("mcpanel", "MC 面板")),
+                Map.of("mcpanel", List.of(tool("mcpanel", "mcpanel_list", "plugin:mcpanel:view")))), false);
+        Map<String, Object> overview = svc.adminOverview();
+        assertEquals(Boolean.FALSE, overview.get("enabled"));
+        assertEquals(0, ((Number) overview.get("toolCount")).intValue());
+        assertTrue(((List<?>) overview.get("modules")).isEmpty());
     }
 
     @Test
