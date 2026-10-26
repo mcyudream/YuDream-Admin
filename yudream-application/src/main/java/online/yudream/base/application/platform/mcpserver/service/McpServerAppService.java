@@ -21,7 +21,9 @@ import java.util.Set;
  * （模块名 = 插件 code，兼容 plugin:&lt;code&gt; 写法）。工具可见与可调用使用同一套
  * 权限判定，用户只能看到、用自己有权限的工具。
  */
-@Service
+// bean 名显式指定：与旧 MCP 客户端的 mcp.service.McpServerAppService 同 simple name，
+// 默认派生名会撞 ConflictingBeanDefinitionException（v1.10.0 生产启动崩溃教训）。
+@Service("mcpServerExposeAppService")
 @RequiredArgsConstructor
 public class McpServerAppService {
 
