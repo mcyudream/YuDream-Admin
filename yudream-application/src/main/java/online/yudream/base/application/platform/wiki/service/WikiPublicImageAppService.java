@@ -123,8 +123,11 @@ public class WikiPublicImageAppService {
      * <p>
      * 仅凭“发布正文引用了该文件 ID”不足以放行：任何能编辑/发布页面的人都可以把猜测到的私有文件 ID
      * 写进正文，借代理匿名读取跨空间或跨模块文件。当前文件模型没有空间字段，空间归属以
-     * {@link WikiSource#getImages()} 登记表达；未登记的旧资产、其他空间的资料图片、非 wiki 模块文件
-     * 一律拒绝（fail closed）。编辑器直传等未走资料登记的图片也会被拒绝，属已知限制。
+     * {@link WikiSource#getImages()} 登记表达；未登记的旧资产、其他空间的资料图片一律拒绝（fail closed）。
+     *
+     * <p>登记之外再校验文件通道：wiki-image 通道（含摄取下载的资料图）天然属于本空间知识资产；
+     * 其他通道（如 CMS 编辑器）上传但已显式公开的图片也放行——它们匿名本可直接读，代理转发不放大访问面。
+     * 未登记且未公开的文件仍然拒绝，编辑器直传未登记的私有图片属已知限制。
      */
     private boolean isSpaceWikiImage(Long spaceId, Long fileId) {
         if (fileId == null || spaceId == null) {
@@ -140,7 +143,11 @@ public class WikiPublicImageAppService {
         try {
             FileObjectDTO file = files.get(fileId);
             String module = file.getModule() == null ? "" : file.getModule().trim();
-            return module.startsWith("wiki-image");
+            if (module.startsWith("wiki-image")) {
+                return true;
+            }
+            // 历史资产兜底：其他通道上传、但已显式公开的图片（如 CMS 编辑器配图），匿名本可直接读
+            return files.isPubliclyReadable(fileId);
         }
         catch (BizException exception) {
             // 文件不存在/已删除：按不可公开访问处理，不回显内部原因
