@@ -446,12 +446,17 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     // ---------- 两步思维链 ----------
 
-    /** 剥离资料正文/生成正文中的 figure 残留标签并收敛空行：生成输入与写库正文共用同一归一 */
+    /** 剥离资料正文/生成正文中的 figure 残留标签并收敛空行：生成输入与写库正文共用同一归一。
+     *  残留有两种形态都要处理：真实标签与提取时被 HTML 转义的实体形态（&lt;figure …&gt;）；
+     *  一律解包裹保留内容（内层 <img> 是真实截图，不能随标签一起删）。 */
     public static String stripFigureResidue(String markdown) {
         if (markdown == null || markdown.isBlank()) {
-            return markdown == null ? "" : markdown;
+            return "";
         }
-        return FIGURE_RESIDUE.matcher(markdown).replaceAll("").replaceAll("\n{3,}", "\n\n");
+        return markdown
+                .replaceAll("(?i)</?figure[^>]*>|</?figcaption[^>]*>", "")
+                .replaceAll("(?i)&lt;/?(?:figure|figcaption)[^&]*&gt;", "")
+                .replaceAll("\n{3,}", "\n\n");
     }
 
     private JsonNode analyze(WikiSpace space, WikiSource source) {

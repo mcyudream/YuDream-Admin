@@ -9,6 +9,7 @@ import online.yudream.base.application.platform.wiki.dto.WikiPublicDocumentDetai
 import online.yudream.base.application.platform.wiki.dto.WikiPublicSpaceDTO;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.application.platform.wiki.service.WikiPublicAppService;
+import online.yudream.base.application.platform.wiki.service.WikiIngestAppService;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.wiki.assembler.WikiWebAssembler;
 import online.yudream.base.interfaces.platform.wiki.request.WikiChatRequest;
@@ -37,7 +38,22 @@ public class WikiPublicController {
 
     @GetMapping("/{spaceSlug}/tree")
     public Result<List<WikiNodeDTO>> tree(@PathVariable String spaceSlug) {
-        return Result.ok(service.tree(spaceSlug));
+        // 公开输出兜底剥离资料残留的 figure 标签（旧前端无渲染层剥离，避免显示为字面文本）
+        List<WikiNodeDTO> nodes = service.tree(spaceSlug);
+        stripFigureResidueDeep(nodes);
+        return Result.ok(nodes);
+    }
+
+    private void stripFigureResidueDeep(List<WikiNodeDTO> nodes) {
+        for (WikiNodeDTO node : nodes) {
+            if (node.getBody() != null) {
+                node.setBody(WikiIngestAppService.stripFigureResidue(node.getBody()));
+            }
+            if (node.getMarkdown() != null) {
+                node.setMarkdown(WikiIngestAppService.stripFigureResidue(node.getMarkdown()));
+            }
+            stripFigureResidueDeep(node.getChildren());
+        }
     }
 
     @GetMapping("/{spaceSlug}/documents")
@@ -47,7 +63,12 @@ public class WikiPublicController {
 
     @GetMapping("/{spaceSlug}/documents/{sourceId}")
     public Result<WikiPublicDocumentDetailDTO> document(@PathVariable String spaceSlug, @PathVariable Long sourceId) {
-        return Result.ok(service.document(spaceSlug, sourceId));
+        WikiPublicDocumentDetailDTO detail = service.document(spaceSlug, sourceId);
+        // 公开输出兜底剥离 figure 残留（record 不可变，重建实例）
+        return Result.ok(new WikiPublicDocumentDetailDTO(detail.id(), detail.title(), detail.folderPath(),
+                detail.kind(), detail.format(),
+                detail.content() == null ? null : WikiIngestAppService.stripFigureResidue(detail.content()),
+                detail.images()));
     }
 
     @PostMapping("/search")

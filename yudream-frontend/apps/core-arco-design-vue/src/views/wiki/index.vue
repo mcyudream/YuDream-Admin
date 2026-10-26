@@ -57,10 +57,15 @@ const documentDetail = ref<WikiPublicDocumentDetail | null>(null)
 const documentLoading = ref(false)
 const documentError = ref('')
 const documentId = computed(() => String(route.query.doc || ''))
-// 飞书导出残留的 <figure data-line>…<figcaption> 不是白名单 HTML，渲染时会被转义成字面文本；
-// 其信息（图片名说明）已由图片 Markdown 语法承载，渲染前剥离整段
+// 飞书导出残留的 figure/figcaption 有两种形态都要解包裹（保留内容，内层 <img> 是真实截图）：
+// 真实标签形态与提取时被 HTML 转义的实体形态（&lt;figure …&gt;），后者渲染会显示为字面文本
 function stripFeishuFigureResidue(markdown: string): string {
-  return markdown ? markdown.replace(/<figure[^>]*>[\s\S]*?<\/figure>/g, '').replace(/\n{3,}/g, '\n\n') : markdown
+  return markdown
+    ? markdown
+      .replace(/<\/?figure[^>]*>|<\/?figcaption[^>]*>/gi, '')
+      .replace(/&lt;\/?(?:figure|figcaption)[^&]*&gt;/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
+    : markdown
 }
 
 // 原文档没有“已发布节点”锚点：正文图片地址不改写，DTO 的 images 列表也不渲染，

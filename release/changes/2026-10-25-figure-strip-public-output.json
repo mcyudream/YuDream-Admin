@@ -1,0 +1,11 @@
+{
+  "id": "figure-strip-public-output",
+  "level": "patch",
+  "title": "公开知识库输出兜底剥离 figure 残留（双形态解包裹）",
+  "commits": ["pending"],
+  "notes": [
+    "figure 残留有两种形态：真实标签与提取时被 HTML 转义的实体形态（&lt;figure …&gt;）；此前剥离只覆盖真实标签形态",
+    "公开树与原文档详情接口输出前兜底剥离两种形态（解包裹保留内容，内层图片不删），旧前端无需升级即可不再显示字面标签",
+    "生成管道 stripFigureResidue 同步扩展双形态（分析/生成输入与生成页、原文档页写库前归一）"
+  ]
+}
