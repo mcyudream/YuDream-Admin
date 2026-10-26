@@ -1,0 +1,14 @@
+{
+ "id": "mcp-server-capability",
+ "level": "minor",
+ "title": "平台 MCP 服务器能力(mcp-server)",
+ "commits": [
+  "5c89ab7f027d",
+  "d5ce63ab01d1"
+ ],
+ "notes": [
+  "新增平台 MCP 服务器能力:宿主作为 MCP 服务端把插件注册的 AI 工具按调用者权限暴露为 MCP 工具,完整端点 /api/mcp 聚合全部模块,模块端点 /api/mcp/{module} 只含单模块(模块=插件 code,首个模块为 mcpanel)",
+  "JSON-RPC 2.0 Streamable HTTP(纯 JSON 响应无 SSE),协议版本 2024-11-05/2025-03-26/2025-06-18 回显;可见=可调用统一按 permissionCode 过滤,DESTRUCTIVE/需确认工具不暴露,仅暴露声明 MCP 触发的工具",
+  "能力双闸门:项目闸门 yudream.platform.capabilities.mcp-server(默认启用,PLATFORM_MCP_SERVER_ENABLED 可关)+应用闸门平台能力页启停;接入指南见 docs/platform/mcp-server.md"
+ ]
+}
