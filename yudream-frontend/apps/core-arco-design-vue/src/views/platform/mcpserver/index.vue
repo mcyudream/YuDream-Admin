@@ -1,416 +1,295 @@
 <script setup lang="ts">
 import type { McpServerOverview } from '@/api/modules/platform-mcpserver'
-import { computed, onMounted, reactive, ref } from 'vue'
-import apiMcpServer from '@/api/modules/platform-mcpserver'
+import { useYdToast, YdAlert, YdButton, YdCard, YdCollapsible, YdCopyButton, YdEmpty, YdFilterSelect, YdForm, YdFormItem, YdIcon, YdListToolbar, YdLoadingOverlay, YdPageHeader, YdPageMain, YdSegmented, YdSelect, YdSkeleton, YdStat, YdSwitch, YdTag } from '@yudream/components'
+import { computed, onMounted, reactive, ref, toRefs, watch } from 'vue'
 import apiCapability from '@/api/modules/platform-capability'
+import apiMcpServer from '@/api/modules/platform-mcpserver'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 
 const toast = useYdToast()
 const appFeatureStore = useAppFeatureStore()
 const router = useRouter()
-
 const loading = ref(false)
 const loadFailed = ref(false)
 const toggling = ref(false)
 const overview = ref<McpServerOverview | null>(null)
-/** 各模块工具清单展开状态，按模块 code 独立保存。 */
+const panel = ref('setup')
+const connectionForm = reactive({ endpointCode: '' })
+const { endpointCode } = toRefs(connectionForm)
+const keyword = ref('')
+const toolAccess = ref('all')
 const expanded = reactive<Record<string, boolean>>({})
-
-const siteOrigin = computed(() => window.location.origin)
 const enabled = computed(() => overview.value?.enabled ?? false)
 const modules = computed(() => overview.value?.modules ?? [])
-
-/** 生成客户端配置示例：完整端点 + 各模块端点各一份，站点域名按当前访问自动填充。 */
-const clientSnippet = computed(() => {
-  const origin = siteOrigin.value
-  const servers: Record<string, { type: string, url: string, headers: Record<string, string> }> = {}
-  if (!modules.value.length) {
-    servers['yudream-full'] = buildServerEntry(`${origin}${overview.value?.endpointFull ?? '/api/mcp'}`)
-  }
-  for (const module of modules.value) {
-    servers[`yudream-${module.code}`] = buildServerEntry(`${origin}${module.endpoint}`)
-  }
-  return JSON.stringify({ mcpServers: servers }, null, 2)
+const fullEndpoint = computed(() => `${window.location.origin}${overview.value?.endpointFull || '/api/mcp'}`)
+const selectedModule = computed(() => modules.value.find(module => module.code === endpointCode.value))
+const selectedEndpoint = computed(() => selectedModule.value ? `${window.location.origin}${selectedModule.value.endpoint}` : fullEndpoint.value)
+const endpointOptions = computed(() => [
+  { label: '完整端点 · 全部模块', value: '' },
+  ...modules.value.map(module => ({ label: `${module.displayName} · ${module.toolCount} 个工具`, value: module.code })),
+])
+// 一次只配置一个端点，避免把完整端点与各模块重复加入客户端。
+const clientSnippet = computed(() => JSON.stringify({
+  mcpServers: {
+    [selectedModule.value ? `yudream-${selectedModule.value.code}` : 'yudream-full']: {
+      type: 'http',
+      url: selectedEndpoint.value,
+      headers: { Authorization: 'Bearer yda_<你的 API Key>' },
+    },
+  },
+}, null, 2))
+const filteredModules = computed(() => {
+  const query = keyword.value.trim().toLocaleLowerCase()
+  return modules.value.flatMap((module) => {
+    const matchesModule = `${module.displayName} ${module.code}`.toLocaleLowerCase().includes(query)
+    const tools = module.tools.filter(tool => (matchesModule || `${tool.name} ${tool.title} ${tool.description} ${tool.permissionCode}`.toLocaleLowerCase().includes(query))
+      && (toolAccess.value === 'all' || (toolAccess.value === 'write' ? tool.write : !tool.write)))
+    return tools.length ? [{ ...module, tools }] : []
+  })
 })
+const filteredToolCount = computed(() => filteredModules.value.reduce((count, module) => count + module.tools.length, 0))
+const hasToolFilter = computed(() => Boolean(keyword.value.trim()) || toolAccess.value !== 'all')
+const writeToolCount = computed(() => modules.value.reduce((count, module) => count + module.tools.filter(tool => tool.write).length, 0))
 
-function buildServerEntry(url: string) {
-  return {
-    type: 'http',
-    url,
-    headers: { Authorization: 'Bearer yda_<你的 API Key>' },
+watch(modules, (items) => {
+  if (endpointCode.value && !items.some(module => module.code === endpointCode.value)) {
+    endpointCode.value = ''
   }
-}
-
+})
 onMounted(load)
 
 async function load() {
+  if (loading.value) {
+    return false
+  }
   loading.value = true
   loadFailed.value = false
   try {
-    const res = await apiMcpServer.overview()
-    overview.value = res.data
+    overview.value = (await apiMcpServer.overview()).data
+    return true
   }
   catch {
-    // 拦截器已提示具体原因，这里只保留可重试的失败状态。
     loadFailed.value = true
+    return false
   }
   finally {
     loading.value = false
   }
 }
 
-/** 连接测试：重新拉取一次总览（内部走能力门禁 + 工具目录解析，等价于 MCP 客户端建联）。 */
-async function testConnection() {
-  await load()
-  if (overview.value) {
-    toast.success('连接正常', { description: `${modules.value.length} 个模块 / ${overview.value.toolCount} 个工具可暴露` })
+async function refreshOverview() {
+  if (await load()) {
+    toast.success('服务器状态已更新')
   }
 }
 
 async function toggleEnabled() {
+  if (toggling.value || loading.value || !overview.value) {
+    return
+  }
   const target = !enabled.value
   toggling.value = true
   try {
     if (target) {
       await apiCapability.enable('mcp-server')
     }
-    else {
-      await apiCapability.disable('mcp-server')
-    }
-    await Promise.all([
-      refreshDynamicRoutes(router),
-      appFeatureStore.load(true),
-    ])
+    else { await apiCapability.disable('mcp-server') }
+    overview.value = { ...overview.value, enabled: target }
+    await Promise.all([refreshDynamicRoutes(router), appFeatureStore.load(true)])
     await load()
     toast.success(target ? 'MCP 服务器已启用' : 'MCP 服务器已禁用')
   }
   catch {
-    // 拦截器已提示失败原因
+    // 拦截器呈现失败原因。
   }
   finally {
     toggling.value = false
   }
 }
+
+function resetFilters() {
+  keyword.value = ''
+  toolAccess.value = 'all'
+}
 </script>
 
 <template>
   <div class="mcpserver-page">
-    <YdPageHeader
-      title="MCP 服务器"
-      description="把平台插件工具按调用者权限暴露为 MCP 端点，供外部 AI 客户端（ZCode、Claude Code 等）直连管理"
-    >
-      <YdButton variant="outline" :loading="loading" @click="testConnection">
-        连接测试
+    <YdPageHeader title="MCP 服务器" description="让外部 AI 客户端连接平台，使用已授权的插件工具。">
+      <YdButton variant="outline" :loading="loading" :disabled="toggling" @click="refreshOverview">
+        <YdIcon name="morph:refresh-cw" />更新状态
       </YdButton>
     </YdPageHeader>
-
-    <YdAlert
-      v-if="loadFailed"
-      variant="destructive"
-      title="加载失败"
-      class="mcpserver-block"
-    >
-      <template #description>
-        加载 MCP 服务器总览失败，请确认能力已启用后重试。
-        <YdButton variant="link" size="sm" @click="load">重试</YdButton>
-      </template>
-    </YdAlert>
-
-    <div v-else class="mcpserver-body">
-      <section class="mcpserver-card">
-        <header class="mcpserver-card__title">
-          <YdIcon name="morph:toggle-left" />
-          能力状态
-        </header>
-        <label class="mcpserver-switch">
-          <YdSwitch
-            :model-value="enabled"
-            :disabled="toggling"
-            v-auth="enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
-            @update:model-value="toggleEnabled"
-          />
-          <span>
-            {{ enabled ? '已启用' : '已禁用' }} · {{ overview?.toolCount ?? 0 }} 个工具 / {{ modules.length }} 个模块
-          </span>
-        </label>
-        <p class="mcpserver-hint">
-          关闭后 /api/mcp 端点立即失效，已配置的客户端将无法连接，本菜单随之隐藏（可在「平台能力」页重新开启）。
-        </p>
-      </section>
-
-      <section class="mcpserver-card">
-        <header class="mcpserver-card__title">
-          <YdIcon name="morph:list-ordered" />
-          三步接入
-        </header>
-
-        <div class="mcpserver-step">
-          <div class="mcpserver-step__head">
-            <span class="mcpserver-step__no">1</span>
-            创建 API Key（客户端的访问凭证）
-          </div>
-          <p class="mcpserver-hint">
-            登录平台后，点击右上角 <strong>头像 → 个人设置 → API Key</strong>，新建密钥（<code class="mcpserver-mono">yda_</code>
-            前缀，明文仅显示一次）。勾选你要通过 MCP 操作的权限，例如
-            <code class="mcpserver-mono">plugin:mcpanel:view</code>（查看实例/文件/备份）与
-            <code class="mcpserver-mono">plugin:mcpanel:manage</code>(启停/写文件/改配置/备份恢复)。
-          </p>
+    <YdPageMain>
+      <YdAlert v-if="loadFailed && overview" variant="destructive" title="状态更新失败">
+        <template #description>
+          <p>当前保留上次读取的内容，服务器状态和工具清单可能已经变化。</p>
+          <YdButton variant="outline" size="sm" @click="load">
+            重新加载
+          </YdButton>
+        </template>
+      </YdAlert>
+      <YdLoadingOverlay :loading="loading">
+        <div v-if="!overview && !loadFailed" class="mcpserver-skeleton" role="status" aria-label="正在加载 MCP 服务器">
+          <YdSkeleton variant="rect" :height="112" />
+          <YdSkeleton variant="rect" :height="320" />
         </div>
+        <YdEmpty v-else-if="!overview" title="MCP 服务器加载失败" description="请检查网络连接与访问权限，然后重新加载。" illustration="error">
+          <template #action>
+            <YdButton variant="outline" @click="load">
+              重新加载
+            </YdButton>
+          </template>
+        </YdEmpty>
+        <div v-else class="mcpserver-content">
+          <div class="mcpserver-stats">
+            <YdStat title="服务状态" :value="enabled ? '已启用' : '已禁用'" description="外部客户端访问开关">
+              <template #actions>
+                <YdSwitch
+                  v-auth="enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
+                  :model-value="enabled"
+                  :disabled="toggling || loading"
+                  aria-label="启用 MCP 服务器"
+                  @update:model-value="toggleEnabled"
+                />
+                <span class="mcpserver-hint">{{ toggling ? '正在更新…' : '停用后可在「平台能力」重新开启' }}</span>
+              </template>
+            </YdStat>
+            <YdStat title="工具模块" :value="modules.length" description="由已加载插件提供" />
+            <YdStat title="可暴露工具" :value="overview.toolCount" :description="`其中 ${writeToolCount} 个写入工具，调用时校验权限`" />
+          </div>
+          <YdAlert v-if="!enabled" title="MCP 服务器已禁用" description="以下为配置参考。启用服务器后，外部客户端才能调用工具。" />
+          <YdSegmented v-model="panel" aria-label="MCP 服务器视图" :options="[{ label: '接入配置', value: 'setup' }, { label: `工具目录 · ${overview.toolCount}`, value: 'tools' }]" />
 
-        <div class="mcpserver-step">
-          <div class="mcpserver-step__head">
-            <span class="mcpserver-step__no">2</span>
-            选择端点（调用者只能看到自己有权限的工具）
-          </div>
-          <div class="mcpserver-endpoint">
-            <div class="mcpserver-endpoint__row">
-              <span class="mcpserver-endpoint__label">完整端点（聚合全部模块）</span>
-              <div class="mcpserver-endpoint__value">
-                <code class="mcpserver-mono">{{ siteOrigin }}{{ overview?.endpointFull }}</code>
-                <YdCopyButton :text="`${siteOrigin}${overview?.endpointFull ?? ''}`" />
-              </div>
-            </div>
-            <div v-for="module in modules" :key="module.code" class="mcpserver-endpoint__row">
-              <span class="mcpserver-endpoint__label">{{ module.displayName }}（{{ module.code }} · {{ module.toolCount }} 个工具）</span>
-              <div class="mcpserver-endpoint__value">
-                <code class="mcpserver-mono">{{ siteOrigin }}{{ module.endpoint }}</code>
-                <YdCopyButton :text="`${siteOrigin}${module.endpoint}`" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mcpserver-step">
-          <div class="mcpserver-step__head">
-            <span class="mcpserver-step__no">3</span>
-            客户端配置（复制到 ZCode / Claude Code 的 MCP 配置）
-          </div>
-          <div class="mcpserver-snippet">
-            <pre class="mcpserver-mono">{{ clientSnippet }}</pre>
-            <YdCopyButton :text="clientSnippet" label="复制配置" />
-          </div>
-          <p class="mcpserver-hint">
-            只需要某一个模块时，把 url 换成对应模块端点即可。API Key 的权限决定能看到的工具：
-            无权限的模块在完整端点里不会出现。
-          </p>
-        </div>
-      </section>
-
-      <section class="mcpserver-card">
-        <header class="mcpserver-card__title">
-          <YdIcon name="morph:wrench" />
-          工具清单（{{ overview?.toolCount ?? 0 }}）
-        </header>
-        <p class="mcpserver-hint">
-          暴露规则：工具需声明 MCP 通道；DESTRUCTIVE 与需二次确认的工具不暴露；写操作凭 API Key
-          授权的权限码放行。调用与审计全走平台既有链路。
-        </p>
-        <div v-for="module in modules" :key="module.code" class="mcpserver-module">
-          <YdCollapsible v-model="expanded[module.code]" class="mcpserver-module__list">
-            <template #trigger="{ open }">
-              <span class="mcpserver-module__trigger">
-                <span>
-                  <YdIcon name="morph:package" />
-                  {{ module.displayName }}（{{ module.code }}）
-                  <span class="mcpserver-module__count">{{ module.toolCount }} 个工具</span>
-                </span>
-                <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" />
-              </span>
-            </template>
-            <div class="mcpserver-module__tools">
-              <div v-for="tool in module.tools" :key="tool.name" class="mcpserver-tool">
-                <div class="mcpserver-tool__head">
-                  <code class="mcpserver-mono mcpserver-tool__name">{{ tool.name }}</code>
-                  <YdTag :variant="tool.write ? 'default' : 'secondary'">
-                    {{ tool.write ? '写' : '读' }}
-                  </YdTag>
+          <div v-if="panel === 'setup'" class="mcpserver-setup">
+            <YdCard title="连接你的 AI 客户端" description="选择一个端点，复制配置，再填入自己的 API Key。">
+              <div class="mcpserver-stack">
+                <YdForm :model="connectionForm" layout="vertical">
+                  <YdFormItem field="endpointCode" label="连接范围" extra="完整端点聚合全部模块；选择单个模块可缩小工具范围。">
+                    <YdSelect v-model="endpointCode" :options="endpointOptions" aria-label="连接范围" class="w-full" />
+                  </YdFormItem>
+                </YdForm>
+                <div class="mcpserver-endpoint">
+                  <div class="mcpserver-stack mcpserver-endpoint__text">
+                    <span class="mcpserver-hint">{{ selectedModule?.displayName || '完整端点' }} · Streamable HTTP</span>
+                    <code>{{ selectedEndpoint }}</code>
+                  </div>
+                  <YdCopyButton :text="selectedEndpoint" label="复制地址" />
                 </div>
-                <p class="mcpserver-tool__desc">
-                  {{ tool.title }}<template v-if="tool.description"> — {{ tool.description }}</template>
-                  <code class="mcpserver-mono mcpserver-tool__perm">{{ tool.permissionCode || '（登录即可）' }}</code>
+                <div class="mcpserver-config">
+                  <div class="mcpserver-config__header">
+                    <span>客户端配置 · JSON</span>
+                    <YdCopyButton :text="clientSnippet" label="复制配置" />
+                  </div>
+                  <pre aria-label="MCP 客户端配置"><code>{{ clientSnippet }}</code></pre>
+                </div>
+                <p class="mcpserver-hint">
+                  将配置加入支持 Streamable HTTP 的客户端，并把占位内容替换为自己的 API Key。一次连接一个端点即可。
                 </p>
               </div>
+            </YdCard>
+            <div class="mcpserver-stack">
+              <YdCard title="三步完成接入">
+                <ol class="mcpserver-steps">
+                  <li><strong>创建访问密钥</strong><p>打开右上角头像 → 个人设置 → API Key，创建密钥并勾选要使用的权限。明文只显示一次，请妥善保存。</p></li>
+                  <li><strong>复制客户端配置</strong><p>选择完整端点或一个模块，将配置加入客户端，替换 <code>yda_&lt;你的 API Key&gt;</code>。</p></li>
+                  <li><strong>在客户端确认工具</strong><p>重新连接后查看工具列表。实际可见工具由密钥权限决定，可以在「工具目录」查找所需权限。</p></li>
+                </ol>
+              </YdCard>
+              <YdCard title="连接遇到问题？">
+                <ul class="mcpserver-help">
+                  <li><strong>无法连接：</strong>确认服务器已启用，客户端能访问此站点，且传输方式为 Streamable HTTP。</li>
+                  <li><strong>没有工具：</strong>检查 API Key 的权限，以及插件是否已启用并注册 MCP 工具。</li>
+                  <li><strong>某个操作不可用：</strong>需要二次确认或具有破坏风险的工具不会在此端点暴露。</li>
+                </ul>
+                <p class="mcpserver-hint">
+                  「更新状态」仅重新读取平台总览；请在客户端验证实际连接与认证。
+                </p>
+              </YdCard>
             </div>
-          </YdCollapsible>
+          </div>
+
+          <div v-else class="mcpserver-stack">
+            <YdListToolbar v-model:keyword="keyword" :title="`工具目录 · ${filteredToolCount} / ${overview.toolCount}`" placeholder="搜索模块、工具或权限">
+              <template #filters>
+                <YdFilterSelect v-model="toolAccess" width="100%" aria-label="工具操作类型" :options="[{ label: '全部操作', value: 'all' }, { label: '只读工具', value: 'read' }, { label: '写入工具', value: 'write' }]" />
+              </template>
+              <template #actions>
+                <YdButton variant="outline" :disabled="!hasToolFilter" @click="resetFilters">
+                  重置
+                </YdButton>
+              </template>
+            </YdListToolbar>
+            <p class="mcpserver-hint">
+              此处展示平台可暴露的工具。客户端只能看到其 API Key 已授权的部分，写入操作也会逐次校验权限。
+            </p>
+            <YdEmpty v-if="!modules.length" title="暂无可暴露的工具" description="启用提供 MCP 工具的插件后，工具会出现在这里。" illustration="empty" />
+            <YdEmpty v-else-if="!filteredModules.length" title="没有匹配的工具" description="试试其他名称或权限码，也可以清除筛选条件。" illustration="no-result">
+              <template #action>
+                <YdButton variant="outline" @click="resetFilters">
+                  清除筛选
+                </YdButton>
+              </template>
+            </YdEmpty>
+            <YdCollapsible v-for="module in filteredModules" :key="module.code" :model-value="hasToolFilter || expanded[module.code]" class="mcpserver-module" @update:model-value="expanded[module.code] = $event">
+              <template #trigger="{ open }">
+                <span class="mcpserver-module__trigger">
+                  <span><strong>{{ module.displayName }}</strong><span class="mcpserver-hint">{{ module.code }} · {{ module.tools.length }} 个工具</span></span>
+                  <YdIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" />
+                </span>
+              </template>
+              <div class="mcpserver-module__tools">
+                <article v-for="tool in module.tools" :key="tool.name" class="mcpserver-tool">
+                  <header class="mcpserver-tool__header">
+                    <strong>{{ tool.title || tool.name }}</strong>
+                    <YdTag :variant="tool.write ? 'outline' : 'secondary'">
+                      {{ tool.write ? '写入' : '只读' }}
+                    </YdTag>
+                  </header>
+                  <code>{{ tool.name }}</code>
+                  <p v-if="tool.description" class="mcpserver-hint">
+                    {{ tool.description }}
+                  </p>
+                  <div class="mcpserver-tool__permission">
+                    <span class="mcpserver-hint">所需权限</span><code>{{ tool.permissionCode || '登录即可' }}</code><YdCopyButton v-if="tool.permissionCode" :text="tool.permissionCode" />
+                  </div>
+                </article>
+              </div>
+            </YdCollapsible>
+          </div>
         </div>
-        <div v-if="!modules.length && enabled" class="mcpserver-module">
-          <YdStateIllustration name="empty" size="sm" />
-          <p class="mcpserver-hint">
-            暂无可暴露的模块：等待插件注册声明了 MCP 通道的工具。
-          </p>
-        </div>
-      </section>
-    </div>
+      </YdLoadingOverlay>
+    </YdPageMain>
   </div>
 </template>
 
 <style scoped>
-.mcpserver-page {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mcpserver-block {
-  margin-bottom: 12px;
-}
-
-.mcpserver-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mcpserver-card {
-  padding: 16px;
-  border: 1px solid var(--dividing-line-color, hsl(var(--border)));
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mcpserver-card__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.mcpserver-switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-}
-
-.mcpserver-hint {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.8;
-  color: var(--secondary-color, hsl(var(--muted-foreground)));
-}
-
-.mcpserver-step {
-  padding: 12px;
-  border: 1px dashed var(--dividing-line-color, hsl(var(--border)));
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mcpserver-step__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.mcpserver-step__no {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-
-.mcpserver-endpoint {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.mcpserver-endpoint__row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mcpserver-endpoint__label {
-  font-size: 12px;
-  color: var(--secondary-color, hsl(var(--muted-foreground)));
-}
-
-.mcpserver-endpoint__value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.mcpserver-mono {
-  font-family: var(--font-family-mono, ui-monospace, monospace);
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.mcpserver-snippet {
-  position: relative;
-  padding: 12px;
-  border-radius: 8px;
-  background: hsl(var(--muted));
-  overflow: auto;
-}
-
-.mcpserver-snippet pre {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.mcpserver-snippet > :last-child {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.mcpserver-module__trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  font-size: 13px;
-}
-
-.mcpserver-module__count {
-  color: var(--secondary-color, hsl(var(--muted-foreground)));
-  font-size: 12px;
-  margin-left: 6px;
-}
-
-.mcpserver-module__tools {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 4px;
-}
-
-.mcpserver-tool__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mcpserver-tool__name {
-  font-weight: 600;
-}
-
-.mcpserver-tool__desc {
-  margin: 2px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--secondary-color, hsl(var(--muted-foreground)));
-}
-
-.mcpserver-tool__perm {
-  margin-left: 6px;
-  opacity: 0.85;
+.mcpserver-page { min-width: 0; }
+.mcpserver-content, .mcpserver-stack, .mcpserver-skeleton { display: grid; min-width: 0; gap: var(--yd-content-gap, 16px); }
+.mcpserver-stats { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: var(--yd-content-gap, 16px); }
+.mcpserver-setup { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; gap: var(--yd-content-gap, 16px); }
+.mcpserver-hint { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.mcpserver-endpoint { display: flex; min-width: 0; align-items: center; gap: 12px; padding: 12px; background: var(--color-fill-1); border: 1px solid var(--color-border-2); border-radius: var(--yd-surface-radius); }
+.mcpserver-endpoint__text { flex: 1; gap: 4px; }
+code { font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.mcpserver-config { min-width: 0; overflow: hidden; border: 1px solid var(--color-border-2); border-radius: var(--yd-surface-radius); }
+.mcpserver-config__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--color-fill-1); color: var(--color-text-2); font-size: 12px; }
+.mcpserver-config pre { overflow: auto; margin: 0; padding: 16px; line-height: 1.8; color: var(--color-text-1); }
+.mcpserver-steps { display: grid; gap: 20px; margin: 0; padding-left: 24px; list-style: decimal; }
+.mcpserver-steps strong { font-size: 14px; }
+.mcpserver-steps p, .mcpserver-help { margin: 6px 0 0; color: var(--color-text-2); font-size: 13px; line-height: 1.8; }
+.mcpserver-help { display: grid; gap: 12px; padding: 0 0 12px; list-style: none; }
+.mcpserver-module { min-width: 0; border: 1px solid var(--color-border-2); border-radius: var(--yd-surface-radius); }
+.mcpserver-module__trigger { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; text-align: left; }
+.mcpserver-module__trigger > span { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.mcpserver-module__tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 14px 14px; }
+.mcpserver-tool { display: grid; min-width: 0; align-content: start; gap: 8px; padding: 14px; background: var(--color-fill-1); border-radius: var(--yd-surface-radius); }
+.mcpserver-tool__header { display: flex; align-items: start; justify-content: space-between; gap: 8px; font-size: 14px; overflow-wrap: anywhere; }
+.mcpserver-tool__permission { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (width <= 1024px) { .mcpserver-setup { grid-template-columns: minmax(0, 1fr); } }
+@media (width <= 640px) {
+  .mcpserver-stats, .mcpserver-module__tools { grid-template-columns: minmax(0, 1fr); }
+  .mcpserver-endpoint { align-items: start; flex-direction: column; }
 }
 </style>
