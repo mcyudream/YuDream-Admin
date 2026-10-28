@@ -175,7 +175,7 @@ yudream.platform.capabilities:
   mcp:
     enabled: true
   mcp-server:
-    enabled: ${PLATFORM_MCP_SERVER_ENABLED:true}
+    enabled: true
   dataviz:
     enabled: true
   milky:

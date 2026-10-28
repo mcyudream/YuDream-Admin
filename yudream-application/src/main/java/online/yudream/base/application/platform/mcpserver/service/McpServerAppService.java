@@ -137,7 +137,8 @@ public class McpServerAppService {
                 "modules", modules);
     }
 
-    private void ensureEnabled() {
+    /** 协议入口可用性校验，握手、探活与通知也必须经过应用闸门。 */
+    public void ensureEnabled() {
         capabilityAppService.ensureEnabled(CAPABILITY, "MCP 服务器");
     }
 }
