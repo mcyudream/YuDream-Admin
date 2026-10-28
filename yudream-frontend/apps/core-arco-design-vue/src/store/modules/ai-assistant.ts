@@ -15,6 +15,7 @@ import { aiRunErrorContent } from '@/utils/ai-run-error'
 import { upsertAiRunInput } from '@/utils/ai-run-input'
 import { aiRunPhaseLabel, projectAiRunActivities, projectAiRunActivity, projectAiRunTool } from '@/utils/ai-run-projection'
 import { canReconnectAiRun, isActiveAiRun, isNewAiCursor } from '@/utils/ai-run-stream'
+import { matchesAiSessionScope } from '@/utils/ai-session-scope'
 import { emptyToolSelection, parseToolSelection, skillItems, toggleSkill, toolPayload } from '@/utils/ai-tool-selection'
 import { hintForMessage } from '@/utils/api-error'
 
@@ -509,11 +510,20 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     if (isEmbeddedAiSession(selected) && scope.agentCode !== selected?.agentCode) {
       id = ''
     }
+    if (selected && !matchesAiSessionScope(selected, scope)) {
+      id = ''
+    }
     const model = request.model || models.value.find(item => item.id === modelId.value)
     sending.value = true
     try {
       if (!id) {
-        id = (await createSession()) || ''
+        id = (await createSession({
+          scopeType: scope.scopeType || 'GENERAL',
+          agentCode: scope.agentCode,
+          spaceSlug: scope.spaceSlug,
+          providerCode: model?.providerCode,
+          modelCode: model?.modelCode,
+        })) || ''
       }
       if (started !== epoch) {
         return
