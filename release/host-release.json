@@ -1,8 +1,8 @@
 {
   "baseline": {
-    "version": "1.10.1",
-    "tag": "v1.10.1",
-    "commit": "a67b54deeecd4e07ea88a95282db2fe52e19932f"
+    "version": "1.11.0",
+    "tag": "v1.11.0",
+    "commit": "eae8f6e0785921223640024105ac492505f63147"
   },
   "releases": [
     {
@@ -106,6 +106,12 @@
       "tag": "v1.11.0",
       "base": "v1.10.1",
       "notesFile": "release/notes/1.11.0.md"
+    },
+    {
+      "version": "1.12.0",
+      "tag": "v1.12.0",
+      "base": "v1.11.0",
+      "notesFile": "release/notes/1.12.0.md"
     }
   ]
 }
