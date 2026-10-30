@@ -5,7 +5,8 @@
   "commits": [
     "d8fe3d96289d7e2554447b57dfe092906bce03d8",
     "71bc1c07ba101e2948600465b6d2b30e3f298f4d",
-    "f2623b07042abaa1b18c003bd9b4197a11ae25d2"
+    "f2623b07042abaa1b18c003bd9b4197a11ae25d2",
+    "1ae00197dd088103031fcbdd3caa5ef6e1e99b98"
   ],
   "notes": [
     "优化 MCP 服务器接入引导、连接配置与工具目录展示，补充工具读写提示和空目录引导。",
